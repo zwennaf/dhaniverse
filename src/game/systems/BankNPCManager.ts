@@ -44,11 +44,20 @@ export class BankNPCManager {
       this.interactionKey = scene.input.keyboard.addKey('E');
     }
     
-    // Create banker at fixed center position in world coordinates
-    // This is where the banker will appear in the bank
-    const bankerX = 400; // Center of bank.gif
-    const bankerY = 300; // Center of bank.gif
+    // Position the banker in the center of the bank interior
+    // Get the bounds of the bank interior using the camera bounds
+    const bankBounds = {
+      x: this.scene.cameras.main.worldView.x,
+      y: this.scene.cameras.main.worldView.y,
+      width: this.scene.cameras.main.worldView.width,
+      height: this.scene.cameras.main.worldView.height
+    };
     
+    // Calculate the center position of the bank interior
+    const bankerX = bankBounds.x + bankBounds.width / 2;
+    const bankerY = bankBounds.y + bankBounds.height / 2;
+    
+    // Create banker NPC
     this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
     this.banker.setScale(5);
     this.banker.anims.play('idle-down');
@@ -56,7 +65,7 @@ export class BankNPCManager {
     
     // Critical fix: Set correct depth and scroll factor
     this.banker.setDepth(100); // Higher depth to ensure visibility
-    this.banker.setScrollFactor(1); // Fixed in world, not to camera
+    this.banker.setScrollFactor(1); // Fixed to camera view (change to 0)
     
     // Add banker name text
     const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Assistant", {
@@ -66,7 +75,7 @@ export class BankNPCManager {
       align: 'center',
       backgroundColor: '#00000080',
       padding: { x: 4, y: 2 }
-    }).setOrigin(0.5).setScrollFactor(1).setDepth(100);
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
     
     // Add interaction text (initially hidden)
     this.interactionText = scene.add.text(this.banker.x, this.banker.y - 80, "Press E to interact", {
@@ -76,7 +85,7 @@ export class BankNPCManager {
       align: 'center',
       backgroundColor: '#00000080',
       padding: { x: 8, y: 4 }
-    }).setOrigin(0.5).setAlpha(0).setScrollFactor(1).setDepth(100);
+    }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
     
     // Add to game container
     const gameContainer = scene.getGameContainer();
@@ -232,12 +241,12 @@ export class BankNPCManager {
     // Mark dialog as active
     this.activeDialog = true;
     
-    // Create a dialog box - using camera coordinates for UI elements
+    // Create a dialog box - using camera coordinates for UI elements with improved padding
     this.dialogBox = this.scene.add.rectangle(
       this.scene.cameras.main.centerX, 
       this.scene.cameras.main.height - 180,
       this.scene.cameras.main.width * 0.8,
-      220,
+      240, // Increased height for better padding
       0x000000,
       0.9
     );
@@ -252,17 +261,18 @@ export class BankNPCManager {
       dialogMessage = `Welcome back to Royal Bank of Dhaniverse!\nYour current balance is ₹${this.bankAccount.balance}.\nHow can I help you today?`;
     }
     
-    // Add dialog text with word wrap
+    // Add dialog text with word wrap and better positioning
     this.dialogText = this.scene.add.text(
       this.dialogBox.x, 
-      this.dialogBox.y - 60, 
+      this.dialogBox.y - 80, // Positioned higher for better spacing
       dialogMessage,
       {
         fontFamily: 'Arial',
         fontSize: '18px',
         color: '#ffffff',
         align: 'center',
-        wordWrap: { width: this.dialogBox.width - 60 }
+        wordWrap: { width: this.dialogBox.width - 80 }, // Increased padding
+        lineSpacing: 8 // Add line spacing for better readability
       }
     ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
     
@@ -285,7 +295,7 @@ export class BankNPCManager {
     );
     this.speechBubble.setScale(2.5);
     this.speechBubble.setDepth(2002);
-    this.speechBubble.setScrollFactor(1); // Match the banker's scroll factor
+    this.speechBubble.setScrollFactor(0); // Match the banker's scroll factor
     
     // Play the opening animation
     this.speechBubble.play('speech-bubble-open');
@@ -295,10 +305,10 @@ export class BankNPCManager {
   }
   
   private setupCreateAccountDialog(): void {
-    // Create account button
+    // Create account button - positioned higher
     const createAccountBg = this.scene.add.rectangle(
       this.dialogBox!.x,
-      this.dialogBox!.y + 30,
+      this.dialogBox!.y - 10, // Moved up from +30 to -10
       200,
       40,
       0x4CAF50,
@@ -333,10 +343,10 @@ export class BankNPCManager {
       this.createBankAccount();
     });
     
-    // Cancel button
+    // Cancel button - positioned higher
     const cancelBg = this.scene.add.rectangle(
       this.dialogBox!.x,
-      this.dialogBox!.y + 80,
+      this.dialogBox!.y + 40, // Moved up from +80 to +40
       200,
       40,
       0xf44336,
@@ -373,13 +383,13 @@ export class BankNPCManager {
   }
   
   private setupBankingDialog(): void {
-    // Create amount selector
+    // Create amount selector with higher positioning
     this.setupAmountSelector();
     
-    // Deposit button
+    // Deposit button - positioned higher
     const depositBg = this.scene.add.rectangle(
       this.dialogBox!.x - 120,
-      this.dialogBox!.y + 80,
+      this.dialogBox!.y + 40, // Moved up from +80 to +40
       200,
       40,
       0x4CAF50,
@@ -414,10 +424,10 @@ export class BankNPCManager {
       this.depositMoney();
     });
     
-    // Withdraw button
+    // Withdraw button - positioned higher
     const withdrawBg = this.scene.add.rectangle(
       this.dialogBox!.x + 120,
-      this.dialogBox!.y + 80,
+      this.dialogBox!.y + 40, // Moved up from +80 to +40
       200,
       40,
       0x2196F3,
@@ -452,10 +462,10 @@ export class BankNPCManager {
       this.withdrawMoney();
     });
     
-    // Close button
+    // Close button - positioned higher
     const closeBg = this.scene.add.rectangle(
       this.dialogBox!.x,
-      this.dialogBox!.y + 130,
+      this.dialogBox!.y + 90, // Moved up from +130 to +90
       200,
       40,
       0xf44336,
@@ -494,10 +504,10 @@ export class BankNPCManager {
   private setupAmountSelector(): void {
     this.amountSelector = this.scene.add.container(0, 0);
     
-    // Amount background
+    // Amount background - moved higher
     const amountBg = this.scene.add.rectangle(
       this.dialogBox!.x,
-      this.dialogBox!.y + 20,
+      this.dialogBox!.y - 20, // Moved up from +20 to -20
       300,
       40,
       0x333333,
