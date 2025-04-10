@@ -4,7 +4,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #3a1c71, #d76d77, #ffaf7b);
+  background: url('public/UI/joingingscreen.jpg') no-repeat center center / cover ;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -13,11 +13,11 @@
 }
 
 .join-container {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.6);
   padding: 2rem;
   border-radius: 10px;
   text-align: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(255 ,255 ,255 , 0.2);
   animation: fadeIn 0.5s ease-out;
 }
 
