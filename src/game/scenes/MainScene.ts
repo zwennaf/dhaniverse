@@ -1,11 +1,11 @@
 import { Scene, Types, GameObjects } from 'phaser';
-import { Player } from '../entities/player.ts';
+import { Player } from '../entities/Player.ts';
 import { CollisionManager } from '../systems/CollisionManager.ts';
 import { MapManager } from '../systems/MapManager.ts';
 import { WebSocketManager } from '../systems/WebSocketManager.ts';
 import { NPCManager } from '../systems/NPCManager.ts';
 import { BuildingManager } from '../systems/BuildingManager.ts';
-import { Constants } from '../utils/Constants.ts';
+import { ExtendedCamera } from '../systems/MapManager.ts';
 
 // Scene interface for type safety
 export interface MainGameScene extends Scene {
@@ -38,15 +38,21 @@ export class MainScene extends Scene implements MainGameScene {
     this.createProgressBar();
     
     // Load assets with paths relative to the public directory
-    this.load.image('map', 'finalmap.png');
-    this.load.image('interior', 'test.png');
+    this.load.image('map', '/maps/finalmap.png');
+    this.load.image('interior', '/maps/bank.gif');
     
-    this.load.spritesheet('character', 'Basic Charakter Spritesheet.png', { 
-      frameWidth: 48,
-      frameHeight: 48
+    this.load.spritesheet('character', '/characters/orange_browncap_guy.png', { 
+      frameWidth: 64,
+      frameHeight: 64
     });
     
-    this.load.json('collisionData', 'collisions.json');
+    this.load.json('collisionData', '/collisions/collisions.json');
+    
+    // Load the speech bubble sprite sheet with proper dimensions
+    this.load.spritesheet('speech_bubble_grey', '/UI/speech_bubble_grey.png', { 
+      frameWidth: 64, 
+      frameHeight: 64 
+    });
     
     // Track loading progress
     this.load.on('progress', (value: number) => {
@@ -64,155 +70,3 @@ export class MainScene extends Scene implements MainGameScene {
       }
     });
   }
-
-  create(): void {
-    // Create game container - all game elements should be added to this container
-    this.gameContainer = this.add.container(0, 0);
-
-    // Create map first so it's at the bottom of the rendering order
-    this.mapManager = new MapManager(this);
-    
-    // Setup collisions after map is created
-    this.collisionManager = new CollisionManager(this);
-    
-    // Initialize keyboard controls with null checks
-    if (this.input.keyboard) {
-      this.cursors = this.input.keyboard.createCursorKeys();
-      this.wasd = {
-        up: this.input.keyboard.addKey('W'),
-        down: this.input.keyboard.addKey('S'),
-        left: this.input.keyboard.addKey('A'),
-        right: this.input.keyboard.addKey('D')
-      };
-      
-      // Additional interaction keys
-      this.input.keyboard.addKey('E');
-      this.input.keyboard.addKey('ESC');
-    }
-
-    // Create player after map and collisions are set up
-    const username = this.registry.get('username') || 'Player';
-    // Set fixed starting position for better gameplay experience 
-    this.player = new Player(this, 800, 800, this.cursors, this.wasd);
-    this.gameContainer.add(this.player.getSprite());
-    this.gameContainer.add(this.player.getNameText());
-
-    // Add player-dependent managers
-    this.buildingManager = new BuildingManager(this);
-    this.npcManager = new NPCManager(this);
-    this.webSocketManager = new WebSocketManager(this, this.player);
-    
-    // Connect to WebSocket server for multiplayer
-    this.webSocketManager.connect(username);
-    
-    // Setup camera to follow player
-    this.cameras.main.startFollow(this.player.getSprite(), true, 0.09, 0.09);
-    this.cameras.main.setZoom(0.7);
-    
-    // Set zoom constraints for better performance and visual clarity
-    this.cameras.main.setZoom(0.7);
-    
-    // Add zoom controls with smoother experience
-    this.addZoomControls();
-    
-    // Notify game is ready
-    this.game.events.emit('ready');
-  }
-
-  override update(time: number, delta: number): void {
-    // Delta-based time stepping for consistent movement regardless of framerate
-    const deltaFactor = delta / (1000 / 60); // Normalize to 60fps
-
-    // Update player first
-    this.player.update(deltaFactor);
-    
-    // Then update all managers
-    this.collisionManager.update();
-    this.mapManager.update();
-    this.webSocketManager.update();
-    this.npcManager.update();
-    this.buildingManager.update();
-  }
-
-  // Create a loading progress bar
-  private createProgressBar(): void {
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
-    
-    // Draw progress bar background
-    this.progressBar = this.add.graphics();
-    this.progressBar.fillStyle(0x222222, 0.8);
-    this.progressBar.fillRect(width / 4, height / 2 - 30, width / 2, 60);
-    
-    // Add loading text
-    this.progressText = this.add.text(width / 2, height / 2 - 50, 'Loading...', {
-      fontFamily: 'Arial',
-      fontSize: '32px',
-      color: '#ffffff'
-    }).setOrigin(0.5);
-    
-    // Initial progress update
-    this.updateProgressBar();
-  }
-
-  // Update the loading progress bar
-  private updateProgressBar(): void {
-    if (this.progressBar) {
-      // Clear the current progress
-      this.progressBar.clear();
-      
-      // Draw background
-      this.progressBar.fillStyle(0x222222, 0.8);
-      this.progressBar.fillRect(this.cameras.main.width / 4, this.cameras.main.height / 2 - 30, this.cameras.main.width / 2, 60);
-      
-      // Draw progress
-      this.progressBar.fillStyle(0x00aa00, 1);
-      this.progressBar.fillRect(
-        this.cameras.main.width / 4 + 10, 
-        this.cameras.main.height / 2 - 20, 
-        (this.cameras.main.width / 2 - 20) * this.loadingProgress, 
-        40
-      );
-      
-      // Update text if needed
-      if (this.progressText) {
-        this.progressText.setText(`Loading... ${Math.floor(this.loadingProgress * 100)}%`);
-      }
-    }
-  }
-
-  // Add smooth zoom controls
-  private addZoomControls(): void {
-    this.input.on('wheel', (pointer: any, gameObjects: any, deltaX: number, deltaY: number) => {
-      // Get current zoom level
-      const currentZoom = this.cameras.main.zoom;
-      
-      // Calculate new zoom level based on wheel direction
-      // Make zoom smoother and limit range
-      const zoomChange = 0.05;
-      let newZoom = currentZoom;
-      
-      if (deltaY > 0) {
-        newZoom = Math.max(0.25, currentZoom - zoomChange);
-      } else {
-        newZoom = Math.min(2, currentZoom + zoomChange);
-      }
-      
-      // Apply smooth zoom transition
-      this.cameras.main.zoomTo(newZoom, 150);
-    });
-  }
-
-  // Public accessors required by the MainGameScene interface
-  getGameContainer(): GameObjects.Container {
-    return this.gameContainer;
-  }
-
-  getPlayer(): Player {
-    return this.player;
-  }
-
-  getCursors(): Types.Input.Keyboard.CursorKeys {
-    return this.cursors;
-  }
-}
