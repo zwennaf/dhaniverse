@@ -248,10 +248,8 @@ export class BankNPCManager {
     
     if (!this.bankAccount.created) {
       dialogMessage = "Welcome to the Royal Bank of Dhaniverse!\nWould you like to open an account with us?";
-      this.setupCreateAccountDialog();
     } else {
       dialogMessage = `Welcome back to Royal Bank of Dhaniverse!\nYour current balance is ₹${this.bankAccount.balance}.\nHow can I help you today?`;
-      this.setupBankingDialog();
     }
     
     // Add dialog text with word wrap
@@ -268,11 +266,18 @@ export class BankNPCManager {
       }
     ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
     
-    // Create a container for dialog elements
+    // Create a container for dialog elements BEFORE using it
     this.dialogContainer = this.scene.add.container(0, 0);
     this.dialogContainer.add([this.dialogBox, this.dialogText]);
     
-    // Create speech bubble animation - using world coordinates for the speech bubble
+    // Now call setup methods AFTER creating the dialog container
+    if (!this.bankAccount.created) {
+      this.setupCreateAccountDialog();
+    } else {
+      this.setupBankingDialog();
+    }
+    
+    // Create speech bubble animation
     this.speechBubble = this.scene.add.sprite(
       this.banker.x,
       this.banker.y - 100,
