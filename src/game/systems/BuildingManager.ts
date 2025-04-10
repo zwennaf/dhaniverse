@@ -1,123 +1,218 @@
-import { Scene, GameObjects } from 'phaser';
+import { GameObjects, Input } from 'phaser';
+import { Constants } from '../utils/Constants.ts';
 import { MainGameScene } from '../scenes/MainScene.ts';
 
-interface MapCache {
-  width: number;
-  height: number;
-}
-
-export class MapManager {
+export class BuildingManager {
   private scene: MainGameScene;
-  private map: GameObjects.Image;
-  private mapCache: MapCache;
-  private isInBuilding: boolean = false;
-  private lastOutdoorPosition: { x: number, y: number } | null = null;
-  private textureLoadPromises: Map<string, Promise<void>> = new Map();
+  private buildingEntrance: { x: number, y: number };
+  private buildingInteractionText: GameObjects.Text;
+  private interactionKey: Input.Keyboard.Key | null = null;
+  private escKey: Input.Keyboard.Key | null = null;
+  private isNearBuilding: boolean = false;
+  private transitionInProgress: boolean = false;
 
   constructor(scene: MainGameScene) {
     this.scene = scene;
+    this.buildingEntrance = { x: 782, y: 5382 };
     
-    // Create map image with better origin setting for performance
-    this.map = scene.add.image(0, 0, 'map');
-    this.map.setOrigin(0, 0);
+    // Initialize buildingInteractionText with improved visual style
+    this.buildingInteractionText = scene.add.text(
+      this.buildingEntrance.x, 
+      this.buildingEntrance.y - 50, 
+      "Press E to enter", 
+      {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ffffff',
+        align: 'center',
+        backgroundColor: '#00000080',
+        padding: { x: 8, y: 4 },
+        shadow: {
+          offsetX: 1,
+          offsetY: 1,
+          color: '#000000',
+          blur: 3,
+          fill: true
+        }
+      }
+    ).setOrigin(0.5).setAlpha(0);
     
-    // Store map dimensions in cache for quick access
-    this.mapCache = {
-      width: this.map.width,
-      height: this.map.height
-    };
-    
-    // Add to game container
-    const gameContainer = scene.getGameContainer();
-    gameContainer.add(this.map);
-    
-    // Set world bounds
-    scene.physics.world.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
-    
-    // Preload interior textures to avoid stutter when entering buildings
-    this.preloadTextures();
-  }
-
-  private preloadTextures(): void {
-    // Make sure the interior texture is ready before needed
-    if (!this.scene.textures.exists('interior')) {
-      const loadPromise = new Promise<void>((resolve) => {
-        this.scene.load.once('complete', () => {
-          resolve();
-        });
-        this.scene.load.image('interior', 'test.png');
-        this.scene.load.start();
-      });
-      this.textureLoadPromises.set('interior', loadPromise);
+    // Setup keys for interaction with null checks
+    if (scene.input.keyboard) {
+      this.interactionKey = scene.input.keyboard.addKey('E');
+      this.escKey = scene.input.keyboard.addKey('ESC');
     }
+    
+    this.setupBuilding();
   }
 
   update(): void {
-    // Update can be used later for map animations or effects
+    // Skip update if transition is in progress
+    if (this.transitionInProgress) return;
+    
+    this.handleBuildingInteraction();
   }
 
-  enterBuilding(playerX: number, playerY: number): { x: number, y: number } {
-    // Store current position
-    this.lastOutdoorPosition = { x: playerX, y: playerY };
-    
-    // Set building state
-    this.isInBuilding = true;
-    
-    // Switch to interior map with improved depth sorting
-    this.map.setTexture('interior');
-    this.map.setDepth(-10); // Ensure map is behind all other elements
-    
-    // Get the center position for player placement
-    const centerX = this.scene.cameras.main.width / 2;
-    const centerY = this.scene.cameras.main.height / 2;
-    
-    // Adjust world and camera bounds based on interior texture
-    const interiorImage = this.scene.textures.get('interior');
-    const width = interiorImage.source[0].width;
-    const height = interiorImage.source[0].height;
-    
-    this.scene.physics.world.setBounds(0, 0, width, height);
-    this.scene.cameras.main.setBounds(0, 0, width, height);
-    
-    // Apply smooth camera transition
-    this.scene.cameras.main.pan(centerX, centerY, 500, 'Power2');
-    
-    return { x: centerX, y: centerY };
+  private setupBuilding(): void {
+    const gameContainer = this.scene.getGameContainer();
+    if (gameContainer) {
+      gameContainer.add(this.buildingInteractionText);
+    }
   }
 
-  exitBuilding(): { x: number, y: number } | null {
-    if (!this.lastOutdoorPosition) return null;
+  private handleBuildingInteraction(): void {
+    const player = this.scene.getPlayer();
+    const mapManager = this.scene.mapManager;
+    if (!player || !mapManager) return;
     
-    // Reset building state
-    this.isInBuilding = false;
+    // Get player position
+    const playerPos = player.getPosition();
     
-    // Switch back to outdoor map
-    this.map.setTexture('map');
-    this.map.setDepth(-10); // Maintain consistent depth
+    // If player is in building, check for ESC to exit
+    if (mapManager.isPlayerInBuilding() && this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
+      this.exitBuilding();
+      return;
+    }
     
-    // Reset physics and camera bounds
-    this.scene.physics.world.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
-    this.scene.cameras.main.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
+    // Calculate distance between player and building entrance
+    const dx = playerPos.x - this.buildingEntrance.x;
+    const dy = playerPos.y - this.buildingEntrance.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Apply smooth camera transition to outdoor position
-    this.scene.cameras.main.pan(
-      this.lastOutdoorPosition.x,
-      this.lastOutdoorPosition.y, 
-      500, 'Power2'
-    );
+    // Check if player is within interaction distance
+    const wasNearBuilding = this.isNearBuilding;
+    this.isNearBuilding = distance <= Constants.BUILDING_INTERACTION_DISTANCE;
     
-    return this.lastOutdoorPosition;
+    // Only react to changes in proximity or handle interaction when near building
+    if (this.isNearBuilding !== wasNearBuilding) {
+      if (this.isNearBuilding && !mapManager.isPlayerInBuilding()) {
+        // Player just entered interaction zone - show text with fade in
+        this.scene.tweens.add({
+          targets: this.buildingInteractionText,
+          alpha: 1,
+          duration: 200,
+          ease: 'Power1'
+        });
+      } else if (!mapManager.isPlayerInBuilding()) {
+        // Player just left interaction zone - hide text with fade out
+        this.scene.tweens.add({
+          targets: this.buildingInteractionText,
+          alpha: 0,
+          duration: 200,
+          ease: 'Power1'
+        });
+      }
+    }
+    
+    // Check for E key press to enter building when near
+    if (this.isNearBuilding && 
+        !mapManager.isPlayerInBuilding() && 
+        this.interactionKey && 
+        Phaser.Input.Keyboard.JustDown(this.interactionKey)) {
+      this.enterBuilding();
+    }
+    
+    // Update interaction text position to follow entrance point
+    if (this.buildingInteractionText) {
+      this.buildingInteractionText.x = this.buildingEntrance.x;
+      this.buildingInteractionText.y = this.buildingEntrance.y - 50;
+    }
   }
 
-  getMapWidth(): number {
-    return this.mapCache.width;
+  private enterBuilding(): void {
+    const player = this.scene.getPlayer();
+    const mapManager = this.scene.mapManager;
+    if (!player || !mapManager || this.transitionInProgress) return;
+    
+    // Set transition in progress to prevent multiple transitions
+    this.transitionInProgress = true;
+    
+    // Hide interaction text immediately
+    this.buildingInteractionText.setAlpha(0);
+    
+    // Get current player position
+    const playerPos = player.getPosition();
+    
+    // Instantly enter building through map manager
+    const newPosition = mapManager.enterBuilding(playerPos.x, playerPos.y);
+    
+    // Instantly move player to new position
+    if (newPosition) {
+      const sprite = player.getSprite();
+      sprite.x = newPosition.x;
+      sprite.y = newPosition.y;
+      
+      // Stop following and center camera immediately
+      this.scene.cameras.main.stopFollow();
+      this.scene.cameras.main.centerOn(newPosition.x, newPosition.y);
+      
+      // Resume camera follow
+      this.scene.cameras.main.startFollow(sprite, true, 0.9, 0.9);
+      
+      // Clear transition flag after a short delay
+      this.scene.time.delayedCall(50, () => {
+        this.transitionInProgress = false;
+      });
+    } else {
+      this.transitionInProgress = false;
+    }
+    
+    // Play sound effect if available
+    try {
+      if (this.scene.sound && this.scene.cache.audio.exists('door-open')) {
+        const doorSound = this.scene.sound.add('door-open', { volume: 0.5 });
+        doorSound.play();
+      }
+    } catch (error) {
+      console.warn('Could not play door-open sound:', error);
+    }
   }
 
-  getMapHeight(): number {
-    return this.mapCache.height;
+  private exitBuilding(): void {
+    const player = this.scene.getPlayer();
+    const mapManager = this.scene.mapManager;
+    if (!player || !mapManager || this.transitionInProgress) return;
+    
+    // Set transition in progress
+    this.transitionInProgress = true;
+    
+    // Exit building through map manager
+    const outdoorPosition = mapManager.exitBuilding();
+    
+    // Instantly move player to last outdoor position
+    if (outdoorPosition) {
+      const sprite = player.getSprite();
+      sprite.x = outdoorPosition.x;
+      sprite.y = outdoorPosition.y;
+      
+      // Stop following and center camera immediately
+      this.scene.cameras.main.stopFollow();
+      this.scene.cameras.main.centerOn(outdoorPosition.x, outdoorPosition.y);
+      
+      // Resume camera follow with slight smoothness
+      this.scene.cameras.main.startFollow(sprite, true, 0.9, 0.9);
+      
+      // Clear transition flag after a short delay
+      this.scene.time.delayedCall(50, () => {
+        this.transitionInProgress = false;
+      });
+    } else {
+      this.transitionInProgress = false;
+    }
+    
+    // Play sound effect if available
+    try {
+      if (this.scene.sound && this.scene.cache.audio.exists('door-close')) {
+        const doorSound = this.scene.sound.add('door-close', { volume: 0.5 });
+        doorSound.play();
+      }
+    } catch (error) {
+      console.warn('Could not play door-close sound:', error);
+    }
   }
-
-  isPlayerInBuilding(): boolean {
-    return this.isInBuilding;
+  
+  // Public getter for building entrance position
+  getBuildingEntrancePosition(): { x: number, y: number } {
+    return this.buildingEntrance;
   }
 }
