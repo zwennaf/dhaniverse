@@ -97,7 +97,6 @@ export class MainScene extends Scene implements MainGameScene {
       this.input.keyboard.addKey('ESC');
     }
 
-    
     // Create player after map and collisions are set up
     const username = this.registry.get('username') || 'Player';
     // Set fixed starting position for better gameplay experience 
