@@ -13,7 +13,7 @@ export class BuildingManager {
 
   constructor(scene: MainGameScene) {
     this.scene = scene;
-    this.buildingEntrance = { x: 782, y: 5382 };
+    this.buildingEntrance = { x: 9383, y: 6087 };
     
     // Initialize buildingInteractionText with improved visual style
     this.buildingInteractionText = scene.add.text(

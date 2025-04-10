@@ -46,12 +46,12 @@ export class Player {
     }
     
     // Create username text
-    this.nameText = scene.add.text(x, y - 50, this.username, {
+    this.nameText = scene.add.text(x, y + 350, this.username, {
       fontFamily: 'Arial',
-      fontSize: '16px',
+      fontSize: '20px',
       color: '#ffffff',
       align: 'center',
-      backgroundColor: '#00000080',
+      backgroundColor: '#00000020',
       padding: { x: 4, y: 2 }
     }).setOrigin(0.5);
   }
