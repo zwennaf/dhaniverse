@@ -1,9 +1,17 @@
-import { Scene, GameObjects } from 'phaser';
+import { Scene, GameObjects, Cameras } from 'phaser';
 import { MainGameScene } from '../scenes/MainScene.ts';
 
 interface MapCache {
   width: number;
   height: number;
+}
+
+// Extended camera interface to support zoom constraint properties
+export interface ExtendedCamera extends Cameras.Scene2D.Camera {
+  _origMinZoom?: number;
+  _origMaxZoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
 }
 
 export class MapManager {
@@ -43,70 +51,179 @@ export class MapManager {
     if (!this.scene.textures.exists('interior')) {
       const loadPromise = new Promise<void>((resolve) => {
         this.scene.load.once('complete', () => {
+          console.log('Interior texture loaded successfully');
           resolve();
         });
         this.scene.load.image('interior', 'test.png');
+        
+        // Preload door sound effects
+        if (!this.scene.cache.audio.exists('door-open')) {
+          this.scene.load.audio('door-open', 'assets/sounds/door-open.mp3');
+        }
+        if (!this.scene.cache.audio.exists('door-close')) {
+          this.scene.load.audio('door-close', 'assets/sounds/door-close.mp3');
+        }
+        
         this.scene.load.start();
       });
       this.textureLoadPromises.set('interior', loadPromise);
     }
   }
 
-  update(): void {
-    // Update can be used later for map animations or effects
-  }
-
   enterBuilding(playerX: number, playerY: number): { x: number, y: number } {
-    // Store current position
-    this.lastOutdoorPosition = { x: playerX, y: playerY };
-    
-    // Set building state
-    this.isInBuilding = true;
-    
-    // Switch to interior map with improved depth sorting
-    this.map.setTexture('interior');
-    this.map.setDepth(-10); // Ensure map is behind all other elements
-    
-    // Get the center position for player placement
-    const centerX = this.scene.cameras.main.width / 2;
-    const centerY = this.scene.cameras.main.height / 2;
-    
-    // Adjust world and camera bounds based on interior texture
-    const interiorImage = this.scene.textures.get('interior');
-    const width = interiorImage.source[0].width;
-    const height = interiorImage.source[0].height;
-    
-    this.scene.physics.world.setBounds(0, 0, width, height);
-    this.scene.cameras.main.setBounds(0, 0, width, height);
-    
-    // Apply smooth camera transition
-    this.scene.cameras.main.pan(centerX, centerY, 500, 'Power2');
-    
-    return { x: centerX, y: centerY };
+    try {
+      // Store current position
+      this.lastOutdoorPosition = { x: playerX, y: playerY };
+      
+      // Set building state - do this first to prevent any rendering issues
+      this.isInBuilding = true;
+      
+      // Switch to interior map - immediate texture swap
+      this.map.setTexture('interior');
+      this.map.setDepth(-10); // Ensure map is behind all other elements
+      
+      // Reset origin to 0.5 for proper centering
+      this.map.setOrigin(0.5, 0.5);
+      
+      // Apply a larger scale to make the map bigger
+      const scale = 2.3; // Scale factor for larger map
+      this.map.setScale(scale);
+      
+      // Get the device dimensions
+      const deviceWidth = this.scene.scale.width;
+      const deviceHeight = this.scene.scale.height;
+      
+      // Get interior dimensions
+      let interiorWidth = 800;  // Default fallback width
+      let interiorHeight = 600; // Default fallback height
+      
+      if (this.scene.textures.exists('interior')) {
+        const interiorImage = this.scene.textures.get('interior');
+        if (interiorImage && interiorImage.source && interiorImage.source[0]) {
+          interiorWidth = interiorImage.source[0].width;
+          interiorHeight = interiorImage.source[0].height;
+        }
+      }
+      
+      // Apply scale factor to calculate the actual displayed dimensions
+      const scaledWidth = interiorWidth * scale;
+      const scaledHeight = interiorHeight * scale;
+      
+      // Position the interior map precisely at the center
+      const centerX = Math.floor(deviceWidth / 2);
+      const centerY = Math.floor(deviceHeight / 2);
+      this.map.setPosition(centerX, centerY);
+      
+      // Set camera and physics bounds to match the scaled interior size and position
+      const boundsX = centerX - (scaledWidth / 2);
+      const boundsY = centerY - (scaledHeight / 2);
+      
+      this.scene.physics.world.setBounds(
+        boundsX,
+        boundsY,
+        scaledWidth,
+        scaledHeight
+      );
+      
+      this.scene.cameras.main.setBounds(
+        boundsX,
+        boundsY,
+        scaledWidth,
+        scaledHeight
+      );
+      
+      // Simple, fixed maxZoom for interior areas
+      const maxZoom = 1.3; // Adjust this value to change how zoomed in you are inside buildings
+      
+      // Get camera and set zoom
+      const camera = this.scene.cameras.main as ExtendedCamera;
+      camera.setZoom(maxZoom);
+      
+      // Store camera settings for restoration later
+      camera._origMinZoom = camera.minZoom || 0.25;
+      camera._origMaxZoom = camera.maxZoom || 2.0;
+      
+      // Set both minZoom and maxZoom to the same value to lock zoom
+      camera.minZoom = maxZoom;
+      camera.maxZoom = maxZoom;
+      
+      return { x: centerX, y: centerY };
+    } catch (error) {
+      console.error('Error entering building:', error);
+      this.isInBuilding = false;
+      return { x: playerX, y: playerY };
+    }
   }
 
   exitBuilding(): { x: number, y: number } | null {
     if (!this.lastOutdoorPosition) return null;
     
-    // Reset building state
+    // Reset building state immediately
     this.isInBuilding = false;
     
-    // Switch back to outdoor map
+    // Switch back to outdoor map - immediate texture swap
     this.map.setTexture('map');
-    this.map.setDepth(-10); // Maintain consistent depth
+    this.map.setDepth(-10);
     
-    // Reset physics and camera bounds
+    // Reset origin to 0,0 for outdoor map
+    this.map.setOrigin(0, 0);
+    
+    // Reset position to origin
+    this.map.setPosition(0, 0);
+    
+    // Reset scale to 1
+    this.map.setScale(1);
+    
+    // Restore original min/max zoom constraints if they were saved
+    const camera = this.scene.cameras.main as ExtendedCamera;
+    
+    if (camera._origMinZoom !== undefined && camera._origMaxZoom !== undefined) {
+      camera.minZoom = camera._origMinZoom;
+      camera.maxZoom = camera._origMaxZoom;
+      
+      // Reset zoom to a comfortable default value
+      camera.setZoom(0.7);
+    }
+    
+    // Reset physics world bounds to outdoor map dimensions
     this.scene.physics.world.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
-    this.scene.cameras.main.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
     
-    // Apply smooth camera transition to outdoor position
-    this.scene.cameras.main.pan(
-      this.lastOutdoorPosition.x,
-      this.lastOutdoorPosition.y, 
-      500, 'Power2'
-    );
+    // Use the main scene's setupCameraBounds method for consistent camera bounds handling
+    // This is cleaner than duplicating the logic here
+    if (this.scene instanceof Scene) {
+      // Call the setupCameraBounds method if it exists on the scene
+      const sceneWithBounds = this.scene as { setupCameraBounds?: () => void };
+      if (typeof sceneWithBounds.setupCameraBounds === 'function') {
+        sceneWithBounds.setupCameraBounds();
+      } else {
+        // Fallback if the method doesn't exist
+        this.setDefaultCameraBounds();
+      }
+    } else {
+      // Fallback if scene is not a Scene instance
+      this.setDefaultCameraBounds();
+    }
     
     return this.lastOutdoorPosition;
+  }
+  
+  // Fallback method for setting camera bounds
+  private setDefaultCameraBounds(): void {
+    const camera = this.scene.cameras.main as ExtendedCamera;
+    const zoom = camera.zoom || 0.7;
+    
+    // Calculate the visible area based on zoom level
+    const visibleWidth = camera.width / zoom;
+    const visibleHeight = camera.height / zoom;
+    
+    // Calculate the bounds with half the visible area as padding
+    const boundsX = Math.min(visibleWidth / 2, this.mapCache.width / 4);
+    const boundsY = Math.min(visibleHeight / 2, this.mapCache.height / 4);
+    const boundsWidth = Math.max(0, this.mapCache.width - visibleWidth);
+    const boundsHeight = Math.max(0, this.mapCache.height - visibleHeight);
+    
+    // Set camera bounds
+    camera.setBounds(boundsX, boundsY, boundsWidth, boundsHeight);
   }
 
   getMapWidth(): number {
