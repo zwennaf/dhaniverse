@@ -1,11 +1,11 @@
 import { Scene, Types, GameObjects } from 'phaser';
-import { Player } from '../entities/player.ts';
+import { Player } from '../entities/Player.ts';
 import { CollisionManager } from '../systems/CollisionManager.ts';
 import { MapManager } from '../systems/MapManager.ts';
 import { WebSocketManager } from '../systems/WebSocketManager.ts';
 import { NPCManager } from '../systems/NPCManager.ts';
 import { BuildingManager } from '../systems/BuildingManager.ts';
-import { Constants } from '../utils/Constants.ts';
+import { ExtendedCamera } from '../systems/MapManager.ts';
 
 // Scene interface for type safety
 export interface MainGameScene extends Scene {
@@ -38,15 +38,21 @@ export class MainScene extends Scene implements MainGameScene {
     this.createProgressBar();
     
     // Load assets with paths relative to the public directory
-    this.load.image('map', 'finalmap.png');
-    this.load.image('interior', 'test.png');
+    this.load.image('map', '/maps/finalmap.png');
+    this.load.image('interior', '/maps/bank.gif');
     
-    this.load.spritesheet('character', 'Basic Charakter Spritesheet.png', { 
-      frameWidth: 48,
-      frameHeight: 48
+    this.load.spritesheet('character', '/characters/orange_browncap_guy.png', { 
+      frameWidth: 64,
+      frameHeight: 64
     });
     
-    this.load.json('collisionData', 'collisions.json');
+    this.load.json('collisionData', '/collisions/collisions.json');
+    
+    // Load the speech bubble sprite sheet with proper dimensions
+    this.load.spritesheet('speech_bubble_grey', '/UI/speech_bubble_grey.png', { 
+      frameWidth: 64, 
+      frameHeight: 64 
+    });
     
     // Track loading progress
     this.load.on('progress', (value: number) => {
@@ -65,6 +71,7 @@ export class MainScene extends Scene implements MainGameScene {
     });
   }
 
+  // Create takes care of establishing game elements
   create(): void {
     // Create game container - all game elements should be added to this container
     this.gameContainer = this.add.container(0, 0);
@@ -105,21 +112,33 @@ export class MainScene extends Scene implements MainGameScene {
     // Connect to WebSocket server for multiplayer
     this.webSocketManager.connect(username);
     
-    // Setup camera to follow player
-    this.cameras.main.startFollow(this.player.getSprite(), true, 0.09, 0.09);
-    this.cameras.main.setZoom(0.7);
+    // Setup camera bounds to prevent showing areas outside the map
+    this.setupCameraBounds();
     
-    // Set zoom constraints for better performance and visual clarity
-    this.cameras.main.setZoom(0.7);
+    // Setup camera to follow player with smooth follow
+    this.cameras.main.startFollow(this.player.getSprite(), true, 0.1, 0.1);
     
-    // Add zoom controls with smoother experience
-    this.addZoomControls();
+    // Set initial zoom and constraints
+    const camera = this.cameras.main as ExtendedCamera;
+    camera.setZoom(0.7);
+    camera.minZoom = 0.25;
+    camera.maxZoom = 2.0;
+    
+    // Enable round pixels to reduce flickering
+    this.cameras.main.setRoundPixels(true);
+
+    // Setup mouse wheel zoom
+    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown, _deltaX: number, deltaY: number) => {
+      const camera = this.cameras.main as ExtendedCamera;
+      const newZoom = camera.zoom + (deltaY > 0 ? -0.1 : 0.1);
+      camera.setZoom(Phaser.Math.Clamp(newZoom, camera.minZoom!, camera.maxZoom!));
+    });
     
     // Notify game is ready
     this.game.events.emit('ready');
   }
 
-  override update(time: number, delta: number): void {
+  override update(_time: number, delta: number): void {
     // Delta-based time stepping for consistent movement regardless of framerate
     const deltaFactor = delta / (1000 / 60); // Normalize to 60fps
 
@@ -128,7 +147,6 @@ export class MainScene extends Scene implements MainGameScene {
     
     // Then update all managers
     this.collisionManager.update();
-    this.mapManager.update();
     this.webSocketManager.update();
     this.npcManager.update();
     this.buildingManager.update();
@@ -181,28 +199,6 @@ export class MainScene extends Scene implements MainGameScene {
     }
   }
 
-  // Add smooth zoom controls
-  private addZoomControls(): void {
-    this.input.on('wheel', (pointer: any, gameObjects: any, deltaX: number, deltaY: number) => {
-      // Get current zoom level
-      const currentZoom = this.cameras.main.zoom;
-      
-      // Calculate new zoom level based on wheel direction
-      // Make zoom smoother and limit range
-      const zoomChange = 0.05;
-      let newZoom = currentZoom;
-      
-      if (deltaY > 0) {
-        newZoom = Math.max(0.25, currentZoom - zoomChange);
-      } else {
-        newZoom = Math.min(2, currentZoom + zoomChange);
-      }
-      
-      // Apply smooth zoom transition
-      this.cameras.main.zoomTo(newZoom, 150);
-    });
-  }
-
   // Public accessors required by the MainGameScene interface
   getGameContainer(): GameObjects.Container {
     return this.gameContainer;
@@ -214,5 +210,12 @@ export class MainScene extends Scene implements MainGameScene {
 
   getCursors(): Types.Input.Keyboard.CursorKeys {
     return this.cursors;
+  }
+
+  // Setup camera bounds to prevent showing areas outside the map
+  private setupCameraBounds(): void {
+    const mapWidth = this.mapManager.getMapWidth();
+    const mapHeight = this.mapManager.getMapHeight();
+    this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
   }
 }
