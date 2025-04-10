@@ -166,6 +166,8 @@ export class BuildingManager {
     } catch (error) {
       console.warn('Could not play door-open sound:', error);
     }
+    
+    // We've entered a building - the BankNPCManager will handle visibility in its update method
   }
 
   private exitBuilding(): void {
@@ -198,6 +200,13 @@ export class BuildingManager {
       });
     } else {
       this.transitionInProgress = false;
+    }
+    
+    // Notify the BankNPCManager that we're exiting the building
+    // Cast MainScene to any since TypeScript doesn't know about bankNPCManager property
+    const mainScene = this.scene as any;
+    if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onExitBuilding === 'function') {
+      mainScene.bankNPCManager.onExitBuilding();
     }
     
     // Play sound effect if available

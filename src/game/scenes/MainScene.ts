@@ -5,6 +5,7 @@ import { MapManager } from '../systems/MapManager.ts';
 import { WebSocketManager } from '../systems/WebSocketManager.ts';
 import { NPCManager } from '../systems/NPCManager.ts';
 import { BuildingManager } from '../systems/BuildingManager.ts';
+import { BankNPCManager } from '../systems/BankNPCManager.ts';
 import { ExtendedCamera } from '../systems/MapManager.ts';
 
 // Scene interface for type safety
@@ -13,6 +14,8 @@ export interface MainGameScene extends Scene {
   getPlayer(): Player;
   getCursors(): Types.Input.Keyboard.CursorKeys;
   mapManager: MapManager;
+  getRupees(): number;
+  updateRupees(amount: number): void;
 }
 
 export class MainScene extends Scene implements MainGameScene {
@@ -23,6 +26,7 @@ export class MainScene extends Scene implements MainGameScene {
   private webSocketManager!: WebSocketManager;
   private npcManager!: NPCManager;
   private buildingManager!: BuildingManager;
+  private bankNPCManager!: BankNPCManager;
   private gameContainer!: GameObjects.Container;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
   private loadingProgress: number = 0;
@@ -54,6 +58,10 @@ export class MainScene extends Scene implements MainGameScene {
       frameWidth: 64, 
       frameHeight: 64 
     });
+    
+    // Load sound effects for banking transactions
+    this.load.audio('coin-deposit', '/sounds/coin-deposit.mp3');
+    this.load.audio('coin-withdraw', '/sounds/coin-withdraw.mp3');
     
     // Track loading progress
     this.load.on('progress', (value: number) => {
@@ -110,6 +118,9 @@ export class MainScene extends Scene implements MainGameScene {
     this.npcManager = new NPCManager(this);
     this.webSocketManager = new WebSocketManager(this, this.player);
     
+    // Initialize the bank NPC manager (will be invisible until player enters the bank)
+    this.bankNPCManager = new BankNPCManager(this);
+    
     // Connect to WebSocket server for multiplayer
     this.webSocketManager.connect(username);
     
@@ -151,6 +162,7 @@ export class MainScene extends Scene implements MainGameScene {
     this.webSocketManager.update();
     this.npcManager.update();
     this.buildingManager.update();
+    this.bankNPCManager.update();
   }
 
   // Method to update rupees count
