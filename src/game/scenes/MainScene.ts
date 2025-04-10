@@ -41,7 +41,7 @@ export class MainScene extends Scene implements MainGameScene {
     this.load.image('map', '/maps/finalmap.png');
     this.load.image('interior', '/maps/bank.gif');
     
-    this.load.spritesheet('character', '/characters/orange_browncap_guy.png', {
+    this.load.spritesheet('character', '/characters/orange_browncap_guy.png', { 
       frameWidth: 64,
       frameHeight: 64
     });
@@ -49,9 +49,9 @@ export class MainScene extends Scene implements MainGameScene {
     this.load.json('collisionData', '/collisions/collisions.json');
     
     // Load the speech bubble sprite sheet with proper dimensions
-    this.load.spritesheet('speech_bubble_grey', '/UI/speech_bubble_grey.png', {
-      frameWidth: 64,
-      frameHeight: 64
+    this.load.spritesheet('speech_bubble_grey', '/UI/speech_bubble_grey.png', { 
+      frameWidth: 64, 
+      frameHeight: 64 
     });
     
     // Track loading progress
@@ -70,8 +70,9 @@ export class MainScene extends Scene implements MainGameScene {
       }
     });
   }
-   // Create takes care of establishing game elements
-   create(): void {
+
+  // Create takes care of establishing game elements
+  create(): void {
     // Create game container - all game elements should be added to this container
     this.gameContainer = this.add.container(0, 0);
 
