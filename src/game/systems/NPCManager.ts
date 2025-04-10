@@ -9,23 +9,19 @@ export class NPCManager {
   private scene: MainGameScene;
   private npc: NPCSprite;
   private npcDialog: GameObjects.Container | null = null;
-  private dialogTween: Phaser.Tweens.Tween | null = null;
   private interactionKey: Input.Keyboard.Key | null = null;
-  private spaceKey: Input.Keyboard.Key | null = null;
-  private enterKey: Input.Keyboard.Key | null = null;
   private readonly interactionDistance: number = 150;
   private interactionText: GameObjects.Text;
   private isPlayerNearNPC: boolean = false;
   private activeDialog: boolean = false;
+  private speechBubble: GameObjects.Sprite | null = null;
 
   constructor(scene: MainGameScene) {
     this.scene = scene;
     
-    // Setup interaction keys with null checks
+    // Setup interaction key with null check
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
-      this.spaceKey = scene.input.keyboard.addKey('SPACE');
-      this.enterKey = scene.input.keyboard.addKey('ENTER');
     }
     
     // Create NPC at predefined position
@@ -60,6 +56,74 @@ export class NPCManager {
       gameContainer.add(npcNameText);
       gameContainer.add(this.interactionText);
       this.npc.nameText = npcNameText;
+    }
+    
+    // Create the speech bubble animations
+    this.createSpeechBubbleAnimations();
+  }
+  
+  private createSpeechBubbleAnimations(): void {
+    try {
+      // Check if the texture exists first
+      if (!this.scene.textures.exists('speech_bubble_grey')) {
+        console.warn("speech_bubble_grey texture not found - loading it now");
+        
+        // Load the texture dynamically if it doesn't exist
+        this.scene.load.once('complete', () => {
+          // Now create the animations after the texture is loaded
+          this.createAnimationsFromLoadedTexture();
+        });
+        
+        // Start loading the spritesheet
+        this.scene.load.spritesheet('speech_bubble_grey', 'assets/speech_bubble_grey.png', {
+          frameWidth: 64,
+          frameHeight: 64
+        });
+        this.scene.load.start();
+        return;
+      }
+      
+      // If texture exists, create animations directly
+      this.createAnimationsFromLoadedTexture();
+      
+    } catch (error) {
+      console.error("Error in speech bubble animations setup:", error);
+    }
+  }
+  
+  private createAnimationsFromLoadedTexture(): void {
+    try {
+      // Check if animations already exist
+      if (!this.scene.anims.exists('speech-bubble-open')) {
+        // Create opening animation (frames 8-14)
+        this.scene.anims.create({
+          key: 'speech-bubble-open',
+          frames: this.scene.anims.generateFrameNumbers('speech_bubble_grey', { 
+            start: 8, 
+            end: 14 
+          }),
+          frameRate: 15,
+          repeat: 0
+        });
+      }
+      
+      if (!this.scene.anims.exists('speech-bubble-close')) {
+        // Create closing animation (frames 15-21)
+        this.scene.anims.create({
+          key: 'speech-bubble-close',
+          frames: this.scene.anims.generateFrameNumbers('speech_bubble_grey', { 
+            start: 15, 
+            end: 21 
+          }),
+          frameRate: 15,
+          repeat: 0
+        });
+      }
+      
+      console.log("Speech bubble animations created successfully");
+    } catch (error) {
+      console.error("Failed to create speech bubble animations:", error);
+      console.log("Make sure speech_bubble_grey spritesheet is properly structured");
     }
   }
 
@@ -167,6 +231,19 @@ export class NPCManager {
     dialogContainer.add([dialogBox, dialogText, closeText]);
     this.npcDialog = dialogContainer;
     
+    // Create speech bubble animation directly above the NPC (centered) and larger
+    this.speechBubble = this.scene.add.sprite(
+      this.npc.x, // Center above the NPC (was this.npc.x + 40)
+      this.npc.y - 120, // Position higher above the NPC (was this.npc.y - 30)
+      'speech_bubble_grey'
+    );
+    this.speechBubble.setScale(2.5); // Make it significantly larger (was 1.5)
+    this.speechBubble.setDepth(2002); // Make sure it appears above other elements
+    this.speechBubble.setScrollFactor(1); // Make it move with the game world
+    
+    // Play the opening animation
+    this.speechBubble.play('speech-bubble-open');
+    
     // Setup keyboard listeners
     this.scene.input.keyboard?.once('keydown-E', () => this.closeDialog());
     this.scene.input.keyboard?.once('keydown-SPACE', () => this.closeDialog());
@@ -176,8 +253,21 @@ export class NPCManager {
   private closeDialog(): void {
     if (!this.npcDialog) return;
 
+    // Play the closing animation if speech bubble exists
+    if (this.speechBubble) {
+      this.speechBubble.play('speech-bubble-close');
+      
+      // Wait for the closing animation to complete
+      this.speechBubble.once('animationcomplete', () => {
+        if (this.speechBubble) {
+          this.speechBubble.destroy();
+          this.speechBubble = null;
+        }
+      });
+    }
+
     // Clean up dialog with fade out animation
-    this.dialogTween = this.scene.tweens.add({
+    this.scene.tweens.add({
       targets: this.npcDialog,
       alpha: 0,
       duration: 200,
@@ -187,7 +277,6 @@ export class NPCManager {
           this.npcDialog = null;
         }
         this.activeDialog = false;
-        this.dialogTween = null;
       }
     });
   }

@@ -7,6 +7,7 @@ export class Player {
   private nameText: GameObjects.Text;
   private cursors: Types.Input.Keyboard.CursorKeys;
   private wasd: Record<string, Phaser.Input.Keyboard.Key>;
+  private shiftKey: Phaser.Input.Keyboard.Key; // Add shift key
   private currentAnimation: string = 'idle-down';
   private lastSentPosition: { x: number; y: number } | null = null;
   private lastSentAnimation: string | null = null;
@@ -18,6 +19,9 @@ export class Player {
     this.cursors = cursors;
     this.wasd = wasd;
     this.username = scene.registry.get('username') || 'Player';
+    
+    // Register shift key for running
+    this.shiftKey = scene.input.keyboard!.addKey('SHIFT');
     
     // Create player sprite
     this.sprite = scene.add.sprite(x, y, 'character');
@@ -61,30 +65,53 @@ export class Player {
     // Calculate movement
     let dx = 0;
     let dy = 0;
-    const speed = Constants.PLAYER_SPEED * deltaFactor;
+    const isRunning = this.shiftKey.isDown;
+    const speed = isRunning ? 
+      Constants.PLAYER_SPEED * 1.6 * deltaFactor : // 60% faster when running
+      Constants.PLAYER_SPEED * deltaFactor;
 
     // Check both arrow keys and WASD
     if (this.cursors.left?.isDown || this.wasd.left?.isDown) {
       dx = -speed;
-      this.sprite.anims.play('walk-left', true);
-      this.currentAnimation = 'walk-left';
+      if (isRunning) {
+        this.sprite.anims.play('run-left', true);
+        this.currentAnimation = 'run-left';
+      } else {
+        this.sprite.anims.play('walk-left', true);
+        this.currentAnimation = 'walk-left';
+      }
     } else if (this.cursors.right?.isDown || this.wasd.right?.isDown) {
       dx = speed;
-      this.sprite.anims.play('walk-right', true);
-      this.currentAnimation = 'walk-right';
+      if (isRunning) {
+        this.sprite.anims.play('run-right', true);
+        this.currentAnimation = 'run-right';
+      } else {
+        this.sprite.anims.play('walk-right', true);
+        this.currentAnimation = 'walk-right';
+      }
     }
 
     if (this.cursors.up?.isDown || this.wasd.up?.isDown) {
       dy = -speed;
       if (dx === 0) {
-        this.sprite.anims.play('walk-up', true);
-        this.currentAnimation = 'walk-up';
+        if (isRunning) {
+          this.sprite.anims.play('run-up', true);
+          this.currentAnimation = 'run-up';
+        } else {
+          this.sprite.anims.play('walk-up', true);
+          this.currentAnimation = 'walk-up';
+        }
       }
     } else if (this.cursors.down?.isDown || this.wasd.down?.isDown) {
       dy = speed;
       if (dx === 0) {
-        this.sprite.anims.play('walk-down', true);
-        this.currentAnimation = 'walk-down';
+        if (isRunning) {
+          this.sprite.anims.play('run-down', true);
+          this.currentAnimation = 'run-down';
+        } else {
+          this.sprite.anims.play('walk-down', true);
+          this.currentAnimation = 'walk-down';
+        }
       }
     }
 
@@ -107,11 +134,18 @@ export class Player {
 
     // Set player velocity using physics body
     if (this.sprite.body) {
+      // Direct velocity setting for smoother movement
       (this.sprite.body as Phaser.Physics.Arcade.Body).setVelocity(dx, dy);
       
-      // Optional: Apply pixel-perfect position rounding for sharper visuals
-      this.sprite.x = Math.round(this.sprite.x);
-      this.sprite.y = Math.round(this.sprite.y);
+      // Apply integer pixel positions to reduce flickering
+      if (dx === 0 && dy === 0) {
+        // Only snap position when not moving to prevent jitter
+        this.sprite.x = Math.round(this.sprite.x);
+        this.sprite.y = Math.round(this.sprite.y);
+        
+        // Also stop the body velocity completely when not moving
+        (this.sprite.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+      }
     }
   }
 
@@ -124,56 +158,80 @@ export class Player {
     // Down animations
     anims.create({
       key: 'idle-down',
-      frames: anims.generateFrameNumbers('character', { start: 0, end: 1 }),
-      frameRate: 2,
+      frames: anims.generateFrameNumbers('character', { frames: [0] }),
+      frameRate: 1,
       repeat: -1
     });
     anims.create({
       key: 'walk-down',
-      frames: anims.generateFrameNumbers('character', { start: 2, end: 3 }),
-      frameRate: 8,
+      frames: anims.generateFrameNumbers('character', { start: 32, end: 37 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    anims.create({
+      key: 'run-down',
+      frames: anims.generateFrameNumbers('character', { frames: [38, 0, 39, 0] }),
+      frameRate: 10,
       repeat: -1
     });
     
     // Up animations
     anims.create({
       key: 'idle-up',
-      frames: anims.generateFrameNumbers('character', { start: 4, end: 5 }),
-      frameRate: 2,
+      frames: anims.generateFrameNumbers('character', { frames: [8] }),
+      frameRate: 1,
       repeat: -1
     });
     anims.create({
       key: 'walk-up',
-      frames: anims.generateFrameNumbers('character', { start: 6, end: 7 }),
-      frameRate: 8,
+      frames: anims.generateFrameNumbers('character', { start: 40, end: 45 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    anims.create({
+      key: 'run-up',
+      frames: anims.generateFrameNumbers('character', { frames: [46, 8, 47, 8] }),
+      frameRate: 10,
       repeat: -1
     });
     
     // Left animations
     anims.create({
       key: 'idle-left',
-      frames: anims.generateFrameNumbers('character', { start: 8, end: 9 }),
-      frameRate: 2,
+      frames: anims.generateFrameNumbers('character', { frames: [24] }),
+      frameRate: 1,
       repeat: -1
     });
     anims.create({
       key: 'walk-left',
-      frames: anims.generateFrameNumbers('character', { start: 10, end: 11 }),
-      frameRate: 8,
+      frames: anims.generateFrameNumbers('character', { start: 56, end: 61 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    anims.create({
+      key: 'run-left',
+      frames: anims.generateFrameNumbers('character', { frames: [62, 24, 63, 24] }),
+      frameRate: 10,
       repeat: -1
     });
     
     // Right animations
     anims.create({
       key: 'idle-right',
-      frames: anims.generateFrameNumbers('character', { start: 12, end: 13 }),
-      frameRate: 2,
+      frames: anims.generateFrameNumbers('character', { frames: [16] }),
+      frameRate: 1,
       repeat: -1
     });
     anims.create({
       key: 'walk-right',
-      frames: anims.generateFrameNumbers('character', { start: 14, end: 15 }),
-      frameRate: 8,
+      frames: anims.generateFrameNumbers('character', { start: 48, end: 53 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    anims.create({
+      key: 'run-right',
+      frames: anims.generateFrameNumbers('character', { frames: [54, 16, 55, 16] }),
+      frameRate: 10,
       repeat: -1
     });
   }

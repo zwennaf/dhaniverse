@@ -1,4 +1,4 @@
-import { Scene, GameObjects, Physics } from 'phaser';
+import { GameObjects, Physics } from 'phaser';
 import { Constants } from '../utils/Constants.ts';
 import { MainGameScene } from '../scenes/MainScene.ts';
 
@@ -62,7 +62,7 @@ export class CollisionManager {
     
     // Clear expired cache entries
     const now = Date.now();
-    for (const [key, entry] of this.collisionCache.entries()) {
+    for (const [key, _entry] of this.collisionCache.entries()) {
       if (now - parseInt(key.split('|')[2]) > this.cacheTTL) {
         this.collisionCache.delete(key);
       }
