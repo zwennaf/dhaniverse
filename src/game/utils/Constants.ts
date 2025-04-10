@@ -10,7 +10,7 @@ export const Constants = {
   INTERACTION_DISTANCE: 100,
   
   // WebSocket settings
-  WS_SERVER_URL: 'ws://localhost:8080',
+  WS_SERVER_URL: 'wss://dhaniverse.deno.dev/ws',
   WS_RECONNECT_DELAY: 5000,
   WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
   
