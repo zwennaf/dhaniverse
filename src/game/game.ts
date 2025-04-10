@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene.ts';
 import { Constants } from './utils/Constants.ts';
+import { initializeHUD, updateHUD } from '../main.ts';
 
 let game: Phaser.Game | null = null;
 let gameContainer: HTMLElement | null = null;
@@ -70,8 +71,12 @@ export function startGame(username: string): void {
       // Register the username for the game
       game.registry.set('username', username);
       
-      // Remove loading indicator when game is ready
+      // Initialize the React HUD when game is ready
       game.events.once('ready', () => {
+        // Initialize HUD with default 25000 rupees
+        initializeHUD(25000);
+        
+        // Remove loading indicator
         if (loadingText && gameContainer) {
           gameContainer.removeChild(loadingText);
           loadingText = null;
@@ -89,6 +94,11 @@ export function stopGame(): void {
     game.destroy(true);
     game = null;
   }
+}
+
+// Expose updateHUD for MainScene to use
+export function updateGameHUD(rupees: number): void {
+  updateHUD(rupees);
 }
 
 // Handle window resizing

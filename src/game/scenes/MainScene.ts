@@ -28,6 +28,7 @@ export class MainScene extends Scene implements MainGameScene {
   private loadingProgress: number = 0;
   private progressBar?: GameObjects.Graphics;
   private progressText?: GameObjects.Text;
+  private playerRupees: number = 25000; // Store rupees in the scene
 
   constructor() {
     super({ key: 'MainScene' });
@@ -150,6 +151,21 @@ export class MainScene extends Scene implements MainGameScene {
     this.webSocketManager.update();
     this.npcManager.update();
     this.buildingManager.update();
+  }
+
+  // Method to update rupees count
+  updateRupees(amount: number): void {
+    this.playerRupees += amount;
+    
+    // Import here to avoid circular dependency
+    import('../game.ts').then(({ updateGameHUD }) => {
+      updateGameHUD(this.playerRupees);
+    });
+  }
+
+  // Method to get current rupees
+  getRupees(): number {
+    return this.playerRupees;
   }
 
   // Create a loading progress bar

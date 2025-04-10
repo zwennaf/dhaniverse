@@ -23,7 +23,7 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="landing-container">
-      <div className="join-container">
+      <div className="join-container pixeloid">
         <h2>Join Dhaniverse</h2>
         <input 
           type="text" 
@@ -33,6 +33,7 @@ const LandingPage: React.FC = () => {
           maxLength={15}
           onKeyDown={handleKeyPress}
           autoFocus
+          className="pixeloid"
         />
         {error && <div className="error-message">{error}</div>}
         <button type="submit" onClick={handleJoin}>Join Game</button>

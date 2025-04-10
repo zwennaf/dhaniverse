@@ -12,7 +12,15 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
+@font-face {
+  font-family: 'Pixeloid';
+  src: url('/fonts/PixeloidSansBold.ttf') format('truetype');
+}
+.pixeloid {
+  font-family: 'Pixeloid', sans-serif;
+  font-weight: 700;
+  font-size: 1.2em;
+}
 a {
   font-weight: 500;
   color: #646cff;
