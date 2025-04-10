@@ -1,0 +1,26 @@
+{
+  "name": "dhaniverse",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "server": "deno run --allow-net server/server.ts"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  },
+  "dependencies": {
+    "phaser": "^3.88.2"
+  },
+  "workspaces": [
+    "client",
+    "server"
+  ]
+}
