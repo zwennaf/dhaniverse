@@ -19,6 +19,7 @@ export class MapManager {
   private map: GameObjects.Image;
   private mapCache: MapCache;
   private isInBuilding: boolean = false;
+  private currentBuildingType: 'bank' | 'stockmarket' | null = null;
   private lastOutdoorPosition: { x: number, y: number } | null = null;
   private textureLoadPromises: Map<string, Promise<void>> = new Map();
 
@@ -47,11 +48,11 @@ export class MapManager {
   }
 
   private preloadTextures(): void {
-    // Make sure the interior texture is ready before needed
+    // Make sure the bank interior texture is ready before needed
     if (!this.scene.textures.exists('interior')) {
-      const loadPromise = new Promise<void>((resolve) => {
+      const bankLoadPromise = new Promise<void>((resolve) => {
         this.scene.load.once('complete', () => {
-          console.log('Interior texture loaded successfully');
+          console.log('Bank interior texture loaded successfully');
           resolve();
         });
         this.scene.load.image('interior', 'test.png');
@@ -66,20 +67,37 @@ export class MapManager {
         
         this.scene.load.start();
       });
-      this.textureLoadPromises.set('interior', loadPromise);
+      this.textureLoadPromises.set('interior', bankLoadPromise);
+    }
+    
+    // Make sure the stock market interior texture is ready
+    if (!this.scene.textures.exists('stockmarket')) {
+      const stockMarketLoadPromise = new Promise<void>((resolve) => {
+        this.scene.load.once('complete', () => {
+          console.log('Stock market interior texture loaded successfully');
+          resolve();
+        });
+        this.scene.load.image('stockmarket', '/maps/stockmarket.png');
+        this.scene.load.start();
+      });
+      this.textureLoadPromises.set('stockmarket', stockMarketLoadPromise);
     }
   }
 
-  enterBuilding(playerX: number, playerY: number): { x: number, y: number } {
+  enterBuilding(playerX: number, playerY: number, buildingType: 'bank' | 'stockmarket' = 'bank'): { x: number, y: number } {
     try {
       // Store current position
       this.lastOutdoorPosition = { x: playerX, y: playerY };
       
       // Set building state - do this first to prevent any rendering issues
       this.isInBuilding = true;
+      this.currentBuildingType = buildingType;
+      
+      // Determine which texture to use based on building type
+      const textureKey = buildingType === 'bank' ? 'interior' : 'stockmarket';
       
       // Switch to interior map - immediate texture swap
-      this.map.setTexture('interior');
+      this.map.setTexture(textureKey);
       this.map.setDepth(-10); // Ensure map is behind all other elements
       
       // Reset origin to 0.5 for proper centering
@@ -97,8 +115,8 @@ export class MapManager {
       let interiorWidth = 800;  // Default fallback width
       let interiorHeight = 600; // Default fallback height
       
-      if (this.scene.textures.exists('interior')) {
-        const interiorImage = this.scene.textures.get('interior');
+      if (this.scene.textures.exists(textureKey)) {
+        const interiorImage = this.scene.textures.get(textureKey);
         if (interiorImage && interiorImage.source && interiorImage.source[0]) {
           interiorWidth = interiorImage.source[0].width;
           interiorHeight = interiorImage.source[0].height;
@@ -133,7 +151,7 @@ export class MapManager {
       );
       
       // Simple, fixed maxZoom for interior areas
-      const maxZoom = 1.3; // Adjust this value to change how zoomed in you are inside buildings
+      const maxZoom = 0.7; // Adjust this value to change how zoomed in you are inside buildings
       
       // Get camera and set zoom
       const camera = this.scene.cameras.main as ExtendedCamera;
@@ -151,6 +169,7 @@ export class MapManager {
     } catch (error) {
       console.error('Error entering building:', error);
       this.isInBuilding = false;
+      this.currentBuildingType = null;
       return { x: playerX, y: playerY };
     }
   }
@@ -160,6 +179,7 @@ export class MapManager {
     
     // Reset building state immediately
     this.isInBuilding = false;
+    this.currentBuildingType = null;
     
     // Switch back to outdoor map - immediate texture swap
     this.map.setTexture('map');
@@ -236,5 +256,9 @@ export class MapManager {
 
   isPlayerInBuilding(): boolean {
     return this.isInBuilding;
+  }
+  
+  getCurrentBuildingType(): 'bank' | 'stockmarket' | null {
+    return this.currentBuildingType;
   }
 }

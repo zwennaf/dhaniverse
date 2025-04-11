@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
+import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize the banking UI separately
   initializeBankingUI();
+  
+  // Initialize the stock market UI separately
+  initializeStockMarketUI();
 });
 
 // Function to initialize banking UI
@@ -35,6 +39,24 @@ function initializeBankingUI() {
     console.log("Banking UI initialized and mounted");
   } else {
     console.error("Could not find banking-ui-container element");
+  }
+}
+
+// Function to initialize stock market UI
+function initializeStockMarketUI() {
+  const stockMarketUIContainer = document.getElementById('stock-market-ui-container');
+  
+  if (stockMarketUIContainer) {
+    // Create a root and explicitly render the StockMarketUI component
+    const stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
+    stockMarketUIRoot.render(React.createElement(StockMarketUI));
+    
+    // Make sure the stock market container is visible
+    stockMarketUIContainer.style.display = 'block';
+    
+    console.log("Stock Market UI initialized and mounted");
+  } else {
+    console.error("Could not find stock-market-ui-container element");
   }
 }
 

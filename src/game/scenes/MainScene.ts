@@ -6,6 +6,7 @@ import { WebSocketManager } from '../systems/WebSocketManager.ts';
 import { NPCManager } from '../systems/NPCManager.ts';
 import { BuildingManager } from '../systems/BuildingManager.ts';
 import { BankNPCManager } from '../systems/BankNPCManager.ts';
+import { StockMarketManager } from '../systems/StockMarketManager.ts';
 import { ExtendedCamera } from '../systems/MapManager.ts';
 
 // Scene interface for type safety
@@ -27,6 +28,7 @@ export class MainScene extends Scene implements MainGameScene {
   private npcManager!: NPCManager;
   private buildingManager!: BuildingManager;
   private bankNPCManager!: BankNPCManager;
+  private stockMarketManager!: StockMarketManager;
   private gameContainer!: GameObjects.Container;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
   private loadingProgress: number = 0;
@@ -34,6 +36,7 @@ export class MainScene extends Scene implements MainGameScene {
   private progressText?: GameObjects.Text;
   private playerRupees: number = 25000; // Store rupees in the scene
   private _bankingClosedListenerAdded: boolean = false;
+  private _stockMarketClosedListenerAdded: boolean = false;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -45,7 +48,8 @@ export class MainScene extends Scene implements MainGameScene {
     
     // Load assets with paths relative to the public directory
     this.load.image('map', '/maps/finalmap.png');
-    this.load.image('interior', '/maps/bank.gif');
+    this.load.image('interior', '/maps/bank.png');
+    this.load.image('stockmarket', '/maps/stockmarket.png');
     
     this.load.spritesheet('character', '/characters/orange_browncap_guy.png', { 
       frameWidth: 64,
@@ -121,6 +125,9 @@ export class MainScene extends Scene implements MainGameScene {
     
     // Initialize the bank NPC manager (will be invisible until player enters the bank)
     this.bankNPCManager = new BankNPCManager(this);
+
+    // Initialize the stock market manager (will be invisible until player enters the stock market)
+    this.stockMarketManager = new StockMarketManager(this);
     
     // Connect to WebSocket server for multiplayer
     this.webSocketManager.connect(username);
@@ -178,6 +185,7 @@ export class MainScene extends Scene implements MainGameScene {
     this.npcManager.update();
     this.buildingManager.update();
     this.bankNPCManager.update();
+    this.stockMarketManager.update();
   }
 
   // Method to open the banking UI
@@ -200,6 +208,29 @@ export class MainScene extends Scene implements MainGameScene {
         }
       });
       this._bankingClosedListenerAdded = true;
+    }
+  }
+  
+  // Method to open the stock market UI
+  openStockMarketUI(stocks: any): void {
+    // Dispatch custom event for the React component to catch
+    const stockMarketEvent = new CustomEvent('openStockMarketUI', { 
+      detail: { 
+        playerRupees: this.playerRupees,
+        stocks: stocks
+      } 
+    });
+    window.dispatchEvent(stockMarketEvent);
+    
+    // Add event listener for stock market UI closed event if not already added
+    if (!this._stockMarketClosedListenerAdded) {
+      window.addEventListener('closeStockMarketUI', () => {
+        console.log("Stock Market UI closed, ending interaction");
+        if (this.stockMarketManager) {
+          this.stockMarketManager.endStockMarketInteraction();
+        }
+      });
+      this._stockMarketClosedListenerAdded = true;
     }
   }
 

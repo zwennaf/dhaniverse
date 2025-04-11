@@ -66,6 +66,19 @@
         #banking-ui-container.active {
             pointer-events: auto;
         }
+        #stock-market-ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1001; /* Same as banking-ui-container, we don't want them both active at once */
+            pointer-events: none; /* By default, allow clicks to pass through */
+        }
+        /* When stock market UI is active, we want it to receive pointer events */
+        #stock-market-ui-container.active {
+            pointer-events: auto;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
 </head>
@@ -75,6 +88,7 @@
     <div id="game-container"></div>
     <div id="hud-container"></div>
     <div id="banking-ui-container"></div>
+    <div id="stock-market-ui-container"></div>
     <script type="module" src="/src/main.ts"></script>
     <script>
         // Remove loading div once game is visible
@@ -88,6 +102,8 @@
         // Toggle the banking UI container's active class when the banking UI opens/closes
         window.addEventListener('openBankingUI', function() {
             document.getElementById('banking-ui-container').classList.add('active');
+            // Make sure stock market UI is not active
+            document.getElementById('stock-market-ui-container').classList.remove('active');
         });
         
         // Only remove the active class when explicitly closing the UI
@@ -96,6 +112,17 @@
             if (event.detail && event.detail.closeUI) {
                 document.getElementById('banking-ui-container').classList.remove('active');
             }
+        });
+
+        // Toggle the stock market UI container's active class when the UI opens/closes
+        window.addEventListener('openStockMarketUI', function() {
+            document.getElementById('stock-market-ui-container').classList.add('active');
+            // Make sure banking UI is not active
+            document.getElementById('banking-ui-container').classList.remove('active');
+        });
+        
+        window.addEventListener('closeStockMarketUI', function() {
+            document.getElementById('stock-market-ui-container').classList.remove('active');
         });
     </script>
 </body>

@@ -5,23 +5,49 @@ import { MainGameScene } from '../scenes/MainScene.ts';
 export class BuildingManager {
   private scene: MainGameScene;
   private buildingEntrance: { x: number, y: number };
+  private stockMarketEntrance: { x: number, y: number };
   private buildingInteractionText: GameObjects.Text;
+  private stockMarketInteractionText: GameObjects.Text;
   private interactionKey: Input.Keyboard.Key | null = null;
   private spaceKey: Input.Keyboard.Key | null = null;
   private enterKey: Input.Keyboard.Key | null = null;
   private escKey: Input.Keyboard.Key | null = null;
   private isNearBuilding: boolean = false;
+  private isNearStockMarket: boolean = false;
   private transitionInProgress: boolean = false;
 
   constructor(scene: MainGameScene) {
     this.scene = scene;
     this.buildingEntrance = { x: 9383, y: 6087 };
+    this.stockMarketEntrance = { x: 2565, y: 3550 }; // Stock market building entrance
     
     // Initialize buildingInteractionText with improved visual style
     this.buildingInteractionText = scene.add.text(
       this.buildingEntrance.x, 
       this.buildingEntrance.y - 50, 
       "Press E to enter", 
+      {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ffffff',
+        align: 'center',
+        backgroundColor: '#00000080',
+        padding: { x: 8, y: 4 },
+        shadow: {
+          offsetX: 1,
+          offsetY: 1,
+          color: '#000000',
+          blur: 3,
+          fill: true
+        }
+      }
+    ).setOrigin(0.5).setAlpha(0);
+    
+    // Add stock market interaction text
+    this.stockMarketInteractionText = scene.add.text(
+      this.stockMarketEntrance.x, 
+      this.stockMarketEntrance.y - 50, 
+      "Press E to enter Stock Market", 
       {
         fontFamily: 'Arial',
         fontSize: '16px',
@@ -55,12 +81,14 @@ export class BuildingManager {
     if (this.transitionInProgress) return;
     
     this.handleBuildingInteraction();
+    this.handleStockMarketInteraction();
   }
 
   private setupBuilding(): void {
     const gameContainer = this.scene.getGameContainer();
     if (gameContainer) {
       gameContainer.add(this.buildingInteractionText);
+      gameContainer.add(this.stockMarketInteractionText);
     }
   }
 
@@ -114,7 +142,7 @@ export class BuildingManager {
         ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
          (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
          (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
-      this.enterBuilding();
+      this.enterBuilding('bank');
     }
     
     // Update interaction text position to follow entrance point
@@ -123,8 +151,62 @@ export class BuildingManager {
       this.buildingInteractionText.y = this.buildingEntrance.y - 50;
     }
   }
+  
+  private handleStockMarketInteraction(): void {
+    const player = this.scene.getPlayer();
+    const mapManager = this.scene.mapManager;
+    if (!player || !mapManager) return;
+    
+    // Get player position
+    const playerPos = player.getPosition();
+    
+    // Calculate distance between player and stock market entrance
+    const dx = playerPos.x - this.stockMarketEntrance.x;
+    const dy = playerPos.y - this.stockMarketEntrance.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Check if player is within interaction distance
+    const wasNearStockMarket = this.isNearStockMarket;
+    this.isNearStockMarket = distance <= Constants.BUILDING_INTERACTION_DISTANCE;
+    
+    // Only react to changes in proximity or handle interaction when near stock market
+    if (this.isNearStockMarket !== wasNearStockMarket) {
+      if (this.isNearStockMarket && !mapManager.isPlayerInBuilding()) {
+        // Player just entered interaction zone - show text with fade in
+        this.scene.tweens.add({
+          targets: this.stockMarketInteractionText,
+          alpha: 1,
+          duration: 200,
+          ease: 'Power1'
+        });
+      } else if (!mapManager.isPlayerInBuilding()) {
+        // Player just left interaction zone - hide text with fade out
+        this.scene.tweens.add({
+          targets: this.stockMarketInteractionText,
+          alpha: 0,
+          duration: 200,
+          ease: 'Power1'
+        });
+      }
+    }
+    
+    // Check for key press to enter stock market when near
+    if (this.isNearStockMarket && 
+        !mapManager.isPlayerInBuilding() && 
+        ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
+         (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+         (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
+      this.enterBuilding('stockmarket');
+    }
+    
+    // Update interaction text position to follow entrance point
+    if (this.stockMarketInteractionText) {
+      this.stockMarketInteractionText.x = this.stockMarketEntrance.x;
+      this.stockMarketInteractionText.y = this.stockMarketEntrance.y - 50;
+    }
+  }
 
-  private enterBuilding(): void {
+  private enterBuilding(buildingType: 'bank' | 'stockmarket' = 'bank'): void {
     const player = this.scene.getPlayer();
     const mapManager = this.scene.mapManager;
     if (!player || !mapManager || this.transitionInProgress) return;
@@ -132,14 +214,15 @@ export class BuildingManager {
     // Set transition in progress to prevent multiple transitions
     this.transitionInProgress = true;
     
-    // Hide interaction text immediately
+    // Hide interaction texts immediately
     this.buildingInteractionText.setAlpha(0);
+    this.stockMarketInteractionText.setAlpha(0);
     
     // Get current player position
     const playerPos = player.getPosition();
     
     // Instantly enter building through map manager
-    const newPosition = mapManager.enterBuilding(playerPos.x, playerPos.y);
+    const newPosition = mapManager.enterBuilding(playerPos.x, playerPos.y, buildingType);
     
     // Instantly move player to new position
     if (newPosition) {
@@ -172,22 +255,42 @@ export class BuildingManager {
       console.warn('Could not play door-open sound:', error);
     }
     
-    // Notify the BankNPCManager that we've entered a building
+    // Notify the BankNPCManager or StockMarketManager that we've entered a building
     const mainScene = this.scene as any;
-    if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onEnterBuilding === 'function') {
-      // Explicitly pass 'bank' as the building type
-      mainScene.bankNPCManager.onEnterBuilding('bank');
-      
-      // Force the banking UI to be active container
-      document.getElementById('banking-ui-container')?.classList.add('active');
-      
-      // Ensure playerRupees is available for the banking UI
-      if (mainScene.playerRupees !== undefined) {
-        // Manually trigger the banking UI to open with current bank account data
+    
+    if (buildingType === 'bank') {
+      // Handle bank building entrance
+      if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onEnterBuilding === 'function') {
+        mainScene.bankNPCManager.onEnterBuilding('bank');
+        
+        // Force the banking UI to be active container
+        document.getElementById('banking-ui-container')?.classList.add('active');
+        
+        // Ensure playerRupees is available for the banking UI
+        if (mainScene.playerRupees !== undefined) {
+          // Manually trigger the banking UI to open with current bank account data
+          this.scene.time.delayedCall(300, () => {
+            if (mainScene.bankNPCManager) {
+              const bankAccount = mainScene.bankNPCManager.getBankAccountData();
+              mainScene.openBankingUI(bankAccount);
+            }
+          });
+        }
+      }
+    } else if (buildingType === 'stockmarket') {
+      // Handle stock market building entrance
+      if (mainScene.stockMarketManager && typeof mainScene.stockMarketManager.onEnterBuilding === 'function') {
+        mainScene.stockMarketManager.onEnterBuilding('stockmarket');
+        
+        // Force the stock market UI to be active container
+        document.getElementById('stock-market-ui-container')?.classList.add('active');
+        
+        // Trigger the stock market UI to open
         this.scene.time.delayedCall(300, () => {
-          if (mainScene.bankNPCManager) {
-            const bankAccount = mainScene.bankNPCManager.getBankAccountData();
-            mainScene.openBankingUI(bankAccount);
+          if (mainScene.stockMarketManager) {
+            // Fixed: Changed getStocksData to getStockMarketData to match the method name in StockMarketManager
+            const stocksData = mainScene.stockMarketManager.getStockMarketData();
+            mainScene.openStockMarketUI(stocksData);
           }
         });
       }
@@ -226,11 +329,13 @@ export class BuildingManager {
       this.transitionInProgress = false;
     }
     
-    // Notify the BankNPCManager that we're exiting the building
-    // Cast MainScene to any since TypeScript doesn't know about bankNPCManager property
+    // Notify NPCManagers that we're exiting the building
     const mainScene = this.scene as any;
     if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onExitBuilding === 'function') {
       mainScene.bankNPCManager.onExitBuilding();
+    }
+    if (mainScene.stockMarketManager && typeof mainScene.stockMarketManager.onExitBuilding === 'function') {
+      mainScene.stockMarketManager.onExitBuilding();
     }
     
     // Play sound effect if available
@@ -247,5 +352,10 @@ export class BuildingManager {
   // Public getter for building entrance position
   getBuildingEntrancePosition(): { x: number, y: number } {
     return this.buildingEntrance;
+  }
+  
+  // Public getter for stock market entrance position
+  getStockMarketEntrancePosition(): { x: number, y: number } {
+    return this.stockMarketEntrance;
   }
 }
