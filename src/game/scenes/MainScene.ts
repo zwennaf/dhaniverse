@@ -33,6 +33,7 @@ export class MainScene extends Scene implements MainGameScene {
   private progressBar?: GameObjects.Graphics;
   private progressText?: GameObjects.Text;
   private playerRupees: number = 25000; // Store rupees in the scene
+  private _bankingClosedListenerAdded: boolean = false;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -146,6 +147,20 @@ export class MainScene extends Scene implements MainGameScene {
       camera.setZoom(Phaser.Math.Clamp(newZoom, camera.minZoom!, camera.maxZoom!));
     });
     
+    // Add event listener for banking UI rupee updates
+    window.addEventListener('updatePlayerRupees', (event: any) => {
+      if (event.detail && typeof event.detail.rupees === 'number') {
+        this.playerRupees = event.detail.rupees;
+        
+        // Import here to avoid circular dependency
+        import('../game.ts').then(({ updateGameHUD }) => {
+          updateGameHUD(this.playerRupees);
+        });
+        
+        console.log("Game received rupee update:", this.playerRupees);
+      }
+    });
+    
     // Notify game is ready
     this.game.events.emit('ready');
   }
@@ -175,16 +190,30 @@ export class MainScene extends Scene implements MainGameScene {
       } 
     });
     window.dispatchEvent(bankingEvent);
+    
+    // Add event listener for banking UI closed event if not already added
+    if (!this._bankingClosedListenerAdded) {
+      window.addEventListener('closeBankingUI', () => {
+        console.log("Banking UI closed, ending interaction");
+        if (this.bankNPCManager) {
+          this.bankNPCManager.endBankingInteraction();
+        }
+      });
+      this._bankingClosedListenerAdded = true;
+    }
   }
 
   // Method to update rupees count
   updateRupees(amount: number): void {
-    this.playerRupees += amount;
+    // Instead of adding to the current amount, set it directly
+    this.playerRupees = amount;
     
     // Import here to avoid circular dependency
     import('../game.ts').then(({ updateGameHUD }) => {
       updateGameHUD(this.playerRupees);
     });
+    
+    console.log("Game updated rupee count to:", this.playerRupees);
   }
 
   // Method to get current rupees

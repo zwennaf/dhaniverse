@@ -40,6 +40,26 @@ export class BankNPCManager {
     // Setup interaction key with null check
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
+      // Add SPACE and ENTER as alternative interaction keys
+      const spaceKey = scene.input.keyboard.addKey('SPACE');
+      const enterKey = scene.input.keyboard.addKey('ENTER');
+      
+      // Make these keys also trigger the interaction
+      if (spaceKey) {
+        spaceKey.on('down', () => {
+          if (this.isPlayerNearBanker && !this.activeDialog) {
+            this.startBankingInteraction();
+          }
+        });
+      }
+      
+      if (enterKey) {
+        enterKey.on('down', () => {
+          if (this.isPlayerNearBanker && !this.activeDialog) {
+            this.startBankingInteraction();
+          }
+        });
+      }
     }
     
     // Initialize the player's bank account
@@ -54,7 +74,7 @@ export class BankNPCManager {
     const bankerY = 500;
     this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
     this.banker.setScale(5);
-    this.banker.anims.play('idle-front');
+    this.banker.anims.play('idle-down');
     
     // Add banker name text
     const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Teller", {
@@ -225,8 +245,10 @@ export class BankNPCManager {
     this.activeDialog = true;
     this.interactionText.setAlpha(0);
     
-    // Create and show speech bubble
-    this.showSpeechBubble();
+    // Skip showing speech bubble - direct banking UI open
+    
+    // Force the banking UI container to be active
+    document.getElementById('banking-ui-container')?.classList.add('active');
     
     // Signal to MainScene to open banking UI
     this.scene.openBankingUI(this.playerBankAccount);
@@ -234,33 +256,11 @@ export class BankNPCManager {
   
   /**
    * Show a speech bubble over the banker's head
+   * Note: This is no longer used for bank teller interactions
+   * but kept for potential future use
    */
   private showSpeechBubble(): void {
-    // Remove existing speech bubble if there is one
-    if (this.speechBubble) {
-      this.speechBubble.destroy();
-      this.speechBubble = null;
-    }
-    
-    // Create new speech bubble
-    this.speechBubble = this.scene.add.sprite(
-      this.banker.x + 70, 
-      this.banker.y - 90,
-      'speech_bubble_grey'
-    );
-    
-    this.speechBubble.setOrigin(0.5);
-    this.speechBubble.setScale(3);
-    this.speechBubble.setDepth(100);
-    
-    // Play the opening animation
-    this.speechBubble.anims.play('speech-bubble-open');
-    
-    // Add speech bubble to the game container
-    const gameContainer = this.scene.getGameContainer();
-    if (gameContainer) {
-      gameContainer.add(this.speechBubble);
-    }
+    // ...existing code...
   }
   
   /**
@@ -272,22 +272,14 @@ export class BankNPCManager {
     console.log("Ending bank interaction");
     this.activeDialog = false;
     
-    // Play closing animation for speech bubble
-    if (this.speechBubble) {
-      this.speechBubble.anims.play('speech-bubble-close');
-      
-      // Remove speech bubble after animation completes
-      this.speechBubble.on('animationcomplete', () => {
-        if (this.speechBubble) {
-          this.speechBubble.destroy();
-          this.speechBubble = null;
-        }
-        
-        // Show interaction text again if player is still nearby
-        if (this.isPlayerNearBanker) {
-          this.interactionText.setAlpha(1);
-        }
-      });
+    // Remove the active class from banking container
+    document.getElementById('banking-ui-container')?.classList.remove('active');
+    
+    // Skip speech bubble closing animation since we're not showing it anymore
+    
+    // Show interaction text again if player is still nearby
+    if (this.isPlayerNearBanker) {
+      this.interactionText.setAlpha(1);
     }
   }
   

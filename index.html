@@ -90,8 +90,12 @@
             document.getElementById('banking-ui-container').classList.add('active');
         });
         
-        window.addEventListener('updatePlayerRupees', function() {
-            document.getElementById('banking-ui-container').classList.remove('active');
+        // Only remove the active class when explicitly closing the UI
+        window.addEventListener('updatePlayerRupees', function(event) {
+            // Only remove active class if explicitly closing the UI
+            if (event.detail && event.detail.closeUI) {
+                document.getElementById('banking-ui-container').classList.remove('active');
+            }
         });
     </script>
 </body>

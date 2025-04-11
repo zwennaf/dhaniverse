@@ -12,21 +12,24 @@ interface FixedDeposit {
   matured: boolean;
 }
 
+// Update the interface to include initialRupees
 interface BankingDashboardProps {
   onClose: () => void;
   playerRupees: number;
+  initialRupees: number;
 }
 
 const BankingDashboard: React.FC<BankingDashboardProps> = ({
   onClose,
-  playerRupees
+  playerRupees,
+  initialRupees
 }) => {
   const [activeTab, setActiveTab] = useState('account');
   const [bankBalance, setBankBalance] = useState(0);
   const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([]);
   const [totalRupeesChange, setTotalRupeesChange] = useState(0);
   
-  // Load bank data from local storage
+  // Use playerRupees directly from props in the useEffect dependency array
   useEffect(() => {
     try {
       // Load bank account data
@@ -57,6 +60,13 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     }
   }, []);
   
+  // Every time playerRupees changes externally, reset the change tracking
+  useEffect(() => {
+    // Reset total change when player rupees are updated externally
+    setTotalRupeesChange(0);
+    console.log("Banking dashboard received updated player rupees:", playerRupees);
+  }, [initialRupees]);
+  
   // Save bank data to local storage
   const saveBankData = () => {
     try {
@@ -73,12 +83,21 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
   
   // Handle deposit to bank account
   const handleDeposit = (amount: number) => {
-    if (amount > playerRupees + totalRupeesChange) {
+    // Verify player has enough money, using playerRupees from props
+    if (amount > playerRupees) {
+      console.error("Cannot deposit more than playerRupees:", playerRupees, "amount:", amount);
       return false;
     }
     
     setBankBalance(prevBalance => prevBalance + amount);
     setTotalRupeesChange(prev => prev - amount);
+    
+    // Immediately dispatch an event to update the game and HUD
+    const newRupees = playerRupees - amount;
+    window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+      detail: { rupees: newRupees }
+    }));
+    
     saveBankData();
     return true;
   };
@@ -91,6 +110,13 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     
     setBankBalance(prevBalance => prevBalance - amount);
     setTotalRupeesChange(prev => prev + amount);
+    
+    // Immediately dispatch an event to update the game and HUD
+    const newRupees = playerRupees + amount;
+    window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+      detail: { rupees: newRupees }
+    }));
+    
     saveBankData();
     return true;
   };
@@ -156,10 +182,27 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     // Save bank data one last time
     saveBankData();
     
-    // Update player rupees via custom event
-    window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
-      detail: { rupees: playerRupees + totalRupeesChange }
-    }));
+    // Calculate the new total rupees - use playerRupees directly
+    const newTotalRupees = playerRupees;
+    
+    // First update the game's internal rupee state if needed
+    if (totalRupeesChange !== 0) {
+      console.log("Banking UI closing with updated rupee balance:", newTotalRupees);
+      window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+        detail: { 
+          rupees: newTotalRupees,
+          closeUI: true  // Add flag to indicate UI should close
+        }
+      }));
+    } else {
+      // Even if no rupee changes, we need to trigger UI close
+      window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+        detail: { 
+          rupees: newTotalRupees,
+          closeUI: true 
+        }
+      }));
+    }
     
     // Close the UI
     onClose();

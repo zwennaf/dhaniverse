@@ -1,14 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import BankingDashboard from './BankingDashboard';
 
 const BankingUI: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [playerRupees, setPlayerRupees] = useState(0);
   const [bankAccount, setBankAccount] = useState(null);
+  // Keep track of the rupees at opening time to calculate the difference later
+  const initialRupeesRef = useRef(0);
   
   useEffect(() => {
     // Listen for the custom event from the game to open the banking UI
     const handleOpenBankingUI = (event: CustomEvent) => {
+      console.log("Banking UI received open event with rupees:", event.detail.playerRupees);
+      
+      // Store the initial rupees value when banking UI opens
+      initialRupeesRef.current = event.detail.playerRupees;
+      
       // Get player rupees from the event
       setPlayerRupees(event.detail.playerRupees);
       
@@ -28,14 +35,28 @@ const BankingUI: React.FC = () => {
       }
     };
     
-    // Add event listener for the openBankingUI event
-    window.addEventListener('openBankingUI', handleOpenBankingUI as EventListener);
+    // Listen for rupee updates from the game while banking UI is open
+    const handleRupeeUpdate = (event: CustomEvent) => {
+      if (event.detail.rupees !== undefined) {
+        console.log("Banking UI received rupee update:", event.detail.rupees);
+        setPlayerRupees(event.detail.rupees);
+        
+        if (isOpen) {
+          initialRupeesRef.current = event.detail.rupees;
+        }
+      }
+    };
     
-    // Clean up the event listener when the component unmounts
+    // Add event listeners
+    window.addEventListener('openBankingUI', handleOpenBankingUI as EventListener);
+    window.addEventListener('rupee-update', handleRupeeUpdate as EventListener);
+    
+    // Clean up event listeners when the component unmounts
     return () => {
       window.removeEventListener('openBankingUI', handleOpenBankingUI as EventListener);
+      window.removeEventListener('rupee-update', handleRupeeUpdate as EventListener);
     };
-  }, []);
+  }, [isOpen]);
   
   // Close the banking UI
   const handleClose = () => {
@@ -59,6 +80,7 @@ const BankingUI: React.FC = () => {
     <BankingDashboard
       onClose={handleClose}
       playerRupees={playerRupees}
+      initialRupees={initialRupeesRef.current}
     />
   );
 };
