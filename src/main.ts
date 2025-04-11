@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
+import BankingUI from './ui/components/banking/BankingUI.tsx';
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,7 +15,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const root = ReactDOM.createRoot(joinScreen);
     root.render(React.createElement(App));
   }
+  
+  // Initialize the banking UI separately
+  initializeBankingUI();
 });
+
+// Function to initialize banking UI
+function initializeBankingUI() {
+  const bankingUIContainer = document.getElementById('banking-ui-container');
+  
+  if (bankingUIContainer) {
+    // Create a root and explicitly render the BankingUI component
+    const bankingUIRoot = ReactDOM.createRoot(bankingUIContainer);
+    bankingUIRoot.render(React.createElement(BankingUI));
+    
+    // Make sure the banking container is visible
+    bankingUIContainer.style.display = 'block';
+    
+    console.log("Banking UI initialized and mounted");
+  } else {
+    console.error("Could not find banking-ui-container element");
+  }
+}
 
 // Function to initialize HUD - will be called from game.ts when game starts
 export function initializeHUD(initialRupees = 25000) {

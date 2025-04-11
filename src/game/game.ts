@@ -26,6 +26,8 @@ export function startGame(username: string): void {
     // Create loading indicator
     loadingText = document.createElement('div');
     loadingText.innerHTML = 'Loading game assets...';
+    loadingText.style.fontFamily = 'Pixeloid';
+    loadingText.style.fontSize = '24px';
     loadingText.style.position = 'absolute';
     loadingText.style.top = '50%';
     loadingText.style.left = '50%';

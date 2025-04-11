@@ -165,6 +165,18 @@ export class MainScene extends Scene implements MainGameScene {
     this.bankNPCManager.update();
   }
 
+  // Method to open the banking UI
+  openBankingUI(bankAccount: any): void {
+    // Dispatch custom event for the React component to catch
+    const bankingEvent = new CustomEvent('openBankingUI', { 
+      detail: { 
+        playerRupees: this.playerRupees,
+        bankAccount: bankAccount
+      } 
+    });
+    window.dispatchEvent(bankingEvent);
+  }
+
   // Method to update rupees count
   updateRupees(amount: number): void {
     this.playerRupees += amount;

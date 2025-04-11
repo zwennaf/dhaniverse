@@ -7,6 +7,8 @@ export class BuildingManager {
   private buildingEntrance: { x: number, y: number };
   private buildingInteractionText: GameObjects.Text;
   private interactionKey: Input.Keyboard.Key | null = null;
+  private spaceKey: Input.Keyboard.Key | null = null;
+  private enterKey: Input.Keyboard.Key | null = null;
   private escKey: Input.Keyboard.Key | null = null;
   private isNearBuilding: boolean = false;
   private transitionInProgress: boolean = false;
@@ -40,6 +42,8 @@ export class BuildingManager {
     // Setup keys for interaction with null checks
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
+      this.spaceKey = scene.input.keyboard.addKey('SPACE');
+      this.enterKey = scene.input.keyboard.addKey('ENTER');
       this.escKey = scene.input.keyboard.addKey('ESC');
     }
     
@@ -104,11 +108,12 @@ export class BuildingManager {
       }
     }
     
-    // Check for E key press to enter building when near
+    // Check for key press to enter building when near (now supports E, Space, or Enter)
     if (this.isNearBuilding && 
         !mapManager.isPlayerInBuilding() && 
-        this.interactionKey && 
-        Phaser.Input.Keyboard.JustDown(this.interactionKey)) {
+        ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
+         (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+         (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
       this.enterBuilding();
     }
     
@@ -167,7 +172,26 @@ export class BuildingManager {
       console.warn('Could not play door-open sound:', error);
     }
     
-    // We've entered a building - the BankNPCManager will handle visibility in its update method
+    // Notify the BankNPCManager that we've entered a building
+    const mainScene = this.scene as any;
+    if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onEnterBuilding === 'function') {
+      // Explicitly pass 'bank' as the building type
+      mainScene.bankNPCManager.onEnterBuilding('bank');
+      
+      // Force the banking UI to be active container
+      document.getElementById('banking-ui-container')?.classList.add('active');
+      
+      // Ensure playerRupees is available for the banking UI
+      if (mainScene.playerRupees !== undefined) {
+        // Manually trigger the banking UI to open with current bank account data
+        this.scene.time.delayedCall(300, () => {
+          if (mainScene.bankNPCManager) {
+            const bankAccount = mainScene.bankNPCManager.getBankAccountData();
+            mainScene.openBankingUI(bankAccount);
+          }
+        });
+      }
+    }
   }
 
   private exitBuilding(): void {

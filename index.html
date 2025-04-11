@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <title>Dhaniverse</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { 
             margin: 0; 
@@ -51,6 +53,19 @@
             z-index: 900; /* Below join-screen but above game */
             display: none; /* Initially hidden, will be shown when game starts */
         }
+        #banking-ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1001; /* Above everything else when active */
+            pointer-events: none; /* By default, allow clicks to pass through */
+        }
+        /* When banking UI is active, we want it to receive pointer events */
+        #banking-ui-container.active {
+            pointer-events: auto;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
 </head>
@@ -59,6 +74,7 @@
     <div id="join-screen"></div>
     <div id="game-container"></div>
     <div id="hud-container"></div>
+    <div id="banking-ui-container"></div>
     <script type="module" src="/src/main.ts"></script>
     <script>
         // Remove loading div once game is visible
@@ -68,6 +84,15 @@
                 if (loading) loading.style.display = 'none';
             }, 1000);
         };
+        
+        // Toggle the banking UI container's active class when the banking UI opens/closes
+        window.addEventListener('openBankingUI', function() {
+            document.getElementById('banking-ui-container').classList.add('active');
+        });
+        
+        window.addEventListener('updatePlayerRupees', function() {
+            document.getElementById('banking-ui-container').classList.remove('active');
+        });
     </script>
 </body>
 </html>
