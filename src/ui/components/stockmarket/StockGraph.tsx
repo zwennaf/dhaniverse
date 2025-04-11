@@ -8,6 +8,13 @@ interface Stock {
   debtEquityRatio: number;
   businessGrowth: number;
   news: string[];
+  marketCap: number;
+  peRatio: number;
+  eps: number;
+  industryAvgPE: number;
+  outstandingShares: number;
+  volatility: number;
+  lastUpdate: number;
 }
 
 interface StockGraphProps {
@@ -20,6 +27,33 @@ const StockGraph: React.FC<StockGraphProps> = ({
   onClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Calculate if the stock is considered an "Undervalued Gem"
+  const isUndervalued = stock.peRatio <= stock.industryAvgPE * 1.1 && 
+                        stock.eps > 30 && 
+                        stock.debtEquityRatio < 1.0;
+  
+  // Format large numbers for display
+  const formatLargeNumber = (num: number): string => {
+    if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
+    return num.toString();
+  };
+  
+  // Get the appropriate color for PE ratio
+  const getPERatioColor = () => {
+    if (stock.peRatio < stock.industryAvgPE * 0.8) return 'text-green-400'; // Potentially undervalued
+    if (stock.peRatio > stock.industryAvgPE * 1.2) return 'text-orange-400'; // Potentially overvalued
+    return 'text-blue-300'; // Fair value
+  };
+  
+  // Get the appropriate color for debt-equity ratio
+  const getDebtEquityColor = () => {
+    if (stock.debtEquityRatio < 0.8) return 'text-green-400'; // Low debt, safer
+    if (stock.debtEquityRatio > 1.5) return 'text-orange-400'; // High debt, riskier
+    return 'text-blue-300'; // Moderate debt
+  };
   
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -164,7 +198,7 @@ const StockGraph: React.FC<StockGraphProps> = ({
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[60]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
-      <div className="relative bg-gray-900 p-6 rounded-lg shadow-xl border border-blue-500 max-w-3xl w-full">
+      <div className="relative bg-gray-900 p-6 rounded-lg shadow-xl border border-blue-500 max-w-4xl w-full">
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-white"
@@ -174,34 +208,129 @@ const StockGraph: React.FC<StockGraphProps> = ({
           </svg>
         </button>
         
-        <h3 className="text-xl font-semibold text-blue-400 mb-4">
-          {stock.name} - Price History
+        <h3 className="text-xl font-semibold text-blue-400 mb-4 flex items-center">
+          {stock.name} - Detailed Analysis
+          {isUndervalued && (
+            <span className="ml-3 px-3 py-1 text-sm bg-green-600/30 text-green-400 rounded-md">
+              Undervalued Gem
+            </span>
+          )}
         </h3>
         
-        <div className="bg-gray-800 p-4 rounded-lg mb-4">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <div className="text-gray-400">Current Price</div>
-              <div className="text-2xl font-bold text-blue-300">₹{stock.currentPrice.toLocaleString()}</div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left column - Price chart */}
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <div className="text-gray-400">Current Price</div>
+                <div className="text-2xl font-bold text-blue-300">₹{stock.currentPrice.toLocaleString()}</div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-gray-400">Debt-Equity Ratio</div>
-              <div className="text-lg font-medium text-blue-300">{stock.debtEquityRatio.toFixed(1)}</div>
+            
+            <div className="bg-gray-900 rounded-md p-3 mb-4">
+              <canvas 
+                ref={canvasRef} 
+                width={600} 
+                height={300}
+                className="w-full h-auto"
+              ></canvas>
+            </div>
+            
+            <div className="text-sm text-gray-400">
+              <p>This chart shows the stock price movement over the last {stock.priceHistory.length} days.</p>
+              <p>Past performance is not indicative of future results.</p>
             </div>
           </div>
           
-          <div className="bg-gray-900 rounded-md p-3 mb-4">
-            <canvas 
-              ref={canvasRef} 
-              width={600} 
-              height={300}
-              className="w-full h-auto"
-            ></canvas>
-          </div>
-          
-          <div className="text-sm text-gray-400">
-            <p>This chart shows the stock price movement over the last {stock.priceHistory.length} days.</p>
-            <p>Past performance is not indicative of future results. Market prices can fluctuate significantly.</p>
+          {/* Right column - Financial metrics */}
+          <div className="bg-gray-800 p-4 rounded-lg">
+            <h4 className="text-lg font-medium text-blue-400 mb-4">Financial Metrics</h4>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm">Market Cap</div>
+                  <div className="text-lg font-medium text-blue-300">
+                    ₹{formatLargeNumber(stock.marketCap)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stock.marketCap > 1000000000 ? 'Large Cap' : 
+                     stock.marketCap > 250000000 ? 'Mid Cap' : 'Small Cap'}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm">Outstanding Shares</div>
+                  <div className="text-lg font-medium text-blue-300">
+                    {formatLargeNumber(stock.outstandingShares)}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm flex items-center">
+                    P/E Ratio
+                    <span className="ml-1 text-xs text-gray-500">
+                      (Industry Avg: {stock.industryAvgPE.toFixed(1)})
+                    </span>
+                  </div>
+                  <div className={`text-lg font-medium ${getPERatioColor()}`}>
+                    {stock.peRatio.toFixed(1)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stock.peRatio < stock.industryAvgPE * 0.8 ? 'Potentially undervalued' : 
+                     stock.peRatio > stock.industryAvgPE * 1.2 ? 'Potentially overvalued' : 'Fair value'}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm">Earnings Per Share</div>
+                  <div className="text-lg font-medium text-blue-300">
+                    ₹{stock.eps.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stock.eps > 50 ? 'Strong profitability' : 
+                     stock.eps > 20 ? 'Good profitability' : 'Moderate profitability'}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm">Debt/Equity Ratio</div>
+                  <div className={`text-lg font-medium ${getDebtEquityColor()}`}>
+                    {stock.debtEquityRatio.toFixed(1)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stock.debtEquityRatio < 0.8 ? 'Low financial risk' : 
+                     stock.debtEquityRatio > 1.5 ? 'Higher financial risk' : 'Moderate leverage'}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-700/50 p-3 rounded-md">
+                  <div className="text-gray-400 text-sm">Business Growth</div>
+                  <div className={`text-lg font-medium ${stock.businessGrowth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {stock.businessGrowth >= 0 ? '+' : ''}{stock.businessGrowth}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stock.businessGrowth > 5 ? 'Strong growth' : 
+                     stock.businessGrowth > 0 ? 'Moderate growth' : 'Contraction'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Analysis summary */}
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <h5 className="font-medium text-blue-400 mb-2">Investment Analysis</h5>
+                <p className="text-sm text-gray-300">
+                  {isUndervalued ? 
+                    `${stock.name} shows strong potential with a favorable P/E ratio (${stock.peRatio.toFixed(1)} vs industry ${stock.industryAvgPE.toFixed(1)}), solid earnings (₹${stock.eps.toFixed(2)} per share), and manageable debt (${stock.debtEquityRatio.toFixed(1)} D/E ratio). This stock appears fundamentally undervalued.` :
+                    `${stock.name} currently has a P/E ratio of ${stock.peRatio.toFixed(1)} (industry average: ${stock.industryAvgPE.toFixed(1)}), earnings of ₹${stock.eps.toFixed(2)} per share, and a debt-to-equity ratio of ${stock.debtEquityRatio.toFixed(1)}. Consider these metrics when making investment decisions.`
+                  }
+                </p>
+              </div>
+              
+              <div className="mt-2 text-xs text-gray-500 italic">
+                This analysis is for educational purposes only and does not constitute financial advice.
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -18,6 +18,12 @@ interface Stock {
   news: string[];
   volatility: number;     // How much the price tends to fluctuate
   lastUpdate: number;     // Timestamp of last price update
+  // New financial metrics
+  marketCap: number;      // Total market value (price * outstanding shares)
+  peRatio: number;        // Price-to-Earnings ratio
+  eps: number;            // Earnings Per Share
+  outstandingShares: number; // Number of shares available to the public
+  industryAvgPE: number;  // Industry average P/E ratio for comparison
 }
 
 // Market status interface to track overall market conditions
@@ -560,7 +566,12 @@ export class StockMarketManager {
         businessGrowth: 4.2,
         news: [],
         volatility: 1.5,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        marketCap: 1500000000,
+        peRatio: 25,
+        eps: 60,
+        outstandingShares: 1000000,
+        industryAvgPE: 20
       },
       {
         id: 'greenedge',
@@ -573,7 +584,12 @@ export class StockMarketManager {
         businessGrowth: 2.8,
         news: [],
         volatility: 2.0,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        marketCap: 850000000,
+        peRatio: 18,
+        eps: 47.22,
+        outstandingShares: 1000000,
+        industryAvgPE: 15
       },
       {
         id: 'bytex',
@@ -586,7 +602,12 @@ export class StockMarketManager {
         businessGrowth: -1.3,
         news: [],
         volatility: 3.0,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        marketCap: 3200000000,
+        peRatio: 30,
+        eps: 106.67,
+        outstandingShares: 1000000,
+        industryAvgPE: 20
       },
       {
         id: 'solarsphere',
@@ -599,7 +620,12 @@ export class StockMarketManager {
         businessGrowth: 6.5,
         news: [],
         volatility: 1.8,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        marketCap: 620000000,
+        peRatio: 12,
+        eps: 51.67,
+        outstandingShares: 1000000,
+        industryAvgPE: 15
       }
     ];
   }
@@ -689,6 +715,9 @@ export class StockMarketManager {
         stock.priceHistory.shift(); // Remove oldest price data
       }
       
+      // Update market cap based on new price
+      stock.marketCap = stock.currentPrice * stock.outstandingShares;
+      
       // Occasionally update business growth (10% chance)
       if (Math.random() < 0.1) {
         const growthChange = (Math.random() * 2) - 1; // -1% to +1%
@@ -699,6 +728,17 @@ export class StockMarketManager {
       if (Math.random() < 0.05) {
         const ratioChange = (Math.random() * 0.4) - 0.2; // -0.2 to +0.2
         stock.debtEquityRatio = Math.max(0.1, Math.round((stock.debtEquityRatio + ratioChange) * 10) / 10);
+      }
+      
+      // Occasionally update EPS and PE ratio (8% chance)
+      if (Math.random() < 0.08) {
+        // EPS can change based on company performance
+        const epsChange = (Math.random() * 4) - 2; // -2% to +2%
+        stock.eps = Math.max(0.1, stock.eps * (1 + epsChange/100));
+        stock.eps = Math.round(stock.eps * 100) / 100; // Round to 2 decimal places
+        
+        // PE ratio is calculated from price and EPS
+        stock.peRatio = stock.eps > 0 ? Math.round((stock.currentPrice / stock.eps) * 10) / 10 : stock.peRatio;
       }
       
       // Generate random news (2% chance per stock per update)
@@ -718,6 +758,9 @@ export class StockMarketManager {
           const newsImpact = Math.random() * 10 - 5; // -5% to +5%
           const impactAmount = stock.currentPrice * (newsImpact / 100);
           stock.currentPrice = Math.max(1, stock.currentPrice + impactAmount);
+          
+          // Update market cap after news impact
+          stock.marketCap = stock.currentPrice * stock.outstandingShares;
         }
       }
     });
