@@ -1,4 +1,7 @@
+
+
 # 🌍 Dhaniverse — Gamified Financial Management App 💸🎮
+  ![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)
 
 > "We're not just making financial education fun — we're making it *relevant* to young India's unique challenges."
 
@@ -6,9 +9,6 @@ Welcome to **Dhaniverse**, a 2D open-world RPG game that transforms the way Gen 
 
 ---
 
-  <img src="![Copy of Dhaniverse - A Gamified Financial Management App (1)](https://github.com/user-attachments/assets/228d44ff-133b-4d9f-bc3e-8241d8292f24)
-" alt="Dhaniverse Banner" width="80%" />
-</p>
 
 ## 🚀 About the Project
 
