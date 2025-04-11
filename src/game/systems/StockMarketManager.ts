@@ -6,14 +6,51 @@ interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
 }
 
+// Enhanced Stock interface with more realistic properties
 interface Stock {
   id: string;
   name: string;
+  sector: string;
   currentPrice: number;
   priceHistory: number[];
   debtEquityRatio: number;
   businessGrowth: number;
   news: string[];
+  volatility: number;     // How much the price tends to fluctuate
+  lastUpdate: number;     // Timestamp of last price update
+}
+
+// Market status interface to track overall market conditions
+interface MarketStatus {
+  isOpen: boolean;        // Whether the market is currently open
+  trend: 'bull' | 'bear' | 'neutral'; // Overall market trend
+  volatility: number;     // Overall market volatility
+  nextOpenTime: number;   // Next time the market will open
+  nextCloseTime: number;  // Next time the market will close
+}
+
+// Player's portfolio to track owned stocks
+interface StockHolding {
+  stockId: string;
+  quantity: number;
+  averagePurchasePrice: number;
+  totalInvestment: number;
+}
+
+interface PlayerPortfolio {
+  holdings: StockHolding[];
+  transactionHistory: StockTransaction[];
+}
+
+// Transaction history
+interface StockTransaction {
+  stockId: string;
+  stockName: string;
+  type: 'buy' | 'sell';
+  price: number;
+  quantity: number;
+  timestamp: number;
+  total: number;
 }
 
 export class StockMarketManager {
@@ -27,6 +64,20 @@ export class StockMarketManager {
   private speechBubble: GameObjects.Sprite | null = null;
   private stockData: Stock[];
   private newsItems: Record<string, string[]>;
+  
+  // New properties for enhanced stock market simulation
+  private marketStatus: MarketStatus;
+  private playerPortfolio: PlayerPortfolio;
+  private marketTimerText: GameObjects.Text;
+  private sectorInfluence: Record<string, number> = {}; // Sector-wide influences
+  private marketEvents: string[]; // Global market events
+  private lastRandomEvent: number = 0; // Timestamp of last random event
+  private updateInterval: number = 15000; // 15 seconds between updates (faster for gameplay)
+  
+  // Market hours (game time)
+  private readonly MARKET_OPEN_HOUR: number = 9;  // 9 AM
+  private readonly MARKET_CLOSE_HOUR: number = 16; // 4 PM
+  private readonly MILLISECONDS_PER_HOUR: number = 60000; // 1 minute real time = 1 hour game time
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -35,6 +86,30 @@ export class StockMarketManager {
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
     }
+    
+    // Initialize market status with a default value to satisfy TypeScript
+    this.marketStatus = {
+      isOpen: false,
+      trend: 'neutral',
+      volatility: 1.0,
+      nextOpenTime: Date.now(),
+      nextCloseTime: Date.now()
+    };
+    
+    // Then properly initialize it
+    this.initializeMarketStatus();
+    
+    // Initialize player portfolio
+    this.playerPortfolio = {
+      holdings: [],
+      transactionHistory: []
+    };
+    
+    // Initialize sector influences
+    this.initializeSectorInfluences();
+    
+    // Initialize market events
+    this.marketEvents = this.setupMarketEvents();
     
     // Initialize mock stock data
     this.stockData = this.generateInitialStockData();
@@ -69,12 +144,23 @@ export class StockMarketManager {
       padding: { x: 8, y: 4 }
     }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
     
+    // Add market timer text
+    this.marketTimerText = scene.add.text(this.broker.x, this.broker.y + 30, "", {
+      fontFamily: 'Arial',
+      fontSize: '14px',
+      color: '#ffffff',
+      align: 'center',
+      backgroundColor: '#00000080',
+      padding: { x: 6, y: 3 }
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    
     // Add to game container
     const gameContainer = scene.getGameContainer();
     if (gameContainer) {
       gameContainer.add(this.broker);
       gameContainer.add(brokerNameText);
       gameContainer.add(this.interactionText);
+      gameContainer.add(this.marketTimerText);
       this.broker.nameText = brokerNameText;
     }
     
@@ -86,7 +172,7 @@ export class StockMarketManager {
     
     console.log("Stock Market NPC created at position:", brokerX, brokerY);
     
-    // Start the stock price simulation
+    // Start the stock price simulation with a faster update interval
     this.simulateStockPrices();
   }
   
@@ -106,6 +192,359 @@ export class StockMarketManager {
   }
 
   /**
+   * Initialize market status and set up initial market conditions
+   */
+  private initializeMarketStatus(): void {
+    // Randomly determine initial market trend
+    const trends: ('bull' | 'bear' | 'neutral')[] = ['bull', 'bear', 'neutral'];
+    const randomTrend = trends[Math.floor(Math.random() * trends.length)];
+    
+    const now = Date.now();
+    const currentHour = new Date().getHours();
+    
+    // Determine if market should be open based on game time
+    const isMarketHours = currentHour >= this.MARKET_OPEN_HOUR && currentHour < this.MARKET_CLOSE_HOUR;
+    
+    // Calculate next open/close times
+    let nextOpenTime: number;
+    let nextCloseTime: number;
+    
+    if (isMarketHours) {
+      // Market is currently open, calculate today's close time and tomorrow's open time
+      const today = new Date();
+      today.setHours(this.MARKET_CLOSE_HOUR, 0, 0, 0);
+      nextCloseTime = today.getTime();
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(this.MARKET_OPEN_HOUR, 0, 0, 0);
+      nextOpenTime = tomorrow.getTime();
+    } else {
+      // Market is closed, calculate next open time
+      const nextOpen = new Date();
+      if (currentHour >= this.MARKET_CLOSE_HOUR) {
+        // It's after closing today, open tomorrow
+        nextOpen.setDate(nextOpen.getDate() + 1);
+      }
+      nextOpen.setHours(this.MARKET_OPEN_HOUR, 0, 0, 0);
+      nextOpenTime = nextOpen.getTime();
+      
+      // Calculate next close time after the open
+      const nextClose = new Date(nextOpenTime);
+      nextClose.setHours(this.MARKET_CLOSE_HOUR, 0, 0, 0);
+      nextCloseTime = nextClose.getTime();
+    }
+    
+    // For gameplay purposes, scale times to be much shorter
+    const scaleFactor = 60; // Make time pass 60x faster for gameplay
+    const timeToNextOpen = (nextOpenTime - now) / scaleFactor;
+    const timeToNextClose = (nextCloseTime - now) / scaleFactor;
+    
+    nextOpenTime = now + timeToNextOpen;
+    nextCloseTime = now + timeToNextClose;
+    
+    // Set up market status
+    this.marketStatus = {
+      isOpen: isMarketHours,
+      trend: randomTrend,
+      volatility: 1.0 + Math.random(), // Base volatility between 1.0 and 2.0
+      nextOpenTime: nextOpenTime,
+      nextCloseTime: nextCloseTime
+    };
+    
+    console.log(`Market initialized: ${isMarketHours ? 'OPEN' : 'CLOSED'}, Trend: ${randomTrend}`);
+    
+    // Schedule market open/close events
+    this.scheduleMarketStatusChanges();
+  }
+  
+  /**
+   * Initialize sector-specific influences
+   */
+  private initializeSectorInfluences(): void {
+    // Set up initial sector influences (these will change over time)
+    this.sectorInfluence = {
+      'Technology': 1 + (Math.random() * 0.4 - 0.2), // 0.8 to 1.2 multiplier
+      'Energy': 1 + (Math.random() * 0.4 - 0.2),
+      'Finance': 1 + (Math.random() * 0.4 - 0.2),
+      'Healthcare': 1 + (Math.random() * 0.4 - 0.2),
+      'Consumer': 1 + (Math.random() * 0.4 - 0.2)
+    };
+  }
+  
+  /**
+   * Setup a database of market events that can affect multiple stocks
+   */
+  private setupMarketEvents(): string[] {
+    return [
+      "Central bank raises interest rates by 0.5%",
+      "Government announces new tech industry regulations",
+      "International trade tensions escalate",
+      "Energy prices surge due to global supply constraints",
+      "Major cybersecurity breach affects multiple companies",
+      "Economic growth exceeds expectations",
+      "Currency value fluctuates significantly",
+      "Unexpected inflation data released",
+      "Healthcare reform bill passes legislature",
+      "Major natural disaster disrupts supply chains"
+    ];
+  }
+  
+  /**
+   * Schedule events to change market open/close status
+   */
+  private scheduleMarketStatusChanges(): void {
+    // Proper way to handle delayed calls in Phaser 3
+    this.scene.time.removeAllEvents(); // Clear any existing timers related to market events
+    
+    const now = Date.now();
+    
+    // Schedule market open
+    if (!this.marketStatus.isOpen) {
+      const timeToOpen = this.marketStatus.nextOpenTime - now;
+      if (timeToOpen > 0) {
+        this.scene.time.delayedCall(timeToOpen, this.openMarket, [], this);
+        console.log(`Market will open in ${Math.round(timeToOpen / 1000)} seconds`);
+      }
+    }
+    
+    // Schedule market close
+    if (this.marketStatus.isOpen) {
+      const timeToClose = this.marketStatus.nextCloseTime - now;
+      if (timeToClose > 0) {
+        this.scene.time.delayedCall(timeToClose, this.closeMarket, [], this);
+        console.log(`Market will close in ${Math.round(timeToClose / 1000)} seconds`);
+      }
+    }
+  }
+  
+  /**
+   * Open the market
+   */
+  private openMarket(): void {
+    this.marketStatus.isOpen = true;
+    console.log("Market is now OPEN");
+    
+    // Generate a market event on opening (30% chance)
+    if (Math.random() < 0.3) {
+      this.generateMarketEvent();
+    }
+    
+    // Calculate next close time
+    const nextClose = Date.now() + (this.MILLISECONDS_PER_HOUR * (this.MARKET_CLOSE_HOUR - this.MARKET_OPEN_HOUR));
+    this.marketStatus.nextCloseTime = nextClose;
+    
+    // Schedule market close
+    const timeToClose = nextClose - Date.now();
+    this.scene.time.delayedCall(timeToClose, this.closeMarket, [], this);
+    
+    // Update market timer text
+    this.updateMarketTimerText();
+    
+    // Update sector influences for the day
+    this.updateSectorInfluences();
+    
+    // If market UI is open, update it with new status
+    this.updateMarketUI();
+  }
+  
+  /**
+   * Close the market
+   */
+  private closeMarket(): void {
+    this.marketStatus.isOpen = false;
+    console.log("Market is now CLOSED");
+    
+    // Calculate next open time (next day)
+    const now = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(this.MARKET_OPEN_HOUR, 0, 0, 0);
+    
+    // Scale for gameplay
+    const scaleFactor = 60;
+    const realTimeToNextOpen = (tomorrow.getTime() - now.getTime()) / scaleFactor;
+    
+    this.marketStatus.nextOpenTime = Date.now() + realTimeToNextOpen;
+    
+    // Schedule market open
+    this.scene.time.delayedCall(realTimeToNextOpen, this.openMarket, [], this);
+    
+    // Update market timer text
+    this.updateMarketTimerText();
+    
+    // Occasionally change market trend overnight (25% chance)
+    if (Math.random() < 0.25) {
+      const trends: ('bull' | 'bear' | 'neutral')[] = ['bull', 'bear', 'neutral'];
+      this.marketStatus.trend = trends[Math.floor(Math.random() * trends.length)];
+      console.log(`Market trend changed to ${this.marketStatus.trend}`);
+    }
+    
+    // Update market UI if open
+    this.updateMarketUI();
+  }
+  
+  /**
+   * Update the market timer text
+   */
+  private updateMarketTimerText(): void {
+    if (!this.marketTimerText) return;
+    
+    const now = Date.now();
+    let timeString: string;
+    let color: string;
+    
+    if (this.marketStatus.isOpen) {
+      const timeToClose = Math.max(0, this.marketStatus.nextCloseTime - now);
+      const minutesToClose = Math.ceil(timeToClose / 60000);
+      timeString = `Market: OPEN (Closes in ${minutesToClose} mins)`;
+      color = '#4ade80'; // Green
+    } else {
+      const timeToOpen = Math.max(0, this.marketStatus.nextOpenTime - now);
+      const minutesToOpen = Math.ceil(timeToOpen / 60000);
+      timeString = `Market: CLOSED (Opens in ${minutesToOpen} mins)`;
+      color = '#f87171'; // Red
+    }
+    
+    // Add trend indicator
+    const trendIndicator = this.marketStatus.trend === 'bull' ? '↑' : 
+                          this.marketStatus.trend === 'bear' ? '↓' : '→';
+    
+    const trendColor = this.marketStatus.trend === 'bull' ? '#4ade80' : 
+                      this.marketStatus.trend === 'bear' ? '#f87171' : '#94a3b8';
+                      
+    timeString += ` | Trend: ${trendIndicator}`;
+    
+    this.marketTimerText.setText(timeString);
+    this.marketTimerText.setColor(color);
+    
+    // Make sure timer text is visible when broker is visible
+    if (this.broker.visible) {
+      this.marketTimerText.setAlpha(1);
+      this.marketTimerText.setPosition(this.broker.x, this.broker.y + 30);
+    } else {
+      this.marketTimerText.setAlpha(0);
+    }
+  }
+  
+  /**
+   * Update sector influences (internal economic factors)
+   */
+  private updateSectorInfluences(): void {
+    Object.keys(this.sectorInfluence).forEach(sector => {
+      // Adjust sector influence by small random amount
+      const change = (Math.random() * 0.2) - 0.1; // -0.1 to +0.1
+      this.sectorInfluence[sector] = Math.max(0.5, Math.min(1.5, this.sectorInfluence[sector] + change));
+      console.log(`Sector ${sector} influence updated to ${this.sectorInfluence[sector].toFixed(2)}`);
+    });
+  }
+  
+  /**
+   * Generate random market event that affects multiple stocks
+   */
+  private generateMarketEvent(): void {
+    // Limit frequency of market events
+    const now = Date.now();
+    if (now - this.lastRandomEvent < 300000) { // No more than one event every 5 minutes
+      return;
+    }
+    
+    // Select random event
+    const eventIndex = Math.floor(Math.random() * this.marketEvents.length);
+    const event = this.marketEvents[eventIndex];
+    
+    console.log(`Market Event: ${event}`);
+    this.lastRandomEvent = now;
+    
+    // Determine which sectors are affected
+    const affectedSectors: string[] = [];
+    
+    // Map event to sectors (simplified logic)
+    if (event.includes('tech')) {
+      affectedSectors.push('Technology');
+    }
+    if (event.includes('energy') || event.includes('supply chain')) {
+      affectedSectors.push('Energy');
+    }
+    if (event.includes('interest rates') || event.includes('economic') || event.includes('inflation')) {
+      affectedSectors.push('Finance');
+    }
+    if (event.includes('healthcare')) {
+      affectedSectors.push('Healthcare');
+    }
+    
+    // If no specific sectors found, affect all sectors
+    if (affectedSectors.length === 0) {
+      affectedSectors.push('Technology', 'Energy', 'Finance', 'Healthcare', 'Consumer');
+    }
+    
+    // Apply market event effects to stocks in affected sectors
+    this.applyMarketEventToStocks(event, affectedSectors);
+  }
+  
+  /**
+   * Apply market event effects to stocks
+   */
+  private applyMarketEventToStocks(event: string, affectedSectors: string[]): void {
+    // Determine if event is positive or negative
+    let impactDirection = 0;
+    
+    if (event.includes('exceeds expectations') || event.includes('passes') || event.includes('surge')) {
+      impactDirection = 1; // positive
+    } else if (event.includes('breach') || event.includes('tensions') || event.includes('disaster') || 
+               event.includes('constraints') || event.includes('raises')) {
+      impactDirection = -1; // negative
+    }
+    
+    // If direction is still neutral, randomly decide
+    if (impactDirection === 0) {
+      impactDirection = Math.random() > 0.5 ? 1 : -1;
+    }
+    
+    // Calculate impact magnitude based on event significance
+    const impactBase = 3 + Math.random() * 7; // 3-10% base impact
+    
+    // Apply to affected stocks
+    this.stockData.forEach(stock => {
+      if (affectedSectors.includes(stock.sector)) {
+        // Calculate stock-specific impact with some randomization
+        const stockImpact = impactDirection * impactBase * (0.8 + Math.random() * 0.4);
+        
+        // Apply price change
+        const priceChange = stock.currentPrice * (stockImpact / 100);
+        stock.currentPrice = Math.max(1, stock.currentPrice + priceChange);
+        
+        // Add event as news
+        const newsItem = `${event}. Impact on ${stock.name}: ${impactDirection > 0 ? 'Positive' : 'Negative'}.`;
+        if (!stock.news.includes(newsItem)) {
+          stock.news.unshift(newsItem);
+          if (stock.news.length > 3) {
+            stock.news.pop();
+          }
+        }
+      }
+    });
+    
+    // Update UI if open
+    this.updateMarketUI();
+  }
+  
+  /**
+   * Update the market UI if it's currently open
+   */
+  private updateMarketUI(): void {
+    if (this.activeDialog) {
+      // Dispatch event to update the UI
+      window.dispatchEvent(new CustomEvent('updateStockMarketUI', {
+        detail: {
+          stocks: this.stockData,
+          marketStatus: this.marketStatus
+        }
+      }));
+    }
+  }
+
+  /**
    * Generate initial stock data for the market
    */
   private generateInitialStockData(): Stock[] {
@@ -113,42 +552,54 @@ export class StockMarketManager {
       {
         id: 'technova',
         name: 'TechNova',
+        sector: 'Technology',
         currentPrice: 1500,
         priceHistory: Array.from({ length: 15 }, 
           (_, i) => 1500 + Math.random() * 300 - 150),
         debtEquityRatio: 0.7,
         businessGrowth: 4.2,
-        news: []
+        news: [],
+        volatility: 1.5,
+        lastUpdate: Date.now()
       },
       {
         id: 'greenedge',
         name: 'GreenEdge',
+        sector: 'Energy',
         currentPrice: 850,
         priceHistory: Array.from({ length: 15 }, 
           (_, i) => 850 + Math.random() * 200 - 100),
         debtEquityRatio: 1.2,
         businessGrowth: 2.8,
-        news: []
+        news: [],
+        volatility: 2.0,
+        lastUpdate: Date.now()
       },
       {
         id: 'bytex',
         name: 'ByteX',
+        sector: 'Technology',
         currentPrice: 3200,
         priceHistory: Array.from({ length: 15 }, 
           (_, i) => 3200 + Math.random() * 600 - 300),
         debtEquityRatio: 0.5,
         businessGrowth: -1.3,
-        news: []
+        news: [],
+        volatility: 3.0,
+        lastUpdate: Date.now()
       },
       {
         id: 'solarsphere',
         name: 'SolarSphere',
+        sector: 'Energy',
         currentPrice: 620,
         priceHistory: Array.from({ length: 15 }, 
           (_, i) => 620 + Math.random() * 150 - 75),
         debtEquityRatio: 1.8,
         businessGrowth: 6.5,
-        news: []
+        news: [],
+        volatility: 1.8,
+        lastUpdate: Date.now()
       }
     ];
   }
@@ -187,6 +638,23 @@ export class StockMarketManager {
         "SolarSphere wins environmental innovation award for new technology."
       ]
     };
+  }
+
+  /**
+   * Ensure each stock has at least one news item
+   */
+  private ensureStocksHaveNews(): void {
+    this.stockData.forEach(stock => {
+      if (stock.news.length === 0 && this.newsItems[stock.id]) {
+        // Select a random news item for this stock
+        const availableNews = this.newsItems[stock.id];
+        const randomNewsIndex = Math.floor(Math.random() * availableNews.length);
+        const newsItem = availableNews[randomNewsIndex];
+        stock.news.push(newsItem);
+        
+        console.log(`Added news item to ${stock.name}: ${newsItem}`);
+      }
+    });
   }
 
   /**
@@ -350,7 +818,8 @@ export class StockMarketManager {
     this.activeDialog = true;
     this.interactionText.setAlpha(0);
     
-    // Skip showing speech bubble - direct stock market UI open
+    // Ensure stocks have news before opening the UI
+    this.ensureStocksHaveNews();
     
     // Force the stock market UI container to be active
     document.getElementById('stock-market-ui-container')?.classList.add('active');
@@ -421,5 +890,209 @@ export class StockMarketManager {
     
     this.broker.destroy();
     this.interactionText.destroy();
+  }
+
+  /**
+   * Get market status for UI
+   */
+  public getMarketStatus(): MarketStatus {
+    // Update the market timer before returning to ensure values are current
+    this.updateMarketTimerText();
+    return this.marketStatus;
+  }
+
+  /**
+   * Get player's portfolio
+   */
+  public getPlayerPortfolio(): PlayerPortfolio {
+    return this.playerPortfolio;
+  }
+  
+  /**
+   * Execute a stock purchase
+   * @param stockId ID of the stock to purchase
+   * @param quantity Number of shares to purchase
+   * @returns Success status and message
+   */
+  public buyStock(stockId: string, quantity: number): { success: boolean; message: string } {
+    // Validate quantity
+    if (quantity <= 0) {
+      return { success: false, message: "Please enter a valid quantity." };
+    }
+    
+    // Check if market is open
+    if (!this.marketStatus.isOpen) {
+      return { success: false, message: "Cannot trade while market is closed." };
+    }
+    
+    // Find the stock
+    const stock = this.stockData.find(s => s.id === stockId);
+    if (!stock) {
+      return { success: false, message: "Stock not found." };
+    }
+    
+    // Calculate total cost
+    const totalCost = stock.currentPrice * quantity;
+    
+    // Check if player has enough money
+    const playerRupees = this.scene.getPlayerRupees();
+    if (totalCost > playerRupees) {
+      return { success: false, message: "Not enough rupees for this purchase." };
+    }
+    
+    // Deduct rupees from player
+    this.scene.deductPlayerRupees(totalCost);
+    
+    // Update player portfolio
+    const existingHolding = this.playerPortfolio.holdings.find(h => h.stockId === stockId);
+    if (existingHolding) {
+      // Update existing holding with new average price
+      const totalShares = existingHolding.quantity + quantity;
+      const totalInvestment = existingHolding.totalInvestment + totalCost;
+      existingHolding.quantity = totalShares;
+      existingHolding.totalInvestment = totalInvestment;
+      existingHolding.averagePurchasePrice = totalInvestment / totalShares;
+    } else {
+      // Add new holding
+      this.playerPortfolio.holdings.push({
+        stockId,
+        quantity,
+        averagePurchasePrice: stock.currentPrice,
+        totalInvestment: totalCost
+      });
+    }
+    
+    // Record transaction
+    this.playerPortfolio.transactionHistory.push({
+      stockId,
+      stockName: stock.name,
+      type: 'buy',
+      price: stock.currentPrice,
+      quantity,
+      timestamp: Date.now(),
+      total: totalCost
+    });
+    
+    // Log transaction
+    console.log(`Purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
+    
+    return { 
+      success: true, 
+      message: `Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost.toLocaleString()}.` 
+    };
+  }
+  
+  /**
+   * Execute a stock sale
+   * @param stockId ID of the stock to sell
+   * @param quantity Number of shares to sell
+   * @returns Success status and message
+   */
+  public sellStock(stockId: string, quantity: number): { success: boolean; message: string } {
+    // Validate quantity
+    if (quantity <= 0) {
+      return { success: false, message: "Please enter a valid quantity." };
+    }
+    
+    // Check if market is open
+    if (!this.marketStatus.isOpen) {
+      return { success: false, message: "Cannot trade while market is closed." };
+    }
+    
+    // Find the stock
+    const stock = this.stockData.find(s => s.id === stockId);
+    if (!stock) {
+      return { success: false, message: "Stock not found." };
+    }
+    
+    // Check if player owns the stock
+    const holdingIndex = this.playerPortfolio.holdings.findIndex(h => h.stockId === stockId);
+    if (holdingIndex === -1) {
+      return { success: false, message: `You don't own any shares of ${stock.name}.` };
+    }
+    
+    const holding = this.playerPortfolio.holdings[holdingIndex];
+    
+    // Check if player owns enough shares
+    if (holding.quantity < quantity) {
+      return { success: false, message: `You only have ${holding.quantity} shares of ${stock.name}.` };
+    }
+    
+    // Calculate sale value
+    const saleValue = stock.currentPrice * quantity;
+    
+    // Add rupees to player
+    this.scene.addPlayerRupees(saleValue);
+    
+    // Update portfolio
+    if (holding.quantity === quantity) {
+      // Remove holding completely if selling all shares
+      this.playerPortfolio.holdings.splice(holdingIndex, 1);
+    } else {
+      // Update quantity and investment value for remaining shares
+      const remainingShares = holding.quantity - quantity;
+      const investmentPerShare = holding.totalInvestment / holding.quantity;
+      holding.quantity = remainingShares;
+      holding.totalInvestment -= investmentPerShare * quantity;
+      // Average price stays the same
+    }
+    
+    // Record transaction
+    this.playerPortfolio.transactionHistory.push({
+      stockId,
+      stockName: stock.name,
+      type: 'sell',
+      price: stock.currentPrice,
+      quantity,
+      timestamp: Date.now(),
+      total: saleValue
+    });
+    
+    // Calculate profit/loss
+    const profit = saleValue - (holding.averagePurchasePrice * quantity);
+    const profitPercent = (profit / (holding.averagePurchasePrice * quantity)) * 100;
+    
+    const profitMessage = profit >= 0 ? 
+      `with a profit of ₹${profit.toLocaleString()} (${profitPercent.toFixed(2)}%)` : 
+      `with a loss of ₹${Math.abs(profit).toLocaleString()} (${Math.abs(profitPercent).toFixed(2)}%)`;
+    
+    console.log(`Sold ${quantity} shares of ${stock.name} for ₹${saleValue} ${profitMessage}`);
+    
+    return { 
+      success: true, 
+      message: `Successfully sold ${quantity} shares of ${stock.name} for ₹${saleValue.toLocaleString()} ${profitMessage}.`
+    };
+  }
+  
+  /**
+   * Calculate portfolio value and performance metrics
+   */
+  public getPortfolioSummary(): { 
+    totalValue: number;
+    totalInvestment: number;
+    totalProfit: number;
+    profitPercent: number;
+  } {
+    let totalValue = 0;
+    let totalInvestment = 0;
+    
+    // Calculate current value of all holdings
+    this.playerPortfolio.holdings.forEach(holding => {
+      const stock = this.stockData.find(s => s.id === holding.stockId);
+      if (stock) {
+        totalValue += stock.currentPrice * holding.quantity;
+        totalInvestment += holding.totalInvestment;
+      }
+    });
+    
+    const totalProfit = totalValue - totalInvestment;
+    const profitPercent = totalInvestment > 0 ? (totalProfit / totalInvestment) * 100 : 0;
+    
+    return {
+      totalValue,
+      totalInvestment,
+      totalProfit,
+      profitPercent
+    };
   }
 }

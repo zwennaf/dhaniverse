@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Stock {
   id: string;
@@ -15,10 +15,33 @@ interface NewsPopupProps {
   onClose: () => void;
 }
 
+// News placeholder items when no real news is available
+const placeholderNews = [
+  "Market analysts remain optimistic about future growth potential.",
+  "Company reports stable performance in quarterly review.",
+  "Investors maintain confidence in long-term business strategy.",
+  "Industry experts predict stable market conditions ahead.",
+  "Board of directors approves continuation of existing business plan."
+];
+
 const NewsPopup: React.FC<NewsPopupProps> = ({
   stock,
   onClose
 }) => {
+  // Create a state to hold the news items that will be displayed
+  const [displayNews, setDisplayNews] = useState<string[]>([]);
+
+  useEffect(() => {
+    // If stock has news, use it; otherwise select a random placeholder
+    if (stock.news && stock.news.length > 0) {
+      setDisplayNews(stock.news);
+    } else {
+      // Select a random placeholder news item
+      const randomIndex = Math.floor(Math.random() * placeholderNews.length);
+      setDisplayNews([placeholderNews[randomIndex]]);
+    }
+  }, [stock]);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[60]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
@@ -37,9 +60,9 @@ const NewsPopup: React.FC<NewsPopupProps> = ({
         </h3>
         
         <div className="space-y-4">
-          {stock.news.length > 0 ? (
+          {displayNews.length > 0 ? (
             <>
-              {stock.news.map((item, index) => (
+              {displayNews.map((item, index) => (
                 <div key={index} className="bg-gray-800 p-4 rounded-md border-l-4 border-blue-500">
                   <div className="flex items-start">
                     <div className="flex-shrink-0 mr-3">

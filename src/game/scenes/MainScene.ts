@@ -252,6 +252,37 @@ export class MainScene extends Scene implements MainGameScene {
     return this.playerRupees;
   }
 
+  // Method to get player rupees (alias for getRupees to match StockMarketManager usage)
+  getPlayerRupees(): number {
+    return this.getRupees();
+  }
+  
+  // Method to add rupees to player's current amount
+  addPlayerRupees(amount: number): void {
+    const newTotal = this.playerRupees + amount;
+    this.updateRupees(newTotal);
+    
+    // Dispatch event to update UI components
+    window.dispatchEvent(new CustomEvent('rupee-update', { 
+      detail: { 
+        rupees: this.playerRupees
+      } 
+    }));
+  }
+  
+  // Method to deduct rupees from player's current amount
+  deductPlayerRupees(amount: number): void {
+    const newTotal = Math.max(0, this.playerRupees - amount);
+    this.updateRupees(newTotal);
+    
+    // Dispatch event to update UI components
+    window.dispatchEvent(new CustomEvent('rupee-update', { 
+      detail: { 
+        rupees: this.playerRupees
+      } 
+    }));
+  }
+
   // Create a loading progress bar
   private createProgressBar(): void {
     const width = this.cameras.main.width;
