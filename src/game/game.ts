@@ -15,63 +15,86 @@ let loadingText: HTMLElement | null = null;
  * Start game with the provided username
  */
 export function startGame(username: string): void {
-  // Hide join screen and show game container
-  const joinScreen = document.getElementById('join-screen');
+  // Check if game is already initialized to avoid duplicate instances
+  if (game) {
+    console.log("Game is already running");
+    return;
+  }
+
   gameContainer = document.getElementById('game-container');
   
-  if (joinScreen && gameContainer) {
-    joinScreen.style.display = 'none';
-    gameContainer.style.display = 'block';
-    
-    // Create loading indicator
-    loadingText = document.createElement('div');
-    loadingText.innerHTML = 'Loading game assets...';
-    loadingText.style.fontFamily = 'Pixeloid';
-    loadingText.style.fontSize = '24px';
-    loadingText.style.position = 'absolute';
-    loadingText.style.top = '50%';
-    loadingText.style.left = '50%';
-    loadingText.style.transform = 'translate(-50%, -50%)';
-    loadingText.style.color = 'white';
-    loadingText.style.fontSize = '24px';
-    loadingText.style.fontFamily = 'Arial';
-    gameContainer.appendChild(loadingText);
+  if (!gameContainer) {
+    console.error("Game container not found");
+    return;
+  }
+  
+  // Ensure the game container is visible and properly sized
+  gameContainer.style.display = 'block';
+  gameContainer.style.width = '100%';
+  gameContainer.style.height = '100vh';
+  
+  // Create loading indicator
+  loadingText = document.createElement('div');
+  loadingText.innerHTML = 'Loading game assets...';
+  loadingText.style.position = 'absolute';
+  loadingText.style.top = '50%';
+  loadingText.style.left = '50%';
+  loadingText.style.transform = 'translate(-50%, -50%)';
+  loadingText.style.color = 'white';
+  loadingText.style.fontSize = '24px';
+  loadingText.style.fontFamily = 'Arial';
+  loadingText.style.zIndex = '1000';
+  gameContainer.appendChild(loadingText);
 
-    // Store username in browser storage for persistence
-    localStorage.setItem('username', username);
-    
-    // Configure the game
-    const config: Phaser.Types.Core.GameConfig = {
-      type: Phaser.AUTO,
-      width: globalThis.innerWidth,
-      height: globalThis.innerHeight,
-      parent: 'game-container',
-      backgroundColor: '#2d2d2d',
-      scene: [MainScene],
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { x: 0, y: 0 },
-          debug: Constants.SHOW_DEBUG_VISUALS
-        }
-      },
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      },
-      render: {
-        pixelArt: false,
-        antialias: true, // Turn off antialiasing for pixel art
-        powerPreference: 'high-performance' // Request high-performance GPU
+  // Get any room code from local storage
+  const roomCode = localStorage.getItem('dhaniverse_room_code') || '';
+  
+  // Configure the game
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    parent: 'game-container',
+    backgroundColor: '#2d2d2d',
+    scene: [MainScene],
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: { x: 0, y: 0 },
+        debug: Constants.SHOW_DEBUG_VISUALS
       }
-    };
-    
-    // Initialize the game after a short delay to allow DOM to update
-    setTimeout(() => {
+    },
+    scale: {
+      mode: Phaser.Scale.RESIZE,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    render: {
+      pixelArt: true,
+      antialias: false,
+      powerPreference: 'high-performance'
+    },
+    fps: {
+      target: 60,
+      forceSetTimeOut: true
+    }
+  };
+  
+  // Clear any existing canvas elements that might be causing display issues
+  const existingCanvas = gameContainer.querySelector('canvas');
+  if (existingCanvas) {
+    gameContainer.removeChild(existingCanvas);
+  }
+  
+  console.log(`Starting game with username: ${username}, room code: ${roomCode}`);
+  
+  // Initialize the game after a short delay to allow DOM to update
+  setTimeout(() => {
+    try {
       game = new Phaser.Game(config);
       
-      // Register the username for the game
+      // Register the username and room code for the game
       game.registry.set('username', username);
+      game.registry.set('roomCode', roomCode);
       
       // Initialize the React HUD when game is ready
       game.events.once('ready', () => {
@@ -84,8 +107,13 @@ export function startGame(username: string): void {
           loadingText = null;
         }
       });
-    }, 100);
-  }
+    } catch (error) {
+      console.error("Error initializing game:", error);
+      if (loadingText) {
+        loadingText.innerHTML = 'Error starting game. Please refresh the page.';
+      }
+    }
+  }, 300);
 }
 
 /**
@@ -104,8 +132,8 @@ export function updateGameHUD(rupees: number): void {
 }
 
 // Handle window resizing
-globalThis.addEventListener('resize', () => {
+window.addEventListener('resize', () => {
   if (game) {
-    game.scale.resize(globalThis.innerWidth, globalThis.innerHeight);
+    game.scale.resize(window.innerWidth, window.innerHeight);
   }
 });

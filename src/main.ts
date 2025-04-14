@@ -1,6 +1,6 @@
-import './style.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
@@ -8,13 +8,19 @@ import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  // Get join-screen container for React
-  const joinScreen = document.getElementById('join-screen');
+  // Get root container for React
+  const rootElement = document.getElementById('root');
   
-  // Render the React app in the join screen
-  if (joinScreen) {
-    const root = ReactDOM.createRoot(joinScreen);
-    root.render(React.createElement(App));
+  // Render the React app with routing in the root container
+  if (rootElement) {
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(
+      React.createElement(
+        BrowserRouter,
+        null,
+        React.createElement(App)
+      )
+    );
   }
   
   // Initialize the banking UI separately

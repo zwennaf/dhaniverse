@@ -69,6 +69,7 @@ export class WebSocketManager {
   private updateInterval: number = 50; // ms between position updates
   private connected: boolean = false;
   private connectionStatusText: GameObjects.Text | null = null;
+  private roomCode: string = '';
 
   constructor(scene: MainGameScene, player: Player) {
     this.scene = scene;
@@ -100,16 +101,28 @@ export class WebSocketManager {
     if (this.connectionStatusText) {
       this.connectionStatusText.setText('Connecting...').setVisible(true);
     }
+    
+    // Get room code from game registry
+    this.roomCode = this.scene.game.registry.get('roomCode') || '';
 
     try {
-      this.ws = new WebSocket(Constants.WS_SERVER_URL);
+      // Construct WebSocket URL with room code if available
+      const wsUrl = this.roomCode 
+        ? `${Constants.WS_SERVER_URL}?room=${encodeURIComponent(this.roomCode)}`
+        : Constants.WS_SERVER_URL;
+        
+      console.log(`Connecting to WebSocket server: ${wsUrl}`);
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.connected = true;
         this.reconnectAttempts = 0;
         
         if (this.connectionStatusText) {
-          this.connectionStatusText.setText('Connected').setVisible(true);
+          const statusText = this.roomCode 
+            ? `Connected to room: ${this.roomCode}` 
+            : 'Connected';
+          this.connectionStatusText.setText(statusText).setVisible(true);
           // Hide after 2 seconds
           this.scene.time.delayedCall(2000, () => {
             if (this.connectionStatusText) {
@@ -124,7 +137,8 @@ export class WebSocketManager {
           type: "join",
           username,
           x: position.x,
-          y: position.y
+          y: position.y,
+          roomCode: this.roomCode // Include room code in join message
         }));
       };
 

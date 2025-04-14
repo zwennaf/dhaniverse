@@ -9,6 +9,13 @@ interface Stock {
   debtEquityRatio: number;
   businessGrowth: number;
   news: string[];
+  marketCap: number;
+  peRatio: number;
+  eps: number;
+  industryAvgPE: number;
+  outstandingShares: number;
+  volatility: number;
+  lastUpdate: number;
 }
 
 const StockMarketUI: React.FC = () => {
