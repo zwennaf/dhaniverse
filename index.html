@@ -4,35 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <title>Dhaniverse</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Direct stylesheet link instead of import in TS -->
     <link rel="stylesheet" href="/src/style.css">
     <style>
         body { 
             margin: 0; 
             padding: 0; 
-            overflow: hidden;
             background-color: #000;
+            /* Remove overflow: hidden from here */
+        }
+        /* Add a class for game pages where scrolling should be disabled */
+        body.game-active {
+            overflow: hidden;
         }
         canvas { 
             display: block; 
             image-rendering: auto;
-        }
-        #loading {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
         }
         #join-screen {
             position: fixed;
@@ -92,7 +78,6 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.88.2/dist/phaser.min.js"></script>
 </head>
 <body>
-    <div id="loading">Loading Assets...</div>
     <div id="root"></div>
     <div id="game-container"></div>
     <div id="hud-container"></div>
@@ -101,12 +86,6 @@
     <script type="module" src="/src/main.ts"></script>
     <script>
         // Remove loading div once game is visible
-        window.onload = function() {
-            setTimeout(function() {
-                const loading = document.getElementById('loading');
-                if (loading) loading.style.display = 'none';
-            }, 1000);
-        };
         
         // Toggle the banking UI container's active class when the banking UI opens/closes
         window.addEventListener('openBankingUI', function() {

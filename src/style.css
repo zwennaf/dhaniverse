@@ -1,3 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -16,26 +22,120 @@
   font-family: 'Pixeloid';
   src: url('/fonts/PixeloidSansBold.ttf') format('truetype');
 }
+@font-face {
+  font-family: 'VCR OSD Mono';
+  src: url('/fonts/VCR_OSD_MONO_1.001.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+.font-vcr {
+  font-family: 'VCR OSD Mono', sans-serif;
+  font-weight: 400;
+  font-size: 1.2em;
+}
 .pixeloid {
   font-family: 'Pixeloid', sans-serif;
   font-weight: 700;
   font-size: 1.2em;
 }
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-black text-white font-vcr overflow-x-hidden;
+  }
 }
 
 h1 {
@@ -100,5 +200,189 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+}
+
+@layer components {
+  /* Gradient eclipse background styling */
+  .gradient-eclipse {
+    @apply fixed inset-0 z-[-2] overflow-hidden;
+    background: radial-gradient(circle at 50% 15%, rgba(180, 138, 0, 0.5) 0%, rgba(82, 63, 0, 0.4) 20%, rgba(28, 24, 10, 0.3) 40%, rgba(0, 0, 0, 1) 90%);
+  }
+  
+  .gradient-overlay {
+    @apply fixed inset-0 z-[-1] bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none;
+    background-image: 
+      linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.8) 100%), 
+      repeating-linear-gradient(90deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(0deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px);
+  }
+
+  /* Pixel corners styling for card elements */
+  .pixel-corners {
+    --pixel-size: 3px;
+    --pixel-color: #FFC700;
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    position: relative;
+  }
+
+  .pixel-corners::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    border: var(--pixel-size) solid var(--pixel-color);
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    pointer-events: none;
+  }
+  .nav-corners {
+    --pixel-size: 7px;
+    --pixel-color: #3A3834;
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    position: relative;
+  }
+
+  .nav-corners::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    border: var(--pixel-size) solid var(--pixel-color);
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    pointer-events: none;
+  }
+
+  .pixel-box {
+    --b: 2px;  /* border thickness */
+    --c: #FFC700; /* border color */
+    --w: 2px;  /* width of the border's step */
+    
+    padding: var(--b);
+    position: relative;
+    border: 1px solid var(--c);
+    background-clip: padding-box;
+  }
+
+  .pixel-box::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--c);
+    padding: var(--b);
+    mask:
+      conic-gradient(at var(--w) var(--w),#0000 75%,#000 0)
+       0 0/calc(100% - var(--w)) calc(100% - var(--w));
+    mask-composite: subtract;
+    pointer-events: none;
+  }
+  
+  /* Animation for glowing pixel effect */
+  .pixel-glow {
+    animation: pixel-pulse 3s infinite alternate;
+  }
+  
+  @keyframes pixel-pulse {
+    0% {
+      filter: drop-shadow(0 0 2px rgba(255, 199, 0, 0.3));
+    }
+    100% {
+      filter: drop-shadow(0 0 8px rgba(255, 199, 0, 0.7));
+    }
+  }
+  
+  /* Scanline effect for retro CRT look */
+  .scanlines {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .scanlines::before {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.05) 0.5%,
+      transparent 1%
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  /* Testimony card style */
+  .testimony-card {
+    @apply bg-dhani-lightgray p-4 rounded-none pixel-corners;
+    border: 2px solid #FFC700;
+  }
+  
+  /* Game building card style */
+  .game-building-card {
+    @apply overflow-hidden pixel-corners border-2 border-dhani-gold;
   }
 }

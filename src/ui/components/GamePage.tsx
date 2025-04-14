@@ -8,6 +8,9 @@ const GamePage: React.FC = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
+    // Add game-active class to body to prevent scrolling
+    document.body.classList.add('game-active');
+    
     // Only use localStorage for the username, don't rely on URL parameters
     const storedUsername = localStorage.getItem('dhaniverse_username');
     
@@ -37,6 +40,9 @@ const GamePage: React.FC = () => {
       if (gameContainer) {
         gameContainer.style.display = 'none';
       }
+      
+      // Remove game-active class when leaving the game page
+      document.body.classList.remove('game-active');
     };
   }, [navigate]);
   
