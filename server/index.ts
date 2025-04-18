@@ -96,6 +96,22 @@ router.get("/ws", async (ctx) => {
             });
           }
           break;
+
+        case "chat":
+          // Broadcast chat message to all connected clients
+          const sender = players.get(playerId);
+          const chatPayload = {
+            type: "chat",
+            id: playerId,
+            username: sender?.username,
+            message: data.message
+          };
+          connections.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify(chatPayload));
+            }
+          });
+          break;
       }
     } catch (e) {
       console.error("Error processing message:", e);
