@@ -20,6 +20,8 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
   const isTypingRef = useRef<boolean>(false);
   // Track whether chat window is dimmed
   const [chatDimmed, setChatDimmed] = useState(false);
+  // Add a ref to track if we're currently sending a message
+  const sendingMessageRef = useRef<boolean>(false);
 
   // Listen for events from the game engine (Phaser)
   useEffect(() => {
@@ -155,79 +157,95 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
         <span className="rupee-value">{currentRupees}</span>
       </div>
       
-      {/* Chat container, shown only when active */}
-      {chatActive && (
-        <div
-          className={`chat-container clickable backdrop-blur-sm transition-opacity duration-300 ${chatDimmed ? 'opacity-50' : 'opacity-100'}`}
-          onClick={(e) => { e.stopPropagation(); setChatDimmed(false); }}
-        >
-          <div className="chat-messages break-words overflow-hidden" ref={messagesRef}>
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className="chat-message">
-                <div className="inline-block font-bold text-dhani-green italic font-tickerbit text-xl">{msg.username}:</div>
-                <span className='font-thin'> {msg.message} </span>
-              </div>
-            ))}
-          </div>
-          <input
-            id="hud-chat-input"
-            ref={chatInputRef}
-            autoFocus
-            className="chat-input"
-            type="text"
-            placeholder="Type a message..."
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            onFocus={() => {
-              window.dispatchEvent(new Event('typing-start'));
-              isTypingRef.current = true;
-              // Reset dimming when focusing input
-              setChatDimmed(false);
-              
-              // Clear any existing timeout when focused
+      {/* Chat container with improved smooth transition */}
+      <div
+        className={`chat-container clickable transition-opacity duration-300 ${chatActive ? (chatDimmed ? 'opacity-50' : 'opacity-100') : 'opacity-0 pointer-events-none'}`}
+        onClick={e => { e.stopPropagation(); setChatDimmed(false); }}
+      >
+        <div className="chat-messages" ref={messagesRef}>
+          {chatMessages.map((msg, idx) => (
+            <div key={idx} className="chat-message">
+              <strong>{msg.username}:</strong> {msg.message}
+            </div>
+          ))}
+        </div>
+        <input
+          id="hud-chat-input"
+          ref={chatInputRef}
+          autoFocus={false}
+          className="chat-input"
+          type="text"
+          placeholder="Type a message..."
+          value={chatInput}
+          onChange={e => setChatInput(e.target.value)}
+          onFocus={() => {
+            window.dispatchEvent(new Event('typing-start'));
+            isTypingRef.current = true;
+            setChatDimmed(false);
+            if (fadeTimeoutRef.current !== null) {
+              clearTimeout(fadeTimeoutRef.current);
+              fadeTimeoutRef.current = null;
+            }
+          }}
+          onBlur={() => {
+            isTypingRef.current = false;
+            // Only dim on blur if we're not sending a message
+            if (!sendingMessageRef.current) {
+              // Don't dim when blur is caused by sending a message
+            }
+            // Reset the sending message flag
+            sendingMessageRef.current = false;
+          }}
+          onKeyDown={e => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+              setChatDimmed(true);
+              chatInputRef.current?.blur();
+              isTypingRef.current = false;
+              window.dispatchEvent(new Event('typing-end'));
               if (fadeTimeoutRef.current !== null) {
                 clearTimeout(fadeTimeoutRef.current);
                 fadeTimeoutRef.current = null;
               }
-            }}
-            onBlur={() => {
-              isTypingRef.current = false;
-              // Do not auto-close; chat remains dimmed
-            }}
-            onKeyDown={e => {
-              // Stop propagation to prevent game from receiving key events
-              e.stopPropagation();
-              if (e.key === 'Escape') {
-                // Dim chat on ESC, do not close
-                setChatDimmed(true);
-                chatInputRef.current?.blur();
-                isTypingRef.current = false;
-                window.dispatchEvent(new Event('typing-end'));
-                if (fadeTimeoutRef.current !== null) {
-                  clearTimeout(fadeTimeoutRef.current);
-                  fadeTimeoutRef.current = null;
-                }
-              }
-              
-              // Handle special keys
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                if (chatInput.trim()) {
+            }
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (chatInput.trim()) {
+                try {
+                  // First ensure we're not dimmed
+                  setChatDimmed(false);
+                  
+                  // Set the sending message flag to prevent future dimming
+                  sendingMessageRef.current = true;
+                  
+                  // Send the message
                   window.dispatchEvent(new CustomEvent('send-chat', { 
                     detail: { message: chatInput.trim() } 
                   }));
+                  
+                  // Clear input and ensure opacity stays at 100%
                   setChatInput('');
                   
-                  // Focus the input again to keep typing
-                  setTimeout(() => {
+                  // Keep focus and prevent dimming in a more reliable way
+                  requestAnimationFrame(() => {
+                    setChatDimmed(false);
                     chatInputRef.current?.focus();
-                  }, 10);
+                    
+                    // Set a backup timeout to ensure dimming stays off
+                    setTimeout(() => {
+                      setChatDimmed(false);
+                      sendingMessageRef.current = false;
+                    }, 100);
+                  });
+                } catch (err) {
+                  console.error("Error in Enter key handler:", err);
                 }
               }
-            }}
-          />
-        </div>
-      )}
+            }
+          }}
+        />
+      </div>
+      {/* End chat container */}
       
       {/* You can add more HUD elements here */}
     </div>
