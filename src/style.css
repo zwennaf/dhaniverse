@@ -11,7 +11,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #000000;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -229,7 +229,7 @@ button:focus-visible {
 
   /* Pixel corners styling for card elements */
   .pixel-corners {
-    --pixel-size: 3px;
+    --pixel-size: 6px;
     --pixel-color: #FFC700;
     clip-path: 
       polygon(
@@ -349,7 +349,7 @@ button:focus-visible {
   
   /* Animation for glowing pixel effect */
   .pixel-glow {
-    animation: pixel-pulse 3s infinite alternate;
+    animation: pixel-pulse 2s infinite alternate;
   }
   
   @keyframes pixel-pulse {
@@ -516,13 +516,27 @@ button:focus-visible {
   /* behind video player blur */
   .video-blob-green {
     position: absolute;
-    width: 880px;
-    height: 550px;
-    background: #bbffbc4f;
+    width: 980px;
+    height: 700px;
+    background: #8fcb8f70;
     filter: blur(150px);
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 1;
+    animation: blobPulse 5s ease-in-out infinite;
+  }
+}
+
+@keyframes blobPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    background: #8fcb8f70;
+    filter: blur(150px);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1);
+    background: #d1fbc770;
+    filter: blur(150px);
   }
 }

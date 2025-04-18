@@ -70,8 +70,8 @@ export function startGame(username: string): void {
       autoCenter: Phaser.Scale.CENTER_BOTH
     },
     render: {
-      pixelArt: true,
-      antialias: false,
+      pixelArt: false,
+      antialias: true,
       powerPreference: 'high-performance'
     },
     fps: {

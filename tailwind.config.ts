@@ -24,7 +24,7 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				dhani: {
-					gold: '#FFC700',
+					gold: '#F1CD36',
 					dark: '#0F0F0F',
 					darker: '#000000',
 					darkgray: '#1A1A1A',

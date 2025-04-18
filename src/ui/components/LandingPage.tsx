@@ -61,27 +61,22 @@ const LandingPage = () => {
   
   return (
     <div className="min-h-screen relative flex flex-col text-white bg-black">
-      {/* Fixed background elements */}
-      <div className="blob blob-1"></div>
-      <div className="blob blob-2"></div>
-      <div className="blob blob-3"></div>
-      <div className="gradient-eclipse"></div>
-      <div className="gradient-overlay"></div>
+      {/* <div className="gradient-overlay z-[]"></div> */}
       
       <Header className="sticky top-6 w-[90%] m-auto z-10" />
       
       {/* Hero section */}
       <section className="w-full pt-16 pb-12 flex flex-col items-center justify-center relative">
         <div className="max-w-6xl mx-auto w-full text-center mb-8 px-4">
-          <div className="inline-block px-3 border mt-20 mb-20 border-white/50">
-            <p className="text-md tracking-wide font-robert p-2 text-white/80">Learn Personal Finance with Fun</p>
+          <div className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 ">
+            <p className="text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
           </div>
           
           <h1 className="text-3xl lg:text-6xl font-vcr mb-4 tracking-wider">
             Welcome to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
           </h1>
           
-          <p className="text-sm font-vcr mb-6 text-white/80">
+          <p className="text-lg font-robert mb-6 tracking-widest text-white/80">
             No lectures. Just quests, coins, maps, and clarity.
           </p>
           
@@ -92,8 +87,8 @@ const LandingPage = () => {
           />
           
           <div className="flex items-center justify-center mt-6 mb-8">
-            <p className="text-sm font-vcr flex items-center">
-              Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" />
+            <p className="sm:text-2xl text-xl font-vcr flex items-center">
+              Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" /><ChevronRight className="w-4 h-4 -ml-2" />
             </p>
           </div>
           
@@ -142,11 +137,11 @@ const LandingPage = () => {
       
       {/* Features section */}
       <section className="w-full px-4 py-16 flex flex-col items-center">
-        <div className="max-w-4xl mx-auto w-full text-center mb-12">
-          <div className="section-title-border">
-            <p className="text-sm font-vcr text-white/80">Learn Personal Finance with Fun</p>
+        <div className="max-w-6xl mx-auto w-full text-center mb-12">
+        <div className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 ">
+            <p className="text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-vcr mb-10 tracking-wide">What Makes Dhaniverse Different?</h2>
+          <h2 className="text-2xl sm:text-5xl font-vcr mb-10 tracking-wide">What Makes <span className="text-dhani-gold pixel-glow">Dhaniverse</span> Different?</h2>
         </div>
         
         <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
