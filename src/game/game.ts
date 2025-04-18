@@ -121,6 +121,9 @@ export function startGame(username: string): void {
  * Stops and destroys the current game instance
  */
 export function stopGame(): void {
+  // Notify MainScene and systems to stop and disconnect first
+  window.dispatchEvent(new Event('stopGame'));
+
   if (game) {
     game.destroy(true);
     game = null;

@@ -38,6 +38,7 @@ export class MainScene extends Scene implements MainGameScene {
   private _bankingClosedListenerAdded: boolean = false;
   private _stockMarketClosedListenerAdded: boolean = false;
   private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
+  private handleStopGameBound = () => this.webSocketManager.disconnect();
 
   constructor() {
     super({ key: 'MainScene' });
@@ -160,12 +161,16 @@ export class MainScene extends Scene implements MainGameScene {
     // Add event listener for banking UI rupee updates
     window.addEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
     
+    // Listen for global stopGame to disconnect socket
+    window.addEventListener('stopGame', this.handleStopGameBound);
+    
     // Notify game is ready
     this.game.events.emit('ready');
    
     // Clean up on scene shutdown to prevent memory leaks
     this.events.on('shutdown', () => {
       window.removeEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
+      window.removeEventListener('stopGame', this.handleStopGameBound);
       this.webSocketManager.disconnect();
     });
   }
