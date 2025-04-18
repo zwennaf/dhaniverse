@@ -18,6 +18,8 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
   const fadeTimeoutRef = useRef<number | null>(null);
   // Add a ref to track if user is actively typing
   const isTypingRef = useRef<boolean>(false);
+  // Track whether chat window is dimmed
+  const [chatDimmed, setChatDimmed] = useState(false);
 
   // Listen for events from the game engine (Phaser)
   useEffect(() => {
@@ -44,6 +46,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       const { id, username, message } = e.detail;
       setChatMessages(prev => [...prev, { id, username, message }]);
       setChatActive(true);
+      setChatDimmed(true);  // open chat in dimmed mode when a message arrives
       // No auto-close timeout, chat stays open until Escape
     };
     window.addEventListener('chat-message' as any, handleChat);
@@ -60,27 +63,29 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
   // Focus chat input when '/' is pressed
   useEffect(() => {
     const handleSlash = (e: KeyboardEvent) => {
-      // Only trigger if chat is not already active
-      if (e.key === '/' && !chatActive) {
+      if (e.key === '/') {
         e.preventDefault();
         e.stopPropagation();
-        setChatActive(true);
-        window.dispatchEvent(new Event('typing-start'));
-        
-        // Use a small timeout to ensure the input is in the DOM
-        setTimeout(() => {
-          chatInputRef.current?.focus();
-        }, 10);
-        
-        // Clear any existing timeout
-        if (fadeTimeoutRef.current !== null) {
-          clearTimeout(fadeTimeoutRef.current);
+        // If chat is open but dimmed, undim and refocus
+        if (chatActive && chatDimmed) {
+          setChatDimmed(false);
+          window.dispatchEvent(new Event('typing-start'));
+          setTimeout(() => chatInputRef.current?.focus(), 10);
+          return;
+        }
+        // If chat not active, open and focus
+        if (!chatActive) {
+          setChatDimmed(false);
+          setChatActive(true);
+          window.dispatchEvent(new Event('typing-start'));
+          setTimeout(() => chatInputRef.current?.focus(), 10);
+          if (fadeTimeoutRef.current !== null) clearTimeout(fadeTimeoutRef.current);
         }
       }
     };
     window.addEventListener('keydown', handleSlash);
     return () => window.removeEventListener('keydown', handleSlash);
-  }, [chatActive]);
+  }, [chatActive, chatDimmed]);
 
   // Close chat on Escape
   useEffect(() => {
@@ -88,7 +93,8 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       if (e.key === 'Escape' && chatActive) {
         // Stop propagation to prevent other handlers from processing this
         e.stopPropagation();
-        setChatActive(false);
+        // Dim chat window instead of closing
+        setChatDimmed(true);
         chatInputRef.current?.blur();
         isTypingRef.current = false;
         window.dispatchEvent(new Event('typing-end'));
@@ -116,16 +122,17 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
     }
   }, [chatActive]);
 
-  // Block Phaser from receiving keyboard events when chat is active
+  // Block Phaser from receiving keyboard events when chat is active and not dimmed
   useEffect(() => {
     const preventGameKeysWhenChatting = (e: KeyboardEvent) => {
-      if (chatActive) {
-        // If the chat input is focused, let all keys through
+      // Only block when chat is visible and not dimmed
+      if (chatActive && !chatDimmed) {
+        // Allow all keys when input is focused
         if (document.activeElement === chatInputRef.current) {
           return;
         }
-        // Only intercept WASD and arrow keys to block game movement
-        if (['w', 'a', 's', 'd', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        // Block movement keys
+        if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
           e.stopPropagation();
           e.preventDefault();
         }
@@ -138,7 +145,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       window.removeEventListener('keydown', preventGameKeysWhenChatting, true);
       window.removeEventListener('keyup', preventGameKeysWhenChatting, true);
     };
-  }, [chatActive]);
+  }, [chatActive, chatDimmed]);
 
   return (
     <div className="game-hud">
@@ -150,7 +157,10 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       
       {/* Chat container, shown only when active */}
       {chatActive && (
-        <div className="chat-container clickable backdrop-blur-sm transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <div
+          className={`chat-container clickable backdrop-blur-sm transition-opacity duration-300 ${chatDimmed ? 'opacity-50' : 'opacity-100'}`}
+          onClick={(e) => { e.stopPropagation(); setChatDimmed(false); }}
+        >
           <div className="chat-messages break-words overflow-hidden" ref={messagesRef}>
             {chatMessages.map((msg, idx) => (
               <div key={idx} className="chat-message">
@@ -171,6 +181,8 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
             onFocus={() => {
               window.dispatchEvent(new Event('typing-start'));
               isTypingRef.current = true;
+              // Reset dimming when focusing input
+              setChatDimmed(false);
               
               // Clear any existing timeout when focused
               if (fadeTimeoutRef.current !== null) {
@@ -180,20 +192,21 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
             }}
             onBlur={() => {
               isTypingRef.current = false;
-              // Removed auto-close timeout to keep chat open
+              // Do not auto-close; chat remains dimmed
             }}
             onKeyDown={e => {
               // Stop propagation to prevent game from receiving key events
               e.stopPropagation();
-              if (e.key == 'Escape') {
-                  setChatActive(false);
-                  chatInputRef.current?.blur();
-                  isTypingRef.current = false;
-                  window.dispatchEvent(new Event('typing-end'));
-                  if (fadeTimeoutRef.current !== null) {
-                    clearTimeout(fadeTimeoutRef.current);
-                    fadeTimeoutRef.current = null;
-                  }
+              if (e.key === 'Escape') {
+                // Dim chat on ESC, do not close
+                setChatDimmed(true);
+                chatInputRef.current?.blur();
+                isTypingRef.current = false;
+                window.dispatchEvent(new Event('typing-end'));
+                if (fadeTimeoutRef.current !== null) {
+                  clearTimeout(fadeTimeoutRef.current);
+                  fadeTimeoutRef.current = null;
+                }
               }
               
               // Handle special keys
