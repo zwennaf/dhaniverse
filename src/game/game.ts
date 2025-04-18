@@ -72,12 +72,30 @@ export function startGame(username: string): void {
     render: {
       pixelArt: false,
       antialias: true,
-      powerPreference: 'high-performance'
+      powerPreference: 'high-performance',
+      autoMobilePipeline: true,
+      roundPixels: false,
+      transparent: false,
+      antialiasGL: true,
+      preserveDrawingBuffer: false,
+      failIfMajorPerformanceCaveat: false,
+      clearBeforeRender: true,
+
     },
     fps: {
       target: 60,
-      forceSetTimeOut: true
-    }
+      forceSetTimeOut: true,
+      smoothStep: true,
+      min: 30,
+      limit: 180,
+      panicMax: 120,
+    },
+    input: {
+      gamepad: true,
+      mouse: true,
+      touch: true
+    },
+    
   };
   
   // Clear any existing canvas elements that might be causing display issues

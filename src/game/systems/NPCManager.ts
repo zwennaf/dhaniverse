@@ -188,35 +188,43 @@ export class NPCManager {
     // Mark dialog as active
     this.activeDialog = true;
     
-    // Create a dialog box
+    // Use camera dimensions for accurate UI positioning
+    const camera = this.scene.cameras.main;
+    const width = camera.width;
+    const height = camera.height;
+    const dialogWidth = width * 0.8;
+    const dialogHeight = 150;
+    const dialogX = width / 2;
+    const dialogY = height / 2;
+    // Create centered dialog box
     const dialogBox = this.scene.add.rectangle(
-      this.scene.cameras.main.centerX, 
-      this.scene.cameras.main.height - 150,
-      this.scene.cameras.main.width * 0.8,
-      150,
+      dialogX,
+      dialogY,
+      dialogWidth,
+      dialogHeight,
       0x000000,
       0.8
     );
     dialogBox.setScrollFactor(0).setDepth(2000);
     
-    // Add dialog text with word wrap
+    // Add dialog text with word wrap, slightly above center
     const dialogText = this.scene.add.text(
-      dialogBox.x, 
-      dialogBox.y, 
+      dialogX,
+      dialogY - 20,
       "Greetings adventurer! I am the Village Elder.\nWelcome to our humble village.",
       {
         fontFamily: 'Arial',
         fontSize: '18px',
         color: '#ffffff',
         align: 'center',
-        wordWrap: { width: dialogBox.width - 40 }
+        wordWrap: { width: dialogWidth - 40 }
       }
     ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
     
-    // Add close instruction
+    // Add close instruction below text
     const closeText = this.scene.add.text(
-      dialogBox.x,
-      dialogBox.y + 60,
+      dialogX,
+      dialogY + 20,
       "Press E, Space or Enter to close",
       {
         fontFamily: 'Arial',
@@ -226,9 +234,9 @@ export class NPCManager {
       }
     ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
     
-    // Create a container for dialog elements
-    const dialogContainer = this.scene.add.container(0, 0);
-    dialogContainer.add([dialogBox, dialogText, closeText]);
+    // Create a container for dialog elements and lock to camera
+    const dialogContainer = this.scene.add.container(0, 0, [dialogBox, dialogText, closeText])
+      .setScrollFactor(0);
     this.npcDialog = dialogContainer;
     
     // Create speech bubble animation directly above the NPC (centered) and larger
@@ -239,7 +247,7 @@ export class NPCManager {
     );
     this.speechBubble.setScale(2.5); // Make it significantly larger (was 1.5)
     this.speechBubble.setDepth(2002); // Make sure it appears above other elements
-    this.speechBubble.setScrollFactor(1); // Make it move with the game world
+    this.speechBubble.setScrollFactor(0); // Lock bubble to camera view as UI element
     
     // Play the opening animation
     this.speechBubble.play('speech-bubble-open');

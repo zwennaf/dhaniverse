@@ -150,11 +150,12 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       
       {/* Chat container, shown only when active */}
       {chatActive && (
-        <div className="chat-container clickable" onClick={(e) => e.stopPropagation()}>
-          <div className="chat-messages" ref={messagesRef}>
+        <div className="chat-container clickable backdrop-blur-sm transition-opacity" onClick={(e) => e.stopPropagation()}>
+          <div className="chat-messages break-words overflow-hidden" ref={messagesRef}>
             {chatMessages.map((msg, idx) => (
               <div key={idx} className="chat-message">
-                <strong>{msg.username}:</strong> {msg.message}
+                <div className="inline-block font-bold text-dhani-green italic font-tickerbit text-xl">{msg.username}:</div>
+                <span className='font-thin'> {msg.message} </span>
               </div>
             ))}
           </div>

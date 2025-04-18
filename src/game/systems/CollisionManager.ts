@@ -131,6 +131,7 @@ export class CollisionManager {
         }
       } else {
         box.setAlpha(0);
+        box.setVisible(false);
       }
       
       // Add to collision objects array
