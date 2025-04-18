@@ -50,12 +50,22 @@ interface PlayerDisconnectMessage extends ServerMessageBase {
   username: string;
 }
 
+// Define chat message type
+interface ChatMessage extends ServerMessageBase {
+  type: "chat";
+  id: string;
+  username: string;
+  message: string;
+}
+
+// Extend ServerMessage union to include ChatMessage
 type ServerMessage = 
   | ConnectMessage 
   | PlayersMessage 
   | PlayerJoinedMessage 
   | PlayerUpdateMessage 
-  | PlayerDisconnectMessage;
+  | PlayerDisconnectMessage
+  | ChatMessage;
 
 export class WebSocketManager {
   private scene: MainGameScene;
@@ -192,6 +202,11 @@ export class WebSocketManager {
         
       case "playerDisconnect":
         this.handlePlayerDisconnect(data.id, data.username);
+        break;
+
+      case "chat":
+        // Dispatch incoming chat messages to the UI
+        window.dispatchEvent(new CustomEvent('chat-message', { detail: { id: data.id, username: data.username, message: data.message } }));
         break;
         
       default:
@@ -374,6 +389,12 @@ export class WebSocketManager {
       this.ws.close();
       this.ws = null;
       console.log('WebSocket connection closed');
+    }
+  }
+
+  public sendChat(message: string): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: "chat", message }));
     }
   }
 }

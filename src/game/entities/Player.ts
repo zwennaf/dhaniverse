@@ -47,7 +47,7 @@ export class Player {
     
     // Create username text
     this.nameText = scene.add.text(x, y + 350, this.username, {
-      fontFamily: 'Arial',
+      fontFamily: 'Pixeloid',
       fontSize: '20px',
       color: '#ffffff',
       align: 'center',

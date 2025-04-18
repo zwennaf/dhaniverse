@@ -21,6 +21,9 @@ export interface MainGameScene extends Scene {
 }
 
 export class MainScene extends Scene implements MainGameScene {
+  private isTyping: boolean = false;
+  private handleTypingStartBound = () => this.handleTypingStart();
+  private handleTypingEndBound = () => this.handleTypingEnd();
   private player!: Player;
   private cursors!: Types.Input.Keyboard.CursorKeys;
   private collisionManager!: CollisionManager;
@@ -40,6 +43,7 @@ export class MainScene extends Scene implements MainGameScene {
   private _stockMarketClosedListenerAdded: boolean = false;
   private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
   private handleStopGameBound = () => this.webSocketManager.disconnect();
+  private handleSendChatBound = (e: any) => this.handleSendChat(e);
 
   constructor() {
     super({ key: 'MainScene' });
@@ -169,7 +173,14 @@ export class MainScene extends Scene implements MainGameScene {
     
     // Listen for global stopGame to disconnect socket
     window.addEventListener('stopGame', this.handleStopGameBound);
-    
+
+    // Add listener to handle chat messages from HUD
+    window.addEventListener('send-chat', this.handleSendChatBound as any);
+
+    // Listen for typing start/end to disable movement
+    window.addEventListener('typing-start', this.handleTypingStartBound);
+    window.addEventListener('typing-end', this.handleTypingEndBound);
+
     // Notify game is ready
     this.game.events.emit('ready');
    
@@ -177,6 +188,9 @@ export class MainScene extends Scene implements MainGameScene {
     this.events.on('shutdown', () => {
       window.removeEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
       window.removeEventListener('stopGame', this.handleStopGameBound);
+      window.removeEventListener('send-chat', this.handleSendChatBound as any);
+      window.removeEventListener('typing-start', this.handleTypingStartBound);
+      window.removeEventListener('typing-end', this.handleTypingEndBound);
       this.webSocketManager.disconnect();
     });
   }
@@ -185,8 +199,10 @@ export class MainScene extends Scene implements MainGameScene {
     // Delta-based time stepping for consistent movement regardless of framerate
     const deltaFactor = delta / (1000 / 60); // Normalize to 60fps
 
-    // Update player first
-    this.player.update(deltaFactor);
+    // Update player only if not typing
+    if (!this.isTyping) {
+      this.player.update(deltaFactor);
+    }
     
     // Then update all managers
     this.collisionManager.update();
@@ -370,5 +386,23 @@ export class MainScene extends Scene implements MainGameScene {
       import('../game.ts').then(({ updateGameHUD }) => updateGameHUD(this.playerRupees));
       console.log('Game received rupee update:', this.playerRupees);
     }
+  }
+
+  // Handle chat messages sent from HUD
+  private handleSendChat(event: any): void {
+    if (event.detail && typeof event.detail.message === 'string') {
+      this.webSocketManager.sendChat(event.detail.message);
+    }
+  }
+
+  // Handle typing state
+  private handleTypingStart(): void {
+    this.isTyping = true;
+    // Don't disable the keyboard - just use the isTyping flag to prevent movement
+  }
+
+  private handleTypingEnd(): void {
+    this.isTyping = false;
+    // No need to re-enable the keyboard since we never disabled it
   }
 }
