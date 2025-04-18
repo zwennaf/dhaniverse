@@ -13,6 +13,7 @@ import { ExtendedCamera } from '../systems/MapManager.ts';
 export interface MainGameScene extends Scene {
   getGameContainer(): GameObjects.Container;
   getPlayer(): Player;
+  getCollisionManager(): CollisionManager;
   getCursors(): Types.Input.Keyboard.CursorKeys;
   mapManager: MapManager;
   getRupees(): number;
@@ -121,6 +122,11 @@ export class MainScene extends Scene implements MainGameScene {
     this.player = new Player(this, 800, 800, this.cursors, this.wasd);
     this.gameContainer.add(this.player.getSprite());
     this.gameContainer.add(this.player.getNameText());
+
+    // Enable physics collisions between player and each collision box
+    this.collisionManager.getCollisionObjects().forEach(box => {
+      this.physics.add.collider(this.player.getSprite(), box);
+    });
 
     // Add player-dependent managers
     this.buildingManager = new BuildingManager(this);
@@ -340,6 +346,10 @@ export class MainScene extends Scene implements MainGameScene {
 
   getPlayer(): Player {
     return this.player;
+  }
+
+  getCollisionManager(): CollisionManager {
+    return this.collisionManager;
   }
 
   getCursors(): Types.Input.Keyboard.CursorKeys {

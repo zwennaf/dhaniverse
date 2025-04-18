@@ -48,16 +48,10 @@ export class CollisionManager {
       for (let y = gridY - 1; y <= gridY + 1; y++) {
         const cellKey = `${x},${y}`;
         const cellColliders = this.spatialGrid.get(cellKey);
-        
         if (cellColliders) {
           relevantColliders.push(...cellColliders);
         }
       }
-    }
-    
-    // Apply collisions only with nearby objects
-    if (relevantColliders.length > 0) {
-      this.scene.physics.collide(playerSprite, relevantColliders);
     }
     
     // Clear expired cache entries
