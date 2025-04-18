@@ -1,7 +1,5 @@
 import { GameObjects, Input } from 'phaser';
-import { Player } from '../entities/Player';
 import { MainScene } from '../scenes/MainScene';
-import { Constants } from '../utils/Constants';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
