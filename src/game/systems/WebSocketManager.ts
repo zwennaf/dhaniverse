@@ -367,4 +367,13 @@ export class WebSocketManager {
     // Count of other players plus this player
     return this.otherPlayers.size + 1;
   }
+
+  // Cleanly close the WebSocket connection
+  public disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+      console.log('WebSocket connection closed');
+    }
+  }
 }

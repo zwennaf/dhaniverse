@@ -1,19 +1,18 @@
 import React from 'react';
-import Header from '../components/atoms/Header';
-import Footer from '../components/atoms/Footer';
-import VideoPlayer from '../components/atoms/VideoPlayer';
-import PixelButton from '../components/atoms/PixelButton';
-import FeatureCard from '../components/atoms/FeatureCard';
-import GameBuildings from '../components/atoms/GameBuildings';
-import MarqueeTestimonials from '../components/atoms/MarqueeTestimonials';
+import Header from './atoms/Header';
+import Footer from './atoms/Footer';
+import VideoPlayer from './atoms/VideoPlayer';
+import PixelButton from './atoms/PixelButton';
+import FeatureCard from './atoms/FeatureCard';
+import GameBuildings from './atoms/GameBuildings';
+import MarqueeTestimonials from './atoms/MarqueeTestimonials';
 import { ArrowRight } from 'lucide-react';
-import LeafIcon from '../components/icons/LeafIcon';
-import CoinIcon from '../components/icons/CoinIcon';
-import EarthIcon from '../components/icons/EarthIcon';
+import LeafIcon from './icons/LeafIcon';
+import CoinIcon from './icons/CoinIcon';
+import EarthIcon from './icons/EarthIcon';
 import { useNavigate } from 'react-router-dom';
-import './LandingPage.css';
 
-const Index = () => {
+const LandingPage = () => {
   const navigate = useNavigate();
   const [username, setUsername] = React.useState('');
   const [roomCode, setRoomCode] = React.useState('');
@@ -92,7 +91,7 @@ const Index = () => {
           
           <div className="flex items-center justify-center mt-4">
             <p className="text-lg font-vcr flex items-center">
-              Your financial glow-up starts here
+              Your financial glow-up starts here Arro
             </p>
           </div>
           
@@ -205,4 +204,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default LandingPage;

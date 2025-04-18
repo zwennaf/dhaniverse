@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startGame } from '../../game/game';
+import { startGame, stopGame } from '../../game/game';
 
 const GamePage: React.FC = () => {
   const [username, setUsername] = useState<string | null>(null);
@@ -35,12 +35,20 @@ const GamePage: React.FC = () => {
     }
     
     return () => {
-      // Cleanup when component unmounts
+      // Stop the Phaser game instance
+      stopGame();
+      // Hide and clear the game container
       const gameContainer = document.getElementById('game-container');
       if (gameContainer) {
         gameContainer.style.display = 'none';
+        gameContainer.innerHTML = ''; // Remove old canvas
       }
-      
+      // Hide React HUD
+      const hudContainer = document.getElementById('hud-container');
+      if (hudContainer) {
+        hudContainer.style.display = 'none';
+        hudContainer.innerHTML = ''; // Clear old HUD content
+      }
       // Remove game-active class when leaving the game page
       document.body.classList.remove('game-active');
     };

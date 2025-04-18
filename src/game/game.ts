@@ -5,7 +5,7 @@
 import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene.ts';
 import { Constants } from './utils/Constants.ts';
-import { initializeHUD, updateHUD } from '../main.ts';
+import { initializeHUD, updateHUD, unmountHUD } from '../main.ts';
 
 let game: Phaser.Game | null = null;
 let gameContainer: HTMLElement | null = null;
@@ -42,7 +42,8 @@ export function startGame(username: string): void {
   loadingText.style.transform = 'translate(-50%, -50%)';
   loadingText.style.color = 'white';
   loadingText.style.fontSize = '24px';
-  loadingText.style.fontFamily = 'Arial';
+  loadingText.style.fontFamily = 'VCR OSD Mono, monospace';
+  loadingText.style.textAlign = 'center';
   loadingText.style.zIndex = '1000';
   gameContainer.appendChild(loadingText);
 
@@ -124,6 +125,12 @@ export function stopGame(): void {
     game.destroy(true);
     game = null;
   }
+
+  // Unmount React HUD to free memory
+  unmountHUD();
+
+  // Clear map cache from localStorage to prevent storage bloat
+  localStorage.removeItem('cachedMap');
 }
 
 // Expose updateHUD for MainScene to use

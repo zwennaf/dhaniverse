@@ -37,6 +37,7 @@ export class MainScene extends Scene implements MainGameScene {
   private playerRupees: number = 25000; // Store rupees in the scene
   private _bankingClosedListenerAdded: boolean = false;
   private _stockMarketClosedListenerAdded: boolean = false;
+  private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
 
   constructor() {
     super({ key: 'MainScene' });
@@ -45,9 +46,11 @@ export class MainScene extends Scene implements MainGameScene {
   preload(): void {
     // Create loading progress bar
     this.createProgressBar();
-    
-    // Load assets with paths relative to the public directory
+
+    // Load the main map image directly from server
     this.load.image('map', '/maps/finalmap.png');
+
+    // Load other assets normally
     this.load.image('interior', '/maps/bank.png');
     this.load.image('stockmarket', '/maps/stockmarket.png');
     
@@ -155,21 +158,16 @@ export class MainScene extends Scene implements MainGameScene {
     });
     
     // Add event listener for banking UI rupee updates
-    window.addEventListener('updatePlayerRupees', (event: any) => {
-      if (event.detail && typeof event.detail.rupees === 'number') {
-        this.playerRupees = event.detail.rupees;
-        
-        // Import here to avoid circular dependency
-        import('../game.ts').then(({ updateGameHUD }) => {
-          updateGameHUD(this.playerRupees);
-        });
-        
-        console.log("Game received rupee update:", this.playerRupees);
-      }
-    });
+    window.addEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
     
     // Notify game is ready
     this.game.events.emit('ready');
+   
+    // Clean up on scene shutdown to prevent memory leaks
+    this.events.on('shutdown', () => {
+      window.removeEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
+      this.webSocketManager.disconnect();
+    });
   }
 
   override update(_time: number, delta: number): void {
@@ -348,5 +346,14 @@ export class MainScene extends Scene implements MainGameScene {
     const mapWidth = this.mapManager.getMapWidth();
     const mapHeight = this.mapManager.getMapHeight();
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+  }
+
+  // Bound handler to update rupees
+  private handleRupeeUpdate(event: any): void {
+    if (event.detail && typeof event.detail.rupees === 'number') {
+      this.playerRupees = event.detail.rupees;
+      import('../game.ts').then(({ updateGameHUD }) => updateGameHUD(this.playerRupees));
+      console.log('Game received rupee update:', this.playerRupees);
+    }
   }
 }

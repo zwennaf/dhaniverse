@@ -6,6 +6,8 @@ import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 
+let hudRootRef: any = null;
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   // Get root container for React
@@ -75,15 +77,29 @@ export function initializeHUD(initialRupees = 25000) {
     hudContainer.style.display = 'block';
     
     // Mount React component
-    const hudRoot = ReactDOM.createRoot(hudContainer);
-    hudRoot.render(
+    hudRootRef = ReactDOM.createRoot(hudContainer);
+    hudRootRef.render(
       React.createElement(GameHUD, { rupees: initialRupees })
     );
     
-    return hudRoot; // Return the root so we can update it later if needed
+    return hudRootRef;
   }
   
   return null;
+}
+
+/**
+ * Unmount the HUD React root and hide the container
+ */
+export function unmountHUD() {
+  const hudContainer = document.getElementById('hud-container');
+  if (hudRootRef) {
+    hudRootRef.unmount();
+    hudRootRef = null;
+  }
+  if (hudContainer) {
+    hudContainer.style.display = 'none';
+  }
 }
 
 // Create a function to update the HUD from Phaser
