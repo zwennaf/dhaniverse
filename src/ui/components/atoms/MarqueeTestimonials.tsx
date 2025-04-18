@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import TestimonialCard from './TestimonialCard';
@@ -26,7 +25,7 @@ const MarqueeTestimonials = ({
   return (
     <div className="relative overflow-hidden w-full">
       <motion.div 
-        className="flex gap-4"
+        className="flex gap-6"
         animate={{
           x: direction === 'left' 
             ? [0, -testimonials.length * 320] 
@@ -40,7 +39,7 @@ const MarqueeTestimonials = ({
         }}
       >
         {doubledTestimonials.map((testimonial, index) => (
-          <div key={index} className="flex-shrink-0 w-[300px]">
+          <div key={index} className="flex-shrink-0 w-[280px]">
             <TestimonialCard
               quote={testimonial.quote}
               author={testimonial.author}

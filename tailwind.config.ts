@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -28,11 +27,13 @@ export default {
 					gold: '#FFC700',
 					dark: '#0F0F0F',
 					darker: '#000000',
+					darkgray: '#1A1A1A',
 					green: '#4CA64C',
 					water: '#4C7EC9',
 					road: '#5E5E5E',
 					lightgray: '#363636',
 					navbg: '#3A3834',
+					text: '#F5EEDC',
 				},
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
@@ -107,7 +108,9 @@ export default {
 			},
 			fontFamily: {
 				'pixel': ['PressStart2P', 'monospace'],
-				'vcr': ['VCR OSD Mono', 'monospace']
+				'vcr': ['VCR OSD Mono', 'monospace'],
+				'tickerbit': ['Tickerbit', 'monospace'],
+				'robert': ['Robert', 'sans-serif'],
 			}
 		}
 	},

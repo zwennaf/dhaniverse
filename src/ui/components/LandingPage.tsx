@@ -6,7 +6,7 @@ import PixelButton from './atoms/PixelButton';
 import FeatureCard from './atoms/FeatureCard';
 import GameBuildings from './atoms/GameBuildings';
 import MarqueeTestimonials from './atoms/MarqueeTestimonials';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 import LeafIcon from './icons/LeafIcon';
 import CoinIcon from './icons/CoinIcon';
 import EarthIcon from './icons/EarthIcon';
@@ -38,7 +38,7 @@ const LandingPage = () => {
   ];
   
   // Sample buildings data
-  const buildings = Array.from({ length: 12 }, (_, i) => ({
+  const buildings = Array.from({ length: 8 }, (_, i) => ({
     id: i + 1,
     name: `Building ${i + 1}`,
     imageSrc: mapUrl
@@ -47,15 +47,12 @@ const LandingPage = () => {
   const handleJoin = () => {
     if (username.trim().length >= 3) {
       setError('');
-      // Store username in localStorage for persistence
       localStorage.setItem('dhaniverse_username', username.trim());
       
-      // Store room code in localStorage if provided
       if (roomCode.trim()) {
         localStorage.setItem('dhaniverse_room_code', roomCode.trim());
       }
       
-      // Navigate to the game page without username in URL
       navigate('/game');
     } else {
       setError('Username must be at least 3 characters long');
@@ -63,23 +60,28 @@ const LandingPage = () => {
   };
   
   return (
-    <div className="min-h-screen relative flex flex-col text-white">
-      {/* Gradient eclipse background */}
+    <div className="min-h-screen relative flex flex-col text-white bg-black">
+      {/* Fixed background elements */}
+      <div className="blob blob-1"></div>
+      <div className="blob blob-2"></div>
+      <div className="blob blob-3"></div>
       <div className="gradient-eclipse"></div>
-      {/* <div className="gradient-overlay"></div> */}
+      <div className="gradient-overlay"></div>
       
-      <Header className="sticky top-3 w-[90%] m-auto z-10" />
+      <Header className="sticky top-6 w-[90%] m-auto z-10" />
       
       {/* Hero section */}
-      <section className="w-full pt-24 pb-12 flex flex-col items-center justify-center">
-        <div className="max-w-4xl mx-auto w-full text-center mb-8 px-4">
-          <p className="text-xs font-vcr mb-6 text-white/80">Learn Personal Finance with Fun</p>
+      <section className="w-full pt-16 pb-12 flex flex-col items-center justify-center relative">
+        <div className="max-w-6xl mx-auto w-full text-center mb-8 px-4">
+          <div className="inline-block px-3 border mt-20 mb-20 border-white/50">
+            <p className="text-md tracking-wide font-robert p-2 text-white/80">Learn Personal Finance with Fun</p>
+          </div>
           
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-vcr mb-3 scanlines">
+          <h1 className="text-3xl lg:text-6xl font-vcr mb-4 tracking-wider">
             Welcome to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
           </h1>
           
-          <p className="text-lg font-vcr mb-8 text-white/80">
+          <p className="text-sm font-vcr mb-6 text-white/80">
             No lectures. Just quests, coins, maps, and clarity.
           </p>
           
@@ -89,14 +91,14 @@ const LandingPage = () => {
             className="mb-6"
           />
           
-          <div className="flex items-center justify-center mt-4">
-            <p className="text-lg font-vcr flex items-center">
-              Your financial glow-up starts here Arro
+          <div className="flex items-center justify-center mt-6 mb-8">
+            <p className="text-sm font-vcr flex items-center">
+              Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" />
             </p>
           </div>
           
-          <div className="mt-8">
-            <PixelButton onClick={() => setShowJoinForm(true)}>
+          <div>
+            <PixelButton size="lg" onClick={() => setShowJoinForm(true)}>
               Play Now
             </PixelButton>
           </div>
@@ -106,8 +108,8 @@ const LandingPage = () => {
       {/* Join form modal */}
       {showJoinForm && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="join-container pixeloid">
-            <h2>Enter Dhaniverse</h2>
+          <div className="pixel-corners bg-black/80 p-6 max-w-md w-full">
+            <h2 className="text-xl font-vcr mb-6 text-center">Enter Dhaniverse</h2>
             <input 
               type="text" 
               value={username}
@@ -115,7 +117,7 @@ const LandingPage = () => {
               placeholder="Enter your username" 
               maxLength={15}
               autoFocus
-              className="pixeloid"
+              className="w-full bg-black/50 border border-dhani-gold text-white p-3 mb-4 font-vcr text-sm"
             />
             <input 
               type="text" 
@@ -123,16 +125,16 @@ const LandingPage = () => {
               onChange={(e) => setRoomCode(e.target.value)}
               placeholder="Room Code (optional)" 
               maxLength={10}
-              className="pixeloid mt-3"
+              className="w-full bg-black/50 border border-dhani-gold text-white p-3 mb-4 font-vcr text-sm"
             />
-            {error && <div className="error-message">{error}</div>}
-            <div className="button-group">
-              <button type="button" onClick={() => setShowJoinForm(false)} className="back-button">
+            {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+            <div className="flex justify-between gap-4">
+              <PixelButton variant="outline" onClick={() => setShowJoinForm(false)}>
                 Back
-              </button>
-              <button type="submit" onClick={handleJoin} className="join-button">
+              </PixelButton>
+              <PixelButton onClick={handleJoin}>
                 Join Game
-              </button>
+              </PixelButton>
             </div>
           </div>
         </div>
@@ -140,9 +142,11 @@ const LandingPage = () => {
       
       {/* Features section */}
       <section className="w-full px-4 py-16 flex flex-col items-center">
-        <div className="max-w-4xl mx-auto w-full text-center mb-12 ">
-          <p className="text-md font-vcr mb-6 text-white/80 border-white border w-max m-auto p-3">Learn Personal Finance with Fun</p>
-          <h2 className="text-2xl sm:text-3xl font-vcr mb-10 scanlines">What Makes Dhaniverse Different?</h2>
+        <div className="max-w-4xl mx-auto w-full text-center mb-12">
+          <div className="section-title-border">
+            <p className="text-sm font-vcr text-white/80">Learn Personal Finance with Fun</p>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-vcr mb-10 tracking-wide">What Makes Dhaniverse Different?</h2>
         </div>
         
         <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -150,7 +154,7 @@ const LandingPage = () => {
             <img src={mapUrl} alt="Dhaniverse Map" className="w-full h-auto" />
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-6">
             <FeatureCard 
               icon={<LeafIcon className="w-6 h-6" />}
               title="No mental stress — just fun."
@@ -176,26 +180,57 @@ const LandingPage = () => {
       {/* Game world section */}
       <section className="w-full px-4 py-16">
         <div className="max-w-4xl mx-auto">
-          <p className="text-xs font-vcr mb-6 text-white/80">Buildings that teaches you the real use of money</p>
+          <div className="section-title-border mb-8">
+            <p className="text-xs font-vcr text-white/80">Buildings that teaches you the real use of money</p>
+          </div>
           
-          <div className="relative">
-            <GameBuildings buildings={buildings} />
+          <div className="relative mt-8 pixel-corners bg-black/30 p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {buildings.map((building) => (
+                <div key={building.id} className="pixel-corners overflow-hidden border border-dhani-gold/50">
+                  <img src={building.imageSrc} alt={building.name} className="w-full h-auto" />
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-8 flex items-center justify-between">
+              <p className="text-sm font-vcr">
+                Explore a full-on financial world.<br/>
+                Where every quest = a life skill.
+              </p>
+              <div className="bg-black/40 p-2 rounded-full text-dhani-gold">
+                <ArrowRight className="w-6 h-6" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
       
       {/* Testimonials section with marquee */}
       <section className="w-full py-16 overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-2xl font-vcr mb-8 text-center scanlines">What Players Say?</h2>
+        <div className="max-w-4xl mx-auto px-4 mb-8">
+          <h2 className="text-2xl font-vcr mb-8 text-center">What Players Say?</h2>
         </div>
         
         <div className="mb-8">
-          <MarqueeTestimonials testimonials={testimonials1} direction="left" />
+          <MarqueeTestimonials testimonials={testimonials1} direction="left" speed={40} />
         </div>
         
-        <div>
+        <div className="mb-16">
           <MarqueeTestimonials testimonials={testimonials2} direction="right" speed={30} />
+        </div>
+      </section>
+      
+      {/* CTA section before footer */}
+      <section className="w-full px-4 py-12 mb-12">
+        <div className="max-w-3xl mx-auto pixel-corners bg-black/70 p-8 text-center">
+          <p className="text-sm font-vcr mb-4 text-white/80">Don't you have to make good finance decisions?</p>
+          <h2 className="text-2xl font-vcr mb-6">Just Start Playing already!</h2>
+          <p className="text-sm font-vcr mb-8 text-white/80">No lectures. Just quests, coins, maps, and clarity.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <PixelButton size="lg" onClick={() => setShowJoinForm(true)}>Play Now</PixelButton>
+            <PixelButton variant="outline">Sign in</PixelButton>
+          </div>
         </div>
       </section>
       

@@ -29,10 +29,19 @@
   font-style: normal;
   font-display: swap;
 }
-.font-vcr {
-  font-family: 'VCR OSD Mono', sans-serif;
-  font-weight: 400;
-  font-size: 1.2em;
+@font-face {
+  font-family: 'Tickerbit';
+  src: url('/fonts/Tickerbit-regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Robert';
+  src: url('/fonts/Robert.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 .pixeloid {
   font-family: 'Pixeloid', sans-serif;
@@ -377,12 +386,143 @@ button:focus-visible {
   
   /* Testimony card style */
   .testimony-card {
-    @apply bg-dhani-lightgray p-4 rounded-none pixel-corners;
-    border: 2px solid #FFC700;
+    @apply bg-dhani-darkgray p-4;
+    position: relative;
+    border: 0;
+    --pixel-card-size: 2px;
+    --pixel-card-color: #FFC700;
+    height: 100%;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .testimony-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--pixel-card-size) solid var(--pixel-card-color);
+    pointer-events: none;
+    clip-path: 
+      polygon(
+        0 var(--pixel-card-size), 
+        var(--pixel-card-size) var(--pixel-card-size), 
+        var(--pixel-card-size) 0, 
+        calc(100% - var(--pixel-card-size)) 0, 
+        calc(100% - var(--pixel-card-size)) var(--pixel-card-size), 
+        100% var(--pixel-card-size), 
+        100% calc(100% - var(--pixel-card-size)), 
+        calc(100% - var(--pixel-card-size)) calc(100% - var(--pixel-card-size)), 
+        calc(100% - var(--pixel-card-size)) 100%, 
+        var(--pixel-card-size) 100%, 
+        var(--pixel-card-size) calc(100% - var(--pixel-card-size)), 
+        0 calc(100% - var(--pixel-card-size))
+      );
   }
   
   /* Game building card style */
   .game-building-card {
     @apply overflow-hidden pixel-corners border-2 border-dhani-gold;
+  }
+
+  /* Override rounded corners for pixel-corners */
+  .pixel-corners, .nav-corners, button.pixel-corners {
+    border-radius: 0 !important;
+  }
+  /* Decorative blurred blobs */
+  .blob {
+    position: fixed;
+    border-radius: 9999px;
+    filter: blur(180px);
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .blob-1 {
+    width: 400px;
+    height: 400px;
+    background: rgba(255, 199, 0, 0.5);
+    top: 5%;
+    left: 15%;
+  }
+  .blob-2 {
+    width: 500px;
+    height: 500px;
+    background: rgba(0, 191, 255, 0.3);
+    bottom: 15%;
+    right: 20%;
+  }
+  .blob-3 {
+    width: 350px;
+    height: 350px;
+    background: rgba(255, 120, 0, 0.3);
+    top: 45%;
+    right: 10%;
+  }
+  /* Uncomment and style gradient overlay to stay fixed */
+  .gradient-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+    background-image: 
+      linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.8) 100%),
+      repeating-linear-gradient(90deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(0deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px);
+  }
+
+  /* Enforce pixelated corners for all pixel-cornered elements */
+  .pixel-corners, 
+  .pixel-corners::after,
+  .nav-corners,
+  .nav-corners::after,
+  button.pixel-corners {
+    border-radius: 0 !important;
+  }
+  
+  /* Make play button more pixel-perfect */
+  button.pixel-corners.bg-dhani-gold {
+    position: relative;
+    --pixel-btn-size: 4px;
+    background-clip: padding-box;
+    border: 0;
+  }
+  
+  button.pixel-corners.bg-dhani-gold::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #FFC700;
+    clip-path: 
+      polygon(
+        0 var(--pixel-btn-size), 
+        var(--pixel-btn-size) var(--pixel-btn-size), 
+        var(--pixel-btn-size) 0, 
+        calc(100% - var(--pixel-btn-size)) 0, 
+        calc(100% - var(--pixel-btn-size)) var(--pixel-btn-size), 
+        100% var(--pixel-btn-size), 
+        100% calc(100% - var(--pixel-btn-size)), 
+        calc(100% - var(--pixel-btn-size)) calc(100% - var(--pixel-btn-size)), 
+        calc(100% - var(--pixel-btn-size)) 100%, 
+        var(--pixel-btn-size) 100%, 
+        var(--pixel-btn-size) calc(100% - var(--pixel-btn-size)), 
+        0 calc(100% - var(--pixel-btn-size))
+      );
+    z-index: -1;
+  }
+
+  /* behind video player blur */
+  .video-blob-green {
+    position: absolute;
+    width: 880px;
+    height: 550px;
+    background: #bbffbc4f;
+    filter: blur(150px);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
   }
 }

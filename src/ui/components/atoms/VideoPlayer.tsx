@@ -23,27 +23,32 @@ const VideoPlayer = ({
     return (
         <div
             className={cn(
-                "relative w-full max-w-4xl mx-auto overflow-hidden",
+                "relative w-full max-w-4xl mx-auto",
                 className
             )}
         >
+             
             {!isPlaying ? (
-                <div>
+                <div className='relative z-[5]'>
                     <img
                         src={thumbnailSrc}
                         alt="Video thumbnail"
-                        className="w-full h-auto"
+                        className="w-full h-auto z-100"
                     />
                     <button
                         onClick={handlePlay}
-                        className="absolute top-1/2 left-1/2 transform bg-transparent -translate-x-1/2 -translate-y-1/2"
+                        className="absolute  hover:border-x-dhani-gold hover:border-y-transparent top-1/2 left-1/2 transform bg-transparent -translate-x-1/2 -translate-y-1/2"
                         aria-label="Play video"
                     >
                         <img src="/UI/videoplay.png" className="size-16 " />
-            </button>
-            <button onClick={handlePlay} className="w-[95%] m-auto bg-transparent cursor-pointer -translate-y-8">
-              <img src="/UI/videotimeline.png" alt="" />
-            </button>
+                    </button>
+                    {/* here add a green blur behind the video element */}
+                    <button
+                        onClick={handlePlay}
+                        className="w-[95%] m-auto hover:border-transparent bg-transparent cursor-pointer -translate-y-12"
+                    >
+                        <img src="/UI/videotimeline.png" alt="" />
+                    </button>
                 </div>
             ) : (
                 <div className="relative w-full pt-[56.25%] pixel-corners overflow-hidden">
@@ -56,6 +61,7 @@ const VideoPlayer = ({
                     ></iframe>
                 </div>
             )}
+            <div className="video-blob-green z-0"></div> 
         </div>
     );
 };

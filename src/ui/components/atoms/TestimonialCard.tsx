@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '../lib/utils';
 
@@ -16,7 +15,7 @@ const TestimonialCard = ({
   className 
 }: TestimonialCardProps) => {
   return (
-    <div className={cn("testimony-card", className)}>
+    <div className={cn("testimony-card flex flex-col min-h-[150px] h-full", className)}>
       <div className="flex-1">
         <p className="text-xs font-vcr text-white leading-relaxed mb-4">"{quote}"</p>
       </div>
