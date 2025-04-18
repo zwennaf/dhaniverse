@@ -23,7 +23,7 @@ const VideoPlayer = ({
     return (
         <div
             className={cn(
-                "relative w-full max-w-4xl mx-auto",
+                "relative w-full max-w-6xl mx-auto",
                 className
             )}
         >
@@ -40,7 +40,7 @@ const VideoPlayer = ({
                         className="absolute  hover:border-x-dhani-gold hover:border-y-transparent top-1/2 left-1/2 transform bg-transparent -translate-x-1/2 -translate-y-1/2"
                         aria-label="Play video"
                     >
-                        <img src="/UI/videoplay.png" className="size-16 " />
+                        <img src="/UI/videoplay.png" className="size-32 " />
                     </button>
                     {/* here add a green blur behind the video element */}
                     <button
@@ -51,7 +51,7 @@ const VideoPlayer = ({
                     </button>
                 </div>
             ) : (
-                <div className="relative w-full pt-[56.25%] pixel-corners overflow-hidden">
+                <div className="relative z-[5] w-full pt-[56.25%] pixel-corners overflow-hidden">
                     <iframe
                         className="absolute top-0 left-0 w-full h-full"
                         src={videoSrc ? videoSrc : "about:blank"}
