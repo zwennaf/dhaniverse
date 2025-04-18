@@ -184,6 +184,16 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
             onKeyDown={e => {
               // Stop propagation to prevent game from receiving key events
               e.stopPropagation();
+              if (e.key == 'Escape') {
+                  setChatActive(false);
+                  chatInputRef.current?.blur();
+                  isTypingRef.current = false;
+                  window.dispatchEvent(new Event('typing-end'));
+                  if (fadeTimeoutRef.current !== null) {
+                    clearTimeout(fadeTimeoutRef.current);
+                    fadeTimeoutRef.current = null;
+                  }
+              }
               
               // Handle special keys
               if (e.key === 'Enter') {
