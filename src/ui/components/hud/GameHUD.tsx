@@ -159,13 +159,14 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
       
       {/* Chat container with improved smooth transition */}
       <div
-        className={`chat-container clickable transition-opacity duration-300 ${chatActive ? (chatDimmed ? 'opacity-50' : 'opacity-100') : 'opacity-0 pointer-events-none'}`}
+        className={`chat-container clickable transition-all backdrop-blur-sm duration-300 ${chatActive ? (chatDimmed ? 'opacity-50 w-fit' : 'opacity-100 w-full') : 'opacity-0 pointer-events-none'}`}
         onClick={e => { e.stopPropagation(); setChatDimmed(false); }}
       >
         <div className="chat-messages" ref={messagesRef}>
           {chatMessages.map((msg, idx) => (
             <div key={idx} className="chat-message">
-              <strong>{msg.username}:</strong> {msg.message}
+              <div className='text-dhani-green text-lg tracking-tighter inline-block'>{msg.username}:</div>
+              <span className='tracking-wider'> {msg.message} </span>
             </div>
           ))}
         </div>
@@ -189,6 +190,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
           }}
           onBlur={() => {
             isTypingRef.current = false;
+            setChatDimmed(true);
             // Only dim on blur if we're not sending a message
             if (!sendingMessageRef.current) {
               // Don't dim when blur is caused by sending a message
