@@ -86,16 +86,19 @@ const LandingPage = () => {
             className="mb-6"
           />
           
-          <div className="flex items-center justify-center mt-6 mb-8">
+          <div className="flex flex-col items-center justify-center mt-6 gap-8">
             <p className="sm:text-2xl text-xl font-vcr flex items-center">
               Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" /><ChevronRight className="w-4 h-4 -ml-2" />
             </p>
-          </div>
           
-          <div>
-            <PixelButton size="lg" onClick={() => setShowJoinForm(true)}>
-              Play Now
-            </PixelButton>
+            <div className='flex gap-5'>
+              <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => setShowJoinForm(true)}>
+                Play Now
+              </PixelButton>
+              <PixelButton variant='cta' onClick={() => setShowJoinForm(true)}>
+                Sign In
+              </PixelButton>
+            </div>
           </div>
         </div>
       </section>
@@ -215,20 +218,24 @@ const LandingPage = () => {
           <MarqueeTestimonials testimonials={testimonials2} direction="right" speed={30} />
         </div>
       </section>
-      
-      {/* CTA section before footer */}
-      <section className="w-full px-4 py-12 mb-12">
-        <div className="max-w-3xl mx-auto pixel-corners bg-black/70 p-8 text-center">
-          <p className="text-sm font-vcr mb-4 text-white/80">Don't you have to make good finance decisions?</p>
-          <h2 className="text-2xl font-vcr mb-6">Just Start Playing already!</h2>
-          <p className="text-sm font-vcr mb-8 text-white/80">No lectures. Just quests, coins, maps, and clarity.</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <PixelButton size="lg" onClick={() => setShowJoinForm(true)}>Play Now</PixelButton>
-            <PixelButton variant="outline">Sign in</PixelButton>
+      <section className='w-full relative md:mb-32 mb-16'>
+        <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
+        <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] translate-y-1/2 absolute bottom-0 right-0 bg-dhani-gold/60 blur-[400px]" />
+        <div className="mx-5 px-4 py-12 bg-[url('/UI/cta.svg')] bg-center bg-no-repeat bg-contain">
+          <div className="mx-auto m-16 text-center">
+            <div className="inline-block px-3 border-[2px] mb-20 border-white/50 ">
+              <p className="text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Dont you have to make good finance decisions?</p>
+            </div>
+            
+            <h2 className="text-3xl md:text-4xl lg:text-6xl font-vcr mb-6">Just Start Playing already!</h2>
+            <p className="text-lg font-robert mb-8 tracking-widest text-white/80">No lectures. Just quests, coins, maps, and clarity.</p>
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+              <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => setShowJoinForm(true)}>Play Now</PixelButton>
+              <PixelButton variant="cta">Sign in</PixelButton>
+            </div>
           </div>
         </div>
       </section>
-      
       <Footer />
     </div>
   );

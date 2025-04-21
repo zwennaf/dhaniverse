@@ -11,19 +11,6 @@ interface FooterProps {
 const Footer = ({ className }: FooterProps) => {
   return (
     <footer className={cn("w-full pt-8 flex flex-col", className)}>
-      {/* CTA section above footer */}
-      <div className="max-w-3xl w-full mx-auto mb-12 bg-black/70 p-8 pixel-corners relative">
-        <p className="text-sm font-vcr mb-4 text-white/80 text-center">Dont you have to make good finance decisions?</p>
-        
-        <h2 className="text-2xl sm:text-3xl font-vcr mb-6 text-center">Just Start Playing already!</h2>
-        
-        <p className="text-sm font-vcr mb-8 text-white/80 text-center">No lectures. Just quests, coins, maps, and clarity.</p>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
-          <PixelButton className="bg-dhani-gold hover:bg-amber-500">Play now</PixelButton>
-          <PixelButton variant="outline">Sign in</PixelButton>
-        </div>
-      </div>
 
       {/* Actual footer with background */}
       <div className="w-full bg-[#37352D]/70 relative pt-10 pb-8 lg:pb-12 text-dhani-text px-6 overflow-hidden">

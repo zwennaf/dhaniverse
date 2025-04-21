@@ -275,6 +275,54 @@ button:focus-visible {
       );
     pointer-events: none;
   }
+  .pixel-corners-cta {
+    --pixel-size: 6px;
+    --pixel-color: transparent;
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    position: relative;
+  }
+
+  .pixel-corners-cta::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: transparent;
+    border: var(--pixel-size) solid var(--pixel-color);
+    clip-path: 
+      polygon(
+        0 var(--pixel-size), 
+        var(--pixel-size) var(--pixel-size), 
+        var(--pixel-size) 0, 
+        calc(100% - var(--pixel-size)) 0, 
+        calc(100% - var(--pixel-size)) var(--pixel-size), 
+        100% var(--pixel-size), 
+        100% calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
+        calc(100% - var(--pixel-size)) 100%, 
+        var(--pixel-size) 100%, 
+        var(--pixel-size) calc(100% - var(--pixel-size)), 
+        0 calc(100% - var(--pixel-size))
+      );
+    pointer-events: none;
+  }
+
   .nav-corners {
     --pixel-size: 7px;
     --pixel-color: #3A3834;
