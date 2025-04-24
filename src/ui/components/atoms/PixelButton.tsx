@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 
 interface PixelButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'cta';
+  variant?: 'default' | 'outline' | 'cta' | 'signout';
   size?: 'default' | 'sm' | 'lg';
   className?: string;
   children: React.ReactNode;
@@ -26,6 +26,7 @@ const PixelButton = ({
           'bg-dhani-gold text-black': variant === 'default',
           'bg-dhani-gold text-dhani-gold hover:bg-dhani-gold/10 px-6 py-2': variant === 'outline',
           'bg-dhani-gold/40 text-white pixel-corners-cta font-tickerbit hover:border-transparent text-lg px-8 py-3': variant === 'cta',
+          'bg-red-500/40 text-white pixel-corners-cta font-tickerbit hover:border-transparent text-lg px-8 py-3': variant === 'signout',
           'text-xs px-4 py-1.5': size === 'sm',
           'bg-dhani-gold/95 pixel-corners-cta font-tickerbit hover:border-transparent text-lg px-8 py-3': size === 'lg',
           'text-lg px-8 py-3': size === 'default',
