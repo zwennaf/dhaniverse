@@ -61,7 +61,7 @@ const VideoPlayer = ({
                     ></iframe>
                 </div>
             )}
-            <div className="video-blob-green z-0"></div> 
+            <div className="absolute lg:w-[980px] lg:h-[700px] md:w-[980px] md:h-[700px] w-[500px] h-[300px] bg-[#8fcb8f70] md:blur-[150px] sm:blur-[100px] blur-[50px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1] animate-[blobPulse_5s_ease-in-out_infinite]"></div> 
         </div>
     );
 };

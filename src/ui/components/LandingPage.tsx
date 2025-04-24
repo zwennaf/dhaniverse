@@ -182,22 +182,16 @@ const LandingPage = () => {
             <p className="text-xs font-vcr text-white/80">Buildings that teaches you the real use of money</p>
           </div>
           
-          <div className="relative mt-8 pixel-corners bg-black/30 p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {buildings.map((building) => (
-                <div key={building.id} className="pixel-corners overflow-hidden border border-dhani-gold/50">
-                  <img src={building.imageSrc} alt={building.name} className="w-full h-auto" />
-                </div>
-              ))}
-            </div>
+          <div className="relative mt-8 bg-black/30 p-6">
+            <img src="/UI/buildingsThatTeach.svg" alt="" />
             
-            <div className="mt-8 flex items-center justify-between">
-              <p className="text-sm font-vcr">
+            <div className="mt-8 absolute bottom-16 left-16 w-full flex items-center justify-between">
+              <p className="text-sm md:text-xl lg:text-2xl font-vcr">
                 Explore a full-on financial world.<br/>
                 Where every quest = a life skill.
               </p>
-              <div className="bg-black/40 p-2 rounded-full text-dhani-gold">
-                <ArrowRight className="w-6 h-6" />
+              <div className="p-2 absolute right-32 bottom-0 rounded-full text-dhani-green ml-auto">
+                <ArrowRight className="w-6 h-6 md:w-9 md:h-9 lg:w-12 lg:h-12" />
               </div>
             </div>
           </div>
