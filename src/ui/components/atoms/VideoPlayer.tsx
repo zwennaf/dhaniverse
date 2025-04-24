@@ -37,7 +37,7 @@ const VideoPlayer = ({
                     />
                     <button
                         onClick={handlePlay}
-                        className="absolute  hover:border-x-dhani-gold hover:border-y-transparent top-1/2 left-1/2 transform bg-transparent -translate-x-1/2 -translate-y-1/2"
+                        className="absolute hover:border-x-dhani-gold hover:border-y-transparent top-1/2 left-1/2 transform bg-transparent -translate-x-1/2 -translate-y-1/2"
                         aria-label="Play video"
                     >
                         <img src="/UI/videoplay.png" className="size-32 " />

@@ -147,9 +147,9 @@ const LandingPage = () => {
           <h2 className="text-2xl sm:text-5xl font-vcr mb-10 tracking-wide">What Makes <span className="text-dhani-gold pixel-glow">Dhaniverse</span> Different?</h2>
         </div>
         
-        <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="pixel-corners overflow-hidden border-2 border-dhani-gold">
-            <img src={mapUrl} alt="Dhaniverse Map" className="w-full h-auto" />
+        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="overflow-hidden">
+            <img src="/UI/whatMakesDifference.png" alt="Dhaniverse Map" className="w-full h-auto" />
           </div>
           
           <div className="space-y-6">
@@ -177,12 +177,12 @@ const LandingPage = () => {
       
       {/* Game world section */}
       <section className="w-full px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="section-title-border mb-8">
-            <p className="text-xs font-vcr text-white/80">Buildings that teaches you the real use of money</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="section-title-border mb-1">
+            <p className="text-md md:text-xl lg:text-2xl text-center font-vcr text-white/80">Buildings that teaches you the real use of money</p>
           </div>
           
-          <div className="relative mt-8 bg-black/30 p-6">
+          <div className="relative bg-black/30 p-6">
             <img src="/UI/buildingsThatTeach.svg" alt="" />
             
             <div className="mt-8 absolute bottom-16 left-16 w-full flex items-center justify-between">
@@ -202,7 +202,7 @@ const LandingPage = () => {
       <section className="w-full relative m-auto py-16 ">
         <div className="w-[150px] h-[150px] lg:w-[350px] lg:h-[350px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
         <div className=" mx-auto px-4 mb-8">
-          <h2 className="text-5xl font-vcr mb-8 text-center">What Players Say?</h2>
+          <h2 className="text-3xl md:text-5xl font-vcr mb-8 text-center">What Players Say?</h2>
         </div>
         
         <div className="mb-4">
