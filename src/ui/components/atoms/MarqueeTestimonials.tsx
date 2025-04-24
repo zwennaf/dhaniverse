@@ -25,7 +25,7 @@ const MarqueeTestimonials = ({
   return (
     <div className="relative overflow-hidden w-full">
       <motion.div 
-        className="flex gap-6"
+        className="flex gap-3"
         animate={{
           x: direction === 'left' 
             ? [0, -testimonials.length * 320] 
@@ -39,11 +39,12 @@ const MarqueeTestimonials = ({
         }}
       >
         {doubledTestimonials.map((testimonial, index) => (
-          <div key={index} className="flex-shrink-0 w-[280px]">
+          <div key={index} className="flex-shrink-0 h-[225px] w-[450px] bg-[url('/UI/cta.svg')] bg-center bg-no-repeat bg-contain">
             <TestimonialCard
               quote={testimonial.quote}
               author={testimonial.author}
-              userIcon={<User className="w-4 h-4 text-white" />}
+              userIcon={<User className="w-8 h-8 text-dhani-text" />}
+              className="p-6 text-wrap"
             />
           </div>
         ))}
