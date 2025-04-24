@@ -205,12 +205,13 @@ const LandingPage = () => {
       </section>
       
       {/* Testimonials section with marquee */}
-      <section className="w-full py-16 overflow-hidden">
-        <div className="max-w-4xl mx-auto px-4 mb-8">
-          <h2 className="text-2xl font-vcr mb-8 text-center">What Players Say?</h2>
+      <section className="w-full relative m-auto py-16 ">
+        <div className="w-[150px] h-[150px] lg:w-[350px] lg:h-[350px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
+        <div className=" mx-auto px-4 mb-8">
+          <h2 className="text-5xl font-vcr mb-8 text-center">What Players Say?</h2>
         </div>
         
-        <div className="mb-8">
+        <div className="mb-4">
           <MarqueeTestimonials testimonials={testimonials1} direction="left" speed={40} />
         </div>
         
