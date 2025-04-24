@@ -28,7 +28,7 @@ const LandingPage = () => {
   const handlePlay = () => {
     if (!isLoaded) return;
     if (!isSignedIn) return navigate('/sign-in');
-    const gameUsername = user.unsafeMetadata.gameUsername;
+    const gameUsername = user?.unsafeMetadata?.gameUsername;
     return gameUsername ? navigate('/game') : navigate('/profile');
   };
 
@@ -90,12 +90,25 @@ const LandingPage = () => {
             </p>
           
             <div className='flex gap-5'>
-              <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={handlePlay}>
-                Play Now
-              </PixelButton>
-              <PixelButton variant='cta' onClick={handlePlay}>
-                Sign In
-              </PixelButton>
+              {isSignedIn ? (
+                <>
+                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>
+                    Play Now
+                  </PixelButton>
+                  <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>
+                    Sign Out
+                  </PixelButton>
+                </>
+              ) : (
+                <>
+                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/sign-in')}>
+                    Play Now
+                  </PixelButton>
+                  <PixelButton variant='cta' onClick={() => navigate('/sign-up')}>
+                    Sign Up
+                  </PixelButton>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -191,12 +204,12 @@ const LandingPage = () => {
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>Play Now</PixelButton>
-                  <PixelButton variant="outline" className="hover:bg-red-500/20" onClick={handleSignOut}>Sign Out</PixelButton>
+                  <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>Sign Out</PixelButton>
                 </>
               ) : (
                 <>
-                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={handlePlay}>Play Now</PixelButton>
-                  <PixelButton variant="cta" onClick={handlePlay}>Sign In</PixelButton>
+                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/sign-in')}>Play Now</PixelButton>
+                  <PixelButton variant='cta' onClick={() => navigate('/sign-up')}>Sign Up</PixelButton>
                 </>
               )}
             </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { startGame, stopGame } from '../../game/game';
+import PixelButton from './atoms/PixelButton';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -55,7 +56,19 @@ const GamePage: React.FC = () => {
   }
    
   // The game will be rendered by Phaser in the game-container div
-  return <div className="game-page"></div>;
+  return (
+    <div className="game-page">
+      <div className="fixed top-4 left-4 z-50">
+        <PixelButton 
+          variant="outline" 
+          onClick={() => navigate('/')} 
+          className="bg-black/50 backdrop-blur-sm border-yellow-400/50 hover:bg-black/70"
+        >
+          Return to Home
+        </PixelButton>
+      </div>
+    </div>
+  );
 };
 
 export default GamePage;
