@@ -159,16 +159,18 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000, username = 'Player' }
         <span>{currentRupees}</span>
       </div>
       
-      {/* Chat container with improved smooth transition */}
+      {/* Chat container with styling matching original CSS exactly */}
       <div
-        className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-sm text-white pointer-events-auto transition-all backdrop-blur-sm duration-300 ${
-          chatActive ? (chatDimmed ? 'opacity-50 w-[20ch]' : 'opacity-100') : 'opacity-0 pointer-events-none'
+        className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-[14px] text-white pointer-events-auto backdrop-blur transition-all duration-300 ease-in-out ${
+          chatActive
+            ? (chatDimmed ? 'opacity-50 scale-x-100' : 'opacity-100 scale-x-100')
+            : 'opacity-0 scale-x-0 pointer-events-none'
         }`}
         onClick={e => { e.stopPropagation(); setChatDimmed(false); }}
       >
-        <div className="flex-1 overflow-y-auto mb-1" ref={messagesRef}>
+        <div className="flex-1 overflow-y-auto mb-1 break-words max-w-fit" ref={messagesRef}>
           {chatMessages.map((msg, idx) => (
-            <div key={idx} className="mb-0.5 leading-tight">
+            <div key={idx} className="mb-0.5 leading-[1.2]">
               <div className="text-dhani-green text-lg tracking-tighter inline-block">{msg.username}:</div>
               <span className="tracking-wider"> {msg.message} </span>
             </div>
@@ -178,7 +180,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000, username = 'Player' }
           id="hud-chat-input"
           ref={chatInputRef}
           autoFocus={false}
-          className="w-full p-1 px-1.5 border-none rounded bg-white/10 text-white outline-none placeholder-white/60"
+          className="w-full px-1.5 py-1 border-none rounded bg-white/10 text-[14px] text-white outline-none placeholder-white/60"
           type="text"
           placeholder="Type a message..."
           value={chatInput}
