@@ -5,7 +5,7 @@ import PixelButton from '../atoms/PixelButton';
 
 const CustomSignIn: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, setActive } = useSignIn();
+  const { signIn, setActive, isLoaded } = useSignIn();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,19 +35,43 @@ const CustomSignIn: React.FC = () => {
       setLoading(false);
     }
   };
+  
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: window.location.origin,
+        redirectUrlComplete: window.location.origin + '/profile'
+      });
+    } catch (err: any) {
+      setError(err.message || 'Google sign in failed');
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="bg-gray-900 p-6 rounded-md shadow-md w-full max-w-md space-y-4">
-        <h1 className="text-3xl font-vcr text-yellow-400 text-center">Sign In to Dhaniverse</h1>
-        {error && <div className="text-red-500 text-sm">{error}</div>}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <div 
+        className="absolute inset-0 z-0" 
+        style={{
+          backgroundImage: `url('/UI/bg.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(8px)'
+        }}
+      />
+      <form onSubmit={handleSubmit} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
+        <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">Sign In to <span className='text-dhani-gold pixel-glow'> Dhaniverse </span></h1>
+        {error && <div className="text-red-400 text-sm font-tickerbit">{error}</div>}
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
           required
-          className="w-full bg-gray-800 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          className="w-full bg-dhani-dark border pixel-corners border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
         />
         <input
           type="password"
@@ -55,30 +79,22 @@ const CustomSignIn: React.FC = () => {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
           required
-          className="w-full bg-gray-800 border border-gray-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
         />
         <PixelButton type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing In...' : 'Sign In'}
         </PixelButton>
-        <PixelButton type="button" disabled={loading} className="w-full bg-blue-700 hover:bg-blue-800 text-white">
-          <span onClick={async () => {
-            setError(''); setLoading(true);
-            try {
-              await signIn.authenticateWithRedirect({
-                strategy: 'oauth_google', 
-                redirectUrl: window.location.origin + '/sign-in',
-                redirectUrlComplete: window.location.origin + '/profile'
-              });
-            } catch (e) {
-              setError('Google sign in failed');
-            } finally { setLoading(false); }
-          }}>
-            Continue with Google
-          </span>
+        <PixelButton 
+          type="button" 
+          disabled={loading} 
+          onClick={handleGoogleSignIn}
+          className="w-full bg-dhani-dark hover:bg-dhani-darkgray border border-dhani-gold/40 text-dhani-text"
+        >
+          Continue with Google
         </PixelButton>
-        <p className="text-center text-gray-400 text-sm">
+        <p className="text-center text-dhani-text/70 text-sm font-robert">
           Don't have an account?{' '}
-          <Link to="/sign-up" className="text-yellow-400 hover:underline">
+          <Link to="/sign-up" className="text-dhani-gold hover:underline hover:text-dhani-gold/80">
             Sign Up
           </Link>
         </p>
