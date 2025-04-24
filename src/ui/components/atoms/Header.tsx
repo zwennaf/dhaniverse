@@ -29,17 +29,21 @@ const Header = ({ className }: HeaderProps) => {
       </Link>
       {isSignedIn ? (
         <div className="flex gap-3">
-          <PixelButton size='lg' className="hover:bg-dhani-gold/50">
-            <Link to="/game">Play Now</Link>
-          </PixelButton>
-          <PixelButton size='lg' variant="outline" className="hover:bg-red-500/20" onClick={handleSignOut}>
+          <Link to="/game">
+            <PixelButton size='lg' className="hover:bg-dhani-gold/50">
+              Play Now
+            </PixelButton>
+            </Link>
+          <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>
             Sign Out
           </PixelButton>
         </div>
       ) : (
-        <PixelButton size='lg' className="hover:bg-dhani-gold/50">
-          <Link to="/sign-in">Sign In</Link>
-        </PixelButton>
+          <Link to="/sign-in">
+            <PixelButton size='lg' className="hover:bg-dhani-gold/50">
+              Sign In
+            </PixelButton>
+          </Link>
       )}
     </header>
   );
