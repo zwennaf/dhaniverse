@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import './GameHUD.css';
+// Removing CSS import as we're using Tailwind classes directly
 
 // Define props interface for type safety
 interface GameHUDProps {
   rupees?: number;
+  username?: string; 
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000, username = 'Player' }) => {
   // State can be added here for dynamic HUD elements
   const [currentRupees, setCurrentRupees] = useState(rupees);
+  const [currentUsername, setCurrentUsername] = useState(username); // Store current player's username
   // Chat feature state
   const [chatMessages, setChatMessages] = useState<{ id: string; username: string; message: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -150,23 +152,25 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
   }, [chatActive, chatDimmed]);
 
   return (
-    <div className="game-hud">
+    <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1000] font-['Pixeloid',Arial,sans-serif]">
       {/* Top right corner for rupee count */}
-      <div className="rupee-counter">
-        <span className="rupee-symbol">₹</span>
-        <span className="rupee-value">{currentRupees}</span>
+      <div className="absolute top-5 right-5 p-2 px-3 rounded-lg flex items-center text-[#FFD700] text-shadow-lg text-2xl font-bold">
+        <span className="mr-1.5 text-3xl">₹</span>
+        <span>{currentRupees}</span>
       </div>
       
       {/* Chat container with improved smooth transition */}
       <div
-        className={`chat-container clickable transition-all backdrop-blur-sm duration-300 ${chatActive ? (chatDimmed ? 'opacity-50 w-fit' : 'opacity-100 w-full') : 'opacity-0 pointer-events-none'}`}
+        className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-sm text-white pointer-events-auto transition-all backdrop-blur-sm duration-300 ${
+          chatActive ? (chatDimmed ? 'opacity-50 w-[20ch]' : 'opacity-100') : 'opacity-0 pointer-events-none'
+        }`}
         onClick={e => { e.stopPropagation(); setChatDimmed(false); }}
       >
-        <div className="chat-messages" ref={messagesRef}>
+        <div className="flex-1 overflow-y-auto mb-1" ref={messagesRef}>
           {chatMessages.map((msg, idx) => (
-            <div key={idx} className="chat-message">
-              <div className='text-dhani-green text-lg tracking-tighter inline-block'>{msg.username}:</div>
-              <span className='tracking-wider'> {msg.message} </span>
+            <div key={idx} className="mb-0.5 leading-tight">
+              <div className="text-dhani-green text-lg tracking-tighter inline-block">{msg.username}:</div>
+              <span className="tracking-wider"> {msg.message} </span>
             </div>
           ))}
         </div>
@@ -174,7 +178,7 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
           id="hud-chat-input"
           ref={chatInputRef}
           autoFocus={false}
-          className="chat-input"
+          className="w-full p-1 px-1.5 border-none rounded bg-white/10 text-white outline-none placeholder-white/60"
           type="text"
           placeholder="Type a message..."
           value={chatInput}
@@ -248,8 +252,6 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
         />
       </div>
       {/* End chat container */}
-      
-      {/* You can add more HUD elements here */}
     </div>
   );
 };
