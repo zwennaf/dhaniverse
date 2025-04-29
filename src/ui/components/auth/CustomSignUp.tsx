@@ -5,8 +5,15 @@ import PixelButton from '../atoms/PixelButton';
 
 const CustomSignUp: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp, setActive } = useSignUp();
+  const { signUp, setActive, isLoaded } = useSignUp();
   if (!signUp || !setActive) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading authentication...</div>
+      </div>
+    );
+  }
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white">Loading authentication...</div>
@@ -18,20 +25,47 @@ const CustomSignUp: React.FC = () => {
   const [gameUsername, setGameUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      // @ts-ignore allow publicMetadata
-      const result = await signUp.create({ emailAddress: email, password, unsafeMetadata: { gameUsername } } as any);
+      // @ts-ignore include username and gameUsername metadata
+      await signUp.create({
+        emailAddress: email,
+        password,
+        username: gameUsername,
+        unsafeMetadata: { gameUsername },
+        strategy: 'email_code',
+        redirectUrlComplete: window.location.origin + '/profile'
+      } as any);
+      setCodeSent(true);
+      setLoading(false);
+      return;
+    } catch (err: any) {
+      setError(err.errors?.[0]?.longMessage || err.message || 'Sign up failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code: verificationCode });
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
         navigate('/profile');
+      } else {
+        setError('Verification failed. Please check your code and try again.');
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.longMessage || err.message || 'Sign up failed');
+      setError(err.errors?.[0]?.longMessage || err.message || 'Verification error');
     } finally {
       setLoading(false);
     }
@@ -48,6 +82,7 @@ const CustomSignUp: React.FC = () => {
           filter: 'blur(8px)'
         }}
       />
+      {!codeSent ? (
       <form onSubmit={handleSubmit} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
         <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">Sign Up for <span className='text-dhani-gold pixel-glow'> Dhaniverse </span></h1>
         {error && <div className="text-red-400 text-sm font-tickerbit">{error}</div>}
@@ -85,6 +120,23 @@ const CustomSignUp: React.FC = () => {
           </Link>
         </p>
       </form>
+      ) : (
+      <form onSubmit={handleVerifyCode} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg w-full max-w-md space-y-4 z-10">
+        <h2 className="text-xl text-center text-dhani-text">Enter verification code</h2>
+        {error && <div className="text-red-400 text-sm">{error}</div>}
+        <input
+          type="text"
+          value={verificationCode}
+          onChange={(e) => setVerificationCode(e.target.value)}
+          placeholder="6-digit code"
+          required
+          className="w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text"
+        />
+        <PixelButton type="submit" disabled={loading} className="w-full">
+          {loading ? 'Verifying...' : 'Verify Code'}
+        </PixelButton>
+      </form>
+      )}
     </div>
   );
 };
