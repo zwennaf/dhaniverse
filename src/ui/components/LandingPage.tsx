@@ -25,11 +25,10 @@ const LandingPage = () => {
     });
   };
 
-  const handlePlay = () => {
+  const handleProfile = () => {
     if (!isLoaded) return;
     if (!isSignedIn) return navigate('/sign-in');
-    const gameUsername = user?.unsafeMetadata?.gameUsername;
-    return gameUsername ? navigate('/game') : navigate('/profile');
+    navigate('/profile');
   };
 
   // Generate pixelated map image for the video thumbnail
@@ -95,10 +94,7 @@ const LandingPage = () => {
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>
                     Play Now
                   </PixelButton>
-                  <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>
-                    Sign Out
-                  </PixelButton>
-                </>
+                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">Profile</PixelButton>                </>
               ) : (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/sign-in')}>
@@ -204,7 +200,7 @@ const LandingPage = () => {
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>Play Now</PixelButton>
-                  <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>Sign Out</PixelButton>
+                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">Profile</PixelButton>
                 </>
               ) : (
                 <>
