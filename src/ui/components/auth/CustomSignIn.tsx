@@ -100,7 +100,14 @@ const CustomSignIn: React.FC = () => {
       />
       <form onSubmit={handleSubmit} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
         <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">Sign In to <span className='text-dhani-gold pixel-glow'> Dhaniverse </span></h1>
-        {error && <div className="text-red-400 text-sm font-tickerbit">{error}</div>}
+        
+        {/* Enhanced error styling to match Profile.tsx */}
+        {error && (
+          <div className="text-red-400 text-sm font-tickerbit p-2 mb-2 border border-red-400 rounded bg-red-900/20">
+            ⚠️ {error}
+          </div>
+        )}
+        
         <input
           type="email"
           value={email}

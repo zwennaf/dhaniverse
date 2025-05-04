@@ -115,7 +115,14 @@ const CustomSignUp: React.FC = () => {
       {!codeSent ? (
       <form onSubmit={handleSubmit} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
         <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">Sign Up for <span className='text-dhani-gold pixel-glow'> Dhaniverse </span></h1>
-        {error && <div className="text-red-400 text-sm font-tickerbit">{error}</div>}
+        
+        {/* Enhanced error styling to match Profile.tsx */}
+        {error && (
+          <div className="text-red-400 text-sm font-tickerbit p-2 mb-2 border border-red-400 rounded bg-red-900/20">
+            ⚠️ {error}
+          </div>
+        )}
+        
         <input
           type="email"
           value={email}
@@ -138,7 +145,7 @@ const CustomSignUp: React.FC = () => {
           onChange={(e) => setGameUsername(e.target.value)}
           placeholder="In-Game Username"
           required
-          className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
+          className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!gameUsername || gameUsername.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
         <PixelButton type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing Up...' : 'Sign Up'}
@@ -167,7 +174,14 @@ const CustomSignUp: React.FC = () => {
       ) : (
       <form onSubmit={handleVerifyCode} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg w-full max-w-md space-y-4 z-10">
         <h2 className="text-xl text-center text-dhani-text">Enter verification code</h2>
-        {error && <div className="text-red-400 text-sm">{error}</div>}
+        
+        {/* Enhanced error styling for verification code form */}
+        {error && (
+          <div className="text-red-400 text-sm font-tickerbit p-2 mb-2 border border-red-400 rounded bg-red-900/20">
+            ⚠️ {error}
+          </div>
+        )}
+        
         <input
           type="text"
           value={verificationCode}
