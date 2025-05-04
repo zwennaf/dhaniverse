@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Header from './atoms/Header';
 import Footer from './atoms/Footer';
 import VideoPlayer from './atoms/VideoPlayer';
@@ -17,6 +17,17 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
+  
+  // Check if the user is signed in but doesn't have a username set
+  // If so, redirect them to the profile page to set one up
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      const gameUsername = user.unsafeMetadata?.gameUsername;
+      if (!gameUsername || (typeof gameUsername === 'string' && gameUsername.trim() === '')) {
+        navigate('/profile');
+      }
+    }
+  }, [isLoaded, isSignedIn, user, navigate]);
   
   const handleSignOut = () => {
     signOut().then(() => {
