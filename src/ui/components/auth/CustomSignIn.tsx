@@ -1,15 +1,50 @@
-import React, { useState } from 'react';
-import { useSignIn } from '@clerk/clerk-react';
+import React, { useState, useEffect } from 'react';
+import { useSignIn, useUser } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 
 const CustomSignIn: React.FC = () => {
   const navigate = useNavigate();
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { user } = useUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Simple effect to handle OAuth callback
+  useEffect(() => {
+    if (!isLoaded || !signIn) return;
+    
+    // Check if we're returning from an OAuth flow
+    const searchParams = new URLSearchParams(window.location.search);
+    const createdSessionId = searchParams.get('createdSessionId');
+    
+    if (createdSessionId) {
+      setLoading(true);
+      setActive({ session: createdSessionId })
+        .then(() => navigate('/profile'))
+        .catch(err => setError(err.message || 'Failed to activate session'))
+        .finally(() => setLoading(false));
+    }
+  }, [isLoaded, signIn, setActive, navigate]);
+
+  // Handle user data after successful authentication
+  useEffect(() => {
+    if (user) {
+      if (user.firstName && !user.username) {
+        user.update({
+          username: user.firstName,
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            gameUsername: user.firstName
+          }
+        }).catch(err => {
+          console.error('Error updating user data:', err);
+        });
+      }
+    }
+  }, [user]);
 
   if (!signIn || !setActive) {
     return (
@@ -37,13 +72,14 @@ const CustomSignIn: React.FC = () => {
   };
   
   const handleGoogleSignIn = async () => {
-    setError('');
-    setLoading(true);
     try {
+      setError('');
+      setLoading(true);
+      // Simple redirect for Google OAuth
       await signIn.authenticateWithRedirect({
-        strategy: 'oauth_google',
-        redirectUrl: window.location.origin,
-        redirectUrlComplete: window.location.origin + '/profile'
+        strategy: "oauth_google",
+        redirectUrl: `${window.location.origin}/sign-in`,
+        redirectUrlComplete: `${window.location.origin}/profile`,
       });
     } catch (err: any) {
       setError(err.message || 'Google sign in failed');

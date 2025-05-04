@@ -1,25 +1,13 @@
-import React, { useState } from 'react';
-import { useSignUp } from '@clerk/clerk-react';
+import React, { useState, useEffect } from 'react';
+import { GoogleOneTap, useSignUp } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 
 const CustomSignUp: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, setActive, isLoaded } = useSignUp();
-  if (!signUp || !setActive) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading authentication...</div>
-      </div>
-    );
-  }
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading authentication...</div>
-      </div>
-    );
-  }
+  
+  // Always declare all hooks at the top level, before any conditional logic
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [gameUsername, setGameUsername] = useState('');
@@ -27,6 +15,29 @@ const CustomSignUp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+
+  useEffect(() => {
+    if (!isLoaded || !signUp) return;
+
+    // Check if we're returning from an OAuth flow
+    const searchParams = new URLSearchParams(window.location.search);
+    const createdSessionId = searchParams.get('createdSessionId');
+
+    if (createdSessionId) {
+      setActive({ session: createdSessionId })
+        .then(() => navigate('/profile'))
+        .catch(err => setError(err.message || 'Failed to set active session'));
+    }
+  }, [isLoaded, signUp, setActive, navigate]);
+
+  // Render loading state if necessary
+  if (!isLoaded || !signUp || !setActive) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading authentication...</div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,15 +62,34 @@ const CustomSignUp: React.FC = () => {
       setLoading(false);
     }
   };
-  
+
+  const handleGoogleSignUp = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signUp.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: `${window.location.origin}/sign-up`,
+        redirectUrlComplete: `${window.location.origin}/profile`,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Google sign up failed');
+      setLoading(false);
+    }
+  };
+
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
       const result = await signUp.attemptEmailAddressVerification({ code: verificationCode });
-      if (result.status === 'complete' && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
+      if (result.status === 'complete') {
+        // Ensure we have a session to activate
+        if (result.createdSessionId) {
+          await setActive({ session: result.createdSessionId });
+        }
+        // Always redirect to profile upon successful verification
         navigate('/profile');
       } else {
         setError('Verification failed. Please check your code and try again.');
@@ -113,6 +143,20 @@ const CustomSignUp: React.FC = () => {
         <PixelButton type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing Up...' : 'Sign Up'}
         </PixelButton>
+        <div className="relative my-4 flex items-center justify-center">
+          <div className="border-t border-dhani-gold/20 w-full"></div>
+          <span className="bg-dhani-darkgray px-3 text-sm text-dhani-text/60">or</span>
+          <div className="border-t border-dhani-gold/20 w-full"></div>
+        </div>
+        <PixelButton 
+          type="button" 
+          disabled={loading} 
+          onClick={handleGoogleSignUp}
+          className="w-full bg-dhani-dark hover:bg-dhani-darkgray border border-dhani-gold/40 text-dhani-text"
+        >
+          Continue with Google
+          </PixelButton>
+      <GoogleOneTap />
         <p className="text-center text-dhani-text/70 text-sm font-robert">
           Already have an account?{' '}
           <Link to="/sign-in" className="text-dhani-gold hover:underline hover:text-dhani-gold/80">
