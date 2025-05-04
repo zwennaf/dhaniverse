@@ -20,6 +20,11 @@ const Profile: React.FC = () => {
     setUsername(existing);
   }, [isLoaded, user]);
 
+  // Clear error on username change
+  useEffect(() => {
+    if (error) setError('');
+  }, [username]);
+
   const handleOnClick = () => {
     navigate('/');
   }
@@ -59,6 +64,29 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handlePlayNow = () => {
+    // Clear previous errors
+    setError('');
+    
+    // Validate username
+    if (!username || username.trim().length < 3) {
+      setError('⚠️ Please set a valid username (at least 3 characters) before playing');
+      setSaved(false);
+      return;
+    }
+    
+    // Username is valid, check if it needs saving
+    if (!saved && username.trim() !== (user.unsafeMetadata?.gameUsername as string || '')) {
+      // Try to save the username first, then navigate in the handleSave success path
+      handleSave().then(() => {
+        navigate('/game');
+      });
+    } else {
+      // Username is already saved, navigate directly
+      navigate('/game');
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       <div 
@@ -73,18 +101,36 @@ const Profile: React.FC = () => {
       <div className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
         <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center"><ArrowLeft className='absolute hover:cursor-pointer translate-y-1 hover:opacity-50 transition-opacity' onClick={handleOnClick} />Your <span className='text-dhani-gold pixel-glow'>Profile</span></h1>
         <p className="text-dhani-text/70 text-sm">Email: <span className="text-dhani-text font-robert">{user.primaryEmailAddress?.emailAddress || 'N/A'}</span></p>
-        {error && <div className="text-red-400 text-sm font-tickerbit mb-2">{error}</div>}
-        {saved && <div className="text-green-400 text-sm font-tickerbit mb-2">Profile saved!</div>}
+        
+        {/* Make error more visible with padding and border */}
+        {error && (
+          <div className="text-red-400 text-sm font-tickerbit p-2 mb-2 border border-red-400 rounded bg-red-900/20">
+            {error}
+          </div>
+        )}
+        
+        {saved && !error && (
+          <div className="text-green-400 text-sm font-tickerbit p-2 mb-2 border border-green-400 rounded bg-green-900/20">
+            Profile saved!
+          </div>
+        )}
+        
         <label className="block text-dhani-text font-robert text-sm">In-Game Username</label>
         <input
           type="text"
           value={username}
           onChange={(e) => { setUsername(e.target.value); setSaved(false); }}
           placeholder="Your Game Username"
-          className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
+          className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!username || username.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
         <div className="flex flex-col sm:flex-row gap-3">
-          <PixelButton variant='outline' size='lg' onClick={() => navigate('/game')} disabled={loading} className="sm:w-1/3 bg-transparent/50 ">
+          <PixelButton 
+            variant='outline' 
+            size='lg' 
+            onClick={handlePlayNow} 
+            disabled={loading} 
+            className="sm:w-1/3 bg-transparent/50"
+          >
             Play Now
           </PixelButton>
           <PixelButton variant='outline' size='lg' onClick={handleSave} disabled={loading} className="sm:w-1/3 bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
