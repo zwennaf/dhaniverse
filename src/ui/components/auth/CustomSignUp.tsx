@@ -15,9 +15,18 @@ const CustomSignUp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
+  const [comingFromSignIn, setComingFromSignIn] = useState(false);
 
   useEffect(() => {
     if (!isLoaded || !signUp) return;
+
+    // Check if we're coming from a Google sign-in attempt
+    const googleSignInAttempt = localStorage.getItem('dhaniverse_google_signin_attempt');
+    if (googleSignInAttempt === 'true') {
+      setError('You need to create an account first. Please sign up with Google below.');
+      setComingFromSignIn(true);
+      localStorage.removeItem('dhaniverse_google_signin_attempt');
+    }
 
     // Check if we're returning from an OAuth flow
     const searchParams = new URLSearchParams(window.location.search);
@@ -67,6 +76,9 @@ const CustomSignUp: React.FC = () => {
     setError('');
     setLoading(true);
     try {
+      // Clear any previous sign-in attempt flag
+      localStorage.removeItem('dhaniverse_google_signin_attempt');
+      
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: `${window.location.origin}/sign-up`,
@@ -155,14 +167,25 @@ const CustomSignUp: React.FC = () => {
           <span className="bg-dhani-darkgray px-3 text-sm text-dhani-text/60">or</span>
           <div className="border-t border-dhani-gold/20 w-full"></div>
         </div>
+        
+        {/* Highlight the Google button with a smooth shimmer effect if coming from sign-in attempt */}
         <PixelButton 
           type="button" 
           disabled={loading} 
           onClick={handleGoogleSignUp}
-          className="w-full bg-dhani-dark hover:bg-dhani-darkgray border border-dhani-gold/40 text-dhani-text"
+          className={`w-full transition-all duration-300 ${
+            comingFromSignIn 
+            ? "shimmer-effect hover:text-dhani-text hover:bg-transparent bg-dhani-gold" 
+            : "bg-dhani-dark hover:bg-dhani-darkgray border border-dhani-gold/40 text-dhani-text"
+          }`}
+          style={comingFromSignIn ? {
+            '--shimmer-base-color': '#FFFFFF',
+            '--shimmer-highlight-color': '#FFFFFF',
+            '--shimmer-text-color': '#000'
+          } as React.CSSProperties : {}}
         >
-          Continue with Google
-          </PixelButton>
+          {comingFromSignIn ? '→ Sign Up with Google ←' : 'Continue with Google'}
+        </PixelButton>
       <GoogleOneTap />
         <p className="text-center text-dhani-text/70 text-sm font-robert">
           Already have an account?{' '}
