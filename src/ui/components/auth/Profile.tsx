@@ -55,7 +55,14 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      await user.update({ unsafeMetadata: { gameUsername: username.trim() }});
+      // Update both the Clerk username field and the unsafeMetadata field
+      await user.update({ 
+        username: username.trim(),
+        unsafeMetadata: { 
+          ...user.unsafeMetadata,
+          gameUsername: username.trim() 
+        }
+      });
       setSaved(true);
     } catch (err: any) {
       setError(err.message || 'Failed to save username');
@@ -84,6 +91,14 @@ const Profile: React.FC = () => {
     } else {
       // Username is already saved, navigate directly
       navigate('/game');
+    }
+  };
+
+  // Handle Enter key press for better UX
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
     }
   };
 
@@ -120,6 +135,7 @@ const Profile: React.FC = () => {
           type="text"
           value={username}
           onChange={(e) => { setUsername(e.target.value); setSaved(false); }}
+          onKeyDown={handleKeyDown}
           placeholder="Your Game Username"
           className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!username || username.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
