@@ -3,7 +3,82 @@ import { useSignIn, useUser } from '@clerk/clerk-react';
 import { useNavigate, Link } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 
+// Simplified device detection function
+const isMobileDevice = () => {
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+  return false;
+};
+
+// Mobile view component - completely separate from the authentication logic
+const MobileView = () => (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    zIndex: 9999
+  }}>
+    <div style={{
+      backgroundColor: '#282828',
+      padding: '24px',
+      borderRadius: '16px',
+      width: '90%',
+      maxWidth: '400px',
+      boxShadow: '0 4px 12px rgba(255, 199, 0, 0.2)',
+      textAlign: 'center',
+      color: 'white'
+    }}>
+      <h1 style={{
+        fontSize: '24px',
+        color: '#FFC700',
+        marginBottom: '16px',
+        fontWeight: 'bold'
+      }}>
+        Desktop Only Experience
+      </h1>
+      <p style={{
+        margin: '16px 0'
+      }}>
+        Dhaniverse is currently optimized for desktop computers only.
+        Please visit us on a laptop or desktop computer for the best experience.
+      </p>
+      <div style={{
+        width: '80px',
+        height: '80px',
+        margin: '20px auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#1a1a1a',
+        borderRadius: '8px'
+      }}>
+        <span style={{fontSize: '40px'}}>🖥️</span>
+      </div>
+      <p style={{
+        fontSize: '14px',
+        color: 'rgba(255,255,255,0.6)'
+      }}>
+        We're considering mobile support in future updates!
+      </p>
+    </div>
+  </div>
+);
+
 const CustomSignIn: React.FC = () => {
+  // Check for mobile immediately before any other logic
+  if (isMobileDevice()) {
+    return <MobileView />;
+  }
+
+  // Continue with the regular component logic for desktop users
   const navigate = useNavigate();
   const { signIn, setActive, isLoaded } = useSignIn();
   const { user } = useUser();
@@ -12,18 +87,35 @@ const CustomSignIn: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [needToSignUp, setNeedToSignUp] = useState(false);
+  const [authLoadTimeout, setAuthLoadTimeout] = useState(false);
+
+  // Set a timeout for auth loading to prevent indefinite loading screens
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!isLoaded) {
+        setAuthLoadTimeout(true);
+        console.warn("Authentication loading timed out");
+      }
+    }, 8000); // 8 seconds timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [isLoaded]);
 
   // Simple effect to handle OAuth callback and check for stored errors
   useEffect(() => {
     if (!isLoaded || !signIn) return;
     
     // Check for stored error from previous redirect
-    const storedError = localStorage.getItem('dhaniverse_signin_error');
-    if (storedError) {
-      setError(storedError);
-      setNeedToSignUp(true);
-      localStorage.removeItem('dhaniverse_signin_error');
-      return;
+    try {
+      const storedError = localStorage.getItem('dhaniverse_signin_error');
+      if (storedError) {
+        setError(storedError);
+        setNeedToSignUp(true);
+        localStorage.removeItem('dhaniverse_signin_error');
+        return;
+      }
+    } catch (err) {
+      console.error("Error accessing localStorage:", err);
     }
     
     // Check if we're returning from an OAuth flow
@@ -69,10 +161,36 @@ const CustomSignIn: React.FC = () => {
     }
   }, [user]);
 
-  if (!signIn || !setActive) {
+  // Show error with retry button if auth loading times out
+  if (authLoadTimeout) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading authentication...</div>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+        <div className="text-red-400 mb-4">Authentication service is taking too long to load.</div>
+        <div className="text-white mb-4">This may be due to a slow network connection or browser privacy settings.</div>
+        <PixelButton 
+          onClick={() => window.location.reload()} 
+          className="bg-dhani-gold text-black"
+        >
+          Retry
+        </PixelButton>
+        <div className="text-white mt-4 text-sm">
+          <p>If this issue persists:</p>
+          <ul className="list-disc pl-5 mt-2">
+            <li>Check your internet connection</li>
+            <li>Try disabling content blockers</li>
+            <li>Ensure cookies are enabled</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // Default loading screen with improved feedback
+  if (!isLoaded || !signIn || !setActive) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <div className="text-white mb-4">Loading authentication...</div>
+        <div className="w-16 h-16 border-t-4 border-dhani-gold border-solid rounded-full animate-spin"></div>
       </div>
     );
   }
