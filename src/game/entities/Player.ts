@@ -44,15 +44,14 @@ export class Player {
       body.setDamping(true);
       body.setDrag(0.85, 0.85);
     }
-    
-    // Create username text
+      // Create username text
     this.nameText = scene.add.text(x, y + 350, this.username, {
-      fontFamily: 'Pixeloid',
-      fontSize: '20px',
-      color: '#ffffff',
+      fontFamily: Constants.PLAYER_NAME_FONT,
+      fontSize: Constants.PLAYER_NAME_SIZE,
+      color: Constants.PLAYER_NAME_COLOR,
       align: 'center',
-      backgroundColor: '#00000020',
-      padding: { x: 4, y: 2 }
+      backgroundColor: Constants.PLAYER_NAME_BACKGROUND,
+      padding: Constants.PLAYER_NAME_PADDING
     }).setOrigin(0.5);
   }
 

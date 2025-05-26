@@ -1,5 +1,6 @@
 import { GameObjects, Input } from 'phaser';
 import { MainGameScene } from '../scenes/MainScene.ts';
+import { Constants } from '../utils/Constants.ts';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -28,25 +29,24 @@ export class NPCManager {
     this.npc = scene.add.sprite(737, 3753, 'character') as NPCSprite;
     this.npc.setScale(5);
     this.npc.anims.play('idle-right');
-    
-    // Add NPC name text
+      // Add NPC name text
     const npcNameText = scene.add.text(this.npc.x, this.npc.y - 50, "Village Elder", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffff00',
+      fontFamily: Constants.NPC_NAME_FONT,
+      fontSize: Constants.NPC_NAME_SIZE,
+      color: Constants.NPC_NAME_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 4, y: 2 }
+      backgroundColor: Constants.NPC_NAME_BACKGROUND,
+      padding: Constants.NPC_NAME_PADDING
     }).setOrigin(0.5);
     
     // Add interaction text (initially hidden)
     this.interactionText = scene.add.text(this.npc.x, this.npc.y - 80, "Press E to interact", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffffff',
+      fontFamily: Constants.UI_TEXT_FONT,
+      fontSize: Constants.UI_TEXT_SIZE,
+      color: Constants.UI_TEXT_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 8, y: 4 }
+      backgroundColor: Constants.UI_TEXT_BACKGROUND,
+      padding: Constants.UI_TEXT_PADDING
     }).setOrigin(0.5).setAlpha(0);
     
     // Add to game container
@@ -198,16 +198,15 @@ export class NPCManager {
       0.8
     );
     dialogBox.setScrollFactor(0).setDepth(2000);
-    
-    // Add dialog text with word wrap
+      // Add dialog text with word wrap
     const dialogText = this.scene.add.text(
       dialogBox.x, 
       dialogBox.y, 
       "Greetings adventurer! I am the Village Elder.\nWelcome to our humble village.",
       {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#ffffff',
+        fontFamily: Constants.DIALOG_TEXT_FONT,
+        fontSize: Constants.DIALOG_TEXT_SIZE,
+        color: Constants.DIALOG_TEXT_COLOR,
         align: 'center',
         wordWrap: { width: dialogBox.width - 40 }
       }
@@ -219,9 +218,9 @@ export class NPCManager {
       dialogBox.y + 60,
       "Press E, Space or Enter to close",
       {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#aaaaaa',
+        fontFamily: Constants.DIALOG_INSTRUCTION_FONT,
+        fontSize: Constants.DIALOG_INSTRUCTION_SIZE,
+        color: Constants.DIALOG_INSTRUCTION_COLOR,
         align: 'center'
       }
     ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);

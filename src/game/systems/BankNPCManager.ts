@@ -1,5 +1,6 @@
 import { GameObjects, Input } from 'phaser';
 import { MainScene } from '../scenes/MainScene';
+import { Constants } from '../utils/Constants.ts';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -73,25 +74,24 @@ export class BankNPCManager {
     this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
     this.banker.setScale(5);
     this.banker.anims.play('idle-down');
-    
-    // Add banker name text
+      // Add banker name text
     const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Teller", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffff00',
+      fontFamily: Constants.NPC_NAME_FONT,
+      fontSize: Constants.NPC_NAME_SIZE,
+      color: Constants.NPC_NAME_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 4, y: 2 }
+      backgroundColor: Constants.NPC_NAME_BACKGROUND,
+      padding: Constants.NPC_NAME_PADDING
     }).setOrigin(0.5);
     
     // Add interaction text (initially hidden)
     this.interactionText = scene.add.text(this.banker.x, this.banker.y - 80, "Press E to interact", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffffff',
+      fontFamily: Constants.UI_TEXT_FONT,
+      fontSize: Constants.UI_TEXT_SIZE,
+      color: Constants.UI_TEXT_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 8, y: 4 }
+      backgroundColor: Constants.UI_TEXT_BACKGROUND,
+      padding: Constants.UI_TEXT_PADDING
     }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
     
     // Add to game container

@@ -20,19 +20,18 @@ export class BuildingManager {
     this.scene = scene;
     this.buildingEntrance = { x: 9383, y: 6087 };
     this.stockMarketEntrance = { x: 2565, y: 3550 }; // Stock market building entrance
-    
-    // Initialize buildingInteractionText with improved visual style
+      // Initialize buildingInteractionText with improved visual style
     this.buildingInteractionText = scene.add.text(
       this.buildingEntrance.x, 
       this.buildingEntrance.y - 50, 
       "Press E to enter", 
       {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#ffffff',
+        fontFamily: Constants.UI_TEXT_FONT,
+        fontSize: Constants.UI_TEXT_SIZE,
+        color: Constants.UI_TEXT_COLOR,
         align: 'center',
-        backgroundColor: '#00000080',
-        padding: { x: 8, y: 4 },
+        backgroundColor: Constants.UI_TEXT_BACKGROUND,
+        padding: Constants.UI_TEXT_PADDING,
         shadow: {
           offsetX: 1,
           offsetY: 1,
@@ -49,12 +48,12 @@ export class BuildingManager {
       this.stockMarketEntrance.y - 50, 
       "Press E to enter Stock Market", 
       {
-        fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#ffffff',
+        fontFamily: Constants.UI_TEXT_FONT,
+        fontSize: Constants.UI_TEXT_SIZE,
+        color: Constants.UI_TEXT_COLOR,
         align: 'center',
-        backgroundColor: '#00000080',
-        padding: { x: 8, y: 4 },
+        backgroundColor: Constants.UI_TEXT_BACKGROUND,
+        padding: Constants.UI_TEXT_PADDING,
         shadow: {
           offsetX: 1,
           offsetY: 1,

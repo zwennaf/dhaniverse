@@ -85,18 +85,17 @@ export class WebSocketManager {
   constructor(scene: MainGameScene, player: Player) {
     this.scene = scene;
     this.player = player;
-    
-    // Create connection status text that will appear if connection issues occur
+      // Create connection status text that will appear if connection issues occur
     this.connectionStatusText = this.scene.add.text(
       this.scene.cameras.main.width / 2, 
       20, 
       'Connecting...', 
       {
-        fontFamily: 'Arial',
-        fontSize: '18px',
-        color: '#ffffff',
-        backgroundColor: '#333333',
-        padding: { x: 10, y: 5 }
+        fontFamily: Constants.SYSTEM_TEXT_FONT,
+        fontSize: Constants.SYSTEM_TEXT_SIZE,
+        color: Constants.SYSTEM_TEXT_COLOR,
+        backgroundColor: Constants.SYSTEM_TEXT_BACKGROUND,
+        padding: Constants.SYSTEM_TEXT_PADDING
       }
     ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(1000).setVisible(false);
     
@@ -359,15 +358,14 @@ export class WebSocketManager {
     
     const otherPlayer = this.scene.add.sprite(playerData.x, playerData.y, 'character');
     otherPlayer.setScale(5);
-    
-    // Add username text above player
+      // Add username text above player
     const nameText = this.scene.add.text(playerData.x, playerData.y - 50, playerData.username, {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffffff',
+      fontFamily: Constants.PLAYER_NAME_FONT,
+      fontSize: Constants.PLAYER_NAME_SIZE,
+      color: Constants.PLAYER_NAME_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 4, y: 2 }
+      backgroundColor: Constants.PLAYER_NAME_BACKGROUND,
+      padding: Constants.PLAYER_NAME_PADDING
     }).setOrigin(0.5);
     
     this.otherPlayers.set(playerData.id, { 

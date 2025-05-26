@@ -116,14 +116,14 @@ export class CollisionManager {
       if (Constants.SHOW_DEBUG_VISUALS) {
         box.setStrokeStyle(2, Constants.COLLISION_COLOR);
         box.setFillStyle(Constants.COLLISION_COLOR, Constants.COLLISION_ALPHA);
-        
-        // Add label with ID if debug mode is on and ID exists
+          // Add label with ID if debug mode is on and ID exists
         if (boxData.id) {
           const idText = this.scene.add.text(centerX, centerY, `ID: ${boxData.id}`, {
-            fontSize: '14px',
-            color: '#ffffff',
-            backgroundColor: '#000000',
-            padding: { x: 4, y: 2 }
+            fontFamily: Constants.DEBUG_TEXT_FONT,
+            fontSize: Constants.DEBUG_TEXT_SIZE,
+            color: Constants.DEBUG_TEXT_COLOR,
+            backgroundColor: Constants.DEBUG_TEXT_BACKGROUND,
+            padding: Constants.DEBUG_TEXT_PADDING
           }).setOrigin(0.5);
           
           gameContainer.add(idText);

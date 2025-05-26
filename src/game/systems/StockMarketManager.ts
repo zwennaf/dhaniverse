@@ -129,34 +129,33 @@ export class StockMarketManager {
     this.broker = scene.add.sprite(brokerX, brokerY, 'character') as NPCSprite;
     this.broker.setScale(5);
     this.broker.anims.play('idle-down');
-    
-    // Add broker name text
+      // Add broker name text
     const brokerNameText = scene.add.text(this.broker.x, this.broker.y - 50, "Stock Broker", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#00ffff',
+      fontFamily: Constants.NPC_NAME_FONT,
+      fontSize: Constants.NPC_NAME_SIZE,
+      color: Constants.BROKER_NAME_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 4, y: 2 }
+      backgroundColor: Constants.NPC_NAME_BACKGROUND,
+      padding: Constants.NPC_NAME_PADDING
     }).setOrigin(0.5);
     
     // Add interaction text (initially hidden)
     this.interactionText = scene.add.text(this.broker.x, this.broker.y - 80, "Press E to interact", {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      color: '#ffffff',
+      fontFamily: Constants.UI_TEXT_FONT,
+      fontSize: Constants.UI_TEXT_SIZE,
+      color: Constants.UI_TEXT_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
-      padding: { x: 8, y: 4 }
+      backgroundColor: Constants.UI_TEXT_BACKGROUND,
+      padding: Constants.UI_TEXT_PADDING
     }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
     
     // Add market timer text
     this.marketTimerText = scene.add.text(this.broker.x, this.broker.y + 30, "", {
-      fontFamily: 'Arial',
+      fontFamily: Constants.UI_TEXT_FONT,
       fontSize: '14px',
-      color: '#ffffff',
+      color: Constants.UI_TEXT_COLOR,
       align: 'center',
-      backgroundColor: '#00000080',
+      backgroundColor: Constants.UI_TEXT_BACKGROUND,
       padding: { x: 6, y: 3 }
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
     
