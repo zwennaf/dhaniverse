@@ -3,8 +3,7 @@ import PixelButton from './PixelButton';
 import { cn } from '../lib/utils';
 import CoinIcon from '../icons/CoinIcon';
 import { Link } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
-import { useClerk } from '@clerk/clerk-react';
+import { useUser, useAuth } from '../../contexts/AuthContext';
 
 interface HeaderProps {
   className?: string;
@@ -12,13 +11,12 @@ interface HeaderProps {
 
 const Header = ({ className }: HeaderProps) => {
   const { isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   
-  const handleSignOut = () => {
-    signOut().then(() => {
-      // Redirect to home after sign out
-      window.location.href = '/';
-    });
+  const handleSignOut = async () => {
+    await signOut();
+    // Redirect to home after sign out
+    window.location.href = '/';
   };
   
   return (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
 import PixelButton from './atoms/PixelButton';
 
@@ -15,9 +15,8 @@ const GamePage: React.FC = () => {
     if (!isSignedIn) {
       navigate('/sign-in');
       return;
-    }
-    // Get in-game username from Clerk metadata
-    const gameUsername = user?.unsafeMetadata?.gameUsername;
+    }    // Get in-game username from our auth system
+    const gameUsername = user?.gameUsername;
     if (!gameUsername) {
       navigate('/profile');
       return;
@@ -27,18 +26,23 @@ const GamePage: React.FC = () => {
     const gameContainer = document.getElementById('game-container');
     if (gameContainer) gameContainer.style.display = 'block';
     setIsLoading(false);
-    setTimeout(() => startGame(gameUsername as string), 100);
-    return () => {
+    setTimeout(() => startGame(gameUsername as string), 100);    return () => {
       stopGame();
       const gameContainer = document.getElementById('game-container');
       if (gameContainer) {
         gameContainer.style.display = 'none';
-        gameContainer.innerHTML = '';
+        // Safely clear container contents
+        while (gameContainer.firstChild) {
+          gameContainer.removeChild(gameContainer.firstChild);
+        }
       }
       const hudContainer = document.getElementById('hud-container');
       if (hudContainer) {
         hudContainer.style.display = 'none';
-        hudContainer.innerHTML = '';
+        // Safely clear container contents
+        while (hudContainer.firstChild) {
+          hudContainer.removeChild(hudContainer.firstChild);
+        }
       }
       document.body.classList.remove('game-active');
     };

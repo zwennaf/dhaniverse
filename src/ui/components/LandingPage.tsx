@@ -11,29 +11,27 @@ import LeafIcon from './icons/LeafIcon';
 import CoinIcon from './icons/CoinIcon';
 import EarthIcon from './icons/EarthIcon';
 import { useNavigate } from 'react-router-dom';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useAuth } from '../contexts/AuthContext';
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   
   // Check if the user is signed in but doesn't have a username set
   // If so, redirect them to the profile page to set one up
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
-      const gameUsername = user.unsafeMetadata?.gameUsername;
+      const gameUsername = user.gameUsername;
       if (!gameUsername || (typeof gameUsername === 'string' && gameUsername.trim() === '')) {
         navigate('/profile');
       }
     }
   }, [isLoaded, isSignedIn, user, navigate]);
-  
-  const handleSignOut = () => {
-    signOut().then(() => {
-      // Reload page after sign out
-      window.location.reload();
-    });
+    const handleSignOut = async () => {
+    await signOut();
+    // Reload page after sign out
+    window.location.reload();
   };
 
   const handleProfile = () => {

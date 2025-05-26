@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 import { ArrowLeft } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const { signOut, updateProfile } = useAuth();
+  const navigate = useNavigate();  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [hasUserTyped, setHasUserTyped] = useState(false); // Track if user has manually typed
 
   useEffect(() => {
-    if (!isLoaded || !user) return;
-    // Prefill the input with existing game username
-    const existing = (user.unsafeMetadata?.gameUsername as string) ?? '';
-    setUsername(existing);
-  }, [isLoaded, user]);
+    if (!isLoaded || !user || hasUserTyped) return; // Don't override if user has typed
+    console.log('Profile: User data:', user); // Debug log
+    console.log('Profile: gameUsername value:', user.gameUsername); // Debug log
+    console.log('Profile: gameUsername type:', typeof user.gameUsername); // Debug log
+    // Prefill the input with existing game username, ensure it's a string
+    setUsername(user.gameUsername || '');
+  }, [isLoaded, user, hasUserTyped]);
 
   // Clear error on username change
   useEffect(() => {
@@ -44,9 +46,7 @@ const Profile: React.FC = () => {
         <div className="text-dhani-text font-tickerbit z-10">Loading...</div>
       </div>
     );
-  }
-
-  const handleSave = async () => {
+  }  const handleSave = async () => {
     if (username.trim().length < 3) {
       setError('Username must be at least 3 characters');
       return;
@@ -55,15 +55,13 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      // Update both the Clerk username field and the unsafeMetadata field
-      await user.update({ 
-        username: username.trim(),
-        unsafeMetadata: { 
-          ...user.unsafeMetadata,
-          gameUsername: username.trim() 
-        }
-      });
-      setSaved(true);
+      const result = await updateProfile(username.trim());
+      if (result.success) {
+        setSaved(true);
+        setHasUserTyped(false); // Reset the flag after successful save
+      } else {
+        setError(result.error || 'Failed to save username');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to save username');
     } finally {
@@ -81,9 +79,8 @@ const Profile: React.FC = () => {
       setSaved(false);
       return;
     }
-    
-    // Username is valid, check if it needs saving
-    if (!saved && username.trim() !== (user.unsafeMetadata?.gameUsername as string || '')) {
+      // Username is valid, check if it needs saving
+    if (!saved && username.trim() !== (user.gameUsername || '')) {
       // Try to save the username first, then navigate in the handleSave success path
       handleSave().then(() => {
         navigate('/game');
@@ -115,7 +112,7 @@ const Profile: React.FC = () => {
       />
       <div className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
         <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center"><ArrowLeft className='absolute hover:cursor-pointer translate-y-1 hover:opacity-50 transition-opacity' onClick={handleOnClick} />Your <span className='text-dhani-gold pixel-glow'>Profile</span></h1>
-        <p className="text-dhani-text/70 text-sm">Email: <span className="text-dhani-text font-robert">{user.primaryEmailAddress?.emailAddress || 'N/A'}</span></p>
+        <p className="text-dhani-text/70 text-sm">Email: <span className="text-dhani-text font-robert">{user.email || 'N/A'}</span></p>
         
         {/* Make error more visible with padding and border */}
         {error && (
@@ -129,14 +126,18 @@ const Profile: React.FC = () => {
             Profile saved!
           </div>
         )}
-        
-        <label className="block text-dhani-text font-robert text-sm">In-Game Username</label>
-        <input
+          <label className="block text-dhani-text font-robert text-sm">In-Game Username</label>        <input
           type="text"
           value={username}
-          onChange={(e) => { setUsername(e.target.value); setSaved(false); }}
+          onChange={(e) => { 
+            console.log('Input onChange triggered:', e.target.value); // Debug log
+            setUsername(e.target.value); 
+            setHasUserTyped(true); // Mark that user has typed
+            setSaved(false); 
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Your Game Username"
+          disabled={loading}
           className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!username || username.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
         <div className="flex flex-col sm:flex-row gap-3">

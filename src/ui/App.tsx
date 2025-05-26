@@ -1,69 +1,100 @@
 import React from 'react';
-import { Route, Routes, Navigate, useNavigate } from 'react-router-dom';
-import { ClerkProvider, SignedIn, SignedOut } from '@clerk/clerk-react';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import LandingPage from './components/LandingPage';
 import GamePage from './components/GamePage';
 import CustomSignIn from './components/auth/CustomSignIn';
 import CustomSignUp from './components/auth/CustomSignUp';
 import Profile from './components/auth/Profile';
-import { nav } from 'node_modules/framer-motion/dist/m';
 
-const ClerkWithRoutes = () => {
-  const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-  if (!PUBLISHABLE_KEY) throw new Error('Missing Publishable Key');
-  const navigate = useNavigate();
+// Protected Route component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="text-center">
+          <div className="w-16 h-16 border-t-4 border-dhani-gold border-solid rounded-full animate-spin mx-auto mb-4"></div>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+  
+  return isSignedIn ? <>{children}</> : <Navigate to="/sign-in" replace />;
+};
+
+// Public Route component (redirect to profile if signed in)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        <div className="text-center">
+          <div className="w-16 h-16 border-t-4 border-dhani-gold border-solid rounded-full animate-spin mx-auto mb-4"></div>
+          <div>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+};
+
+const AppRoutes = () => {
   return (
-    <ClerkProvider 
-      publishableKey={PUBLISHABLE_KEY}
-      appearance={{
-        elements: {
-          formButtonPrimary: 'bg-dhani-gold hover:bg-dhani-gold/80 text-white',
-          socialButtonsBlockButton: 'bg-dhani-dark border border-dhani-gold/30 text-dhani-text'
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<LandingPage />} />
+      <Route 
+        path="/sign-in" 
+        element={
+          <PublicRoute>
+            <CustomSignIn />
+          </PublicRoute>
+        } 
+      />
+      <Route 
+        path="/sign-up" 
+        element={
+          <PublicRoute>
+            <CustomSignUp />
+          </PublicRoute>
+        } 
+      />
+      
+      {/* Protected routes */}
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
         }
-      }}
-    >
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/sign-in/*" element={<CustomSignIn />} />
-        <Route path="/sign-up/*" element={<CustomSignUp />} />
-        {/* Profile route for setting in-game username */}
-        <Route
-          path="/profile"
-          element={
-            <>
-              <SignedIn>
-                <Profile />
-              </SignedIn>
-              <SignedOut>
-                <Navigate to="/sign-in" replace />
-              </SignedOut>
-            </>
-          }
-        />
-        {/* Protected game route */}
-        <Route
-          path="/game"
-          element={
-            <>
-              <SignedIn>
-                <GamePage />
-              </SignedIn>
-              <SignedOut>
-                <Navigate to="/sign-in" replace />
-              </SignedOut>
-            </>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </ClerkProvider>
+      />
+      <Route
+        path="/game"
+        element={
+          <ProtectedRoute>
+            <GamePage />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 
 const App: React.FC = () => {
-  return <ClerkWithRoutes />;
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
 };
 
 export default App;
