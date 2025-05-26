@@ -6,7 +6,7 @@ import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 
-let hudRootRef: any = null;
+let hudRootRef: ReactDOM.Root | null = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

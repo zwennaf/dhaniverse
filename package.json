@@ -8,7 +8,7 @@
     "host": "vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "deno run --allow-net server/server.ts"
+    "server": "deno run --allow-net --allow-env --allow-read --watch server/index.ts"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
@@ -16,13 +16,14 @@
     "vite": "^6.2.0"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.30.0",
+    "@google-cloud/local-auth": "^3.0.1",
     "@types/node": "^22.14.1",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.2",
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
     "framer-motion": "^12.7.2",
+    "google-auth-library": "^9.15.1",
     "lucide-react": "^0.488.0",
     "path": "^0.12.7",
     "phaser": "^3.88.2",
