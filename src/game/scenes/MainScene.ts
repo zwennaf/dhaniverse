@@ -9,6 +9,19 @@ import { BankNPCManager } from '../systems/BankNPCManager.ts';
 import { StockMarketManager } from '../systems/StockMarketManager.ts';
 import { ExtendedCamera } from '../systems/MapManager.ts';
 
+// Custom event interfaces
+interface RupeeUpdateEvent extends CustomEvent {
+  detail: {
+    rupees: number;
+  };
+}
+
+interface ChatEvent extends CustomEvent {
+  detail: {
+    message: string;
+  };
+}
+
 // Scene interface for type safety
 export interface MainGameScene extends Scene {
   getGameContainer(): GameObjects.Container;
@@ -18,6 +31,11 @@ export interface MainGameScene extends Scene {
   mapManager: MapManager;
   getRupees(): number;
   updateRupees(amount: number): void;
+  bankNPCManager: BankNPCManager;
+  stockMarketManager: StockMarketManager;
+  openBankingUI(bankAccount: any): void;
+  openStockMarketUI(stocks: any[]): void;
+  playerRupees: number;
 }
 
 export class MainScene extends Scene implements MainGameScene {
@@ -31,19 +49,19 @@ export class MainScene extends Scene implements MainGameScene {
   private webSocketManager!: WebSocketManager;
   private npcManager!: NPCManager;
   private buildingManager!: BuildingManager;
-  private bankNPCManager!: BankNPCManager;
-  private stockMarketManager!: StockMarketManager;
+  bankNPCManager!: BankNPCManager;
+  stockMarketManager!: StockMarketManager;
   private gameContainer!: GameObjects.Container;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
   private loadingProgress: number = 0;
   private progressBar?: GameObjects.Graphics;
   private progressText?: GameObjects.Text;
-  private playerRupees: number = 25000; // Store rupees in the scene
+  playerRupees: number = 25000; // Store rupees in the scene
   private _bankingClosedListenerAdded: boolean = false;
   private _stockMarketClosedListenerAdded: boolean = false;
   private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
   private handleStopGameBound = () => this.webSocketManager.disconnect();
-  private handleSendChatBound = (e: any) => this.handleSendChat(e);
+  private handleSendChatBound = (e: Event) => this.handleSendChat(e);
 
   constructor() {
     super({ key: 'MainScene' });
@@ -179,10 +197,18 @@ export class MainScene extends Scene implements MainGameScene {
 
     // Listen for typing start/end to disable movement
     window.addEventListener('typing-start', this.handleTypingStartBound);
-    window.addEventListener('typing-end', this.handleTypingEndBound);
-
-    // Notify game is ready
+    window.addEventListener('typing-end', this.handleTypingEndBound);    // Notify game is ready
     this.game.events.emit('ready');
+
+    // Remove loading indicator immediately after scene is ready
+    this.time.delayedCall(100, () => {
+      const gameContainer = document.getElementById('game-container');
+      const loadingText = gameContainer?.querySelector('div');
+      if (loadingText && loadingText.textContent?.includes('Loading game assets')) {
+        gameContainer?.removeChild(loadingText);
+        console.log('Loading indicator removed from scene');
+      }
+    });
    
     // Clean up on scene shutdown to prevent memory leaks
     this.events.on('shutdown', () => {
@@ -211,9 +237,7 @@ export class MainScene extends Scene implements MainGameScene {
     this.buildingManager.update();
     this.bankNPCManager.update();
     this.stockMarketManager.update();
-  }
-
-  // Method to open the banking UI
+  }  // Method to open the banking UI
   openBankingUI(bankAccount: any): void {
     // Dispatch custom event for the React component to catch
     const bankingEvent = new CustomEvent('openBankingUI', { 
@@ -234,10 +258,8 @@ export class MainScene extends Scene implements MainGameScene {
       });
       this._bankingClosedListenerAdded = true;
     }
-  }
-  
-  // Method to open the stock market UI
-  openStockMarketUI(stocks: any): void {
+  }    // Method to open the stock market UI
+  openStockMarketUI(stocks: any[]): void {
     // Dispatch custom event for the React component to catch
     const stockMarketEvent = new CustomEvent('openStockMarketUI', { 
       detail: { 
@@ -377,21 +399,21 @@ export class MainScene extends Scene implements MainGameScene {
     const mapWidth = this.mapManager.getMapWidth();
     const mapHeight = this.mapManager.getMapHeight();
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
-  }
-
-  // Bound handler to update rupees
-  private handleRupeeUpdate(event: any): void {
-    if (event.detail && typeof event.detail.rupees === 'number') {
-      this.playerRupees = event.detail.rupees;
+  }  // Bound handler to update rupees
+  private handleRupeeUpdate(event: Event): void {
+    const customEvent = event as RupeeUpdateEvent;
+    if (customEvent.detail && typeof customEvent.detail.rupees === 'number') {
+      this.playerRupees = customEvent.detail.rupees;
       import('../game.ts').then(({ updateGameHUD }) => updateGameHUD(this.playerRupees));
       console.log('Game received rupee update:', this.playerRupees);
     }
   }
 
   // Handle chat messages sent from HUD
-  private handleSendChat(event: any): void {
-    if (event.detail && typeof event.detail.message === 'string') {
-      this.webSocketManager.sendChat(event.detail.message);
+  private handleSendChat(event: Event): void {
+    const customEvent = event as ChatEvent;
+    if (customEvent.detail && typeof customEvent.detail.message === 'string') {
+      this.webSocketManager.sendChat(customEvent.detail.message);
     }
   }
 
@@ -404,5 +426,25 @@ export class MainScene extends Scene implements MainGameScene {
   private handleTypingEnd(): void {
     this.isTyping = false;
     // No need to re-enable the keyboard since we never disabled it
+  }
+  // Cleanup method called when scene is destroyed
+  destroy(): void {
+    console.log('MainScene destroy called - cleaning up WebSocket connection');
+    
+    // Disconnect WebSocket
+    if (this.webSocketManager) {
+      this.webSocketManager.disconnect();
+    }
+
+    // Remove event listeners
+    window.removeEventListener('rupee-update', this.handleRupeeUpdateBound);
+    window.removeEventListener('stop-game', this.handleStopGameBound);
+    window.removeEventListener('send-chat', this.handleSendChatBound);
+    window.removeEventListener('typing-start', this.handleTypingStart);
+    window.removeEventListener('typing-end', this.handleTypingEnd);
+
+    // Clean up scene resources
+    this.events.removeAllListeners();
+    this.input.removeAllListeners();
   }
 }

@@ -252,11 +252,10 @@ export class BuildingManager {
         doorSound.play();
       }
     } catch (error) {
-      console.warn('Could not play door-open sound:', error);
-    }
+      console.warn('Could not play door-open sound:', error);    }
     
     // Notify the BankNPCManager or StockMarketManager that we've entered a building
-    const mainScene = this.scene as any;
+    const mainScene = this.scene;
     
     if (buildingType === 'bank') {
       // Handle bank building entrance
@@ -328,9 +327,8 @@ export class BuildingManager {
     } else {
       this.transitionInProgress = false;
     }
-    
-    // Notify NPCManagers that we're exiting the building
-    const mainScene = this.scene as any;
+      // Notify NPCManagers that we're exiting the building
+    const mainScene = this.scene;
     if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onExitBuilding === 'function') {
       mainScene.bankNPCManager.onExitBuilding();
     }

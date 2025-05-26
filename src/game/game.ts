@@ -32,10 +32,9 @@ export function startGame(username: string): void {
   gameContainer.style.display = 'block';
   gameContainer.style.width = '100%';
   gameContainer.style.height = '100vh';
-  
-  // Create loading indicator
+    // Create loading indicator
   loadingText = document.createElement('div');
-  loadingText.innerHTML = 'Loading game assets...';
+  loadingText.textContent = 'Loading game assets...';
   loadingText.style.position = 'absolute';
   loadingText.style.top = '50%';
   loadingText.style.left = '50%';
@@ -125,11 +124,10 @@ export function startGame(username: string): void {
           gameContainer.removeChild(loadingText);
           loadingText = null;
         }
-      });
-    } catch (error) {
+      });    } catch (error) {
       console.error("Error initializing game:", error);
       if (loadingText) {
-        loadingText.innerHTML = 'Error starting game. Please refresh the page.';
+        loadingText.textContent = 'Error starting game. Please refresh the page.';
       }
     }
   }, 300);

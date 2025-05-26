@@ -80,6 +80,7 @@ export class WebSocketManager {
   private connected: boolean = false;
   private connectionStatusText: GameObjects.Text | null = null;
   private roomCode: string = '';
+  private intentionalDisconnect: boolean = false;
 
   constructor(scene: MainGameScene, player: Player) {
     this.scene = scene;
@@ -105,9 +106,24 @@ export class WebSocketManager {
         this.connectionStatusText.setPosition(this.scene.cameras.main.width / 2, 20);
       }
     });
-  }
+  }  connect(username: string): void {
+    // Don't connect if already connected or connecting
+    if (this.connected || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
+      console.log('Already connected or connecting, ignoring connect request');
+      return;
+    }
 
-  connect(username: string): void {
+    // Close existing connection if it exists
+    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+      console.log('Closing existing WebSocket connection before creating new one');
+      this.intentionalDisconnect = true;
+      this.ws.close();
+      this.ws = null;
+    }
+
+    // Reset intentional disconnect flag for new connection
+    this.intentionalDisconnect = false;
+
     if (this.connectionStatusText) {
       this.connectionStatusText.setText('Connecting...').setVisible(true);
     }
@@ -139,16 +155,18 @@ export class WebSocketManager {
               this.connectionStatusText.setVisible(false);
             }
           });
+        }        // Send authentication message with token and username
+        const token = localStorage.getItem('dhaniverse_token');
+        if (!token) {
+          console.error('No authentication token found');
+          this.ws?.close();
+          return;
         }
 
-        // Send join message with username and initial position
-        const position = this.player.getPosition();
         this.ws?.send(JSON.stringify({
-          type: "join",
-          username,
-          x: position.x,
-          y: position.y,
-          roomCode: this.roomCode // Include room code in join message
+          type: "authenticate",
+          token: token,
+          gameUsername: username
         }));
       };
 
@@ -159,10 +177,26 @@ export class WebSocketManager {
         } catch (error) {
           console.error('Error parsing message:', error);
         }
-      };
-
-      this.ws.onclose = () => {
+      };      this.ws.onclose = (event) => {
         this.connected = false;
+        
+        // Don't reconnect if this was an intentional disconnect
+        if (this.intentionalDisconnect) {
+          console.log('WebSocket closed intentionally, not reconnecting');
+          return;
+        }
+
+        // Check close code - 1000 means normal closure, 4000 means duplicate connection
+        if (event.code === 1000 || event.code === 4000) {
+          console.log(`WebSocket closed normally (code: ${event.code}), not reconnecting`);
+          if (event.code === 4000) {
+            console.log('Duplicate connection detected by server');
+          }
+          return;
+        }
+
+        console.log(`WebSocket closed with code: ${event.code}, reason: ${event.reason}`);
+        
         if (this.connectionStatusText) {
           this.connectionStatusText.setText('Connection lost. Reconnecting...').setVisible(true);
         }
@@ -181,14 +215,15 @@ export class WebSocketManager {
       this.handleReconnect(username);
     }
   }
-
   private handleServerMessage(data: ServerMessage): void {
     switch (data.type) {
       case "connect":
         this.playerId = data.id;
+        console.log(`Received player ID: ${this.playerId}`);
         break;
         
       case "players":
+        console.log(`Received players list, my ID: ${this.playerId}, players:`, data.players);
         this.handleExistingPlayers(data.players);
         break;
         
@@ -239,12 +274,16 @@ export class WebSocketManager {
     this.removeOtherPlayer(playerId);
     console.log(`${username} left the game`);
   }
-
   private handleReconnect(username: string): void {
+    // Don't reconnect if already connected or reconnecting
+    if (this.connected || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       setTimeout(() => {
-        if (!this.connected) {
+        if (!this.connected && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
           console.log(`Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts}...`);
           this.connect(username);
         }
@@ -381,14 +420,23 @@ export class WebSocketManager {
   getConnectedPlayers(): number {
     // Count of other players plus this player
     return this.otherPlayers.size + 1;
-  }
-
-  // Cleanly close the WebSocket connection
+  }  // Cleanly close the WebSocket connection
   public disconnect(): void {
     if (this.ws) {
+      this.intentionalDisconnect = true;
       this.ws.close();
       this.ws = null;
-      console.log('WebSocket connection closed');
+      this.connected = false;
+      this.playerId = null;
+      
+      // Clear all other players from the map
+      this.otherPlayers.forEach((otherPlayer) => {
+        otherPlayer.sprite.destroy();
+        otherPlayer.nameText.destroy();
+      });
+      this.otherPlayers.clear();
+      
+      console.log('WebSocket connection closed and all players cleared');
     }
   }
 
