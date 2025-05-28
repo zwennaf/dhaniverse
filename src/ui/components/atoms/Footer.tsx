@@ -19,15 +19,13 @@ const Footer = ({ className }: FooterProps) => {
         <div className="absolute top-[14px] left-[16px] w-[29px] h-[29px] bg-black"></div>
         <div className="absolute top-[10px] left-[-76px] w-[107px] h-[33px] bg-black"></div>
         <div className="absolute top-[29px] left-[-76px] w-[102px] h-[29px] bg-black"></div>
-         */}
-        <div className="max-w-6xl relative z-[10] mx-auto w-full flex flex-row text-lg justify-between items-center font-thin tracking-widest mb-12">
+         */}        <div className="max-w-6xl relative z-[10] mx-auto w-full flex flex-col sm:flex-row text-sm sm:text-base md:text-lg justify-between items-center font-thin tracking-widest mb-12 gap-4 sm:gap-0">
           <div className="flex justify-center items-center">
             <p className="font-vcr">© Dhaniverse</p>
-          </div>
-          <div className="flex gap-6">
-            <Link to="https://linkedin.com/in/gursimrxnsingh" className=" hover:text-dhani-gold transition-colors">Gursimran Singh</Link>
-            <a href="#" className="hover:text-dhani-gold transition-colors">Jashanjot Singh</a>
-            <a href="#" className="hover:text-dhani-gold transition-colors">Aagam Jain</a>
+          </div>          <div className="flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6 md:gap-8 lg:gap-10">
+            <Link to="https://linkedin.com/in/gursimrxnsingh" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Gursimran Singh</Link>
+            <a href="https://www.linkedin.com/in/jashanjotsingh01" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Jashanjot Singh</a>
+            <a href="https://www.linkedin.com/in/aagam-jain0" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Aagam Jain</a>
           </div>
         </div>
         
