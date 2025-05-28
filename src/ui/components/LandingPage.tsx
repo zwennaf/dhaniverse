@@ -193,18 +193,29 @@ const LandingPage = () => {
         <div className="mb-16">
           <MarqueeTestimonials testimonials={testimonials2} direction="right" speed={30} />
         </div>
-      </section>
-      <section className='w-full relative md:mb-32 mb-16'>
+      </section>      <section className='w-full relative md:mb-32 mb-16'>
         <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
         <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] translate-y-1/2 absolute bottom-0 right-0 bg-dhani-gold/60 blur-[400px]" />
-        <div className="mx-5 px-4 py-12 bg-[url('/UI/cta.svg')] bg-center bg-no-repeat bg-contain">
-          <div className="mx-auto m-16 text-center">
-            <div className="inline-block px-3 border-[2px] mb-20 border-white/50 ">
-              <p className="text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Dont you have to make good finance decisions?</p>
+        <div className="max-w-6xl mx-auto px-2 sm:px-5 py-8 sm:py-12 relative">
+          <div 
+            className="mx-auto text-center relative p-4 sm:p-8 md:p-12 lg:p-16"
+            style={{
+              backgroundImage: `url("data:image/svg+xml;base64,${btoa(`<svg width="100%" height="100%" viewBox="0 0 1201 602" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M1187 15L1170 15V0H35V15L18 15L18 45L0 45V553H18V583H35V602H1170V583H1187V553H1201V45H1187V15Z" fill="white" fill-opacity="0.1"/>
+                <path d="M1170 15H1169V16H1170V15ZM1187 15H1188V14H1187V15ZM1170 0H1171V-1H1170V0ZM35 0V-1H34V0H35ZM35 15V16H36V15H35ZM18 15V14H17V15H18ZM18 45V46H19V45H18ZM0 45L-2.11928e-07 44H-1V45H0ZM0 553H-1V554H0V553ZM18 553H19V552H18V553ZM18 583H17V584H18V583ZM35 583H36V582H35V583ZM35 602H34V603H35V602ZM1170 602V603H1171V602H1170ZM1170 583V582H1169V583H1170ZM1187 583V584H1188V583H1187ZM1187 553V552H1186V553H1187ZM1201 553V554H1202V553H1201ZM1201 45H1202V44H1201V45ZM1187 45H1186V46H1187V45Z" fill="white" fill-opacity="0.2"/>
+              </svg>`)}")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              backgroundSize: '100% 100%',
+              minHeight: '300px',
+            }}
+          >
+            <div className="inline-block px-2 sm:px-3 border-[2px] mb-8 sm:mb-12 md:mb-20 border-white/50 ">
+              <p className="text-xs sm:text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Dont you have to make good finance decisions?</p>
             </div>
             
-            <h2 className="text-3xl md:text-4xl lg:text-6xl font-vcr mb-6">Just Start Playing already!</h2>
-            <p className="text-lg font-robert mb-8 tracking-widest text-white/80">No lectures. Just quests, coins, maps, and clarity.</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-vcr mb-4 sm:mb-6 px-2">Just Start Playing already!</h2>
+            <p className="text-sm sm:text-lg font-robert mb-6 sm:mb-8 tracking-widest text-white/80 px-2">No lectures. Just quests, coins, maps, and clarity.</p>
             <div className="flex flex-col md:flex-row items-center justify-center gap-4">
               {isSignedIn ? (
                 <>
