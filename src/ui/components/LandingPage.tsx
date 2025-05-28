@@ -12,6 +12,7 @@ import CoinIcon from './icons/CoinIcon';
 import EarthIcon from './icons/EarthIcon';
 import { useNavigate } from 'react-router-dom';
 import { useUser, useAuth } from '../contexts/AuthContext';
+import { CoinIcon2 } from './icons/CoinIcon2';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -118,37 +119,36 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-      
-      {/* Features section */} 
-      <section className="w-full px-4 py-16 flex flex-col items-center">
-        <div className="max-w-6xl mx-auto w-full text-center mb-12">
-        <div className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 ">
-            <p className="text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
+        {/* Features section */} 
+      <section className="w-full px-4 py-8 md:py-16 flex flex-col items-center">
+        <div className="max-w-6xl mx-auto w-full text-center mb-8 md:mb-12">
+          <div className="inline-block px-3 border-[2px] mt-10 md:mt-20 mb-10 md:mb-20 border-white/50">
+            <p className="text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
           </div>
-          <h2 className="text-2xl sm:text-5xl font-vcr mb-10 tracking-wide">What Makes <span className="text-dhani-gold pixel-glow">Dhaniverse</span> Different?</h2>
+          <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-vcr mb-6 md:mb-10 tracking-wide px-2">
+            What Makes <span className="text-dhani-gold pixel-glow">Dhaniverse</span> Different?
+          </h2>
         </div>
-        
-        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="overflow-hidden">
+          <div className="max-w-6xl mx-auto w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 lg:items-start">
+          <div className="overflow-hidden order-2 lg:order-1">
             <img src="/UI/whatMakesDifference.png" alt="Dhaniverse Map" className="w-full h-auto" />
           </div>
           
-          <div className="space-y-6">
+          <div className="space-y-1 sm:space-y-2 md:space-y-3 lg:space-y-4 order-1 lg:order-2 flex flex-col justify-center lg:justify-start">
             <FeatureCard 
-              icon={<LeafIcon className="w-6 h-6" />}
-              title="No mental stress — just fun."
-              description="Learn through games, not lectures. Financial education that's actually enjoyable."
+              icon={<LeafIcon />}
+              title="No mental stress — just clarity."
+              description="Learn through gameplay, not lectures. No trauma. No pressure. Just understanding."
             />
             
             <FeatureCard 
-              icon={<CoinIcon className="w-6 h-6" />}
-              iconBg="bg-black"
-              title="Gamify currency, real lessons"
+              icon={<CoinIcon2 />}
+              title="Dummy currency, real skills."
               description="Earn in-game coins & level up while learning real-world money skills."
             />
             
             <FeatureCard 
-              icon={<EarthIcon className="w-6 h-6" />}
+              icon={<EarthIcon />}
               title="Ethical, real-world adventure"
               description="No ads. Just fun quests that teach real financial wisdom."
             />
