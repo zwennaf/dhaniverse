@@ -8,7 +8,8 @@
     "oak": "https://deno.land/x/oak@v17.1.3/mod.ts",
     "cors": "https://deno.land/x/cors@v1.2.2/mod.ts",
     "djwt": "https://deno.land/x/djwt@v3.0.1/mod.ts",
-    "socket_io": "https://deno.land/x/socket_io@0.2.0/mod.ts"
+    "socket_io": "https://deno.land/x/socket_io@0.2.0/mod.ts",
+    "mongo": "https://deno.land/x/mongo@v0.33.0/mod.ts"
   },
   "nodeModulesDir": "auto",
   "deploy": {

@@ -1,9 +1,45 @@
+// Load environment variables first
+import { load } from "https://deno.land/std@0.224.0/dotenv/mod.ts";
+
+// Load the .env file
+await load({ export: true });
+
 import { Application } from "https://deno.land/x/oak@v17.1.3/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { config } from "./src/config/config.ts";
+import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
 import wsRouter from "./src/routes/wsRouter.ts";
+
+// Initialize database connection
+async function initializeDatabase() {
+  try {
+    await mongodb.connect();
+  } catch (error) {
+    console.error("❌ Failed to initialize database:", error);
+    if (!config.isDev) {
+      // In production, exit if database connection fails
+      Deno.exit(1);
+    } else {
+      console.warn("⚠️  Continuing without database in development mode");
+    }
+  }
+}
+
+// Graceful shutdown
+async function gracefulShutdown() {
+  await mongodb.disconnect();
+  Deno.exit(0);
+}
+
+// Handle shutdown signals
+Deno.addSignalListener("SIGINT", gracefulShutdown);
+
+// SIGTERM is not supported on Windows, only add if not on Windows
+if (Deno.build.os !== "windows") {
+  Deno.addSignalListener("SIGTERM", gracefulShutdown);
+}
 
 // Create an Oak application
 const app = new Application();
@@ -27,17 +63,19 @@ app.use(oakCors({
   allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
 }));
 
-// Debug logging middleware
-app.use(async (ctx, next) => {
-  console.log(`${new Date().toISOString()} - ${ctx.request.method} ${ctx.request.url.pathname}`);
-  console.log("Origin:", ctx.request.headers.get("origin"));
+// Debug logging middleware (removed for production)
+app.use(async (_ctx, next) => {
   await next();
 });
 
-// Health check endpoint
+// Health check endpoint with database status
 app.use(async (ctx, next) => {
   if (ctx.request.url.pathname === "/health") {
-    ctx.response.body = { status: "ok", timestamp: new Date().toISOString() };
+    ctx.response.body = { 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      database: mongodb.isHealthy() ? "connected" : "disconnected"
+    };
     return;
   }
   await next();
@@ -55,12 +93,15 @@ app.use(authRouter.allowedMethods());
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
 
-// Start the server
-const port = config.port;
-console.log(`🚀 Server starting on port ${port}`);
-console.log(`🔌 WebSocket available on /ws route`);
+// Start the server with database initialization
+async function startServer() {
+  await initializeDatabase();
+  
+  const port = config.port;
+  app.listen({ port });
+}
 
-app.listen({ port });
-
-// Note: Socket.IO server on separate port is no longer needed
-// All WebSocket connections now go through /ws route on main server
+startServer().catch((error) => {
+  console.error("❌ Failed to start server:", error);
+  Deno.exit(1);
+});

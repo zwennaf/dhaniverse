@@ -1,6 +1,7 @@
 import { Router } from "https://deno.land/x/oak@v17.1.3/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { config } from "../config/config.ts";
+import { mongodb } from "../db/mongo.ts";
 
 const apiRouter = new Router();
 
@@ -18,11 +19,8 @@ apiRouter.use(oakCors({
   allowedHeaders: ["Content-Type", "Authorization", "Accept"],
 }));
 
-// Add debug middleware to log all requests
-apiRouter.use(async (ctx, next) => {
-  console.log(`🚀 ${ctx.request.method} ${ctx.request.url.pathname}`);
-  console.log("Origin:", ctx.request.headers.get("origin"));
-  console.log("Content-Type:", ctx.request.headers.get("content-type"));
+// Add debug middleware (removed for production)
+apiRouter.use(async (_ctx, next) => {
   await next();
 });
 
@@ -34,6 +32,44 @@ apiRouter.get("/api/health", (ctx) => {
 // Game-related endpoints can be added here in the future
 apiRouter.get("/api/game/status", (ctx) => {
   ctx.response.body = { status: "Game server running", players: 0 };
+});
+
+// Debug endpoint to check database contents
+apiRouter.get("/api/debug/collections", async (ctx) => {
+  try {
+    const users = mongodb.getCollection("users");
+    const playerStates = mongodb.getCollection("player_states");
+    const bankAccounts = mongodb.getCollection("bank_accounts");
+    
+    const userCount = await users.countDocuments();
+    const playerStateCount = await playerStates.countDocuments();
+    const bankAccountCount = await bankAccounts.countDocuments();
+    
+    // Get actual user documents
+    const userDocs = await users.find({}).limit(5).toArray();
+    
+    ctx.response.body = {
+      database: "dhaniverse",
+      collections: {
+        users: {
+          count: userCount,
+          samples: userDocs.map(user => ({
+            id: user._id?.toString(),
+            email: user.email,
+            gameUsername: user.gameUsername,
+            createdAt: user.createdAt
+          }))
+        },
+        player_states: { count: playerStateCount },
+        bank_accounts: { count: bankAccountCount }      }
+    };
+  } catch (error) {
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: "Database query failed", 
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
 });
 
 export default apiRouter;

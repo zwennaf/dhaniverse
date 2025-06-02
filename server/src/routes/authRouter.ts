@@ -1,22 +1,11 @@
 import { Router } from "https://deno.land/x/oak@v17.1.3/mod.ts";
 import { create, verify } from "https://deno.land/x/djwt@v3.0.1/mod.ts";
+import { ObjectId } from "npm:mongodb@5.6.0";
 import { config } from "../config/config.ts";
+import { mongodb } from "../db/mongo.ts";
+import type { UserDocument } from "../db/schemas.ts";
 
 const authRouter = new Router();
-
-// In-memory storage for now (will replace with database later)
-const users: Map<string, {
-  id: string;
-  email: string;
-  passwordHash: string;
-  gameUsername: string;
-  createdAt: Date;
-}> = new Map();
-
-const _sessions: Map<string, {
-  userId: string;
-  createdAt: Date;
-}> = new Map();
 
 // Helper function to hash passwords (basic implementation)
 async function hashPassword(password: string): Promise<string> {
@@ -84,11 +73,6 @@ authRouter.use(async (ctx, next) => {
 
 // Register endpoint
 authRouter.post("/auth/register", async (ctx) => {
-  console.log("🔥 REGISTER ENDPOINT HIT!");
-  console.log("Method:", ctx.request.method);
-  console.log("URL:", ctx.request.url.pathname);
-  console.log("Headers:", Object.fromEntries(ctx.request.headers.entries()));
-  
   try {
     const body = await ctx.request.body.json();
     const { email, password, gameUsername } = body;
@@ -113,25 +97,23 @@ authRouter.post("/auth/register", async (ctx) => {
     }
 
     // Check if user already exists
-    for (const user of users.values()) {
-      if (user.email === email) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "User with this email already exists" };
-        return;
-      }
-      if (user.gameUsername === gameUsername) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "Game username is already taken" };
-        return;
-      }
+    const existingEmailUser = await mongodb.findUserByEmail(email);
+    if (existingEmailUser) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "User with this email already exists" };
+      return;
+    }
+
+    const existingUsernameUser = await mongodb.findUserByGameUsername(gameUsername);
+    if (existingUsernameUser) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Game username is already taken" };
+      return;
     }
 
     // Create user
-    const userId = crypto.randomUUID();
     const passwordHash = await hashPassword(password);
-    
-    users.set(userId, {
-      id: userId,
+    const user = await mongodb.createUser({
       email,
       passwordHash,
       gameUsername,
@@ -139,14 +121,14 @@ authRouter.post("/auth/register", async (ctx) => {
     });
 
     // Create session token
-    const token = await createToken(userId);
+    const token = await createToken(user.id);
 
     ctx.response.body = {
       token,
       user: {
-        id: userId,
-        email,
-        gameUsername
+        id: user.id,
+        email: user.email,
+        gameUsername: user.gameUsername
       }
     };
   } catch (error) {
@@ -169,13 +151,7 @@ authRouter.post("/auth/login", async (ctx) => {
     }
 
     // Find user
-    let user = null;
-    for (const u of users.values()) {
-      if (u.email === email) {
-        user = u;
-        break;
-      }
-    }
+    const user = await mongodb.findUserByEmail(email);
 
     if (!user) {
       ctx.response.status = 401;
@@ -225,11 +201,12 @@ authRouter.get("/auth/me", async (ctx) => {
     if (!verified) {
       ctx.response.status = 401;
       ctx.response.body = { error: "Invalid token" };
-      return;
-    }
+      return;    }
 
-    const user = users.get(verified.userId);
-    if (!user) {
+    // Find user by ID in MongoDB
+    const users = mongodb.getCollection<UserDocument>("users");
+    const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+    if (!userDoc) {
       ctx.response.status = 404;
       ctx.response.body = { error: "User not found" };
       return;
@@ -237,9 +214,9 @@ authRouter.get("/auth/me", async (ctx) => {
 
     ctx.response.body = {
       user: {
-        id: user.id,
-        email: user.email,
-        gameUsername: user.gameUsername
+        id: userDoc._id?.toString() || "",
+        email: userDoc.email,
+        gameUsername: userDoc.gameUsername
       }
     };
   } catch (error) {
@@ -260,14 +237,16 @@ authRouter.put("/auth/profile", async (ctx) => {
     }
 
     const token = authHeader.substring(7);
-    const verified = await verifyToken(token);    if (!verified) {
+    const verified = await verifyToken(token);
+
+    if (!verified) {
       ctx.response.status = 401;
       ctx.response.body = { error: "Invalid token" };
-      return;
-    }
+      return;    }
 
-    const user = users.get(verified.userId);
-    if (!user) {
+    const users = mongodb.getCollection<UserDocument>("users");
+    const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+    if (!userDoc) {
       ctx.response.status = 404;
       ctx.response.body = { error: "User not found" };
       return;
@@ -283,24 +262,31 @@ authRouter.put("/auth/profile", async (ctx) => {
     }
 
     // Check if new username is taken
-    if (gameUsername && gameUsername !== user.gameUsername) {
-      for (const u of users.values()) {
-        if (u.gameUsername === gameUsername && u.id !== user.id) {
-          ctx.response.status = 400;
-          ctx.response.body = { error: "Game username is already taken" };
-          return;
-        }
+    if (gameUsername && gameUsername !== userDoc.gameUsername) {
+      const existingUser = await mongodb.findUserByGameUsername(gameUsername);
+      if (existingUser && existingUser.id !== verified.userId) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: "Game username is already taken" };
+        return;
       }
     }    // Update user
     if (gameUsername) {
-      user.gameUsername = gameUsername;
+      const usersCollection = mongodb.getCollection<UserDocument>("users");
+      await usersCollection.updateOne(
+        { _id: new ObjectId(verified.userId) },
+        { $set: { gameUsername, lastUpdated: new Date() } }
+      );
     }
+
+    // Get updated user
+    const usersCollection = mongodb.getCollection<UserDocument>("users");
+    const updatedUser = await usersCollection.findOne({ _id: new ObjectId(verified.userId) });
 
     ctx.response.body = {
       user: {
-        id: user.id,
-        email: user.email,
-        gameUsername: user.gameUsername
+        id: updatedUser?._id?.toString() || "",
+        email: updatedUser?.email || "",
+        gameUsername: updatedUser?.gameUsername || ""
       }
     };
   } catch (error) {
@@ -311,7 +297,7 @@ authRouter.put("/auth/profile", async (ctx) => {
 });
 
 // Google OAuth endpoints
-authRouter.get("/auth/google", async (ctx) => {
+authRouter.get("/auth/google", (ctx) => {
   ctx.response.body = {
     message: "Google OAuth endpoint. Use POST with googleToken to authenticate.",
     method: "POST",
@@ -336,7 +322,7 @@ authRouter.post("/auth/google", async (ctx) => {
     const { email, sub: googleId } = googleUserInfo;
 
     // Check if user exists by email
-    let user = Array.from(users.values()).find(u => u.email === email);
+    const user = await mongodb.findUserByEmail(email);
 
     if (user) {
       // User exists, sign them in
@@ -353,19 +339,15 @@ authRouter.post("/auth/google", async (ctx) => {
       };
     } else {
       // Auto-create new user with Google - no username required initially
-      const userId = crypto.randomUUID();
-      const newUser = {
-        id: userId,
+      const newUser = await mongodb.createUser({
         email: email,
         passwordHash: '', // No password for Google users
         gameUsername: '', // Empty initially - user will set it in profile
         createdAt: new Date(),
         googleId: googleId
-      };
+      });
 
-      users.set(userId, newUser);
-
-      const token = await createToken(userId);
+      const token = await createToken(newUser.id);
       ctx.response.status = 201;
       ctx.response.body = {
         success: true,
@@ -390,9 +372,7 @@ async function verifyGoogleToken(token: string): Promise<{ email: string; sub: s
   try {
     // For Google ID tokens (JWT), we should use the tokeninfo endpoint for id_token
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-    if (!response.ok) {
-      console.log("Google token verification failed:", response.status, response.statusText);
-      return null;
+    if (!response.ok) {      return null;
     }
     const data = await response.json();
     
