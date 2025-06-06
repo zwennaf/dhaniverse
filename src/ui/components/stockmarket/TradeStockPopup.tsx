@@ -28,8 +28,8 @@ interface TradeStockPopupProps {
   stock: Stock;
   playerRupees: number;
   holdings: StockHolding[];
-  onBuy: (stockId: string, quantity: number) => { success: boolean; message: string };
-  onSell: (stockId: string, quantity: number) => { success: boolean; message: string };
+  onBuy: (stockId: string, quantity: number) => Promise<{ success: boolean; message: string }>;
+  onSell: (stockId: string, quantity: number) => Promise<{ success: boolean; message: string }>;
   onClose: () => void;
 }
 
@@ -92,9 +92,8 @@ const TradeStockPopup: React.FC<TradeStockPopupProps> = ({
       return [1, 5, 10, Math.min(25, sharesOwned), Math.min(50, sharesOwned), sharesOwned];
     }
   };
-  
-  // Execute the trade
-  const handleTrade = () => {
+    // Execute the trade
+  const handleTrade = async () => {
     if (quantity <= 0) {
       setMessage("Please enter a valid quantity.");
       setMessageType('error');
@@ -103,32 +102,37 @@ const TradeStockPopup: React.FC<TradeStockPopupProps> = ({
     
     let result;
     
-    if (tradeType === 'buy') {
-      if (!canAfford) {
-        setMessage("You don't have enough rupees for this purchase.");
-        setMessageType('error');
-        return;
+    try {
+      if (tradeType === 'buy') {
+        if (!canAfford) {
+          setMessage("You don't have enough rupees for this purchase.");
+          setMessageType('error');
+          return;
+        }
+        
+        result = await onBuy(stock.id, quantity);
+      } else {
+        if (!canSell) {
+          setMessage(`You only have ${sharesOwned} shares to sell.`);
+          setMessageType('error');
+          return;
+        }
+        
+        result = await onSell(stock.id, quantity);
       }
       
-      result = onBuy(stock.id, quantity);
-    } else {
-      if (!canSell) {
-        setMessage(`You only have ${sharesOwned} shares to sell.`);
+      if (result.success) {
+        setMessage(result.message);
+        setMessageType('success');
+        
+        // Reset quantity after successful trade
+        setQuantity(1);
+      } else {
+        setMessage(result.message);
         setMessageType('error');
-        return;
       }
-      
-      result = onSell(stock.id, quantity);
-    }
-    
-    if (result.success) {
-      setMessage(result.message);
-      setMessageType('success');
-      
-      // Reset quantity after successful trade
-      setQuantity(1);
-    } else {
-      setMessage(result.message);
+    } catch (error) {
+      setMessage("Network error occurred. Please try again.");
       setMessageType('error');
     }
   };

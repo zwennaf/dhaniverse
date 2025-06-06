@@ -6,6 +6,7 @@ import Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene.ts';
 import { Constants } from './utils/Constants.ts';
 import { initializeHUD, updateHUD, unmountHUD } from '../main.ts';
+import { playerStateApi } from '../utils/api.ts';
 
 let game: Phaser.Game | null = null;
 let gameContainer: HTMLElement | null = null;
@@ -106,8 +107,7 @@ export function startGame(username: string): void {
   console.log(`Starting game with username: ${username}, room code: ${roomCode}`);
   
   // Initialize the game after a short delay to allow DOM to update
-  setTimeout(() => {
-    try {
+  setTimeout(() => {    try {
       game = new Phaser.Game(config);
       
       // Register the username and room code for the game
@@ -116,15 +116,16 @@ export function startGame(username: string): void {
       
       // Initialize the React HUD when game is ready
       game.events.once('ready', () => {
-        // Initialize HUD with default 25000 rupees
-        initializeHUD(25000);
+        // Load player state from backend and initialize HUD
+        loadPlayerStateAndInitializeHUD();
         
         // Remove loading indicator
         if (loadingText && gameContainer) {
           gameContainer.removeChild(loadingText);
           loadingText = null;
         }
-      });    } catch (error) {
+      });
+    } catch (error) {
       console.error("Error initializing game:", error);
       if (loadingText) {
         loadingText.textContent = 'Error starting game. Please refresh the page.';
@@ -155,6 +156,34 @@ export function stopGame(): void {
 // Expose updateHUD for MainScene to use
 export function updateGameHUD(rupees: number): void {
   updateHUD(rupees);
+}
+
+/**
+ * Load player state from backend and initialize HUD with actual rupees
+ */
+async function loadPlayerStateAndInitializeHUD(): Promise<void> {
+  try {
+    // Load player state from backend
+    const response = await playerStateApi.get();
+    
+    if (response.success && response.data) {
+      const playerState = response.data;
+      const rupees = playerState.financial?.rupees || 25000;
+      
+      // Initialize HUD with actual rupees from database
+      initializeHUD(rupees);
+      
+      console.log(`Player state loaded: ${rupees} rupees`);
+    } else {
+      // Fallback to default if API fails
+      console.warn('Failed to load player state, using default values');
+      initializeHUD(25000);
+    }
+  } catch (error) {
+    console.error('Error loading player state:', error);
+    // Fallback to default if API fails
+    initializeHUD(25000);
+  }
 }
 
 // Handle window resizing

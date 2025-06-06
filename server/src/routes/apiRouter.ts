@@ -2,6 +2,7 @@ import { Router } from "https://deno.land/x/oak@v17.1.3/mod.ts";
 import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
 import { config } from "../config/config.ts";
 import { mongodb } from "../db/mongo.ts";
+import { COLLECTIONS } from "../db/schemas.ts";
 
 const apiRouter = new Router();
 
@@ -37,9 +38,9 @@ apiRouter.get("/api/game/status", (ctx) => {
 // Debug endpoint to check database contents
 apiRouter.get("/api/debug/collections", async (ctx) => {
   try {
-    const users = mongodb.getCollection("users");
-    const playerStates = mongodb.getCollection("player_states");
-    const bankAccounts = mongodb.getCollection("bank_accounts");
+    const users = mongodb.getCollection(COLLECTIONS.USERS);
+    const playerStates = mongodb.getCollection(COLLECTIONS.PLAYER_STATES);
+    const bankAccounts = mongodb.getCollection(COLLECTIONS.BANK_ACCOUNTS);
     
     const userCount = await users.countDocuments();
     const playerStateCount = await playerStates.countDocuments();
@@ -58,10 +59,10 @@ apiRouter.get("/api/debug/collections", async (ctx) => {
             email: user.email,
             gameUsername: user.gameUsername,
             createdAt: user.createdAt
-          }))
-        },
-        player_states: { count: playerStateCount },
-        bank_accounts: { count: bankAccountCount }      }
+          }))        },
+        playerStates: { count: playerStateCount },
+        bankAccounts: { count: bankAccountCount }
+      }
     };
   } catch (error) {
     ctx.response.status = 500;

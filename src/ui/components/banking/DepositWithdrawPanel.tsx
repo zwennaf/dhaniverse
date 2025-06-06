@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 interface DepositWithdrawPanelProps {
   playerRupees: number;
   bankBalance: number;
-  onDeposit: (amount: number) => boolean;
-  onWithdraw: (amount: number) => boolean;
+  onDeposit: (amount: number) => Promise<boolean>;
+  onWithdraw: (amount: number) => Promise<boolean>;
 }
 
 const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
@@ -12,11 +12,11 @@ const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
   bankBalance,
   onDeposit,
   onWithdraw
-}) => {
-  const [amount, setAmount] = useState(1000);
+}) => {  const [amount, setAmount] = useState(1000);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [transactionType, setTransactionType] = useState<'deposit' | 'withdraw'>('deposit');
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Predefined amounts for quick selection
   const predefinedAmounts = [500, 1000, 5000, 10000];
@@ -28,41 +28,53 @@ const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
     }
   };
   
-  const handleTransaction = () => {
+  const handleTransaction = async () => {
     if (amount <= 0) {
       setMessage('Please enter a valid amount');
       setMessageType('error');
       return;
     }
     
-    let success = false;
-    if (transactionType === 'deposit') {
-      if (amount > playerRupees) {
-        setMessage('You don\'t have enough rupees!');
-        setMessageType('error');
-        return;
-      }
-      success = onDeposit(amount);
-      if (success) {
-        setMessage(`Successfully deposited ₹${amount.toLocaleString()}`);
-        setMessageType('success');
-      }
-    } else {
-      if (amount > bankBalance) {
-        setMessage('Insufficient balance in your account!');
-        setMessageType('error');
-        return;
-      }
-      success = onWithdraw(amount);
-      if (success) {
-        setMessage(`Successfully withdrew ₹${amount.toLocaleString()}`);
-        setMessageType('success');
-      }
-    }
+    setIsProcessing(true);
+    setMessage('');
     
-    if (!success) {
-      setMessage('Transaction failed. Please try again.');
+    try {
+      let success = false;
+      if (transactionType === 'deposit') {
+        if (amount > playerRupees) {
+          setMessage('You don\'t have enough rupees!');
+          setMessageType('error');
+          setIsProcessing(false);
+          return;
+        }
+        success = await onDeposit(amount);
+        if (success) {
+          setMessage(`Successfully deposited ₹${amount.toLocaleString()}`);
+          setMessageType('success');
+        }
+      } else {
+        if (amount > bankBalance) {
+          setMessage('Insufficient balance in your account!');
+          setMessageType('error');
+          setIsProcessing(false);
+          return;
+        }
+        success = await onWithdraw(amount);
+        if (success) {
+          setMessage(`Successfully withdrew ₹${amount.toLocaleString()}`);
+          setMessageType('success');
+        }
+      }
+      
+      if (!success) {
+        setMessage('Transaction failed. Please try again.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      setMessage(`Transaction failed: ${error}`);
       setMessageType('error');
+    } finally {
+      setIsProcessing(false);
     }
   };
   
@@ -140,17 +152,22 @@ const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
           ))}
         </div>
       </div>
-      
-      {/* Transaction Button */}
+        {/* Transaction Button */}
       <button
         onClick={handleTransaction}
-        className={`w-full py-3 rounded-md font-medium ${
-          transactionType === 'deposit'
+        disabled={isProcessing}
+        className={`w-full py-3 rounded-md font-medium transition-colors ${
+          isProcessing 
+            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            : transactionType === 'deposit'
             ? 'bg-green-600 hover:bg-green-700 text-white'
             : 'bg-blue-600 hover:bg-blue-700 text-white'
         }`}
       >
-        {transactionType === 'deposit' ? 'Deposit Rupees' : 'Withdraw Rupees'}
+        {isProcessing 
+          ? 'Processing...' 
+          : transactionType === 'deposit' ? 'Deposit Rupees' : 'Withdraw Rupees'
+        }
       </button>
       
       {/* Message */}

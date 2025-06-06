@@ -4,6 +4,7 @@ import StockGraph from './StockGraph.tsx';
 import NewsPopup from './NewsPopup.tsx';
 import HelpPanel from './HelpPanel.tsx';
 import TradeStockPopup from './TradeStockPopup.tsx';
+import { stockApi } from '../../../utils/api.ts';
 
 interface Stock {
   id: string;
@@ -97,25 +98,48 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
     holdings: [],
     transactionHistory: []
   });
-  
-  // Load portfolio data from localStorage on initial render
+    // Load portfolio data from backend API on initial render
   useEffect(() => {
-    try {
-      const savedPortfolio = localStorage.getItem('dhaniverse_stock_portfolio');
-      if (savedPortfolio) {
-        setPortfolio(JSON.parse(savedPortfolio));
+    const loadPortfolio = async () => {
+      try {
+        const response = await stockApi.getPortfolio();
+        if (response.success && response.data) {
+          // Transform backend data to match frontend structure
+          const backendPortfolio = response.data;
+          const transformedPortfolio: PlayerPortfolio = {
+            holdings: backendPortfolio.holdings?.map((holding: any) => ({
+              stockId: holding.symbol,
+              quantity: holding.quantity,
+              averagePurchasePrice: holding.averagePrice,
+              totalInvestment: holding.quantity * holding.averagePrice
+            })) || [],
+            transactionHistory: []
+          };
+          setPortfolio(transformedPortfolio);
+        }
+      } catch (error) {
+        console.error("Error loading stock portfolio from backend:", error);
+        // Keep default empty portfolio on error
       }
-    } catch (error) {
-      console.error("Error loading stock portfolio:", error);
-    }
+    };
+    
+    loadPortfolio();
   }, []);
-  
-  // Save portfolio to localStorage when it changes
+    // Save portfolio to backend when it changes
   useEffect(() => {
-    try {
-      localStorage.setItem('dhaniverse_stock_portfolio', JSON.stringify(portfolio));
-    } catch (error) {
-      console.error("Error saving stock portfolio:", error);
+    const savePortfolio = async () => {
+      try {
+        // Portfolio is automatically saved when buy/sell operations are performed
+        // via the stockApi.buyStock() and stockApi.sellStock() calls
+        // This effect is kept for consistency but doesn't need localStorage anymore
+        console.log('Portfolio state updated, backend will be synced via trade operations');
+      } catch (error) {
+        console.error("Error syncing portfolio:", error);
+      }
+    };
+    
+    if (portfolio.holdings.length > 0) {
+      savePortfolio();
     }
   }, [portfolio]);
 
@@ -240,9 +264,8 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
       </span>
     );
   };
-  
-  // Handle buying stock
-  const handleBuyStock = (stockId: string, quantity: number) => {
+    // Handle buying stock
+  const handleBuyStock = async (stockId: string, quantity: number) => {
     // Find the stock
     const stock = stocks.find(s => s.id === stockId);
     if (!stock) {
@@ -254,68 +277,51 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
       return { success: false, message: "Cannot trade while market is closed." };
     }
     
-    // Calculate total cost
-    const totalCost = stock.currentPrice * quantity;
-    
-    // Check if player has enough money
-    if (totalCost > currentRupees) {
-      return { success: false, message: "Not enough rupees for this purchase." };
+    try {      // Use backend API to buy stock
+      const response = await stockApi.buyStock(stockId, quantity, stock.currentPrice, stock.name);
+      
+      if (response.success) {
+        // Calculate total cost
+        const totalCost = stock.currentPrice * quantity;
+        
+        // Update local state for immediate UI feedback
+        setCurrentRupees(prevRupees => prevRupees - totalCost);
+        
+        // Dispatch event to update game HUD
+        window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+          detail: { rupees: currentRupees - totalCost }
+        }));
+        
+        // Reload portfolio from backend to get updated data
+        const portfolioResponse = await stockApi.getPortfolio();
+        if (portfolioResponse.success && portfolioResponse.data) {
+          const transformedPortfolio: PlayerPortfolio = {
+            holdings: portfolioResponse.data.holdings?.map((holding: any) => ({
+              stockId: holding.symbol,
+              quantity: holding.quantity,
+              averagePurchasePrice: holding.averagePrice,
+              totalInvestment: holding.quantity * holding.averagePrice
+            })) || [],
+            transactionHistory: []
+          };
+          setPortfolio(transformedPortfolio);
+        }
+        
+        console.log(`Purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
+        return { 
+          success: true, 
+          message: `Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost.toLocaleString()}.` 
+        };
+      } else {
+        return { success: false, message: response.message || "Failed to buy stock." };
+      }
+    } catch (error) {
+      console.error("Error buying stock:", error);
+      return { success: false, message: "Network error. Please try again." };
     }
-    
-    // Deduct rupees from player
-    setCurrentRupees(prevRupees => prevRupees - totalCost);
-    
-    // Dispatch an event to notify the game about the rupee change
-    window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
-      detail: { rupees: currentRupees - totalCost }
-    }));
-    
-    // Update player portfolio
-    const updatedPortfolio = { ...portfolio };
-    const existingHolding = updatedPortfolio.holdings.find(h => h.stockId === stockId);
-    
-    if (existingHolding) {
-      // Update existing holding with new average price
-      const totalShares = existingHolding.quantity + quantity;
-      const totalInvestment = existingHolding.totalInvestment + totalCost;
-      existingHolding.quantity = totalShares;
-      existingHolding.totalInvestment = totalInvestment;
-      existingHolding.averagePurchasePrice = totalInvestment / totalShares;
-    } else {
-      // Add new holding
-      updatedPortfolio.holdings.push({
-        stockId,
-        quantity,
-        averagePurchasePrice: stock.currentPrice,
-        totalInvestment: totalCost
-      });
-    }
-    
-    // Record transaction
-    updatedPortfolio.transactionHistory.push({
-      stockId,
-      stockName: stock.name,
-      type: 'buy',
-      price: stock.currentPrice,
-      quantity,
-      timestamp: Date.now(),
-      total: totalCost
-    });
-    
-    // Update portfolio state
-    setPortfolio(updatedPortfolio);
-    
-    // Log transaction
-    console.log(`Purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
-    
-    return { 
-      success: true, 
-      message: `Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost.toLocaleString()}.` 
-    };
   };
-  
-  // Handle selling stock
-  const handleSellStock = (stockId: string, quantity: number) => {
+    // Handle selling stock
+  const handleSellStock = async (stockId: string, quantity: number) => {
     // Find the stock
     const stock = stocks.find(s => s.id === stockId);
     if (!stock) {
@@ -328,72 +334,69 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
     }
     
     // Check if player owns the stock
-    const updatedPortfolio = { ...portfolio };
-    const holdingIndex = updatedPortfolio.holdings.findIndex(h => h.stockId === stockId);
+    const holding = portfolio.holdings.find(h => h.stockId === stockId);
     
-    if (holdingIndex === -1) {
+    if (!holding) {
       return { success: false, message: `You don't own any shares of ${stock.name}.` };
     }
-    
-    const holding = updatedPortfolio.holdings[holdingIndex];
     
     // Check if player owns enough shares
     if (holding.quantity < quantity) {
       return { success: false, message: `You only have ${holding.quantity} shares of ${stock.name}.` };
     }
     
-    // Calculate sale value
-    const saleValue = stock.currentPrice * quantity;
-    
-    // Add rupees to player
-    setCurrentRupees(prevRupees => prevRupees + saleValue);
-    
-    // Dispatch an event to notify the game about the rupee change
-    window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
-      detail: { rupees: currentRupees + saleValue }
-    }));
-    
-    // Update portfolio
-    if (holding.quantity === quantity) {
-      // Remove holding completely if selling all shares
-      updatedPortfolio.holdings.splice(holdingIndex, 1);
-    } else {
-      // Update quantity and investment value for remaining shares
-      const remainingShares = holding.quantity - quantity;
-      const investmentPerShare = holding.totalInvestment / holding.quantity;
-      holding.quantity = remainingShares;
-      holding.totalInvestment -= investmentPerShare * quantity;
-      // Average price stays the same
+    try {
+      // Use backend API to sell stock
+      const response = await stockApi.sellStock(stockId, quantity, stock.currentPrice);
+      
+      if (response.success) {
+        // Calculate sale value
+        const saleValue = stock.currentPrice * quantity;
+        
+        // Update local state for immediate UI feedback
+        setCurrentRupees(prevRupees => prevRupees + saleValue);
+        
+        // Dispatch event to update game HUD
+        window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
+          detail: { rupees: currentRupees + saleValue }
+        }));
+        
+        // Reload portfolio from backend to get updated data
+        const portfolioResponse = await stockApi.getPortfolio();
+        if (portfolioResponse.success && portfolioResponse.data) {
+          const transformedPortfolio: PlayerPortfolio = {
+            holdings: portfolioResponse.data.holdings?.map((holding: any) => ({
+              stockId: holding.symbol,
+              quantity: holding.quantity,
+              averagePurchasePrice: holding.averagePrice,
+              totalInvestment: holding.quantity * holding.averagePrice
+            })) || [],
+            transactionHistory: []
+          };
+          setPortfolio(transformedPortfolio);
+        }
+        
+        // Calculate profit/loss
+        const profit = saleValue - (holding.averagePurchasePrice * quantity);
+        const profitPercent = (profit / (holding.averagePurchasePrice * quantity)) * 100;
+        
+        const profitMessage = profit >= 0 ? 
+          `with a profit of ₹${profit.toLocaleString()} (${profitPercent.toFixed(2)}%)` : 
+          `with a loss of ₹${Math.abs(profit).toLocaleString()} (${Math.abs(profitPercent).toFixed(2)}%)`;
+        
+        console.log(`Sold ${quantity} shares of ${stock.name} for ₹${saleValue} ${profitMessage}`);
+        
+        return { 
+          success: true, 
+          message: `Successfully sold ${quantity} shares of ${stock.name} for ₹${saleValue.toLocaleString()} ${profitMessage}.`
+        };
+      } else {
+        return { success: false, message: response.message || "Failed to sell stock." };
+      }
+    } catch (error) {
+      console.error("Error selling stock:", error);
+      return { success: false, message: "Network error. Please try again." };
     }
-    
-    // Record transaction
-    updatedPortfolio.transactionHistory.push({
-      stockId,
-      stockName: stock.name,
-      type: 'sell',
-      price: stock.currentPrice,
-      quantity,
-      timestamp: Date.now(),
-      total: saleValue
-    });
-    
-    // Update portfolio state
-    setPortfolio(updatedPortfolio);
-    
-    // Calculate profit/loss
-    const profit = saleValue - (holding.averagePurchasePrice * quantity);
-    const profitPercent = (profit / (holding.averagePurchasePrice * quantity)) * 100;
-    
-    const profitMessage = profit >= 0 ? 
-      `with a profit of ₹${profit.toLocaleString()} (${profitPercent.toFixed(2)}%)` : 
-      `with a loss of ₹${Math.abs(profit).toLocaleString()} (${Math.abs(profitPercent).toFixed(2)}%)`;
-    
-    console.log(`Sold ${quantity} shares of ${stock.name} for ₹${saleValue} ${profitMessage}`);
-    
-    return { 
-      success: true, 
-      message: `Successfully sold ${quantity} shares of ${stock.name} for ₹${saleValue.toLocaleString()} ${profitMessage}.`
-    };
   };
   
   // Calculate portfolio value

@@ -11,6 +11,7 @@ import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
 import wsRouter from "./src/routes/wsRouter.ts";
+import gameRouter from "./src/routes/gameRouter.ts";
 
 // Initialize database connection
 async function initializeDatabase() {
@@ -89,6 +90,10 @@ app.use(apiRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
+// Game routes - mounted directly for game API endpoints
+app.use(gameRouter.routes());
+app.use(gameRouter.allowedMethods());
+
 // WebSocket routes
 app.use(wsRouter.routes());
 app.use(wsRouter.allowedMethods());
@@ -98,7 +103,9 @@ async function startServer() {
   await initializeDatabase();
   
   const port = config.port;
+  console.log(`🚀 Server starting on port ${port}`);
   app.listen({ port });
+  console.log(`✅ Server running on http://localhost:${port}`);
 }
 
 startServer().catch((error) => {

@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 
 interface FixedDeposit {
-  id: string;
+  id?: string;
+  _id?: string;
   amount: number;
   interestRate: number;
   startDate: number;
   duration: number;
   maturityDate: number;
   matured: boolean;
+  status?: 'active' | 'matured' | 'claimed';
 }
 
 interface FixedDepositPanelProps {
   bankBalance: number;
   fixedDeposits: FixedDeposit[];
-  onCreateFD: (amount: number, duration: number) => boolean;
-  onClaimFD: (id: string) => boolean;
+  onCreateFD: (amount: number, duration: number) => Promise<boolean>;
+  onClaimFD: (id: string) => Promise<boolean>;
 }
 
 const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
@@ -22,11 +24,12 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
   fixedDeposits,
   onCreateFD,
   onClaimFD
-}) => {
-  const [amount, setAmount] = useState(5000);
+}) => {  const [amount, setAmount] = useState(5000);
   const [duration, setDuration] = useState(90); // Days
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+  const [isCreatingFD, setIsCreatingFD] = useState(false);
+  const [claimingFDs, setClaimingFDs] = useState<Set<string>>(new Set());
   
   // Predefined durations in days
   const durations = [
@@ -75,8 +78,7 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
   const handleDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDuration(parseInt(e.target.value));
   };
-  
-  const handleCreateFD = () => {
+    const handleCreateFD = async () => {
     if (amount <= 0) {
       setMessage('Please enter a valid amount');
       setMessageType('error');
@@ -89,27 +91,54 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
       return;
     }
     
-    const success = onCreateFD(amount, duration);
-    if (success) {
-      setMessage(`Fixed deposit of ₹${amount.toLocaleString()} created successfully!`);
-      setMessageType('success');
-    } else {
-      setMessage('Failed to create fixed deposit. Please try again.');
+    setIsCreatingFD(true);
+    setMessage('');
+    
+    try {
+      const success = await onCreateFD(amount, duration);
+      if (success) {
+        setMessage(`Fixed deposit of ₹${amount.toLocaleString()} created successfully!`);
+        setMessageType('success');
+      } else {
+        setMessage('Failed to create fixed deposit. Please try again.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      setMessage(`Failed to create fixed deposit: ${error}`);
       setMessageType('error');
+    } finally {
+      setIsCreatingFD(false);
     }
   };
   
-  const handleClaimFD = (id: string) => {
-    const fd = fixedDeposits.find(d => d.id === id);
+  const handleClaimFD = async (id: string) => {
+    const fdId = id || '';
+    if (!fdId) return;
+    
+    const fd = fixedDeposits.find(d => (d.id || d._id) === fdId);
     if (!fd) return;
     
-    const success = onClaimFD(id);
-    if (success) {
-      setMessage(`Successfully claimed fixed deposit with interest!`);
-      setMessageType('success');
-    } else {
-      setMessage('Failed to claim fixed deposit. Please try again.');
+    setClaimingFDs(prev => new Set([...prev, fdId]));
+    setMessage('');
+    
+    try {
+      const success = await onClaimFD(fdId);
+      if (success) {
+        setMessage(`Successfully claimed fixed deposit with interest!`);
+        setMessageType('success');
+      } else {
+        setMessage('Failed to claim fixed deposit. Please try again.');
+        setMessageType('error');
+      }
+    } catch (error) {
+      setMessage(`Failed to claim fixed deposit: ${error}`);
       setMessageType('error');
+    } finally {
+      setClaimingFDs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fdId);
+        return newSet;
+      });
     }
   };
   
@@ -172,13 +201,16 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
             </div>
           </div>
         </div>
-        
-        <button
+          <button
           onClick={handleCreateFD}
-          className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-200"
-          disabled={amount > bankBalance}
+          disabled={amount > bankBalance || isCreatingFD}
+          className={`w-full py-2 rounded-md transition-colors duration-200 ${
+            amount > bankBalance || isCreatingFD
+              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              : 'bg-green-600 hover:bg-green-700 text-white'
+          }`}
         >
-          Create Fixed Deposit
+          {isCreatingFD ? 'Creating...' : 'Create Fixed Deposit'}
         </button>
         
         {amount > bankBalance && (
@@ -193,10 +225,13 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
         <h3 className="font-medium text-yellow-300">Your Fixed Deposits</h3>
         
         {fixedDeposits.length > 0 ? (
-          <div className="space-y-4">
-            {fixedDeposits.map(fd => (
+          <div className="space-y-4">            {fixedDeposits.map(fd => {
+              const fdId = fd.id || fd._id || '';
+              const isClaimingThis = claimingFDs.has(fdId);
+              
+              return (
               <div 
-                key={fd.id} 
+                key={fdId} 
                 className={`p-4 rounded-md border ${
                   fd.matured 
                     ? 'bg-green-900/30 border-green-700' 
@@ -239,14 +274,20 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
                 
                 {fd.matured && (
                   <button
-                    onClick={() => handleClaimFD(fd.id)}
-                    className="mt-3 w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-200"
+                    onClick={() => handleClaimFD(fdId)}
+                    disabled={isClaimingThis}
+                    className={`mt-3 w-full py-2 rounded-md transition-colors duration-200 ${
+                      isClaimingThis
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
                   >
-                    Claim with Interest
+                    {isClaimingThis ? 'Claiming...' : 'Claim with Interest'}
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="p-4 bg-gray-800 rounded-md text-gray-400 text-center">

@@ -5,6 +5,7 @@ import type {
   PlayerStateDocument,
   BankAccountDocument,
 } from "./schemas.ts";
+import { COLLECTIONS } from "./schemas.ts";
 
 export interface User {
   id: string;
@@ -65,7 +66,7 @@ class MongoDatabase {
         },
         lastLoginAt: new Date(),
         isActive: true
-      };      const users = this.getCollection<UserDocument>("users");
+      };      const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
       const result = await users.insertOne(userDoc);
       
       // Create initial player state
@@ -88,9 +89,8 @@ class MongoDatabase {
       throw error;
     }
   }
-
   async findUserByEmail(email: string): Promise<User | null> {
-    const users = this.getCollection<UserDocument>("users");
+    const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
     const userDoc = await users.findOne({ email });
     if (!userDoc) return null;
 
@@ -103,9 +103,8 @@ class MongoDatabase {
       googleId: userDoc.googleId
     };
   }
-
   async findUserByGameUsername(gameUsername: string): Promise<User | null> {
-    const users = this.getCollection<UserDocument>("users");
+    const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
     const userDoc = await users.findOne({ gameUsername });
     if (!userDoc) return null;
 
@@ -118,9 +117,8 @@ class MongoDatabase {
       googleId: userDoc.googleId
     };
   }
-
   async findUserByGoogleId(googleId: string): Promise<User | null> {
-    const users = this.getCollection<UserDocument>("users");
+    const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
     const userDoc = await users.findOne({ googleId });
     if (!userDoc) return null;
 
@@ -133,15 +131,13 @@ class MongoDatabase {
       googleId: userDoc.googleId
     };
   }
-
   // Game state methods
   async getPlayerState(userId: string): Promise<PlayerStateDocument | null> {
-    const playerStates = this.getCollection<PlayerStateDocument>("player_states");
+    const playerStates = this.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
     return await playerStates.findOne({ userId });
   }
-
   async updatePlayerPosition(userId: string, position: { x: number; y: number; scene: string }): Promise<void> {
-    const playerStates = this.getCollection<PlayerStateDocument>("player_states");
+    const playerStates = this.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
     await playerStates.updateOne(
       { userId },
       { 
@@ -152,11 +148,10 @@ class MongoDatabase {
       }
     );
   }
-
   async getBankAccount(userId: string): Promise<BankAccountDocument | null> {
-    const bankAccounts = this.getCollection<BankAccountDocument>("bank_accounts");
+    const bankAccounts = this.getCollection<BankAccountDocument>(COLLECTIONS.BANK_ACCOUNTS);
     return await bankAccounts.findOne({ userId });
-  }  private async createInitialPlayerState(userId: string): Promise<void> {
+  }private async createInitialPlayerState(userId: string): Promise<void> {
     // Create initial player state
     const playerState: PlayerStateDocument = {
       userId,
@@ -182,7 +177,7 @@ class MongoDatabase {
         autoSave: true
       },
       lastUpdated: new Date()
-    };    const playerStates = this.getCollection<PlayerStateDocument>("player_states");
+    };    const playerStates = this.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
     await playerStates.insertOne(playerState);
     
     // Create initial bank account
@@ -193,7 +188,7 @@ class MongoDatabase {
       createdAt: new Date(),
       lastUpdated: new Date()
     };
-      const bankAccounts = this.getCollection<BankAccountDocument>("bank_accounts");
+    const bankAccounts = this.getCollection<BankAccountDocument>(COLLECTIONS.BANK_ACCOUNTS);
     await bankAccounts.insertOne(bankAccount);
   }
 
