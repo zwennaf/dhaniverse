@@ -67,7 +67,7 @@ type SortDirection = 'asc' | 'desc';
 type FilterOption = 'all' | 'undervalued' | 'highGrowth' | 'lowRisk' | 'highRisk';
 
 // Tab options
-type TabOption = 'market' | 'portfolio' | 'news';
+type TabOption = 'market' | 'portfolio';
 
 const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
   onClose,
@@ -98,13 +98,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
     holdings: [],
     transactionHistory: []
   });
-    // Load portfolio data from backend API on initial render
+  // Load portfolio data from backend API on initial render
   useEffect(() => {
     const loadPortfolio = async () => {
       try {
         const response = await stockApi.getPortfolio();
         if (response.success && response.data) {
-          // Transform backend data to match frontend structure
           const backendPortfolio = response.data;
           const transformedPortfolio: PlayerPortfolio = {
             holdings: backendPortfolio.holdings?.map((holding: any) => ({
@@ -119,29 +118,42 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
         }
       } catch (error) {
         console.error("Error loading stock portfolio from backend:", error);
-        // Keep default empty portfolio on error
       }
     };
-    
+
     loadPortfolio();
   }, []);
-    // Save portfolio to backend when it changes
+
+  // Listen for rupee updates from the game
   useEffect(() => {
-    const savePortfolio = async () => {
-      try {
-        // Portfolio is automatically saved when buy/sell operations are performed
-        // via the stockApi.buyStock() and stockApi.sellStock() calls
-        // This effect is kept for consistency but doesn't need localStorage anymore
-        console.log('Portfolio state updated, backend will be synced via trade operations');
-      } catch (error) {
-        console.error("Error syncing portfolio:", error);
+    const handleRupeeUpdate = (event: CustomEvent) => {
+      setCurrentRupees(event.detail.rupees);
+    };
+
+    window.addEventListener('rupee-update', handleRupeeUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('rupee-update', handleRupeeUpdate as EventListener);
+    };
+  }, []);
+
+  // Listen for rupee updates from the game
+  useEffect(() => {
+    const handleRupeeUpdate = (event: CustomEvent) => {
+      if (event.detail.rupees !== undefined) {
+        console.log("StockMarketDashboard received rupee update:", event.detail.rupees);
+        setCurrentRupees(event.detail.rupees);
       }
     };
-    
-    if (portfolio.holdings.length > 0) {
-      savePortfolio();
-    }
-  }, [portfolio]);
+
+    // Add event listener
+    window.addEventListener('rupee-update', handleRupeeUpdate as EventListener);
+
+    // Clean up event listener when component unmounts
+    return () => {
+      window.removeEventListener('rupee-update', handleRupeeUpdate as EventListener);
+    };
+  }, []);
 
   // Apply sorting and filtering whenever related states change
   useEffect(() => {
@@ -226,7 +238,6 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
   // Toggle help panel
   const toggleHelp = () => {
     setShowHelp(!showHelp);
-    // Close other popups when help is opened
     if (!showHelp) {
       setShowGraph(false);
       setShowNews(false);
@@ -234,21 +245,11 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
     }
   };
 
-  // Close all popups
-  const closeAllPopups = () => {
-    setShowGraph(false);
-    setShowNews(false);
-    setShowHelp(false);
-    setShowTrade(false);
-  };
-  
   // Handle sorting when column header is clicked
   const handleSort = (field: SortField) => {
     if (field === sortField) {
-      // Toggle sort direction if same field is clicked
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new field and default to ascending
       setSortField(field);
       setSortDirection('asc');
     }
@@ -259,40 +260,43 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
     if (sortField !== field) return null;
     
     return (
-      <span className="ml-1">
-        {sortDirection === 'asc' ? '↑' : '↓'}
+      <span className="ml-2">
+        {sortDirection === 'asc' ? (
+          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </span>
     );
   };
-    // Handle buying stock
+
+  // Handle buying stock
   const handleBuyStock = async (stockId: string, quantity: number) => {
-    // Find the stock
     const stock = stocks.find(s => s.id === stockId);
     if (!stock) {
       return { success: false, message: "Stock not found." };
     }
     
-    // Check if market is open
     if (!marketStatus.isOpen) {
       return { success: false, message: "Cannot trade while market is closed." };
     }
     
-    try {      // Use backend API to buy stock
+    try {
       const response = await stockApi.buyStock(stockId, quantity, stock.currentPrice, stock.name);
       
       if (response.success) {
-        // Calculate total cost
         const totalCost = stock.currentPrice * quantity;
         
-        // Update local state for immediate UI feedback
         setCurrentRupees(prevRupees => prevRupees - totalCost);
         
-        // Dispatch event to update game HUD
         window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
           detail: { rupees: currentRupees - totalCost }
         }));
         
-        // Reload portfolio from backend to get updated data
         const portfolioResponse = await stockApi.getPortfolio();
         if (portfolioResponse.success && portfolioResponse.data) {
           const transformedPortfolio: PlayerPortfolio = {
@@ -307,7 +311,6 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
           setPortfolio(transformedPortfolio);
         }
         
-        console.log(`Purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
         return { 
           success: true, 
           message: `Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost.toLocaleString()}.` 
@@ -320,48 +323,40 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
       return { success: false, message: "Network error. Please try again." };
     }
   };
-    // Handle selling stock
+
+  // Handle selling stock
   const handleSellStock = async (stockId: string, quantity: number) => {
-    // Find the stock
     const stock = stocks.find(s => s.id === stockId);
     if (!stock) {
       return { success: false, message: "Stock not found." };
     }
     
-    // Check if market is open
     if (!marketStatus.isOpen) {
       return { success: false, message: "Cannot trade while market is closed." };
     }
     
-    // Check if player owns the stock
     const holding = portfolio.holdings.find(h => h.stockId === stockId);
     
     if (!holding) {
       return { success: false, message: `You don't own any shares of ${stock.name}.` };
     }
     
-    // Check if player owns enough shares
     if (holding.quantity < quantity) {
       return { success: false, message: `You only have ${holding.quantity} shares of ${stock.name}.` };
     }
     
     try {
-      // Use backend API to sell stock
       const response = await stockApi.sellStock(stockId, quantity, stock.currentPrice);
       
       if (response.success) {
-        // Calculate sale value
         const saleValue = stock.currentPrice * quantity;
         
-        // Update local state for immediate UI feedback
         setCurrentRupees(prevRupees => prevRupees + saleValue);
         
-        // Dispatch event to update game HUD
         window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
           detail: { rupees: currentRupees + saleValue }
         }));
         
-        // Reload portfolio from backend to get updated data
         const portfolioResponse = await stockApi.getPortfolio();
         if (portfolioResponse.success && portfolioResponse.data) {
           const transformedPortfolio: PlayerPortfolio = {
@@ -376,15 +371,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
           setPortfolio(transformedPortfolio);
         }
         
-        // Calculate profit/loss
         const profit = saleValue - (holding.averagePurchasePrice * quantity);
         const profitPercent = (profit / (holding.averagePurchasePrice * quantity)) * 100;
         
         const profitMessage = profit >= 0 ? 
           `with a profit of ₹${profit.toLocaleString()} (${profitPercent.toFixed(2)}%)` : 
           `with a loss of ₹${Math.abs(profit).toLocaleString()} (${Math.abs(profitPercent).toFixed(2)}%)`;
-        
-        console.log(`Sold ${quantity} shares of ${stock.name} for ₹${saleValue} ${profitMessage}`);
         
         return { 
           success: true, 
@@ -422,148 +414,238 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
       profitPercent
     };
   };
-  
-  // Convert timestamp to readable date
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString() + ' ' + 
-           new Date(timestamp).toLocaleTimeString();
-  };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      {/* Semi-transparent overlay */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-      
-      {/* Stock Market UI */}
-      <div className="relative w-4/5 max-w-5xl max-h-[90vh] bg-gray-900 text-white rounded-lg shadow-xl border border-blue-600 overflow-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="p-4 bg-gradient-to-r from-blue-800 to-blue-600 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Dhaniverse Stock Exchange</h1>
-          
-          {/* Player's rupees */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <div className="flex items-center space-x-4">
-            <div className="bg-gray-800 rounded-full px-4 py-2 text-yellow-300 font-medium">
-              Your Rupees: ₹{currentRupees.toLocaleString()}
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-400 via-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white tracking-tight">Stock Exchange</h2>
+                <p className="text-sm text-gray-400 font-medium">Build your wealth • Trade smart</p>
+              </div>
             </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 bg-gray-700/50 rounded-full px-5 py-3 border border-gray-600/50">
+              <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-sm"></div>
+              <span className="text-sm text-gray-300 font-medium">Balance:</span>
+              <span className="text-xl font-bold text-white">₹{currentRupees.toLocaleString()}</span>
+            </div>
+            
             <button
               onClick={toggleHelp}
-              className="bg-blue-700 hover:bg-blue-800 text-white p-2 rounded-full"
-              title="Show Help"
+              className="p-3 bg-gray-700/70 rounded-full hover:bg-gray-600 transition-all duration-200 text-gray-300 hover:text-white hover:scale-105 border border-gray-600/50"
+              title="Help & Guide"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            
+            <button
+              onClick={onClose}
+              className="p-3 bg-gray-700/70 rounded-full hover:bg-red-500 transition-all duration-200 text-gray-300 hover:text-white hover:scale-105 border border-gray-600/50"
+              title="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
         </div>
-        
-        {/* Tabs */}
+
+        {/* Navigation Tabs */}
         <div className="flex border-b border-gray-700">
           <button
             onClick={() => setActiveTab('market')}
-            className={`px-6 py-3 font-medium ${
+            className={`px-6 py-4 font-semibold transition-all duration-200 ${
               activeTab === 'market'
-                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                ? 'text-emerald-400 border-b-2 border-emerald-400 bg-gray-750'
+                : 'text-gray-400 hover:text-white hover:bg-gray-750'
             }`}
           >
-            Market View
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Market</span>
+            </div>
           </button>
           <button
             onClick={() => setActiveTab('portfolio')}
-            className={`px-6 py-3 font-medium ${
+            className={`px-6 py-4 font-semibold transition-all duration-200 ${
               activeTab === 'portfolio'
-                ? 'bg-gray-800 text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                ? 'text-emerald-400 border-b-2 border-emerald-400 bg-gray-750'
+                : 'text-gray-400 hover:text-white hover:bg-gray-750'
             }`}
           >
-            Portfolio
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span>Portfolio</span>
+              {portfolio.holdings.length > 0 && (
+                <span className="bg-emerald-500 text-white text-xs px-2 py-1 rounded-full">
+                  {portfolio.holdings.length}
+                </span>
+              )}
+            </div>
           </button>
         </div>
-        
-        {/* Main Content */}
+
+        {/* Content */}
         <div className="p-6">
           {/* Market View Tab */}
           {activeTab === 'market' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-blue-400">Market Overview</h2>
-                
-                {/* Filtering options */}
-                <div className="flex items-center space-x-3">
-                  <label className="text-sm text-gray-400">Filter by:</label>
-                  <select 
-                    className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm"
-                    value={filterOption}
-                    onChange={(e) => setFilterOption(e.target.value as FilterOption)}
-                  >
-                    <option value="all">All Stocks</option>
-                    <option value="undervalued">Undervalued Gems</option>
-                    <option value="highGrowth">High Growth</option>
-                    <option value="lowRisk">Low Risk</option>
-                    <option value="highRisk">High Risk/Reward</option>
-                  </select>
-                  
-                  {/* Market status display */}
-                  <span className={`px-3 py-1 rounded-full text-sm ${
+                <div className="flex items-center space-x-4">
+                  <h3 className="text-xl font-bold text-white">Market Overview</h3>
+                  <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-sm font-medium ${
                     marketStatus.isOpen 
-                      ? 'bg-green-900/50 text-green-400' 
-                      : 'bg-red-900/50 text-red-400'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
                   }`}>
-                    Market: {marketStatus.isOpen ? 'OPEN' : 'CLOSED'}
-                  </span>
+                    <div className={`w-2 h-2 rounded-full ${marketStatus.isOpen ? 'bg-emerald-400' : 'bg-red-400'} animate-pulse`}></div>
+                    <span>Market {marketStatus.isOpen ? 'OPEN' : 'CLOSED'}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-400 font-medium">Filter:</label>
+                    <select 
+                      className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      value={filterOption}
+                      onChange={(e) => setFilterOption(e.target.value as FilterOption)}
+                    >
+                      <option value="all">All Stocks</option>
+                      <option value="undervalued">💎 Undervalued</option>
+                      <option value="highGrowth">📈 High Growth</option>
+                      <option value="lowRisk">🛡️ Low Risk</option>
+                      <option value="highRisk">⚡ High Risk</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               
-              {/* Stock listings */}
-              <div className="overflow-x-auto">
-                <table className="w-full bg-gray-800 rounded-lg">
-                  <thead>
-                    <tr className="bg-gray-700 text-left text-sm">
-                      <th className="p-4 rounded-tl-lg cursor-pointer hover:bg-gray-600" onClick={() => handleSort('name')}>
-                        Company Name {renderSortIndicator('name')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('price')}>
-                        Current Price {renderSortIndicator('price')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('marketCap')}>
-                        Market Cap {renderSortIndicator('marketCap')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('peRatio')}>
-                        P/E Ratio {renderSortIndicator('peRatio')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('debtEquity')}>
-                        Debt/Equity {renderSortIndicator('debtEquity')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('eps')}>
-                        EPS {renderSortIndicator('eps')}
-                      </th>
-                      <th className="p-4 cursor-pointer hover:bg-gray-600" onClick={() => handleSort('growth')}>
-                        Growth {renderSortIndicator('growth')}
-                      </th>
-                      <th className="p-4 rounded-tr-lg">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredStocks.length > 0 ? (
-                      filteredStocks.map((stock) => (
-                        <StockDetail
-                          key={stock.id}
-                          stock={stock}
-                          onShowGraph={() => handleShowGraph(stock)}
-                          onShowNews={() => handleShowNews(stock)}
-                          onTrade={() => handleShowTrade(stock)}
-                        />
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={8} className="p-4 text-center text-gray-400">
-                          No stocks match the selected filter.
-                        </td>
+              {/* Modern Stock Table */}
+              <div className="bg-gray-750 rounded-xl overflow-hidden border border-gray-700/50">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-700/50 text-left">
+                        <th className="p-4 font-semibold text-gray-300 cursor-pointer hover:bg-gray-600/50 transition-colors" onClick={() => handleSort('name')}>
+                          <div className="flex items-center space-x-1">
+                            <span>Company</span>
+                            {renderSortIndicator('name')}
+                          </div>
+                        </th>
+                        <th className="p-4 font-semibold text-gray-300 cursor-pointer hover:bg-gray-600/50 transition-colors" onClick={() => handleSort('price')}>
+                          <div className="flex items-center space-x-1">
+                            <span>Price</span>
+                            {renderSortIndicator('price')}
+                          </div>
+                        </th>
+                        <th className="p-4 font-semibold text-gray-300 cursor-pointer hover:bg-gray-600/50 transition-colors" onClick={() => handleSort('marketCap')}>
+                          <div className="flex items-center space-x-1">
+                            <span>Market Cap</span>
+                            {renderSortIndicator('marketCap')}
+                          </div>
+                        </th>
+                        <th className="p-4 font-semibold text-gray-300 cursor-pointer hover:bg-gray-600/50 transition-colors" onClick={() => handleSort('peRatio')}>
+                          <div className="flex items-center space-x-1">
+                            <span>P/E</span>
+                            {renderSortIndicator('peRatio')}
+                          </div>
+                        </th>
+                        <th className="p-4 font-semibold text-gray-300 cursor-pointer hover:bg-gray-600/50 transition-colors" onClick={() => handleSort('growth')}>
+                          <div className="flex items-center space-x-1">
+                            <span>Growth</span>
+                            {renderSortIndicator('growth')}
+                          </div>
+                        </th>
+                        <th className="p-4 font-semibold text-gray-300">Actions</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredStocks.length > 0 ? (
+                        filteredStocks.map((stock, index) => (
+                          <tr key={stock.id} className={`border-t border-gray-700/30 hover:bg-gray-700/30 transition-colors ${index % 2 === 0 ? 'bg-gray-800/20' : ''}`}>
+                            <td className="p-4">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                                  {stock.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-white">{stock.name}</div>
+                                  <div className="text-xs text-gray-400">{stock.id.toUpperCase()}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="font-bold text-lg text-white">₹{stock.currentPrice.toLocaleString()}</div>
+                              <div className="text-xs text-gray-400">per share</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="font-semibold text-white">₹{(stock.marketCap / 1000000).toFixed(1)}M</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="font-semibold text-white">{stock.peRatio.toFixed(2)}</div>
+                            </td>
+                            <td className="p-4">
+                              <div className={`font-semibold ${stock.businessGrowth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {stock.businessGrowth >= 0 ? '+' : ''}{stock.businessGrowth.toFixed(1)}%
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleShowTrade(stock)}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  Trade
+                                </button>
+                                <button
+                                  onClick={() => handleShowGraph(stock)}
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  Chart
+                                </button>
+                                <button
+                                  onClick={() => handleShowNews(stock)}
+                                  className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                >
+                                  News
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-gray-400">
+                            <div className="flex flex-col items-center space-y-2">
+                              <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.291-1.007-5.824-2.562M15 6.306a7.962 7.962 0 00-6 0M12 4v2.5" />
+                              </svg>
+                              <span>No stocks match the selected filter</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -572,53 +654,59 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
           {activeTab === 'portfolio' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-blue-400">Your Portfolio</h2>
+                <h3 className="text-xl font-bold text-white">Your Portfolio</h3>
                 
-                {/* Portfolio summary */}
                 {portfolio.holdings.length > 0 && (
-                  <div className="text-sm text-right">
-                    <div className="text-gray-400">Total Value: 
-                      <span className="ml-2 text-blue-300 font-medium">
-                        ₹{calculatePortfolioValue().totalValue.toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    <div className="text-gray-400 mt-1">Total Profit/Loss: 
-                      <span className={`ml-2 font-medium ${
-                        calculatePortfolioValue().totalProfit >= 0 
-                          ? 'text-green-400' 
-                          : 'text-red-400'
-                      }`}>
-                        {calculatePortfolioValue().totalProfit >= 0 ? '+' : ''}
-                        ₹{calculatePortfolioValue().totalProfit.toLocaleString()} 
-                        ({calculatePortfolioValue().totalProfit >= 0 ? '+' : ''}
-                        {calculatePortfolioValue().profitPercent.toFixed(2)}%)
-                      </span>
+                  <div className="bg-gray-750 rounded-lg p-4 border border-gray-700/50">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-400">Total Value</div>
+                        <div className="text-xl font-bold text-white">
+                          ₹{calculatePortfolioValue().totalValue.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400">Total P&L</div>
+                        <div className={`text-xl font-bold ${
+                          calculatePortfolioValue().totalProfit >= 0 
+                            ? 'text-emerald-400' 
+                            : 'text-red-400'
+                        }`}>
+                          {calculatePortfolioValue().totalProfit >= 0 ? '+' : ''}
+                          ₹{calculatePortfolioValue().totalProfit.toLocaleString()}
+                          <span className="text-sm ml-1">
+                            ({calculatePortfolioValue().totalProfit >= 0 ? '+' : ''}
+                            {calculatePortfolioValue().profitPercent.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
               
-              {/* Current Holdings */}
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-lg font-medium text-blue-300 mb-3">Current Holdings</h3>
+              {/* Holdings */}
+              <div className="bg-gray-750 rounded-xl overflow-hidden border border-gray-700/50">
+                <div className="p-4 bg-gray-700/30 border-b border-gray-700/50">
+                  <h4 className="font-semibold text-white">Current Holdings</h4>
+                </div>
                 
                 {portfolio.holdings.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-left text-sm border-b border-gray-700">
-                          <th className="p-2">Stock</th>
-                          <th className="p-2">Quantity</th>
-                          <th className="p-2">Avg. Price</th>
-                          <th className="p-2">Current Price</th>
-                          <th className="p-2">Market Value</th>
-                          <th className="p-2">Profit/Loss</th>
-                          <th className="p-2">Action</th>
+                        <tr className="bg-gray-700/20 text-left">
+                          <th className="p-4 font-semibold text-gray-300">Stock</th>
+                          <th className="p-4 font-semibold text-gray-300">Quantity</th>
+                          <th className="p-4 font-semibold text-gray-300">Avg. Price</th>
+                          <th className="p-4 font-semibold text-gray-300">Current Price</th>
+                          <th className="p-4 font-semibold text-gray-300">Value</th>
+                          <th className="p-4 font-semibold text-gray-300">P&L</th>
+                          <th className="p-4 font-semibold text-gray-300">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {portfolio.holdings.map(holding => {
+                        {portfolio.holdings.map((holding, index) => {
                           const stock = stocks.find(s => s.id === holding.stockId);
                           if (!stock) return null;
                           
@@ -627,33 +715,54 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
                           const profitPercent = (profit / holding.totalInvestment) * 100;
                           
                           return (
-                            <tr key={holding.stockId} className="border-b border-gray-700 hover:bg-gray-700/30">
-                              <td className="p-3">
-                                <div className="font-medium text-blue-300">{stock.name}</div>
+                            <tr key={holding.stockId} className={`border-t border-gray-700/30 hover:bg-gray-700/20 transition-colors ${index % 2 === 0 ? 'bg-gray-800/10' : ''}`}>
+                              <td className="p-4">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                                    {stock.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-white">{stock.name}</div>
+                                    <div className="text-xs text-gray-400">{stock.id.toUpperCase()}</div>
+                                  </div>
+                                </div>
                               </td>
-                              <td className="p-3">{holding.quantity}</td>
-                              <td className="p-3">₹{holding.averagePurchasePrice.toFixed(2)}</td>
-                              <td className="p-3">₹{stock.currentPrice.toLocaleString()}</td>
-                              <td className="p-3">₹{currentValue.toLocaleString()}</td>
-                              <td className={`p-3 ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {profit >= 0 ? '+' : ''}₹{profit.toLocaleString()} 
-                                <span className="text-xs ml-1">
+                              <td className="p-4">
+                                <div className="font-semibold text-white">{holding.quantity}</div>
+                                <div className="text-xs text-gray-400">shares</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-semibold text-white">₹{holding.averagePurchasePrice.toFixed(2)}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-semibold text-white">₹{stock.currentPrice.toLocaleString()}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-bold text-white">₹{currentValue.toLocaleString()}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className={`font-semibold ${profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {profit >= 0 ? '+' : ''}₹{profit.toLocaleString()}
+                                </div>
+                                <div className={`text-xs ${profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                   ({profit >= 0 ? '+' : ''}{profitPercent.toFixed(2)}%)
-                                </span>
+                                </div>
                               </td>
-                              <td className="p-3 space-x-1">
-                                <button
-                                  onClick={() => handleShowTrade(stock)}
-                                  className="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-xs"
-                                >
-                                  Trade
-                                </button>
-                                <button
-                                  onClick={() => handleShowGraph(stock)}
-                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs"
-                                >
-                                  Graph
-                                </button>
+                              <td className="p-4">
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => handleShowTrade(stock)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                  >
+                                    Trade
+                                  </button>
+                                  <button
+                                    onClick={() => handleShowGraph(stock)}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                                  >
+                                    Chart
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -662,61 +771,29 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-400">
-                    You don't own any stocks yet. Start investing by trading on the Market tab!
+                  <div className="p-8 text-center">
+                    <div className="flex flex-col items-center space-y-4">
+                      <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                      <div className="text-gray-400">
+                        <div className="font-semibold mb-1">No investments yet</div>
+                        <div className="text-sm">Start building your portfolio by trading on the Market tab!</div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('market')}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors"
+                      >
+                        Explore Market
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-              
-              {/* Transaction History */}
-              {portfolio.transactionHistory.length > 0 && (
-                <div className="bg-gray-800 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-blue-300 mb-3">Transaction History</h3>
-                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-left text-sm border-b border-gray-700">
-                          <th className="p-2">Date</th>
-                          <th className="p-2">Stock</th>
-                          <th className="p-2">Type</th>
-                          <th className="p-2">Quantity</th>
-                          <th className="p-2">Price</th>
-                          <th className="p-2">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {portfolio.transactionHistory
-                          .sort((a, b) => b.timestamp - a.timestamp) // Sort by newest first
-                          .map((transaction, index) => (
-                            <tr key={index} className="border-b border-gray-700 hover:bg-gray-700/30">
-                              <td className="p-3 text-sm">{formatDate(transaction.timestamp)}</td>
-                              <td className="p-3">{transaction.stockName}</td>
-                              <td className={`p-3 ${transaction.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
-                                {transaction.type === 'buy' ? 'BUY' : 'SELL'}
-                              </td>
-                              <td className="p-3">{transaction.quantity}</td>
-                              <td className="p-3">₹{transaction.price.toLocaleString()}</td>
-                              <td className="p-3">₹{transaction.total.toLocaleString()}</td>
-                            </tr>
-                          ))
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </div>
           )}
-        </div>
-        
-        {/* Footer */}
-        <div className="border-t border-gray-700 p-4 flex justify-end">
-          <button 
-            onClick={onClose}
-            className="px-6 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md transition-colors duration-200"
-          >
-            Exit Stock Market
-          </button>
         </div>
       </div>
       
