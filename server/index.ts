@@ -64,6 +64,15 @@ app.use(oakCors({
   allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
 }));
 
+// CSP header middleware to allow framing of specific domains
+app.use(async (ctx, next) => {
+  await next();
+  ctx.response.headers.set(
+    "Content-Security-Policy",
+    "frame-src 'self' https://accounts.google.com https://*.googleusercontent.com https://vercel.live https://www.youtube.com"
+  );
+});
+
 // Debug logging middleware (removed for production)
 app.use(async (_ctx, next) => {
   await next();
