@@ -4,15 +4,17 @@ console.log("📍 MongoDB URI:", Deno.env.get("MONGODB_URI") ? "✅ Found" : "�
 console.log("📍 JWT Secret:", Deno.env.get("JWT_SECRET") ? "✅ Found" : "❌ Missing");
 console.log("📍 Node ENV:", Deno.env.get("NODE_ENV") || "development");
 
-import { Application, Context } from "oak";
+import { Application } from "oak";
 import { oakCors } from "cors";
 import { config } from "./src/config/config.ts";
 import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
-import wsRouter from "./src/routes/wsRouter.ts";
 import gameRouter from "./src/routes/gameRouter.ts";
-import { startWebSocketServer } from "./src/websocket-server.ts";
+import { WebSocketService } from "./src/services/WebSocketService.ts";
+
+// Initialize WebSocket service
+const webSocketService = new WebSocketService();
 
 // Initialize database connection
 async function initializeDatabase() {
@@ -22,39 +24,29 @@ async function initializeDatabase() {
         return true;
     } catch (error) {
         console.error("❌ Failed to initialize database:", error);
-        
         console.log("\n💡 MongoDB Atlas Setup Required:");
         console.log("   1. Create MongoDB Atlas account at https://cloud.mongodb.com/");
         console.log("   2. Create a cluster and database user");
         console.log("   3. Get connection string and set MONGODB_URI environment variable");
         console.log("   4. Ensure your IP is whitelisted in Network Access");
-        
-        // Continue without database to allow server to start
         console.warn("⚠️  Starting server without database (limited functionality)");
-        console.warn("⚠️  Authentication and game features will not work properly");
         return false;
     }
 }
 
-// Graceful shutdown
-async function gracefulShutdown() {
-    await mongodb.disconnect();
-    Deno.exit(0);
-}
-
-// Handle shutdown signals
-Deno.addSignalListener("SIGINT", gracefulShutdown);
-
-// SIGTERM is not supported on Windows, only add if not on Windows
-if (Deno.build.os !== "windows") {
-    Deno.addSignalListener("SIGTERM", gracefulShutdown);
-}
-
-// Create an Oak application
+// Create Oak application for API routes
 const app = new Application();
 
+// Global CORS
+app.use(oakCors({
+    origin: "*",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
+}));
+
 // Global error handling
-app.use(async (ctx: Context, next) => {
+app.use(async (ctx, next) => {
     try {
         await next();
     } catch (err) {
@@ -64,16 +56,8 @@ app.use(async (ctx: Context, next) => {
     }
 });
 
-// Global CORS - allow all origins for localhost development
-app.use(oakCors({
-    origin: "*",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
-}));
-
-// CSP header middleware to allow framing of specific domains
-app.use(async (ctx: Context, next) => {
+// CSP header middleware
+app.use(async (ctx, next) => {
     await next();
     ctx.response.headers.set(
         "Content-Security-Policy",
@@ -81,79 +65,100 @@ app.use(async (ctx: Context, next) => {
     );
 });
 
-// Debug logging middleware (removed for production)
-app.use(async (_ctx: Context, next) => {
-    await next();
-});
-
-// Health check endpoint with database status
-app.use(async (ctx: Context, next) => {
-    if (ctx.request.url.pathname === "/health") {
-        ctx.response.body = { 
-            status: "ok", 
-            timestamp: new Date().toISOString(),
-            database: mongodb.isHealthy() ? "connected" : "disconnected",
-            websocket: "separate_server_port_8001"
-        };
-        return;
-    }
-    await next();
-});
-
-// Use API router for all /api routes
+// Use routers
 app.use(apiRouter.routes());
 app.use(apiRouter.allowedMethods());
-
-// Auth routes - direct mounting without /api prefix for backward compatibility
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
-
-// Game routes - mounted directly for game API endpoints
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 
-// WebSocket info routes (no actual WebSocket handling in main server for local dev)
-app.use(wsRouter.routes());
-app.use(wsRouter.allowedMethods());
+// Convert Oak app to handler
+const oakHandler = async (request: Request): Promise<Response> => {
+    const response = await app.handle(request);
+    return response || new Response("Not Found", { status: 404 });
+};
 
-// Start the server with database initialization
-async function startServer() {
-    console.log("🔄 Initializing server...");
+// Main request handler with WebSocket support
+async function handleRequest(request: Request): Promise<Response> {
+    const url = new URL(request.url);
     
-    try {
-        await initializeDatabase();
-        console.log("✅ Database initialization completed");
-    } catch (error) {
-        console.error("❌ Database initialization failed, but continuing...", error);
-        // Don't exit, continue without database for now
+    // Handle WebSocket upgrade on /ws
+    if (url.pathname === "/ws") {
+        const upgrade = request.headers.get("upgrade");
+        if (upgrade?.toLowerCase() === "websocket") {
+            try {
+                const { socket, response } = Deno.upgradeWebSocket(request);
+                webSocketService.handleConnection(socket);
+                return response;
+            } catch (error) {
+                console.error("❌ WebSocket upgrade failed:", error);
+                return new Response(JSON.stringify({
+                    error: "WebSocket upgrade failed",
+                    details: error instanceof Error ? error.message : "Unknown error"
+                }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+            }
+        }
     }
     
-    // Start separate WebSocket server for local development
-    if (config.isDev) {
-        console.log("🔄 Starting WebSocket server...");
-        startWebSocketServer().catch(error => {
-            console.error("❌ Failed to start WebSocket server:", error);
-            console.warn("⚠️  Continuing without WebSocket server");
+    // Handle health check
+    if (url.pathname === "/health") {
+        return new Response(JSON.stringify({
+            status: "ok",
+            timestamp: new Date().toISOString(),
+            database: mongodb.isHealthy() ? "connected" : "disconnected",
+            websocket: "integrated",
+            connections: webSocketService.getConnectionCount()
+        }), {
+            headers: { "Content-Type": "application/json" }
         });
     }
     
+    // Handle all other requests through Oak
+    return await oakHandler(request);
+}
+
+// Graceful shutdown
+async function gracefulShutdown() {
+    console.log("🛑 Shutting down server...");
+    await mongodb.disconnect();
+    Deno.exit(0);
+}
+
+// Handle shutdown signals
+Deno.addSignalListener("SIGINT", gracefulShutdown);
+if (Deno.build.os !== "windows") {
+    Deno.addSignalListener("SIGTERM", gracefulShutdown);
+}
+
+// Start the server
+async function startServer() {
+    console.log("🔄 Initializing server...");
+    
+    await initializeDatabase();
+    
     const port = config.port;
-    console.log(`🚀 HTTP Server starting on port ${port}...`);
+    console.log(`🚀 Starting server on port ${port}...`);
     
     try {
-        console.log("🔄 Binding to port...");
-        await app.listen({ port });
-        console.log(`✅ HTTP Server running on http://localhost:${port}`);
-        console.log(`🔌 WebSocket server running on ws://localhost:${config.socketPort}/ws`);
+        await Deno.serve({
+            port: port,
+            hostname: "0.0.0.0",
+        }, handleRequest);
+        
+        console.log(`✅ Server running on http://localhost:${port}`);
+        console.log(`🔌 WebSocket endpoint: ws://localhost:${port}/ws`);
         console.log(`🏥 Health check: http://localhost:${port}/health`);
         console.log(`🌐 Auth endpoint: http://localhost:${port}/auth/google`);
     } catch (error) {
-        console.error("❌ Failed to start HTTP server:", error);
-        console.error("Error details:", error);
+        console.error("❌ Failed to start server:", error);
         
         if (error.message?.includes('EADDRINUSE')) {
-            console.log("💡 Port 8000 is already in use. Try:");
-            console.log("   - Close other applications using port 8000");
+            console.log("💡 Port is already in use. Try:");
+            console.log("   - Close other applications using the port");
             console.log("   - Or change PORT in .env file");
         }
         
@@ -161,7 +166,7 @@ async function startServer() {
     }
 }
 
-startServer().catch((error) => {
-    console.error("❌ Failed to start server:", error);
-    Deno.exit(1);
-});
+// Start the server
+if (import.meta.main) {
+    await startServer();
+}
