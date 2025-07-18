@@ -8,7 +8,7 @@
         "host": "vite --host",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "server": "deno run --allow-net --allow-env --allow-read --env-file=server/.env --watch server/index.ts",
+        "server": "deno run --A --env-file=server/.env --watch server/index.ts",
         "server:ws": "deno run --allow-net --allow-env --allow-read --env-file=server/.env --watch server/src/websocket-server.ts",
         "server:local": "deno serve --allow-net --allow-env --allow-read --env-file=server/.env --port 8000 server/deploy.ts"
     },
