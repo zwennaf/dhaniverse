@@ -7,25 +7,33 @@ export const config = {
   serverDomain: Deno.env.get("SERVER_DOMAIN") || "localhost",
   jwtSecret: Deno.env.get("JWT_SECRET") || "your-jwt-secret-key-change-this-in-production",
   
-  // MongoDB Configuration
+  // MongoDB Configuration - Atlas only
   mongodb: {
-    url: Deno.env.get("MONGODB_URI") || "mongodb://localhost:27017",
-    dbName: "dhaniverse"
+    url: Deno.env.get("MONGODB_URI"),
+    dbName: Deno.env.get("DB_NAME") || "dhaniverse"
   },
   
   corsOrigins: isDev 
     ? ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:4173"]
-    : ["https://dhaniverse.vercel.app", "https://dhaniverse-git-main-gursimrans-projects-bb3ba6b6.vercel.app"],
+    : ["https://dhaniverse.vercel.app"],
   
   isDev
 };
 
-// Validate required environment variables
-if (!config.mongodb.url) {
-  console.error("❌ MONGODB_URI environment variable is required!");
-  Deno.exit(1);
-}
-
+// Validate JWT secret
 if (config.jwtSecret === "your-jwt-secret-key-change-this-in-production") {
   console.warn("⚠️  Warning: Using default JWT secret. Set JWT_SECRET environment variable for production!");
+  if (!isDev) {
+    console.error("❌ JWT_SECRET must be set in production!");
+    Deno.exit(1);
+  }
 }
+
+// Log configuration (without sensitive data)
+console.log("🔧 Server Configuration:");
+console.log(`   Environment: ${isDev ? 'Development' : 'Production'}`);
+console.log(`   Port: ${config.port}`);
+console.log(`   WebSocket Port: ${config.socketPort}`);
+console.log(`   Database: ${config.mongodb.dbName}`);
+console.log(`   MongoDB Atlas: ✅ Configured`);
+console.log(`   JWT Secret: ${config.jwtSecret !== 'your-jwt-secret-key-change-this-in-production' ? '✅ Configured' : '⚠️  Using default'}`);

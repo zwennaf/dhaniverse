@@ -33,8 +33,13 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id',
         callback: async (response: any) => {
           try {
+            console.log('Google sign-in response:', response);
             // The response contains the JWT token from Google
             const token = response.credential;
+            console.log('Google token received:', token ? 'Token present' : 'No token');
+            if (!token) {
+              throw new Error('No credential received from Google');
+            }
             onSuccess(token);
           } catch (error) {
             console.error('Google sign-in callback error:', error);

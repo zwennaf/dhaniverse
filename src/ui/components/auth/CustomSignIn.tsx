@@ -83,10 +83,12 @@ const CustomSignIn = () => {
   const { signIn, signInWithGoogle, isLoaded } = useAuth();  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  // Clear error on input change
+  // Clear error and success messages on input change
   useEffect(() => {
     if (error) setError('');
+    if (success) setSuccess('');
   }, [email, password]);
 
   // Default loading screen with improved feedback
@@ -102,11 +104,20 @@ const CustomSignIn = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
     
     const result = await signIn(email, password);
     
     if (result.success) {
-      navigate('/profile');
+      if (result.isNewUser && result.message) {
+        setSuccess(result.message);
+        // Give user a moment to see the success message before navigating
+        setTimeout(() => {
+          navigate('/profile');
+        }, 2000);
+      } else {
+        navigate('/profile');
+      }
     } else {
       setError(result.error || 'Sign in failed');
     }
@@ -153,6 +164,13 @@ const CustomSignIn = () => {
           </div>
         )}
         
+        {/* Success message styling */}
+        {success && (
+          <div className="text-green-400 text-sm font-tickerbit p-2 mb-2 border border-green-400 rounded bg-green-900/20">
+            ✅ {success}
+          </div>
+        )}
+        
         <input
           type="email"
           value={email}
@@ -169,7 +187,7 @@ const CustomSignIn = () => {
           required
           className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
         />        <PixelButton type="submit" disabled={loading} className="w-full">
-          {loading ? 'Signing In...' : 'Sign In'}
+          {loading ? 'Signing In...' : 'Sign In / Create Account'}
         </PixelButton>
         
         <div className="flex items-center justify-center my-4">
@@ -182,12 +200,17 @@ const CustomSignIn = () => {
           onSuccess={handleGoogleSuccess}
           onError={handleGoogleError}
           disabled={loading}
-        />        <p className="text-center text-dhani-text/70 text-sm font-robert">
-          Don't have an account?{' '}
-          <Link to="/sign-up" className="text-dhani-gold hover:underline hover:text-dhani-gold/80">
-            Sign Up
-          </Link>
-        </p>
+        />        <div className="text-center space-y-2">
+          <p className="text-dhani-text/60 text-xs font-robert">
+            New to Dhaniverse? Just enter your email and password above - we'll create your account automatically!
+          </p>
+          <p className="text-dhani-text/70 text-sm font-robert">
+            Or{' '}
+            <Link to="/sign-up" className="text-dhani-gold hover:underline hover:text-dhani-gold/80">
+              create account manually
+            </Link>
+          </p>
+        </div>
       </form>
     </div>
   );

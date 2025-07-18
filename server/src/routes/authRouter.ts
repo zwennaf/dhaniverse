@@ -1,6 +1,5 @@
-import { Router } from "https://deno.land/x/oak@v17.1.3/mod.ts";
-import { ObjectId } from "npm:mongodb@5.6.0";
-import { config } from "../config/config.ts";
+import { Router, Context } from "oak";
+import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
 import { createToken, verifyToken } from "../auth/jwt.ts";
 import type { UserDocument } from "../db/schemas.ts";
@@ -17,7 +16,7 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 // Manual CORS middleware for auth routes
-authRouter.use(async (ctx, next) => {
+authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
   // Set CORS headers
   ctx.response.headers.set("Access-Control-Allow-Origin", "*");
   ctx.response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -34,8 +33,15 @@ authRouter.use(async (ctx, next) => {
 });
 
 // Register endpoint
-authRouter.post("/auth/register", async (ctx) => {
+authRouter.post("/auth/register", async (ctx: Context) => {
   try {
+    // Check database connection first
+    if (!mongodb.isHealthy()) {
+      ctx.response.status = 503;
+      ctx.response.body = { error: "Database service unavailable" };
+      return;
+    }
+
     const body = await ctx.request.body.json();
     const { email, password, gameUsername } = body;
 
@@ -100,11 +106,18 @@ authRouter.post("/auth/register", async (ctx) => {
   }
 });
 
-// Login endpoint
-authRouter.post("/auth/login", async (ctx) => {
+// Login endpoint with auto-registration for new users
+authRouter.post("/auth/login", async (ctx: Context) => {
   try {
+    // Check database connection first
+    if (!mongodb.isHealthy()) {
+      ctx.response.status = 503;
+      ctx.response.body = { error: "Database service unavailable" };
+      return;
+    }
+
     const body = await ctx.request.body.json();
-    const { email, password } = body;
+    const { email, password, autoRegister } = body;
 
     if (!email || !password) {
       ctx.response.status = 400;
@@ -113,15 +126,61 @@ authRouter.post("/auth/login", async (ctx) => {
     }
 
     // Find user
-    const user = await mongodb.findUserByEmail(email);
+    let user = await mongodb.findUserByEmail(email);
 
     if (!user) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Invalid email or password" };
-      return;
+      // If autoRegister is enabled, create a new user
+      if (autoRegister) {
+        // Validate password for new user
+        if (password.length < 6) {
+          ctx.response.status = 400;
+          ctx.response.body = { error: "Password must be at least 6 characters for new account" };
+          return;
+        }
+
+        // Generate a default game username from email
+        const defaultGameUsername = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
+        
+        // Ensure the generated username is unique
+        let gameUsername = defaultGameUsername;
+        let counter = 1;
+        while (await mongodb.findUserByGameUsername(gameUsername)) {
+          gameUsername = defaultGameUsername + '_' + counter;
+          counter++;
+        }
+
+        // Create new user
+        const passwordHash = await hashPassword(password);
+        user = await mongodb.createUser({
+          email,
+          passwordHash,
+          gameUsername,
+          createdAt: new Date()
+        });
+
+        // Create session token
+        const token = await createToken(user.id);
+
+        ctx.response.status = 201;
+        ctx.response.body = {
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            gameUsername: user.gameUsername
+          },
+          isNewUser: true,
+          message: "Account created successfully! You can change your username in your profile."
+        };
+        return;
+      } else {
+        ctx.response.status = 401;
+        ctx.response.body = { error: "Invalid email or password" };
+        return;
+      }
     }
 
-    // Verify password
+    // Verify password for existing user
     const passwordHash = await hashPassword(password);
     if (passwordHash !== user.passwordHash) {
       ctx.response.status = 401;
@@ -138,7 +197,8 @@ authRouter.post("/auth/login", async (ctx) => {
         id: user.id,
         email: user.email,
         gameUsername: user.gameUsername
-      }
+      },
+      isNewUser: false
     };
   } catch (error) {
     ctx.response.status = 500;
@@ -148,7 +208,7 @@ authRouter.post("/auth/login", async (ctx) => {
 });
 
 // Get current user endpoint
-authRouter.get("/auth/me", async (ctx) => {
+authRouter.get("/auth/me", async (ctx: Context) => {
   try {
     const authHeader = ctx.request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -189,7 +249,7 @@ authRouter.get("/auth/me", async (ctx) => {
 });
 
 // Update user profile endpoint
-authRouter.put("/auth/profile", async (ctx) => {
+authRouter.put("/auth/profile", async (ctx: Context) => {
   try {
     const authHeader = ctx.request.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -259,7 +319,7 @@ authRouter.put("/auth/profile", async (ctx) => {
 });
 
 // Google OAuth endpoints
-authRouter.get("/auth/google", (ctx) => {
+authRouter.get("/auth/google", (ctx: Context) => {
   ctx.response.body = {
     message: "Google OAuth endpoint. Use POST with googleToken to authenticate.",
     method: "POST",
@@ -267,7 +327,7 @@ authRouter.get("/auth/google", (ctx) => {
   };
 });
 
-authRouter.post("/auth/google", async (ctx) => {
+authRouter.post("/auth/google", async (ctx: Context) => {
   try {
     const body = await ctx.request.body.json();
     const { googleToken } = body;
@@ -334,7 +394,8 @@ async function verifyGoogleToken(token: string): Promise<{ email: string; sub: s
   try {
     // For Google ID tokens (JWT), we should use the tokeninfo endpoint for id_token
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-    if (!response.ok) {      return null;
+    if (!response.ok) {
+      return null;
     }
     const data = await response.json();
     

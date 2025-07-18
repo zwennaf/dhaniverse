@@ -1,4 +1,4 @@
-import { create, verify } from "https://deno.land/x/djwt@v3.0.1/mod.ts";
+import { create, verify } from "djwt";
 import { config } from "../config/config.ts";
 
 // Helper function to create JWT token
