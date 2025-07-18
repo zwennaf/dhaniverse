@@ -12,7 +12,7 @@ export const Constants = {
     // WebSocket settings - dynamic URL based on environment
     get WS_SERVER_URL() {
         if (import.meta.env.DEV) {
-            return "ws://localhost:8001/ws";
+            return "ws://localhost:8000/ws";
         }
         
         // For production, determine the correct WebSocket URL
@@ -22,7 +22,7 @@ export const Constants = {
             
             // If deployed on Vercel (frontend), use the API domain
             if (host.includes('vercel.app')) {
-                return 'wss://dhaniverse-api.deno.dev/ws';
+                return 'wss://dhaniverseapi.deno.dev/ws';
             }
             
             // If deployed on the same domain (Deno Deploy), use same domain
@@ -30,7 +30,7 @@ export const Constants = {
         }
         
         // Fallback
-        return 'wss://dhaniverse-api.deno.dev/ws';
+        return 'wss://dhaniverseapi.deno.dev/ws';
     },
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
