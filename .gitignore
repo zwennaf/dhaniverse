@@ -24,5 +24,5 @@ dist-ssr
 *.sw?
 
 .vercel
-public/maps/finapmap.png
-public/maps/
+
+public/maps/fullmap
