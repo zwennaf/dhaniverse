@@ -5,20 +5,23 @@ interface GameHUDProps {
     username?: string;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({
-    rupees = 25000,
-    username = "Player",
-}) => {
+const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
         { id: string; username: string; message: string }[]
     >([]);
     const [chatInput, setChatInput] = useState("");
-    const [isChatOpen, setIsChatOpen] = useState(false);
-    const [isTyping, setIsTyping] = useState(false);
+    // Always show chat window, but control focus state - start unfocused
+    const [isChatFocused, setIsChatFocused] = useState(false);
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
+
+    // Ensure initial state is correct
+    useEffect(() => {
+        // Make sure typing is disabled initially
+        window.dispatchEvent(new Event("typing-end"));
+    }, []);
 
     // Listen for rupee updates
     useEffect(() => {
@@ -38,10 +41,55 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // Listen for incoming chat messages
     useEffect(() => {
+        // Track message IDs to prevent duplicates
+        const processedMessageIds = new Set<string>();
+
         const handleChat = (e: any) => {
+            console.log("Received chat message:", e.detail);
             const { id, username, message } = e.detail;
-            setChatMessages((prev) => [...prev, { id, username, message }]);
-            setIsChatOpen(true);
+
+            if (!message) {
+                console.warn(
+                    "Received chat message with no content:",
+                    e.detail
+                );
+                return;
+            }
+
+            // Generate a unique ID if none provided
+            const messageId =
+                id ||
+                `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+            // Skip if we've already processed this message
+            if (processedMessageIds.has(messageId)) {
+                console.log("Skipping duplicate message:", messageId);
+                return;
+            }
+
+            // Add to processed set
+            processedMessageIds.add(messageId);
+
+            // If set gets too large, remove oldest entries
+            if (processedMessageIds.size > 100) {
+                const iterator = processedMessageIds.values();
+                const firstValue = iterator.next().value;
+                if (firstValue) {
+                    processedMessageIds.delete(firstValue);
+                }
+            }
+
+            setChatMessages((prev) => {
+                // Keep only the last 50 messages to prevent memory issues
+                const newMessages = [
+                    ...prev,
+                    { id: messageId, username, message },
+                ];
+                if (newMessages.length > 50) {
+                    return newMessages.slice(-50);
+                }
+                return newMessages;
+            });
         };
 
         window.addEventListener("chat-message" as any, handleChat);
@@ -68,11 +116,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
             }
 
             // Open chat with "/"
-            if (e.key === "/" && !isTyping) {
+            if (e.key === "/" && !isChatFocused) {
                 e.preventDefault();
-                setIsChatOpen(true);
-                setIsTyping(true);
-                window.dispatchEvent(new Event("typing-start"));
+                setIsChatFocused(true);
 
                 setTimeout(() => {
                     if (chatInputRef.current) {
@@ -84,10 +130,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
             }
 
             // Close chat with Escape (only if we're typing)
-            if (e.key === "Escape" && isTyping) {
+            if (e.key === "Escape" && isChatFocused) {
                 e.preventDefault();
-                setIsTyping(false);
-                window.dispatchEvent(new Event("typing-end"));
+                setIsChatFocused(false);
 
                 if (chatInputRef.current) {
                     chatInputRef.current.blur();
@@ -98,25 +143,29 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isTyping]);
+    }, [isChatFocused]);
 
     // Handle chat input focus/blur
     const handleChatFocus = () => {
-        setIsTyping(true);
+        console.log("Chat input focused - sending typing-start");
+        setIsChatFocused(true);
+        // Send typing-start ONLY when the input is actually focused
         window.dispatchEvent(new Event("typing-start"));
     };
 
     const handleChatBlur = () => {
-        setIsTyping(false);
+        console.log("Chat input blurred - sending typing-end");
+        setIsChatFocused(false);
+        // Send typing-end when the input loses focus
         window.dispatchEvent(new Event("typing-end"));
     };
 
     // Handle chat input key events
     const handleChatKeyDown = (e: React.KeyboardEvent) => {
+        // Don't prevent default for WASD keys - let them work normally in the input
         if (e.key === "Escape") {
             e.preventDefault();
-            setIsTyping(false);
-            window.dispatchEvent(new Event("typing-end"));
+            setIsChatFocused(false);
             chatInputRef.current?.blur();
         }
 
@@ -144,16 +193,30 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 <span>{currentRupees}</span>
             </div>
 
-            {/* Chat window */}
-            {isChatOpen && (
-                <div className="absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-[14px] text-white pointer-events-auto backdrop-blur">
-                    <div
-                        className="flex-1 overflow-y-auto mb-1 break-words max-w-fit"
-                        ref={messagesRef}
-                    >
-                        {chatMessages.map((msg, idx) => (
+            {/* Chat window - always visible */}
+            <div
+                className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-[14px] text-white pointer-events-auto backdrop-blur transition-opacity duration-300 ${
+                    isChatFocused ? "opacity-100" : "opacity-60"
+                }`}
+            >
+                <div
+                    className="h-[20vh] overflow-y-auto mb-1 break-words max-w-fit"
+                    ref={messagesRef}
+                >
+                    {chatMessages.length === 0 ? (
+                        <div className="text-gray-400 italic">
+                            No messages yet. Press / to chat.
+                        </div>
+                    ) : (
+                        chatMessages.map((msg, idx) => (
                             <div key={idx} className="mb-0.5 leading-[1.2]">
-                                <span className="text-dhani-green text-lg tracking-tighter">
+                                <span
+                                    className={`text-lg tracking-tighter ${
+                                        msg.username === "System"
+                                            ? "text-blue-300"
+                                            : "text-dhani-green"
+                                    }`}
+                                >
                                     {msg.username}:
                                 </span>
                                 <span className="tracking-wider">
@@ -161,22 +224,24 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                     {msg.message}
                                 </span>
                             </div>
-                        ))}
-                    </div>
-
-                    <input
-                        ref={chatInputRef}
-                        className="w-full px-1.5 py-1 border-none rounded bg-white/10 text-[14px] text-white outline-none placeholder-white/60"
-                        type="text"
-                        placeholder="Type a message..."
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onFocus={handleChatFocus}
-                        onBlur={handleChatBlur}
-                        onKeyDown={handleChatKeyDown}
-                    />
+                        ))
+                    )}
                 </div>
-            )}
+
+                <input
+                    ref={chatInputRef}
+                    className="w-full px-1.5 py-1 border-none rounded bg-white/10 text-[14px] text-white outline-none placeholder-white/60"
+                    type="text"
+                    placeholder={
+                        isChatFocused ? "Type a message..." : "Press / to chat"
+                    }
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onFocus={handleChatFocus}
+                    onBlur={handleChatBlur}
+                    onKeyDown={handleChatKeyDown}
+                />
+            </div>
         </div>
     );
 };

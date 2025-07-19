@@ -222,8 +222,9 @@ window.addEventListener("resize", () => {
 // Simple, focused browser key prevention - only prevent truly problematic browser shortcuts
 window.addEventListener("keydown", (event) => {
     const gameContainer = document.getElementById("game-container");
-    const isGameActive = game && gameContainer && gameContainer.style.display !== "none";
-    
+    const isGameActive =
+        game && gameContainer && gameContainer.style.display !== "none";
+
     if (isGameActive) {
         // Only prevent specific browser shortcuts that cause major issues
         // Keep this list minimal to avoid conflicts
@@ -232,13 +233,16 @@ window.addEventListener("keydown", (event) => {
             "F11", // Fullscreen
             "F12", // Dev tools
         ];
-        
+
         // Prevent Ctrl+key combinations that interfere
-        if (event.ctrlKey && ["r", "R", "f", "F", "u", "U"].includes(event.key)) {
+        if (
+            event.ctrlKey &&
+            ["r", "R", "f", "F", "u", "U"].includes(event.key)
+        ) {
             event.preventDefault();
             return;
         }
-        
+
         if (problematicKeys.includes(event.key)) {
             event.preventDefault();
         }

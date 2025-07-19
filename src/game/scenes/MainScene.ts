@@ -354,7 +354,7 @@ export class MainScene extends Scene implements MainGameScene {
     
     // Add loading text
     this.progressText = this.add.text(width / 2, height / 2 - 50, 'Loading...', {
-      fontFamily: 'Arial',
+      fontFamily: 'Pixeloid',
       fontSize: '32px',
       color: '#ffffff'
     }).setOrigin(0.5);
@@ -431,11 +431,13 @@ export class MainScene extends Scene implements MainGameScene {
 
   // Handle typing state
   private handleTypingStart(): void {
+    console.log("MainScene: Typing started - disabling movement");
     this.isTyping = true;
     // Don't disable the keyboard - just use the isTyping flag to prevent movement
   }
 
   private handleTypingEnd(): void {
+    console.log("MainScene: Typing ended - enabling movement");
     this.isTyping = false;
     // No need to re-enable the keyboard since we never disabled it
   }

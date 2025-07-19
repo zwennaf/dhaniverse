@@ -89,7 +89,16 @@ async function handleRequest(request: Request): Promise<Response> {
         if (upgrade?.toLowerCase() === "websocket") {
             try {
                 const { socket, response } = Deno.upgradeWebSocket(request);
-                webSocketService.handleConnection(socket);
+                
+                // Get client IP address
+                const forwardedFor = request.headers.get("x-forwarded-for");
+                const ip = forwardedFor ? 
+                    forwardedFor.split(",")[0].trim() : 
+                    request.headers.get("cf-connecting-ip") || "unknown";
+                
+                // Pass the IP to the WebSocketService
+                webSocketService.handleConnection(socket, undefined, ip);
+                
                 return response;
             } catch (error) {
                 console.error("❌ WebSocket upgrade failed:", error);
