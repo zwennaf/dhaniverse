@@ -598,10 +598,10 @@ export class ChunkedMapManager {
         if (player) {
             const playerPos = player.getPosition();
 
-            // Calculate movement direction for tracking purposes only
+            // Calculate movement direction for the preloading system
             this.updateMovementDirection(playerPos);
 
-            // Only update visibility if player has moved to a different chunk
+            // Only update chunks if player has moved to a different chunk
             const currentChunk = this.getChunkCoordForPosition(
                 playerPos.x,
                 playerPos.y
@@ -612,12 +612,12 @@ export class ChunkedMapManager {
             );
 
             if (this.lastCheckedChunkId !== currentChunkId) {
-                // Only update what's visible, don't trigger loading here
-                this.updateVisibleChunksDisplay(playerPos.x, playerPos.y);
+                // Use smart visibility system that staggers loading
+                this.updateVisibleChunks(playerPos.x, playerPos.y);
                 this.lastCheckedChunkId = currentChunkId;
 
-                // Optimize rendering after chunk changes
-                this.optimizeRendering();
+                // Optimize rendering after chunk changes (with delay to avoid conflicts)
+                setTimeout(() => this.optimizeRendering(), 500);
             }
         }
     }
@@ -644,15 +644,29 @@ export class ChunkedMapManager {
 
         const chunkId = this.getChunkId(chunkX, chunkY);
 
-        // Check if we're already at max concurrent loads
-        if (
-            this.loadingChunks.size >= this.maxConcurrentLoads &&
-            priority === "low"
-        ) {
-            console.log(
-                `Skipping low priority chunk ${chunkId} - too many concurrent loads`
-            );
+        // Skip if already loaded or loading
+        if (this.loadedChunks.has(chunkId) || this.loadingChunks.has(chunkId)) {
             return;
+        }
+
+        // Check if we're already at max concurrent loads
+        if (this.loadingChunks.size >= this.maxConcurrentLoads) {
+            if (priority === "low") {
+                console.log(
+                    `Deferring low priority chunk ${chunkId} - too many concurrent loads`
+                );
+                // Defer low priority chunks when system is busy
+                setTimeout(() => {
+                    this.loadChunkByIdWithPriority(chunkX, chunkY, priority);
+                }, 1000 + Math.random() * 1000); // Random delay to spread load
+                return;
+            } else {
+                // For high priority, wait a bit and try again
+                setTimeout(() => {
+                    this.loadChunkByIdWithPriority(chunkX, chunkY, priority);
+                }, 200);
+                return;
+            }
         }
 
         // Mark as loading to prevent duplicate loads
@@ -664,22 +678,16 @@ export class ChunkedMapManager {
         );
         if (chunkMetadata) {
             try {
+                // Add a small delay for low priority chunks to prevent rapid loading
                 if (priority === "low") {
-                    // Use setTimeout to defer low priority loading
-                    setTimeout(async () => {
-                        try {
-                            await this.loadChunkSimple(chunkMetadata);
-                        } finally {
-                            this.loadingChunks.delete(chunkId);
-                        }
-                    }, 100);
-                } else {
-                    await this.loadChunkSimple(chunkMetadata);
-                    this.loadingChunks.delete(chunkId);
+                    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
                 }
+                
+                await this.loadChunkSimple(chunkMetadata);
             } catch (error) {
+                console.warn(`Failed to load chunk ${chunkId}:`, error);
+            } finally {
                 this.loadingChunks.delete(chunkId);
-                throw error;
             }
         } else {
             console.warn(`Chunk metadata not found for ${chunkId}`);
@@ -844,6 +852,9 @@ export class ChunkedMapManager {
         // Reset building state immediately
         this.isInBuilding = false;
         this.currentBuildingType = null;
+
+        // Restart smart loading when exiting building
+        this.startContinuousLoading();
 
         // Clean up interior map
         if ((this as any).currentInteriorMap) {
@@ -1135,5 +1146,30 @@ export class ChunkedMapManager {
         console.log(
             `Cleanup complete. Loaded chunks: ${this.loadedChunks.size}, Max: ${this.maxLoadedChunks}`
         );
+    }
+
+    // Cleanup method for proper disposal
+    public destroy(): void {
+        console.log("Destroying ChunkedMapManager...");
+        
+        // Stop continuous loading
+        this.stopContinuousLoading();
+        
+        // Clear all chunks
+        this.loadedChunks.clear();
+        this.loadingChunks.clear();
+        this.visibleChunks.clear();
+        this.chunkAccessTimes.clear();
+        this.failedChunks.clear();
+        
+        // Clear preload queue
+        this.clearPreloadQueue();
+        
+        // Clean up container
+        if (this.mapContainer) {
+            this.mapContainer.clearAllChunks();
+        }
+        
+        console.log("ChunkedMapManager destroyed");
     }
 }
