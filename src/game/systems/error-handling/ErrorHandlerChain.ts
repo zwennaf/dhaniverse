@@ -10,10 +10,7 @@ export class ErrorHandlerChain {
 
   constructor() {
     this.logger = new ErrorLogger();
-    this.setupChain();
-  }
-
-  private setupChain(): void {
+    
     // Create handlers
     const retryHandler = new RetryHandler(3, 1000, 10000);
     const fallbackHandler = new FallbackHandler();
@@ -47,7 +44,8 @@ export class ErrorHandlerChain {
       console.error(`Error handler chain failed for chunk ${error.chunkId}:`, handlerError);
       
       // Log the handler failure
-      this.logger.logError(error, false, `Handler chain failed: ${handlerError.message}`);
+      const errorMessage = handlerError instanceof Error ? handlerError.message : String(handlerError);
+      this.logger.logError(error, false, `Handler chain failed: ${errorMessage}`);
       
       return {
         handled: false,
