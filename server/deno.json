@@ -17,6 +17,6 @@
       "**/node_modules"
     ],
     "include": [],
-    "entrypoint": "deploy.ts"
+    "entrypoint": "index.ts"
   }
 }
