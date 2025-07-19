@@ -1,394 +1,1139 @@
-import { Scene, GameObjects, Cameras } from 'phaser';
-import { MainGameScene } from '../scenes/MainScene.ts';
+import { Scene, GameObjects, Cameras } from "phaser";
+import { MainGameScene } from "../scenes/MainScene.ts";
+import { PhaserChunkContainer } from "./PhaserChunkContainer.ts";
+import { PreloadingManager } from "./preloading/PreloadingManager.ts";
+import { PreloadingConfig } from "./preloading/IPreloadingStrategy.ts";
+import { ErrorHandlerChain } from "./error-handling/ErrorHandlerChain.ts";
 
 interface MapCache {
-  width: number;
-  height: number;
+    width: number;
+    height: number;
 }
 
 interface ChunkMetadata {
-  id: string;
-  x: number;
-  y: number;
-  pixelX: number;
-  pixelY: number;
-  width: number;
-  height: number;
-  filename: string;
+    id: string;
+    x: number;
+    y: number;
+    pixelX: number;
+    pixelY: number;
+    width: number;
+    height: number;
+    filename: string;
 }
 
 interface ChunkedMapMetadata {
-  version: number;
-  totalWidth: number;
-  totalHeight: number;
-  chunkWidth: number;
-  chunkHeight: number;
-  chunksX: number;
-  chunksY: number;
-  chunks: ChunkMetadata[];
+    version: number;
+    totalWidth: number;
+    totalHeight: number;
+    chunkWidth: number;
+    chunkHeight: number;
+    chunksX: number;
+    chunksY: number;
+    chunks: ChunkMetadata[];
 }
 
 // Extended camera interface to support zoom constraint properties
 export interface ExtendedCamera extends Cameras.Scene2D.Camera {
-  _origMinZoom?: number;
-  _origMaxZoom?: number;
-  minZoom?: number;
-  maxZoom?: number;
+    _origMinZoom?: number;
+    _origMaxZoom?: number;
+    minZoom?: number;
+    maxZoom?: number;
 }
 
 export class ChunkedMapManager {
-  private scene: MainGameScene;
-  private mapContainer: GameObjects.Container;
-  private mapCache: MapCache;
-  private isInBuilding: boolean = false;
-  private currentBuildingType: 'bank' | 'stockmarket' | null = null;
-  private lastOutdoorPosition: { x: number, y: number } | null = null;
-  private textureLoadPromises: Map<string, Promise<void>> = new Map();
-  
-  // Chunk management
-  private chunkMetadata: ChunkedMapMetadata | null = null;
-  private loadedChunks: Map<string, GameObjects.Image> = new Map();
+    private scene: MainGameScene;
+    private mapContainer: PhaserChunkContainer;
+    private mapCache: MapCache;
+    private isInBuilding: boolean = false;
+    private currentBuildingType: "bank" | "stockmarket" | null = null;
+    private lastOutdoorPosition: { x: number; y: number } | null = null;
+    private textureLoadPromises: Map<string, Promise<void>> = new Map();
 
-  constructor(scene: MainGameScene) {
-    this.scene = scene;
+    // Chunk management
+    private chunkMetadata: ChunkedMapMetadata | null = null;
+    private loadedChunks: Map<string, GameObjects.Image> = new Map();
+
+    // Dynamic loading system
+    private visibleChunks: Set<string> = new Set();
+    private loadingChunks: Set<string> = new Set();
+    private viewDistance: number = 2; // How many chunks to load in each direction
+    private lastCheckedChunkId: string = "";
     
-    // Create container for map chunks
-    this.mapContainer = scene.add.container(0, 0);
-    
-    // Store map dimensions in cache for quick access (will be set after metadata loads)
-    this.mapCache = {
-      width: 12074, // Default values, will be updated
-      height: 8734
+    // Continuous async loading system
+    private continuousLoadingActive: boolean = false;
+    private loadingInterval: number | null = null;
+    private chunkSize: { width: number; height: number } = {
+        width: 0,
+        height: 0,
     };
-    
-    // Add to game container
-    const gameContainer = scene.getGameContainer();
-    gameContainer.add(this.mapContainer);
-    
-    // Initialize chunks
-    this.initializeChunks();
-    
-    // Preload interior textures to avoid stutter when entering buildings
-    this.preloadTextures();
-  }
+    private lastPlayerPosition: { x: number; y: number } = { x: 0, y: 0 };
+    private playerMovementDirection: { x: number; y: number } = { x: 0, y: 0 };
 
-  private async initializeChunks(): Promise<void> {
-    try {
-      await this.loadChunkMetadata();
-      await this.loadInitialChunks();
-    } catch (error) {
-      console.error('Failed to initialize chunks:', error);
-      this.createFallbackMap();
-    }
-  }
+    // Memory management - reduce to prevent overwhelming the system
+    private maxLoadedChunks: number = 40; // Reduced from 50
+    private maxConcurrentLoads: number = 2; // Reduced from 4 to prevent stuttering
+    private chunkAccessTimes: Map<string, number> = new Map(); // LRU tracking
 
-  private async loadChunkMetadata(): Promise<void> {
-    try {
-      const response = await fetch('/maps/chunks/metadata.json');
-      this.chunkMetadata = await response.json();
-      
-      if (this.chunkMetadata) {
-        // Update map cache with actual dimensions
+    // Error handling
+    private failedChunks: Map<string, number> = new Map(); // Track failed chunks and retry count
+    private maxRetries: number = 3;
+
+    // Preloading system
+    private preloadingManager: PreloadingManager;
+
+    // Error handling system
+    private errorHandler: ErrorHandlerChain;
+
+    constructor(scene: MainGameScene) {
+        this.scene = scene;
+
+        // Create specialized container for map chunks with smooth transitions
+        this.mapContainer = new PhaserChunkContainer(scene, 0, 0);
+
+        // Store map dimensions in cache for quick access (will be set after metadata loads)
         this.mapCache = {
-          width: this.chunkMetadata.totalWidth,
-          height: this.chunkMetadata.totalHeight
+            width: 12074, // Default values, will be updated
+            height: 8734,
         };
-        
-        // Set world bounds
-        this.scene.physics.world.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
-        
-        console.log(`Loaded chunk metadata: ${this.chunkMetadata.chunksX}x${this.chunkMetadata.chunksY} grid`);
-      }
-    } catch (error) {
-      console.error('Failed to load chunk metadata:', error);
-    }
-  }
 
-  private async loadInitialChunks(): Promise<void> {
-    if (!this.chunkMetadata) return;
-    
-    console.log('Loading initial chunks...');
-    
-    // Load only the first 4 chunks for proof of concept
-    const initialChunks = this.chunkMetadata.chunks.slice(0, 4);
-    
-    for (const chunk of initialChunks) {
-      await this.loadChunkSimple(chunk);
-    }
-    
-    console.log(`Loaded ${this.loadedChunks.size} initial chunks`);
-  }
-
-  private async loadChunkSimple(chunk: ChunkMetadata): Promise<void> {
-    try {
-      const textureKey = `chunk_${chunk.id}`;
-      
-      // Skip if already loaded
-      if (this.scene.textures.exists(textureKey)) {
-        this.createChunkImage(chunk, textureKey);
-        return;
-      }
-      
-      // Create a simple image element to load the chunk
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => {
-          try {
-            // Add texture to Phaser
-            this.scene.textures.addImage(textureKey, img);
-            this.createChunkImage(chunk, textureKey);
-            console.log(`✓ Chunk ${chunk.id} loaded`);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
+        // Initialize smart preloading system with gradual loading
+        const preloadConfig: PreloadingConfig = {
+            maxPreloadDistance: 4, // Moderate distance for balanced loading
+            movementThreshold: 3, // Lower threshold for more responsive detection
+            preloadDelay: 150, // Balanced delay for smooth loading
+            priorityRadius: 2, // Focus on immediate area first
         };
+
+        this.preloadingManager = new PreloadingManager(
+            preloadConfig,
+            (chunkX, chunkY) => this.loadChunkByIdWithPriority(chunkX, chunkY, "low"),
+            (chunkId, success, loadTime) => {
+                if (success) {
+                    console.log(`Smart loaded chunk ${chunkId} in ${loadTime}ms`);
+                }
+            }
+        );
+
+        // Initialize error handling system
+        this.errorHandler = new ErrorHandlerChain();
+
+        // Set up global error handling for WebGL issues
+        this.setupGlobalErrorHandling();
+
+        // Add to game container
+        const gameContainer = scene.getGameContainer();
+        gameContainer.add(this.mapContainer);
+
+        // Initialize chunks
+        this.initializeChunks();
+
+        // Preload interior textures to avoid stutter when entering buildings
+        this.preloadTextures();
         
-        img.onerror = () => {
-          reject(new Error(`Failed to load image: /maps/chunks/${chunk.filename}`));
-        };
-        
-        img.src = `/maps/chunks/${chunk.filename}`;
-      });
-      
-    } catch (error) {
-      console.error(`Failed to load chunk ${chunk.id}:`, error);
+        // Start continuous loading system
+        this.startContinuousLoading();
     }
-  }
 
-  private createChunkImage(chunk: ChunkMetadata, textureKey: string): void {
-    // Create image object for this chunk
-    const chunkImage = this.scene.add.image(chunk.pixelX, chunk.pixelY, textureKey);
-    chunkImage.setOrigin(0, 0); // Top-left origin like the original
-    chunkImage.setDepth(-10); // Behind other elements
+    private async initializeChunks(): Promise<void> {
+        try {
+            await this.loadChunkMetadata();
+            await this.loadInitialChunks();
+        } catch (error) {
+            console.error("Failed to initialize chunks:", error);
+            this.createFallbackMap();
+        }
+    }
+
+    private async loadChunkMetadata(): Promise<void> {
+        try {
+            const response = await fetch("/maps/chunks/metadata.json");
+            this.chunkMetadata = await response.json();
+
+            if (this.chunkMetadata) {
+                // Update map cache with actual dimensions
+                this.mapCache = {
+                    width: this.chunkMetadata.totalWidth,
+                    height: this.chunkMetadata.totalHeight,
+                };
+
+                // Set world bounds
+                this.scene.physics.world.setBounds(
+                    0,
+                    0,
+                    this.mapCache.width,
+                    this.mapCache.height
+                );
+
+                console.log(
+                    `Loaded chunk metadata: ${this.chunkMetadata.chunksX}x${this.chunkMetadata.chunksY} grid`
+                );
+            }
+        } catch (error) {
+            console.error("Failed to load chunk metadata:", error);
+        }
+    }
+
+    private async loadInitialChunks(): Promise<void> {
+        if (!this.chunkMetadata) return;
+
+        console.log("Loading initial chunks...");
+
+        // Store chunk size for convenience
+        this.chunkSize = {
+            width: this.chunkMetadata.chunkWidth,
+            height: this.chunkMetadata.chunkHeight,
+        };
+
+        // Get player position for initial chunk loading
+        const player = this.scene.getPlayer();
+        const playerPos = player.getPosition();
+
+        // Update visible chunks based on player position
+        this.updateVisibleChunks(playerPos.x, playerPos.y);
+
+        console.log(`Loaded ${this.loadedChunks.size} initial chunks`);
+    }
+
+    // Smart async loading system
+    private startContinuousLoading(): void {
+        if (this.continuousLoadingActive) return;
+        
+        this.continuousLoadingActive = true;
+        console.log("Starting smart chunk loading system");
+        
+        // Start the smart loading loop with longer intervals to prevent stuttering
+        this.loadingInterval = window.setInterval(() => {
+            this.performSmartLoading();
+        }, 1000); // Load chunks every 1 second for smoother performance
+    }
     
-    // Add to container
-    this.mapContainer.add(chunkImage);
+    private stopContinuousLoading(): void {
+        this.continuousLoadingActive = false;
+        if (this.loadingInterval !== null) {
+            clearInterval(this.loadingInterval);
+            this.loadingInterval = null;
+        }
+        console.log("Stopped smart chunk loading system");
+    }
     
-    // Store reference
-    this.loadedChunks.set(chunk.id, chunkImage);
-  }
+    private performSmartLoading(): void {
+        if (!this.chunkMetadata || this.isInBuilding) return;
+        
+        const player = this.scene.getPlayer();
+        if (!player) return;
+        
+        const playerPos = player.getPosition();
+        
+        // Use the existing preloading manager for smart loading
+        this.preloadingManager.requestPreload(
+            playerPos.x,
+            playerPos.y,
+            this.playerMovementDirection,
+            this.chunkSize,
+            {
+                chunksX: this.chunkMetadata.chunksX,
+                chunksY: this.chunkMetadata.chunksY,
+            },
+            new Set([
+                ...this.loadedChunks.keys(),
+                ...this.loadingChunks,
+            ])
+        );
+    }
 
-  private createFallbackMap(): void {
-    console.log('Creating fallback map...');
-    // Create a simple colored rectangle as fallback
-    const graphics = this.scene.add.graphics();
-    graphics.fillStyle(0x228B22); // Forest green
-    graphics.fillRect(0, 0, this.mapCache.width, this.mapCache.height);
-    graphics.setDepth(-10);
-    this.mapContainer.add(graphics);
-  }
+    private async loadChunkSimple(chunk: ChunkMetadata): Promise<void> {
+        const retryCount = this.failedChunks.get(chunk.id) || 0;
 
-  private preloadTextures(): void {
-    // Make sure the bank interior texture is ready before needed
-    if (!this.scene.textures.exists('interior')) {
-      const bankLoadPromise = new Promise<void>((resolve) => {
-        this.scene.load.once('complete', () => {
-          console.log('Bank interior texture loaded successfully');
-          resolve();
+        try {
+            const textureKey = `chunk_${chunk.id}`;
+
+            // Skip if already loaded
+            if (this.scene.textures.exists(textureKey)) {
+                this.createChunkImage(chunk, textureKey);
+                // Clear any previous failure record
+                this.failedChunks.delete(chunk.id);
+                return;
+            }
+
+            // Create a simple image element to load the chunk
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error(`Timeout loading chunk ${chunk.id}`));
+                }, 10000); // 10 second timeout
+
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    try {
+                        // Add texture to Phaser
+                        this.scene.textures.addImage(textureKey, img);
+                        this.createChunkImage(chunk, textureKey);
+                        console.log(`✓ Chunk ${chunk.id} loaded`);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(
+                        new Error(
+                            `Failed to load image: /maps/chunks/${chunk.filename}`
+                        )
+                    );
+                };
+
+                img.src = `/maps/chunks/${chunk.filename}`;
+            });
+
+            // Clear any previous failure record on success
+            this.failedChunks.delete(chunk.id);
+        } catch (error) {
+            await this.handleChunkLoadError(
+                chunk.id,
+                error as Error,
+                retryCount
+            );
+        }
+    }
+
+    private async handleChunkLoadError(
+        chunkId: string,
+        error: Error,
+        retryCount: number
+    ): Promise<void> {
+        // Determine error type
+        let errorType: "NETWORK" | "TIMEOUT" | "PARSE" | "MEMORY" | "UNKNOWN" =
+            "UNKNOWN";
+
+        if (error.message.includes("Timeout")) {
+            errorType = "TIMEOUT";
+        } else if (error.message.includes("Failed to load image")) {
+            errorType = "NETWORK";
+        } else if (
+            error.message.includes("memory") ||
+            error.message.includes("Memory") ||
+            error.message.includes("glTexture") ||
+            error.message.includes("WebGL")
+        ) {
+            errorType = "MEMORY";
+            // Force cleanup on WebGL/memory errors
+            this.forceCleanup();
+        } else if (
+            error.message.includes("parse") ||
+            error.message.includes("Parse")
+        ) {
+            errorType = "PARSE";
+        }
+
+        // Create error object
+        const chunkError = this.errorHandler.createError(
+            chunkId,
+            errorType,
+            error.message,
+            retryCount,
+            error
+        );
+
+        // Handle the error through the chain
+        const result = await this.errorHandler.handleError(chunkError);
+
+        // Act on the result
+        if (result.shouldRetry && result.retryDelay) {
+            this.failedChunks.set(chunkId, retryCount + 1);
+
+            setTimeout(() => {
+                const chunkMetadata = this.chunkMetadata?.chunks.find(
+                    (c) => c.id === chunkId
+                );
+                if (chunkMetadata) {
+                    this.loadChunkSimple(chunkMetadata);
+                }
+            }, result.retryDelay);
+        } else if (!result.handled) {
+            // Mark as permanently failed
+            this.failedChunks.set(chunkId, retryCount + 1);
+            console.error(
+                `Chunk ${chunkId} failed permanently after error handling`
+            );
+        }
+
+        // Show user message if provided
+        if (result.userMessage) {
+            // Could integrate with a notification system
+            console.info(`User notification: ${result.userMessage}`);
+        }
+    }
+
+    private createChunkImage(chunk: ChunkMetadata, textureKey: string): void {
+        // Create image object for this chunk
+        const chunkImage = this.scene.add.image(
+            chunk.pixelX,
+            chunk.pixelY,
+            textureKey
+        );
+        chunkImage.setOrigin(0, 0); // Top-left origin like the original
+        chunkImage.setDepth(-10); // Behind other elements
+
+        // Add to container with smooth transition
+        this.mapContainer.addChunkWithTransition(chunk.id, chunkImage);
+
+        // Store reference and mark as accessed
+        this.loadedChunks.set(chunk.id, chunkImage);
+        this.markChunkAccessed(chunk.id);
+
+        // Enforce memory limits
+        this.enforceMemoryLimits();
+    }
+
+    private createFallbackMap(): void {
+        console.log("Creating fallback map...");
+        // Create a simple colored rectangle as fallback
+        const graphics = this.scene.add.graphics();
+        graphics.fillStyle(0x228b22); // Forest green
+        graphics.fillRect(0, 0, this.mapCache.width, this.mapCache.height);
+        graphics.setDepth(-10);
+        this.mapContainer.add(graphics);
+    }
+
+    // Dynamic chunk loading methods
+    private getChunkCoordForPosition(
+        x: number,
+        y: number
+    ): { x: number; y: number } {
+        if (!this.chunkMetadata) return { x: 0, y: 0 };
+        const chunkX = Math.floor(x / this.chunkMetadata.chunkWidth);
+        const chunkY = Math.floor(y / this.chunkMetadata.chunkHeight);
+        return { x: chunkX, y: chunkY };
+    }
+
+    private getChunkId(chunkX: number, chunkY: number): string {
+        return `${chunkX}_${chunkY}`;
+    }
+
+    public updateVisibleChunks(playerX: number, playerY: number): void {
+        if (!this.chunkMetadata) return;
+
+        // Get player's current chunk
+        const playerChunk = this.getChunkCoordForPosition(playerX, playerY);
+
+        // Calculate which chunks should be visible
+        const newVisibleChunks = new Set<string>();
+        const criticalChunks: Array<{ x: number, y: number }> = [];
+        const deferredChunks: Array<{ x: number, y: number }> = [];
+
+        // Load chunks in a square around the player
+        for (
+            let y = playerChunk.y - this.viewDistance;
+            y <= playerChunk.y + this.viewDistance;
+            y++
+        ) {
+            for (
+                let x = playerChunk.x - this.viewDistance;
+                x <= playerChunk.x + this.viewDistance;
+                x++
+            ) {
+                // Skip invalid chunks
+                if (
+                    x < 0 ||
+                    y < 0 ||
+                    x >= this.chunkMetadata.chunksX ||
+                    y >= this.chunkMetadata.chunksY
+                ) {
+                    continue;
+                }
+
+                const chunkId = this.getChunkId(x, y);
+                newVisibleChunks.add(chunkId);
+
+                // If this chunk isn't loaded, categorize for loading
+                if (
+                    !this.loadedChunks.has(chunkId) &&
+                    !this.loadingChunks.has(chunkId)
+                ) {
+                    // Critical chunks: current player chunk and immediate neighbors
+                    const distance = Math.abs(x - playerChunk.x) + Math.abs(y - playerChunk.y);
+                    if (distance <= 1) {
+                        criticalChunks.push({ x, y });
+                    } else {
+                        deferredChunks.push({ x, y });
+                    }
+                } else if (this.loadedChunks.has(chunkId)) {
+                    // Mark as accessed for LRU tracking
+                    this.markChunkAccessed(chunkId);
+                }
+            }
+        }
+
+        // Load critical chunks immediately (max 2 to prevent stuttering)
+        const maxCritical = Math.min(2, criticalChunks.length);
+        for (let i = 0; i < maxCritical; i++) {
+            const chunk = criticalChunks[i];
+            this.loadChunkByIdWithPriority(chunk.x, chunk.y, "high");
+        }
+
+        // Defer remaining critical chunks
+        for (let i = maxCritical; i < criticalChunks.length; i++) {
+            const chunk = criticalChunks[i];
+            setTimeout(() => {
+                this.loadChunkByIdWithPriority(chunk.x, chunk.y, "high");
+            }, i * 100); // Stagger loading
+        }
+
+        // Defer all non-critical chunks with longer delays
+        deferredChunks.forEach((chunk, index) => {
+            setTimeout(() => {
+                this.loadChunkByIdWithPriority(chunk.x, chunk.y, "low");
+            }, (index + criticalChunks.length) * 200);
         });
-        this.scene.load.image('interior', 'test.png');
-        
-        // Preload door sound effects
-        if (!this.scene.cache.audio.exists('door-open')) {
-          this.scene.load.audio('door-open', 'assets/sounds/door-open.mp3');
-        }
-        if (!this.scene.cache.audio.exists('door-close')) {
-          this.scene.load.audio('door-close', 'assets/sounds/door-close.mp3');
-        }
-        
-        this.scene.load.start();
-      });
-      this.textureLoadPromises.set('interior', bankLoadPromise);
+
+        // Update visible chunks set
+        this.visibleChunks = newVisibleChunks;
     }
-    
-    // Make sure the stock market interior texture is ready
-    if (!this.scene.textures.exists('stockmarket')) {
-      const stockMarketLoadPromise = new Promise<void>((resolve) => {
-        this.scene.load.once('complete', () => {
-          console.log('Stock market interior texture loaded successfully');
-          resolve();
+
+    // Display-only version that doesn't trigger loading
+    private updateVisibleChunksDisplay(playerX: number, playerY: number): void {
+        if (!this.chunkMetadata) return;
+
+        // Get player's current chunk
+        const playerChunk = this.getChunkCoordForPosition(playerX, playerY);
+
+        // Calculate which chunks should be visible
+        const newVisibleChunks = new Set<string>();
+
+        // Check chunks in a square around the player for visibility only
+        for (
+            let y = playerChunk.y - this.viewDistance;
+            y <= playerChunk.y + this.viewDistance;
+            y++
+        ) {
+            for (
+                let x = playerChunk.x - this.viewDistance;
+                x <= playerChunk.x + this.viewDistance;
+                x++
+            ) {
+                // Skip invalid chunks
+                if (
+                    x < 0 ||
+                    y < 0 ||
+                    x >= this.chunkMetadata.chunksX ||
+                    y >= this.chunkMetadata.chunksY
+                ) {
+                    continue;
+                }
+
+                const chunkId = this.getChunkId(x, y);
+                newVisibleChunks.add(chunkId);
+
+                // Only mark as accessed if already loaded, don't trigger loading
+                if (this.loadedChunks.has(chunkId)) {
+                    this.markChunkAccessed(chunkId);
+                }
+            }
+        }
+
+        // Update visible chunks set
+        this.visibleChunks = newVisibleChunks;
+    }
+
+    private async loadChunkById(chunkX: number, chunkY: number): Promise<void> {
+        return this.loadChunkByIdWithPriority(chunkX, chunkY, "high");
+    }
+
+    // Unload chunks when memory limits are exceeded
+    private unloadChunk(chunkId: string): void {
+        const chunk = this.loadedChunks.get(chunkId);
+        if (chunk) {
+            // Remove from all tracking
+            this.loadedChunks.delete(chunkId);
+            this.chunkAccessTimes.delete(chunkId);
+            
+            // Remove from container with smooth transition
+            this.mapContainer.removeChunkWithTransition(chunkId);
+            
+            console.log(`Unloaded chunk ${chunkId}`);
+        }
+    }
+
+    private enforceMemoryLimits(): void {
+        // Only enforce hard limits when we have way too many chunks
+        const hardLimit = this.maxLoadedChunks * 1.5; // 50% more than normal limit
+        
+        if (this.loadedChunks.size <= hardLimit) return;
+
+        console.log(`Memory pressure detected: ${this.loadedChunks.size} chunks loaded`);
+
+        // Get chunks sorted by last access time (LRU)
+        const sortedChunks = Array.from(this.chunkAccessTimes.entries())
+            .sort((a, b) => a[1] - b[1]) // Sort by access time (oldest first)
+            .map((entry) => entry[0]);
+
+        // Only unload chunks that are not currently visible
+        const chunksToUnload = sortedChunks.filter(
+            (chunkId) => !this.visibleChunks.has(chunkId)
+        );
+        
+        const excessCount = this.loadedChunks.size - this.maxLoadedChunks;
+        const chunksToActuallyUnload = Math.min(excessCount, chunksToUnload.length, 5); // Max 5 at a time
+
+        for (let i = 0; i < chunksToActuallyUnload; i++) {
+            this.unloadChunk(chunksToUnload[i]);
+        }
+        
+        console.log(`Unloaded ${chunksToActuallyUnload} chunks due to memory pressure`);
+    }
+
+    private markChunkAccessed(chunkId: string): void {
+        this.chunkAccessTimes.set(chunkId, Date.now());
+    }
+
+    public update(): void {
+        if (this.isInBuilding) return;
+
+        // Get player position
+        const player = this.scene.getPlayer();
+        if (player) {
+            const playerPos = player.getPosition();
+
+            // Calculate movement direction for tracking purposes only
+            this.updateMovementDirection(playerPos);
+
+            // Only update visibility if player has moved to a different chunk
+            const currentChunk = this.getChunkCoordForPosition(
+                playerPos.x,
+                playerPos.y
+            );
+            const currentChunkId = this.getChunkId(
+                currentChunk.x,
+                currentChunk.y
+            );
+
+            if (this.lastCheckedChunkId !== currentChunkId) {
+                // Only update what's visible, don't trigger loading here
+                this.updateVisibleChunksDisplay(playerPos.x, playerPos.y);
+                this.lastCheckedChunkId = currentChunkId;
+
+                // Optimize rendering after chunk changes
+                this.optimizeRendering();
+            }
+        }
+    }
+
+    private updateMovementDirection(currentPos: {
+        x: number;
+        y: number;
+    }): void {
+        // Calculate movement direction
+        this.playerMovementDirection = {
+            x: currentPos.x - this.lastPlayerPosition.x,
+            y: currentPos.y - this.lastPlayerPosition.y,
+        };
+
+        this.lastPlayerPosition = currentPos;
+    }
+
+    private async loadChunkByIdWithPriority(
+        chunkX: number,
+        chunkY: number,
+        priority: "high" | "low" = "high"
+    ): Promise<void> {
+        if (!this.chunkMetadata) return;
+
+        const chunkId = this.getChunkId(chunkX, chunkY);
+
+        // Check if we're already at max concurrent loads
+        if (
+            this.loadingChunks.size >= this.maxConcurrentLoads &&
+            priority === "low"
+        ) {
+            console.log(
+                `Skipping low priority chunk ${chunkId} - too many concurrent loads`
+            );
+            return;
+        }
+
+        // Mark as loading to prevent duplicate loads
+        this.loadingChunks.add(chunkId);
+
+        // Find the chunk metadata
+        const chunkMetadata = this.chunkMetadata.chunks.find(
+            (c) => c.id === chunkId
+        );
+        if (chunkMetadata) {
+            try {
+                if (priority === "low") {
+                    // Use setTimeout to defer low priority loading
+                    setTimeout(async () => {
+                        try {
+                            await this.loadChunkSimple(chunkMetadata);
+                        } finally {
+                            this.loadingChunks.delete(chunkId);
+                        }
+                    }, 100);
+                } else {
+                    await this.loadChunkSimple(chunkMetadata);
+                    this.loadingChunks.delete(chunkId);
+                }
+            } catch (error) {
+                this.loadingChunks.delete(chunkId);
+                throw error;
+            }
+        } else {
+            console.warn(`Chunk metadata not found for ${chunkId}`);
+            this.loadingChunks.delete(chunkId);
+        }
+    }
+
+    private preloadTextures(): void {
+        // Make sure the bank interior texture is ready before needed
+        if (!this.scene.textures.exists("interior")) {
+            const bankLoadPromise = new Promise<void>((resolve) => {
+                this.scene.load.once("complete", () => {
+                    console.log("Bank interior texture loaded successfully");
+                    resolve();
+                });
+                this.scene.load.image("interior", "test.png");
+
+                // Preload door sound effects
+                if (!this.scene.cache.audio.exists("door-open")) {
+                    this.scene.load.audio(
+                        "door-open",
+                        "assets/sounds/door-open.mp3"
+                    );
+                }
+                if (!this.scene.cache.audio.exists("door-close")) {
+                    this.scene.load.audio(
+                        "door-close",
+                        "assets/sounds/door-close.mp3"
+                    );
+                }
+
+                this.scene.load.start();
+            });
+            this.textureLoadPromises.set("interior", bankLoadPromise);
+        }
+
+        // Make sure the stock market interior texture is ready
+        if (!this.scene.textures.exists("stockmarket")) {
+            const stockMarketLoadPromise = new Promise<void>((resolve) => {
+                this.scene.load.once("complete", () => {
+                    console.log(
+                        "Stock market interior texture loaded successfully"
+                    );
+                    resolve();
+                });
+                this.scene.load.image("stockmarket", "/maps/stockmarket.png");
+                this.scene.load.start();
+            });
+            this.textureLoadPromises.set("stockmarket", stockMarketLoadPromise);
+        }
+    }
+
+    enterBuilding(
+        playerX: number,
+        playerY: number,
+        buildingType: "bank" | "stockmarket" = "bank"
+    ): { x: number; y: number } {
+        try {
+            // Store current position
+            this.lastOutdoorPosition = { x: playerX, y: playerY };
+
+            // Set building state - do this first to prevent any rendering issues
+            this.isInBuilding = true;
+            this.currentBuildingType = buildingType;
+
+            // Stop continuous loading while in building
+            this.stopContinuousLoading();
+
+            // Hide the chunked map container
+            this.mapContainer.setVisible(false);
+
+            // Create temporary single image for interior (same as original logic)
+            const textureKey =
+                buildingType === "bank" ? "interior" : "stockmarket";
+
+            // Create interior map image
+            const interiorMap = this.scene.add.image(0, 0, textureKey);
+            interiorMap.setDepth(-10);
+            interiorMap.setOrigin(0.5, 0.5);
+
+            // Apply a larger scale to make the map bigger
+            const scale = 2.3;
+            interiorMap.setScale(scale);
+
+            // Get the device dimensions
+            const deviceWidth = this.scene.scale.width;
+            const deviceHeight = this.scene.scale.height;
+
+            // Get interior dimensions
+            let interiorWidth = 800;
+            let interiorHeight = 600;
+
+            if (this.scene.textures.exists(textureKey)) {
+                const interiorImage = this.scene.textures.get(textureKey);
+                if (
+                    interiorImage &&
+                    interiorImage.source &&
+                    interiorImage.source[0]
+                ) {
+                    interiorWidth = interiorImage.source[0].width;
+                    interiorHeight = interiorImage.source[0].height;
+                }
+            }
+
+            // Apply scale factor to calculate the actual displayed dimensions
+            const scaledWidth = interiorWidth * scale;
+            const scaledHeight = interiorHeight * scale;
+
+            // Position the interior map precisely at the center
+            const centerX = Math.floor(deviceWidth / 2);
+            const centerY = Math.floor(deviceHeight / 2);
+            interiorMap.setPosition(centerX, centerY);
+
+            // Set camera and physics bounds to match the scaled interior size and position
+            const boundsX = centerX - scaledWidth / 2;
+            const boundsY = centerY - scaledHeight / 2;
+
+            this.scene.physics.world.setBounds(
+                boundsX,
+                boundsY,
+                scaledWidth,
+                scaledHeight
+            );
+
+            this.scene.cameras.main.setBounds(
+                boundsX,
+                boundsY,
+                scaledWidth,
+                scaledHeight
+            );
+
+            // Simple, fixed maxZoom for interior areas
+            const maxZoom = 0.7;
+
+            // Get camera and set zoom
+            const camera = this.scene.cameras.main as ExtendedCamera;
+            camera.setZoom(maxZoom);
+
+            // Store camera settings for restoration later
+            camera._origMinZoom = camera.minZoom || 0.25;
+            camera._origMaxZoom = camera.maxZoom || 2.0;
+
+            // Set both minZoom and maxZoom to the same value to lock zoom
+            camera.minZoom = maxZoom;
+            camera.maxZoom = maxZoom;
+
+            // Store reference to interior map for cleanup
+            (this as any).currentInteriorMap = interiorMap;
+
+            return { x: centerX, y: centerY };
+        } catch (error) {
+            console.error("Error entering building:", error);
+            this.isInBuilding = false;
+            this.currentBuildingType = null;
+            return { x: playerX, y: playerY };
+        }
+    }
+
+    exitBuilding(): { x: number; y: number } | null {
+        if (!this.lastOutdoorPosition) return null;
+
+        // Reset building state immediately
+        this.isInBuilding = false;
+        this.currentBuildingType = null;
+
+        // Clean up interior map
+        if ((this as any).currentInteriorMap) {
+            (this as any).currentInteriorMap.destroy();
+            (this as any).currentInteriorMap = null;
+        }
+
+        // Show the chunked map container again
+        this.mapContainer.setVisible(true);
+
+        // Restore original min/max zoom constraints if they were saved
+        const camera = this.scene.cameras.main as ExtendedCamera;
+
+        if (
+            camera._origMinZoom !== undefined &&
+            camera._origMaxZoom !== undefined
+        ) {
+            camera.minZoom = camera._origMinZoom;
+            camera.maxZoom = camera._origMaxZoom;
+
+            // Reset zoom to a comfortable default value
+            camera.setZoom(0.7);
+        }
+
+        // Reset physics world bounds to outdoor map dimensions
+        this.scene.physics.world.setBounds(
+            0,
+            0,
+            this.mapCache.width,
+            this.mapCache.height
+        );
+
+        // Use the main scene's setupCameraBounds method for consistent camera bounds handling
+        if (this.scene instanceof Scene) {
+            const sceneWithBounds = this.scene as {
+                setupCameraBounds?: () => void;
+            };
+            if (typeof sceneWithBounds.setupCameraBounds === "function") {
+                sceneWithBounds.setupCameraBounds();
+            } else {
+                this.setDefaultCameraBounds();
+            }
+        } else {
+            this.setDefaultCameraBounds();
+        }
+
+        return this.lastOutdoorPosition;
+    }
+
+    // Fallback method for setting camera bounds
+    private setDefaultCameraBounds(): void {
+        const camera = this.scene.cameras.main as ExtendedCamera;
+        const zoom = camera.zoom || 0.7;
+
+        // Calculate the visible area based on zoom level
+        const visibleWidth = camera.width / zoom;
+        const visibleHeight = camera.height / zoom;
+
+        // Calculate the bounds with half the visible area as padding
+        const boundsX = Math.min(visibleWidth / 2, this.mapCache.width / 4);
+        const boundsY = Math.min(visibleHeight / 2, this.mapCache.height / 4);
+        const boundsWidth = Math.max(0, this.mapCache.width - visibleWidth);
+        const boundsHeight = Math.max(0, this.mapCache.height - visibleHeight);
+
+        // Set camera bounds
+        camera.setBounds(boundsX, boundsY, boundsWidth, boundsHeight);
+    }
+
+    getMapWidth(): number {
+        return this.mapCache.width;
+    }
+
+    getMapHeight(): number {
+        return this.mapCache.height;
+    }
+
+    isPlayerInBuilding(): boolean {
+        return this.isInBuilding;
+    }
+
+    getCurrentBuildingType(): "bank" | "stockmarket" | null {
+        return this.currentBuildingType;
+    }
+
+    // Performance monitoring and debugging methods
+    public getLoadedChunkCount(): number {
+        return this.loadedChunks.size;
+    }
+
+    public getLoadingChunkCount(): number {
+        return this.loadingChunks.size;
+    }
+
+    public getFailedChunkCount(): number {
+        return Array.from(this.failedChunks.values()).filter(
+            (count) => count > this.maxRetries
+        ).length;
+    }
+
+    public getPerformanceStats(): {
+        loadedChunks: number;
+        loadingChunks: number;
+        failedChunks: number;
+        visibleChunks: number;
+        memoryUsage: string;
+        preloadQueue: number;
+        preloadMetrics: any;
+        errorStats: any;
+    } {
+        return {
+            loadedChunks: this.loadedChunks.size,
+            loadingChunks: this.loadingChunks.size,
+            failedChunks: this.getFailedChunkCount(),
+            visibleChunks: this.visibleChunks.size,
+            memoryUsage: `${this.loadedChunks.size}/${this.maxLoadedChunks}`,
+            preloadQueue: this.preloadingManager.getQueueSize(),
+            preloadMetrics: this.preloadingManager.getMetrics(),
+            errorStats: this.errorHandler.getErrorStats(),
+        };
+    }
+
+    public debugLogChunkStatus(): void {
+        const stats = this.getPerformanceStats();
+        console.log("Chunk Manager Status:", stats);
+        console.log("Visible chunks:", Array.from(this.visibleChunks));
+        console.log("Loading chunks:", Array.from(this.loadingChunks));
+    }
+
+    public optimizeRendering(): void {
+        // Update chunk depths to ensure proper z-ordering
+        this.mapContainer.updateChunkDepth();
+
+        // Force texture cache cleanup for unused textures
+        this.cleanupUnusedTextures();
+    }
+
+    private cleanupUnusedTextures(): void {
+        // Defer texture cleanup to prevent WebGL errors
+        setTimeout(() => {
+            try {
+                const textureManager = this.scene.textures;
+                const loadedChunkIds = Array.from(this.loadedChunks.keys());
+                const visibleChunkIds = Array.from(this.visibleChunks);
+
+                // Get all chunk textures
+                const chunkTextures = textureManager.list;
+
+                Object.keys(chunkTextures).forEach((textureKey) => {
+                    if (textureKey.startsWith("chunk_")) {
+                        const chunkId = textureKey.replace("chunk_", "");
+
+                        // Only remove texture if chunk is not loaded AND not visible
+                        // This prevents removing textures that are still being used
+                        if (
+                            !loadedChunkIds.includes(chunkId) &&
+                            !visibleChunkIds.includes(chunkId)
+                        ) {
+                            // Additional safety check - make sure no GameObjects are using this texture
+                            const texture = textureManager.get(textureKey);
+                            if (
+                                texture &&
+                                texture.source &&
+                                texture.source.length > 0
+                            ) {
+                                // Check if the texture has any active references
+                                const hasActiveReferences =
+                                    this.mapContainer.list.some((child) => {
+                                        if (
+                                            child instanceof GameObjects.Image
+                                        ) {
+                                            return (
+                                                child.texture &&
+                                                child.texture.key === textureKey
+                                            );
+                                        }
+                                        return false;
+                                    });
+
+                                if (!hasActiveReferences) {
+                                    textureManager.remove(textureKey);
+                                    console.log(
+                                        `Cleaned up unused texture: ${textureKey}`
+                                    );
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.warn("Error during texture cleanup:", error);
+            }
+        }, 1000); // 1 second delay to ensure all transitions are complete
+    }
+
+    public setTransitionSettings(
+        duration: number,
+        fadeAlpha: number = 0.8
+    ): void {
+        this.mapContainer.setTransitionDuration(duration);
+        this.mapContainer.setFadeInAlpha(fadeAlpha);
+    }
+
+    public configurePreloading(config: Partial<PreloadingConfig>): void {
+        this.preloadingManager.updateStrategy(config);
+    }
+
+    public clearPreloadQueue(): void {
+        this.preloadingManager.clearQueue();
+    }
+
+    public getPreloadingMetrics() {
+        return this.preloadingManager.getMetrics();
+    }
+
+    public getErrorStats() {
+        return this.errorHandler.getErrorStats();
+    }
+
+    public getRecentErrors(count: number = 10) {
+        return this.errorHandler.getRecentErrors(count);
+    }
+
+    public clearErrorLogs(): void {
+        this.errorHandler.clearErrorLogs();
+    }
+
+    public configureErrorHandling(
+        maxRetries: number,
+        baseDelay: number,
+        maxDelay: number
+    ): void {
+        this.errorHandler.configureRetryHandler(
+            maxRetries,
+            baseDelay,
+            maxDelay
+        );
+    }
+
+    private setupGlobalErrorHandling(): void {
+        // Listen for WebGL context lost events
+        const canvas = this.scene.game.canvas;
+        if (canvas) {
+            canvas.addEventListener("webglcontextlost", (event) => {
+                console.error(
+                    "WebGL context lost - triggering emergency cleanup"
+                );
+                event.preventDefault();
+                this.forceCleanup();
+            });
+
+            canvas.addEventListener("webglcontextrestored", () => {
+                console.log("WebGL context restored - reinitializing chunks");
+                // Clear all loaded chunks and reload visible ones
+                this.loadedChunks.clear();
+                this.chunkAccessTimes.clear();
+                this.mapContainer.clearAllChunks();
+
+                // Reload visible chunks
+                const player = this.scene.getPlayer();
+                if (player) {
+                    const playerPos = player.getPosition();
+                    this.updateVisibleChunks(playerPos.x, playerPos.y);
+                }
+            });
+        }
+    }
+
+    public forceCleanup(): void {
+        console.log("Forcing cleanup to prevent WebGL issues...");
+
+        // Clear preload queue to reduce memory pressure
+        this.clearPreloadQueue();
+
+        // Aggressively clean up non-visible chunks
+        const chunksToRemove = Array.from(this.loadedChunks.keys()).filter(
+            (chunkId) => !this.visibleChunks.has(chunkId)
+        );
+
+        chunksToRemove.forEach((chunkId) => {
+            this.unloadChunk(chunkId);
         });
-        this.scene.load.image('stockmarket', '/maps/stockmarket.png');
-        this.scene.load.start();
-      });
-      this.textureLoadPromises.set('stockmarket', stockMarketLoadPromise);
-    }
-  }
 
-  enterBuilding(playerX: number, playerY: number, buildingType: 'bank' | 'stockmarket' = 'bank'): { x: number, y: number } {
-    try {
-      // Store current position
-      this.lastOutdoorPosition = { x: playerX, y: playerY };
-      
-      // Set building state - do this first to prevent any rendering issues
-      this.isInBuilding = true;
-      this.currentBuildingType = buildingType;
-      
-      // Hide the chunked map container
-      this.mapContainer.setVisible(false);
-      
-      // Create temporary single image for interior (same as original logic)
-      const textureKey = buildingType === 'bank' ? 'interior' : 'stockmarket';
-      
-      // Create interior map image
-      const interiorMap = this.scene.add.image(0, 0, textureKey);
-      interiorMap.setDepth(-10);
-      interiorMap.setOrigin(0.5, 0.5);
-      
-      // Apply a larger scale to make the map bigger
-      const scale = 2.3;
-      interiorMap.setScale(scale);
-      
-      // Get the device dimensions
-      const deviceWidth = this.scene.scale.width;
-      const deviceHeight = this.scene.scale.height;
-      
-      // Get interior dimensions
-      let interiorWidth = 800;
-      let interiorHeight = 600;
-      
-      if (this.scene.textures.exists(textureKey)) {
-        const interiorImage = this.scene.textures.get(textureKey);
-        if (interiorImage && interiorImage.source && interiorImage.source[0]) {
-          interiorWidth = interiorImage.source[0].width;
-          interiorHeight = interiorImage.source[0].height;
-        }
-      }
-      
-      // Apply scale factor to calculate the actual displayed dimensions
-      const scaledWidth = interiorWidth * scale;
-      const scaledHeight = interiorHeight * scale;
-      
-      // Position the interior map precisely at the center
-      const centerX = Math.floor(deviceWidth / 2);
-      const centerY = Math.floor(deviceHeight / 2);
-      interiorMap.setPosition(centerX, centerY);
-      
-      // Set camera and physics bounds to match the scaled interior size and position
-      const boundsX = centerX - (scaledWidth / 2);
-      const boundsY = centerY - (scaledHeight / 2);
-      
-      this.scene.physics.world.setBounds(
-        boundsX,
-        boundsY,
-        scaledWidth,
-        scaledHeight
-      );
-      
-      this.scene.cameras.main.setBounds(
-        boundsX,
-        boundsY,
-        scaledWidth,
-        scaledHeight
-      );
-      
-      // Simple, fixed maxZoom for interior areas
-      const maxZoom = 0.7;
-      
-      // Get camera and set zoom
-      const camera = this.scene.cameras.main as ExtendedCamera;
-      camera.setZoom(maxZoom);
-      
-      // Store camera settings for restoration later
-      camera._origMinZoom = camera.minZoom || 0.25;
-      camera._origMaxZoom = camera.maxZoom || 2.0;
-      
-      // Set both minZoom and maxZoom to the same value to lock zoom
-      camera.minZoom = maxZoom;
-      camera.maxZoom = maxZoom;
-      
-      // Store reference to interior map for cleanup
-      (this as any).currentInteriorMap = interiorMap;
-      
-      return { x: centerX, y: centerY };
-    } catch (error) {
-      console.error('Error entering building:', error);
-      this.isInBuilding = false;
-      this.currentBuildingType = null;
-      return { x: playerX, y: playerY };
-    }
-  }
+        // Force texture cleanup immediately
+        this.cleanupUnusedTextures();
 
-  exitBuilding(): { x: number, y: number } | null {
-    if (!this.lastOutdoorPosition) return null;
-    
-    // Reset building state immediately
-    this.isInBuilding = false;
-    this.currentBuildingType = null;
-    
-    // Clean up interior map
-    if ((this as any).currentInteriorMap) {
-      (this as any).currentInteriorMap.destroy();
-      (this as any).currentInteriorMap = null;
-    }
-    
-    // Show the chunked map container again
-    this.mapContainer.setVisible(true);
-    
-    // Restore original min/max zoom constraints if they were saved
-    const camera = this.scene.cameras.main as ExtendedCamera;
-    
-    if (camera._origMinZoom !== undefined && camera._origMaxZoom !== undefined) {
-      camera.minZoom = camera._origMinZoom;
-      camera.maxZoom = camera._origMaxZoom;
-      
-      // Reset zoom to a comfortable default value
-      camera.setZoom(0.7);
-    }
-    
-    // Reset physics world bounds to outdoor map dimensions
-    this.scene.physics.world.setBounds(0, 0, this.mapCache.width, this.mapCache.height);
-    
-    // Use the main scene's setupCameraBounds method for consistent camera bounds handling
-    if (this.scene instanceof Scene) {
-      const sceneWithBounds = this.scene as { setupCameraBounds?: () => void };
-      if (typeof sceneWithBounds.setupCameraBounds === 'function') {
-        sceneWithBounds.setupCameraBounds();
-      } else {
-        this.setDefaultCameraBounds();
-      }
-    } else {
-      this.setDefaultCameraBounds();
-    }
-    
-    return this.lastOutdoorPosition;
-  }
-  
-  // Fallback method for setting camera bounds
-  private setDefaultCameraBounds(): void {
-    const camera = this.scene.cameras.main as ExtendedCamera;
-    const zoom = camera.zoom || 0.7;
-    
-    // Calculate the visible area based on zoom level
-    const visibleWidth = camera.width / zoom;
-    const visibleHeight = camera.height / zoom;
-    
-    // Calculate the bounds with half the visible area as padding
-    const boundsX = Math.min(visibleWidth / 2, this.mapCache.width / 4);
-    const boundsY = Math.min(visibleHeight / 2, this.mapCache.height / 4);
-    const boundsWidth = Math.max(0, this.mapCache.width - visibleWidth);
-    const boundsHeight = Math.max(0, this.mapCache.height - visibleHeight);
-    
-    // Set camera bounds
-    camera.setBounds(boundsX, boundsY, boundsWidth, boundsHeight);
-  }
+        // Reduce max loaded chunks temporarily
+        this.maxLoadedChunks = Math.max(8, this.maxLoadedChunks - 4);
 
-  getMapWidth(): number {
-    return this.mapCache.width;
-  }
-
-  getMapHeight(): number {
-    return this.mapCache.height;
-  }
-
-  isPlayerInBuilding(): boolean {
-    return this.isInBuilding;
-  }
-  
-  getCurrentBuildingType(): 'bank' | 'stockmarket' | null {
-    return this.currentBuildingType;
-  }
+        console.log(
+            `Cleanup complete. Loaded chunks: ${this.loadedChunks.size}, Max: ${this.maxLoadedChunks}`
+        );
+    }
 }

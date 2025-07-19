@@ -248,6 +248,9 @@ export class MainScene extends Scene implements MainGameScene {
     this.buildingManager.update();
     this.bankNPCManager.update();
     this.stockMarketManager.update();
+    
+    // Update map chunks based on player position
+    this.mapManager.update();
   }  // Method to open the banking UI
   openBankingUI(bankAccount: any): void {
     // Dispatch custom event for the React component to catch

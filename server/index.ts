@@ -10,8 +10,8 @@ import { config } from "./src/config/config.ts";
 import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
-import wsRouter from "./src/routes/wsRouter";
 import gameRouter from "./src/routes/gameRouter.ts";
+import wsRouter from "./src/routes/wsRouter.ts";
 
 // Initialize database connection
 async function initializeDatabase() {
