@@ -1,13 +1,13 @@
 import { Scene, Types, GameObjects } from 'phaser';
 import { Player } from '../entities/Player.ts';
 import { CollisionManager } from '../systems/CollisionManager.ts';
-import { MapManager } from '../systems/MapManager.ts';
+import { ChunkedMapManager } from '../systems/ChunkedMapManager.ts';
 import { WebSocketManager } from '../systems/WebSocketManager.ts';
 import { NPCManager } from '../systems/NPCManager.ts';
 import { BuildingManager } from '../systems/BuildingManager.ts';
 import { BankNPCManager } from '../systems/BankNPCManager.ts';
 import { StockMarketManager } from '../systems/StockMarketManager.ts';
-import { ExtendedCamera } from '../systems/MapManager.ts';
+import { ExtendedCamera } from '../systems/ChunkedMapManager.ts';
 
 // Custom event interfaces
 interface RupeeUpdateEvent extends CustomEvent {
@@ -28,7 +28,7 @@ export interface MainGameScene extends Scene {
   getPlayer(): Player;
   getCollisionManager(): CollisionManager;
   getCursors(): Types.Input.Keyboard.CursorKeys;
-  mapManager: MapManager;
+  mapManager: ChunkedMapManager;
   getRupees(): number;
   updateRupees(amount: number): void;
   bankNPCManager: BankNPCManager;
@@ -45,7 +45,7 @@ export class MainScene extends Scene implements MainGameScene {
   private player!: Player;
   private cursors!: Types.Input.Keyboard.CursorKeys;
   private collisionManager!: CollisionManager;
-  mapManager!: MapManager;
+  mapManager!: ChunkedMapManager;
   private webSocketManager!: WebSocketManager;
   private npcManager!: NPCManager;
   private buildingManager!: BuildingManager;
@@ -83,8 +83,7 @@ export class MainScene extends Scene implements MainGameScene {
     // Create loading progress bar
     this.createProgressBar();
 
-    // Load the main map image directly from server
-    this.load.image('map', '/maps/finalmap.png');
+    // Map chunks will be loaded dynamically by ChunkedMapManager
 
     // Load other assets normally
     this.load.image('interior', '/maps/bank.png');
@@ -130,7 +129,7 @@ export class MainScene extends Scene implements MainGameScene {
     this.gameContainer = this.add.container(0, 0);
 
     // Create map first so it's at the bottom of the rendering order
-    this.mapManager = new MapManager(this);
+    this.mapManager = new ChunkedMapManager(this);
     
     // Setup collisions after map is created
     this.collisionManager = new CollisionManager(this);

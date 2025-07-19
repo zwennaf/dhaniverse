@@ -1,0 +1,13 @@
+{
+  "name": "map-tools",
+  "version": "1.0.0",
+  "description": "Tools for map optimization",
+  "main": "chunk-map.js",
+  "scripts": {
+    "chunk": "node chunk-map.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.0",
+    "canvas": "^2.11.2"
+  }
+}
