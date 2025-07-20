@@ -1,10 +1,14 @@
-import { create, verify } from "djwt";
+import { create, verify, Payload } from "djwt";
 import { config } from "../config/config.ts";
 
 // Helper function to create JWT token
-export async function createToken(userId: string): Promise<string> {
+export async function createToken(
+  userId: string,
+  username?: string
+): Promise<string> {
   const payload = {
     userId,
+    username,
     exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7), // 7 days
   };
   
@@ -20,7 +24,7 @@ export async function createToken(userId: string): Promise<string> {
 }
 
 // Helper function to verify JWT token
-export async function verifyToken(token: string): Promise<{ userId: string } | null> {
+export async function verifyToken(token: string): Promise<Payload | null> {
   try {
     const key = await crypto.subtle.importKey(
       "raw",
@@ -30,9 +34,24 @@ export async function verifyToken(token: string): Promise<{ userId: string } | n
       ["sign", "verify"]
     );
     
-    const payload = await verify(token, key);
-    return { userId: payload.userId as string };
-  } catch {
+    return await verify(token, key);
+  } catch (error) {
+    console.error("JWT verification error:", error);
+    return null;
+  }
+}
+
+// Decode JWT without verification (for debugging)
+export function decodeToken(token: string): Payload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = parts[1];
+    const decoded = atob(payload);
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.error("JWT decoding error:", error);
     return null;
   }
 }
