@@ -76,7 +76,7 @@ export class WebSocketManager {
     private reconnectAttempts: number = 0;
     private maxReconnectAttempts: number = 10;
     private lastUpdateTime: number = 0;
-    private updateInterval: number = 50; // ms between position updates
+    private updateInterval: number = 33; // ms between position updates (30fps)
     private connected: boolean = false;
     private connectionStatusText: GameObjects.Text | null = null;
     private roomCode: string = "";
@@ -281,10 +281,15 @@ export class WebSocketManager {
                 break;
 
             case "playerJoined":
+                console.log(`Player joined:`, data.player);
                 this.handlePlayerJoined(data.player);
                 break;
 
             case "playerUpdate":
+                // Log occasionally to avoid spam
+                if (Math.random() < 0.9) {  // Log only 5% of updates
+                    console.log(`Received player update:`, data.player);
+                }
                 this.handlePlayerUpdate(data.player);
                 break;
 
@@ -415,16 +420,19 @@ export class WebSocketManager {
                 otherPlayer.targetY !== undefined
             ) {
                 // Interpolate position for smoother movement
+                // Use a higher interpolation factor for more responsive movement
+                const interpolationFactor = 0.5;  // Increased from 0.4 for more responsive movement
+                
                 otherPlayer.sprite.x = Phaser.Math.Linear(
                     otherPlayer.sprite.x,
                     otherPlayer.targetX,
-                    0.2
+                    interpolationFactor
                 );
 
                 otherPlayer.sprite.y = Phaser.Math.Linear(
                     otherPlayer.sprite.y,
                     otherPlayer.targetY,
-                    0.2
+                    interpolationFactor
                 );
 
                 // Update username text
@@ -454,6 +462,7 @@ export class WebSocketManager {
                     Constants.WS_POSITION_THRESHOLD ||
                 currentAnimation !== lastSentAnimation
             ) {
+                // Send update to server
                 this.ws.send(
                     JSON.stringify({
                         type: "update",
@@ -475,8 +484,11 @@ export class WebSocketManager {
     private createOtherPlayer(playerData: PlayerData): void {
         // Check if this player already exists
         if (this.otherPlayers.has(playerData.id)) {
+            console.log(`Player ${playerData.id} already exists, skipping creation`);
             return;
         }
+
+        console.log(`Creating other player:`, playerData);
 
         const otherPlayer = this.scene.add.sprite(
             playerData.x,
@@ -484,6 +496,8 @@ export class WebSocketManager {
             "character"
         );
         otherPlayer.setScale(5);
+        
+        console.log(`Created sprite for player ${playerData.username} at (${playerData.x}, ${playerData.y})`);
         // Add username text above player
         const nameText = this.scene.add
             .text(playerData.x, playerData.y - 50, playerData.username, {
@@ -509,6 +523,9 @@ export class WebSocketManager {
         if (gameContainer) {
             gameContainer.add(otherPlayer);
             gameContainer.add(nameText);
+            console.log(`Added player ${playerData.username} to game container`);
+        } else {
+            console.warn(`No game container found for player ${playerData.username}`);
         }
 
         // Set initial animation if provided
@@ -531,6 +548,10 @@ export class WebSocketManager {
             if (playerData.animation) {
                 otherPlayer.sprite.anims.play(playerData.animation, true);
             }
+        } else {
+            // If player doesn't exist yet, create them
+            console.log(`Creating player that was missing: ${playerData.id} (${playerData.username})`);
+            this.createOtherPlayer(playerData);
         }
     }
 
@@ -567,8 +588,10 @@ export class WebSocketManager {
     }
 
     public sendChat(message: string): void {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.playerId) {
             this.ws.send(JSON.stringify({ type: "chat", message }));
+        } else {
+            console.warn("Cannot send chat: not connected or not authenticated");
         }
     }
 }

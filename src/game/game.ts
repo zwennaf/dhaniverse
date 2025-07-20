@@ -170,7 +170,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
 
         if (response.success && response.data) {
             const playerState = response.data;
-            const rupees = playerState.financial?.rupees || 25000;
+            const rupees = playerState.financial?.rupees || 0;
 
             // Initialize HUD with actual rupees from database
             initializeHUD(rupees);
@@ -187,26 +187,26 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
         } else {
             // Fallback to default if API fails
             console.warn("Failed to load player state, using default values");
-            initializeHUD(25000);
+            initializeHUD(0);
 
             // Initialize MainScene with fallback
             if (game) {
                 const mainScene = game.scene.getScene("MainScene") as MainScene;
                 if (mainScene) {
-                    mainScene.initializePlayerRupees(25000);
+                    mainScene.initializePlayerRupees(0);
                 }
             }
         }
     } catch (error) {
         console.error("Error loading player state:", error);
         // Fallback to default if API fails
-        initializeHUD(25000);
+        initializeHUD(0);
 
         // Initialize MainScene with fallback
         if (game) {
             const mainScene = game.scene.getScene("MainScene") as MainScene;
             if (mainScene) {
-                mainScene.initializePlayerRupees(25000);
+                mainScene.initializePlayerRupees(0);
             }
         }
     }

@@ -211,16 +211,24 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
                         chatMessages.map((msg, idx) => (
                             <div key={idx} className="mb-0.5 leading-[1.2]">
                                 <span
-                                    className={`text-lg tracking-tighter ${
+                                    className={`text-sm tracking-tighter ${
                                         msg.username === "System"
-                                            ? "text-blue-300"
-                                            : "text-dhani-green"
+                                            ? "text-gray-400 italic"
+                                            : "text-dhani-green text-lg"
                                     }`}
                                 >
-                                    {msg.username}:
+                                    {msg.username === "System"
+                                        ? ""
+                                        : `${msg.username}:`}
                                 </span>
-                                <span className="tracking-wider">
-                                    {" "}
+                                <span
+                                    className={`tracking-wider ${
+                                        msg.username === "System"
+                                            ? "text-gray-400 italic text-sm"
+                                            : ""
+                                    }`}
+                                >
+                                    {msg.username === "System" ? "" : " "}
                                     {msg.message}
                                 </span>
                             </div>

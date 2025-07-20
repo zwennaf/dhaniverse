@@ -33,7 +33,7 @@ export const Constants = {
         return 'wss://dhaniverseapi.deno.dev/ws';
     },
     WS_RECONNECT_DELAY: 5000,
-    WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
+    WS_POSITION_THRESHOLD: 3, // Only send updates when player moves more than this amount
     // Font settings for consistent styling
     PLAYER_NAME_FONT: "Pixeloid",
     PLAYER_NAME_SIZE: "18px",
