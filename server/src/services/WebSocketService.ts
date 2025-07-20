@@ -196,18 +196,18 @@ export class WebSocketService {
             if (this.sockets.get(socketId)?.readyState !== WebSocket.OPEN) {
                 this.queueMessage(socketId, {
                     type: "chat",
-                    id: "system",
+                    id: `system-welcome-${Date.now()}`,
                     username: "System",
-                    message: "Welcome to Dhaniverse! Type / to chat.",
+                    message: "🌟 Welcome to Dhaniverse! Use the chat to communicate with other players.",
                     timestamp: Date.now()
                 });
             } else {
                 setTimeout(() => {
                     this.sendToSocket(socketId, {
                         type: "chat",
-                        id: "system",
+                        id: `system-welcome-${Date.now()}`,
                         username: "System",
-                        message: "Welcome to Dhaniverse! Type / to chat.",
+                        message: "🌟 Welcome to Dhaniverse! Use the chat to communicate with other players.",
                         timestamp: Date.now()
                     });
                 }, 1000);
@@ -328,11 +328,12 @@ export class WebSocketService {
             }
         }, socketId);
 
+        // Send system message to all clients including the new player
         this.broadcast({
             type: "chat",
-            id: "system",
+            id: `system-join-${Date.now()}`,
             username: "System",
-            message: `${username} joined the game`,
+            message: `🎮 ${username} joined the room`,
             timestamp: Date.now()
         });
     }
@@ -396,11 +397,12 @@ export class WebSocketService {
                 }
             }, socketId);
 
+            // Send system message to all clients including the new player
             this.broadcast({
                 type: "chat",
-                id: "system",
+                id: `system-join-${Date.now()}`,
                 username: "System",
-                message: `${username} joined the game`,
+                message: `🎮 ${username} joined the room`,
                 timestamp: Date.now()
             });
         }
@@ -507,9 +509,9 @@ export class WebSocketService {
 
             this.broadcast({
                 type: "chat",
-                id: "system",
+                id: `system-leave-${Date.now()}`,
                 username: "System",
-                message: `${username} left the game`,
+                message: `👋 ${username} left the room`,
                 timestamp: Date.now()
             });
         }
