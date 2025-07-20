@@ -27,6 +27,13 @@ interface PlayerMoveMessage extends BaseMessage {
     };
 }
 
+interface PlayerUpdateMessage extends BaseMessage {
+    type: "update";
+    x: number;
+    y: number;
+    animation?: string;
+}
+
 interface ReconnectMessage extends BaseMessage {
     type: "reconnect";
     token?: string;
@@ -37,6 +44,7 @@ type WebSocketMessage =
     | AuthMessage
     | ChatMessage
     | PlayerMoveMessage
+    | PlayerUpdateMessage
     | ReconnectMessage
     | BaseMessage;
 
@@ -46,6 +54,7 @@ export class WebSocketService {
     private userSockets = new Map<string, string>(); // userId -> socketId
     private socketUsers = new Map<string, string>(); // socketId -> userId
     private socketUsernames = new Map<string, string>(); // socketId -> username
+    private socketPositions = new Map<string, {x: number; y: number; animation?: string}>(); // socketId -> position
     private welcomeSent = new Set<string>();
     private ipConnections = new Map<string, Set<string>>(); // IP -> socketIds
     private pendingMessages = new Map<string, Array<Record<string, unknown>>>(); // socketId -> pending messages
@@ -240,7 +249,7 @@ export class WebSocketService {
                 break;
                 
             case "update":
-                // Ignore frequent updates
+                this.handlePlayerUpdate(socketId, message as PlayerUpdateMessage);
                 break;
                 
             case "reconnect":
@@ -279,12 +288,45 @@ export class WebSocketService {
         this.socketUsernames.set(socketId, username);
         console.log(`👤 Set username ${username} for socket ${socketId}`);
 
-        // Notify all clients
-        this.broadcast({
-            type: "player-joined",
-            username,
-            message: `${username} joined the game`
+        // Set default position for new player
+        this.socketPositions.set(socketId, {x: 400, y: 300});
+
+        // Send player their own ID
+        this.sendToSocket(socketId, {
+            type: "connect",
+            id: socketId
         });
+
+        // Send existing players to the new player
+        const existingPlayers: Array<{id: string; username: string; x: number; y: number; animation?: string}> = [];
+        for (const [sId, existingUsername] of this.socketUsernames) {
+            if (sId !== socketId) {
+                const position = this.socketPositions.get(sId) || {x: 400, y: 300};
+                existingPlayers.push({
+                    id: sId,
+                    username: existingUsername,
+                    x: position.x,
+                    y: position.y,
+                    animation: position.animation
+                });
+            }
+        }
+
+        this.sendToSocket(socketId, {
+            type: "players",
+            players: existingPlayers
+        });
+
+        // Notify other clients about the new player
+        this.broadcast({
+            type: "playerJoined",
+            player: {
+                id: socketId,
+                username,
+                x: 400, // Default position
+                y: 300  // Default position
+            }
+        }, socketId);
 
         this.broadcast({
             type: "chat",
@@ -297,8 +339,70 @@ export class WebSocketService {
 
     private handleAuth(socketId: string, data: AuthMessage) {
         if (data.gameUsername && typeof data.gameUsername === "string") {
-            this.socketUsernames.set(socketId, data.gameUsername);
-            console.log(`🔑 Authenticated socket ${socketId} as ${data.gameUsername}`);
+            const username = data.gameUsername.trim();
+            if (username.length === 0) return;
+
+            // Check if username is already in use
+            for (const [sId, existingUsername] of this.socketUsernames) {
+                if (existingUsername === username && sId !== socketId) {
+                    this.sendToSocket(socketId, {
+                        type: "error",
+                        message: "Username is already taken"
+                    });
+                    return;
+                }
+            }
+
+            this.socketUsernames.set(socketId, username);
+            console.log(`🔑 Authenticated socket ${socketId} as ${username}`);
+
+            // Set default position for new player
+            this.socketPositions.set(socketId, {x: 400, y: 300});
+
+            // Send player their own ID
+            this.sendToSocket(socketId, {
+                type: "connect",
+                id: socketId
+            });
+
+            // Send existing players to the new player
+            const existingPlayers: Array<{id: string; username: string; x: number; y: number; animation?: string}> = [];
+            for (const [sId, existingUsername] of this.socketUsernames) {
+                if (sId !== socketId) {
+                    const position = this.socketPositions.get(sId) || {x: 400, y: 300};
+                    existingPlayers.push({
+                        id: sId,
+                        username: existingUsername,
+                        x: position.x,
+                        y: position.y,
+                        animation: position.animation
+                    });
+                }
+            }
+
+            this.sendToSocket(socketId, {
+                type: "players",
+                players: existingPlayers
+            });
+
+            // Notify other clients about the new player
+            this.broadcast({
+                type: "playerJoined",
+                player: {
+                    id: socketId,
+                    username,
+                    x: 400, // Default position
+                    y: 300  // Default position
+                }
+            }, socketId);
+
+            this.broadcast({
+                type: "chat",
+                id: "system",
+                username: "System",
+                message: `${username} joined the game`,
+                timestamp: Date.now()
+            });
         }
     }
 
@@ -338,6 +442,36 @@ export class WebSocketService {
         }, socketId);
     }
 
+    private handlePlayerUpdate(socketId: string, data: PlayerUpdateMessage) {
+        const username = this.socketUsernames.get(socketId);
+        if (!username) return;
+        
+        // Validate position data
+        if (typeof data.x !== "number" || typeof data.y !== "number") {
+            console.error("Invalid player update data");
+            return;
+        }
+        
+        // Store the player's position
+        this.socketPositions.set(socketId, {
+            x: data.x,
+            y: data.y,
+            animation: data.animation
+        });
+        
+        // Broadcast the update to all other players
+        this.broadcast({
+            type: "playerUpdate",
+            player: {
+                id: socketId,
+                username,
+                x: data.x,
+                y: data.y,
+                animation: data.animation
+            }
+        }, socketId);
+    }
+
     private handleReconnect(socketId: string, _data: ReconnectMessage) {
         console.log(`🔄 Reconnection request from ${socketId}`);
         const userId = this.socketUsers.get(socketId);
@@ -366,7 +500,8 @@ export class WebSocketService {
         // Notify other players
         if (username) {
             this.broadcast({
-                type: "player-left",
+                type: "playerDisconnect",
+                id: socketId,
                 username
             });
 
@@ -390,6 +525,7 @@ export class WebSocketService {
         this.sockets.delete(socketId);
         this.welcomeSent.delete(socketId);
         this.socketUsernames.delete(socketId);
+        this.socketPositions.delete(socketId);
         this.pendingMessages.delete(socketId);
         
         // Remove from IP tracking
