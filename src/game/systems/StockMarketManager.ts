@@ -79,6 +79,7 @@ export class StockMarketManager {
   private marketEvents: string[]; // Global market events
   private lastRandomEvent: number = 0; // Timestamp of last random event
   private updateInterval: number = 15000; // 15 seconds between updates (faster for gameplay)
+  private handleStockMarketClosedBound = this.handleStockMarketClosed.bind(this);
   
   // Market hours (game time)
   private readonly MARKET_OPEN_HOUR: number = 9;  // 9 AM
@@ -177,8 +178,25 @@ export class StockMarketManager {
     
     console.log("Stock Market NPC created at position:", brokerX, brokerY);
     
+    // Listen for stock market UI closure to sync any changes
+    window.addEventListener('closeStockMarketUI', this.handleStockMarketClosedBound);
+    
     // Start the stock price simulation with a faster update interval
     this.simulateStockPrices();
+  }
+
+  /**
+   * Handle stock market UI closure and sync any money changes with backend
+   */
+  private async handleStockMarketClosed(): Promise<void> {
+    console.log("Stock Market UI closed - syncing any changes with backend");
+    
+    try {
+      // Refresh player state from backend to ensure consistency
+      await this.scene.refreshPlayerStateFromBackend();
+    } catch (error) {
+      console.error("Failed to sync stock market changes with backend:", error);
+    }
   }
   
   private setupSpeechBubbleAnimations(): void {
@@ -922,6 +940,9 @@ export class StockMarketManager {
    * Clean up resources when scene is being destroyed
    */
   public destroy(): void {
+    // Remove event listeners
+    window.removeEventListener('closeStockMarketUI', this.handleStockMarketClosedBound);
+    
     if (this.broker.nameText) {
       this.broker.nameText.destroy();
     }
@@ -932,6 +953,7 @@ export class StockMarketManager {
     
     this.broker.destroy();
     this.interactionText.destroy();
+    this.marketTimerText.destroy();
   }
 
   /**

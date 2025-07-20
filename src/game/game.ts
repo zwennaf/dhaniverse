@@ -161,53 +161,110 @@ export function updateGameHUD(rupees: number): void {
 }
 
 /**
+ * Get current game instance (for debugging)
+ */
+export function getCurrentGame(): Phaser.Game | null {
+    return game;
+}
+
+/**
+ * Debug function to refresh player state from backend
+ */
+export async function refreshPlayerState(): Promise<void> {
+    if (game) {
+        const mainScene = game.scene.getScene("MainScene") as MainScene;
+        if (mainScene) {
+            await mainScene.refreshPlayerStateFromBackend();
+        }
+    }
+}
+
+// Expose functions globally for debugging
+if (typeof window !== 'undefined') {
+    (window as any).dhaniverse = {
+        refreshPlayerState,
+        getCurrentGame,
+        stopGame,
+        startGame
+    };
+}
+
+/**
  * Load player state from backend and initialize HUD with actual rupees
  */
 async function loadPlayerStateAndInitializeHUD(): Promise<void> {
     try {
+        console.log("Loading player state from backend...");
+        
         // Load player state from backend
         const response = await playerStateApi.get();
 
         if (response.success && response.data) {
             const playerState = response.data;
-            const rupees = playerState.financial?.rupees || 0;
+            const rupees = playerState.financial?.rupees || 25000;
+
+            console.log("Player state loaded successfully:", {
+                rupees,
+                totalWealth: playerState.financial?.totalWealth,
+                level: playerState.progress?.level
+            });
 
             // Initialize HUD with actual rupees from database
             initializeHUD(rupees);
 
-            // Initialize MainScene with correct rupees
+            // Initialize MainScene with correct rupees (with retry mechanism)
             if (game) {
-                const mainScene = game.scene.getScene("MainScene") as MainScene;
-                if (mainScene) {
-                    mainScene.initializePlayerRupees(rupees);
-                }
+                const initializeScene = () => {
+                    if (!game) return; // Additional null check
+                    const mainScene = game.scene.getScene("MainScene") as MainScene;
+                    if (mainScene && mainScene.scene.isActive()) {
+                        mainScene.initializePlayerRupees(rupees);
+                        console.log(`MainScene initialized with ${rupees} rupees`);
+                    } else {
+                        // Scene not ready yet, try again in 100ms
+                        setTimeout(initializeScene, 100);
+                    }
+                };
+                initializeScene();
             }
-
-            console.log(`Player state loaded: ${rupees} rupees`);
         } else {
-            // Fallback to default if API fails
-            console.warn("Failed to load player state, using default values");
-            initializeHUD(0);
-
-            // Initialize MainScene with fallback
-            if (game) {
-                const mainScene = game.scene.getScene("MainScene") as MainScene;
-                if (mainScene) {
-                    mainScene.initializePlayerRupees(0);
-                }
-            }
+            console.warn("Failed to load player state from backend:", response);
+            throw new Error("Invalid response from player state API");
         }
     } catch (error) {
-        console.error("Error loading player state:", error);
+        console.error("Error loading player state from backend:", error);
+        
+        // Show user-friendly error message
+        if (loadingText) {
+            loadingText.textContent = "Loading game data failed, using defaults...";
+            setTimeout(() => {
+                if (loadingText && gameContainer) {
+                    gameContainer.removeChild(loadingText);
+                    loadingText = null;
+                }
+            }, 2000);
+        }
+        
         // Fallback to default if API fails
-        initializeHUD(0);
+        const defaultRupees = 25000;
+        console.log("Using default rupees:", defaultRupees);
+        
+        initializeHUD(defaultRupees);
 
         // Initialize MainScene with fallback
         if (game) {
-            const mainScene = game.scene.getScene("MainScene") as MainScene;
-            if (mainScene) {
-                mainScene.initializePlayerRupees(0);
-            }
+            const initializeScene = () => {
+                if (!game) return; // Additional null check
+                const mainScene = game.scene.getScene("MainScene") as MainScene;
+                if (mainScene && mainScene.scene.isActive()) {
+                    mainScene.initializePlayerRupees(defaultRupees);
+                    console.log(`MainScene initialized with default ${defaultRupees} rupees`);
+                } else {
+                    // Scene not ready yet, try again in 100ms
+                    setTimeout(initializeScene, 100);
+                }
+            };
+            initializeScene();
         }
     }
 }

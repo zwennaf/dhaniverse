@@ -32,6 +32,7 @@ export class BankNPCManager {
   private activeDialog: boolean = false;
   private speechBubble: GameObjects.Sprite | null = null;
   private playerBankAccount: BankAccount;
+  private handleBankingClosedBound = this.handleBankingClosed.bind(this);
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -109,7 +110,24 @@ export class BankNPCManager {
     // Setup speech bubble animations
     this.setupSpeechBubbleAnimations();
     
+    // Listen for banking UI closure to sync any changes
+    window.addEventListener('closeBankingUI', this.handleBankingClosedBound);
+    
     console.log("Bank NPC created at position:", bankerX, bankerY);
+  }
+
+  /**
+   * Handle banking UI closure and sync any money changes with backend
+   */
+  private async handleBankingClosed(): Promise<void> {
+    console.log("Banking UI closed - syncing any changes with backend");
+    
+    try {
+      // Refresh player state from backend to ensure consistency
+      await this.scene.refreshPlayerStateFromBackend();
+    } catch (error) {
+      console.error("Failed to sync banking changes with backend:", error);
+    }
   }
   
   private setupSpeechBubbleAnimations(): void {
@@ -396,6 +414,9 @@ export class BankNPCManager {
    * Clean up resources when scene is being destroyed
    */
   public destroy(): void {
+    // Remove event listeners
+    window.removeEventListener('closeBankingUI', this.handleBankingClosedBound);
+    
     if (this.banker.nameText) {
       this.banker.nameText.destroy();
     }

@@ -61,6 +61,7 @@ export class MainScene extends Scene implements MainGameScene {
   private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
   private handleStopGameBound = () => this.webSocketManager.disconnect();
   private handleSendChatBound = (e: Event) => this.handleSendChat(e);
+  private handleUpdatePlayerRupeesBound = this.handleUpdatePlayerRupees.bind(this);
 
   constructor() {
     super({ key: 'MainScene' });
@@ -70,13 +71,59 @@ export class MainScene extends Scene implements MainGameScene {
    * Initialize player rupees from database
    */
   public initializePlayerRupees(rupees: number): void {
+    const oldRupees = this.playerRupees;
     this.playerRupees = rupees;
+    
     console.log("MainScene initialized with rupees:", rupees);
     
-    // Dispatch event to update all UI components
-    window.dispatchEvent(new CustomEvent('rupee-update', {
-      detail: { rupees: this.playerRupees }
-    }));
+    // Only dispatch update if the value actually changed
+    if (oldRupees !== rupees) {
+      // Dispatch event to update all UI components
+      window.dispatchEvent(new CustomEvent('rupee-update', {
+        detail: { rupees: this.playerRupees }
+      }));
+      
+      // Update game HUD
+      import('../game.ts').then(({ updateGameHUD }) => {
+        updateGameHUD(this.playerRupees);
+      });
+    }
+  }
+
+  /**
+   * Load fresh player state from backend (useful for refreshing game state)
+   */
+  public async refreshPlayerStateFromBackend(): Promise<void> {
+    try {
+      console.log("Refreshing player state from backend...");
+      
+      // Import API here to avoid circular dependency
+      const { playerStateApi } = await import('../../utils/api.ts');
+      
+      const response = await playerStateApi.get();
+      
+      if (response.success && response.data) {
+        const playerState = response.data;
+        const rupees = playerState.financial?.rupees || this.playerRupees;
+        
+        console.log("Fresh player state loaded:", {
+          rupees,
+          totalWealth: playerState.financial?.totalWealth,
+          level: playerState.progress?.level
+        });
+        
+        // Update rupees if different
+        if (rupees !== this.playerRupees) {
+          this.initializePlayerRupees(rupees);
+        }
+        
+        return playerState;
+      } else {
+        console.warn("Failed to refresh player state:", response);
+      }
+    } catch (error) {
+      console.error("Error refreshing player state:", error);
+    }
   }
 
   preload(): void {
@@ -197,8 +244,8 @@ export class MainScene extends Scene implements MainGameScene {
       camera.setZoom(Phaser.Math.Clamp(newZoom, camera.minZoom!, camera.maxZoom!));
     });
     
-    // Add event listener for banking UI rupee updates
-    window.addEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
+    // Add event listener for updatePlayerRupees events (from banking and stock market)
+    window.addEventListener('updatePlayerRupees', this.handleUpdatePlayerRupeesBound);
     
     // Listen for global stopGame to disconnect socket
     window.addEventListener('stopGame', this.handleStopGameBound);
@@ -208,8 +255,16 @@ export class MainScene extends Scene implements MainGameScene {
 
     // Listen for typing start/end to disable movement
     window.addEventListener('typing-start', this.handleTypingStartBound);
-    window.addEventListener('typing-end', this.handleTypingEndBound);    // Notify game is ready
+    window.addEventListener('typing-end', this.handleTypingEndBound);
+    
+    // Notify game is ready
     this.game.events.emit('ready');
+
+    // Setup periodic sync with backend (every 30 seconds)
+    this.setupPeriodicBackendSync();
+
+    // Add debug helpers to global window object
+    this.setupDebugHelpers();
 
     // Remove loading indicator immediately after scene is ready
     this.time.delayedCall(100, () => {
@@ -223,7 +278,16 @@ export class MainScene extends Scene implements MainGameScene {
    
     // Clean up on scene shutdown to prevent memory leaks
     this.events.on('shutdown', () => {
-      window.removeEventListener('updatePlayerRupees', this.handleRupeeUpdateBound);
+      // Cleanup managers
+      if (this.bankNPCManager) {
+        this.bankNPCManager.destroy();
+      }
+      
+      if (this.stockMarketManager) {
+        this.stockMarketManager.destroy();
+      }
+      
+      window.removeEventListener('updatePlayerRupees', this.handleUpdatePlayerRupeesBound);
       window.removeEventListener('stopGame', this.handleStopGameBound);
       window.removeEventListener('send-chat', this.handleSendChatBound as any);
       window.removeEventListener('typing-start', this.handleTypingStartBound);
@@ -305,7 +369,133 @@ export class MainScene extends Scene implements MainGameScene {
       updateGameHUD(this.playerRupees);
     });
     
+    // Sync with backend (fire and forget, don't block the game)
+    this.syncRupeesToBackend(amount);
+    
     console.log("Game updated rupee count to:", this.playerRupees);
+  }
+
+  /**
+   * Sync rupees to backend database
+   */
+  private async syncRupeesToBackend(rupees: number): Promise<void> {
+    try {
+      // Import API here to avoid circular dependency
+      const { playerStateApi } = await import('../../utils/api.ts');
+      
+      await playerStateApi.updateRupees(rupees, 'set');
+      console.log(`Synced ${rupees} rupees to backend successfully`);
+    } catch (error) {
+      console.error('Failed to sync rupees to backend:', error);
+      // Don't throw error to avoid disrupting game flow
+    }
+  }
+
+  /**
+   * Setup periodic sync with backend to ensure data consistency
+   */
+  private setupPeriodicBackendSync(): void {
+    // Sync every 30 seconds
+    const syncInterval = 30000;
+    
+    const performSync = async () => {
+      try {
+        // Import API here to avoid circular dependency
+        const { playerStateApi } = await import('../../utils/api.ts');
+        
+        // Get current state from backend
+        const response = await playerStateApi.get();
+        
+        if (response.success && response.data) {
+          const backendRupees = response.data.financial?.rupees || this.playerRupees;
+          
+          // Only update if there's a significant difference (to avoid constant updates)
+          if (Math.abs(backendRupees - this.playerRupees) > 0) {
+            console.log(`Backend sync: updating rupees from ${this.playerRupees} to ${backendRupees}`);
+            this.playerRupees = backendRupees;
+            
+            // Update UI
+            import('../game.ts').then(({ updateGameHUD }) => {
+              updateGameHUD(this.playerRupees);
+            });
+            
+            // Dispatch event to update all UI components
+            window.dispatchEvent(new CustomEvent('rupee-update', {
+              detail: { rupees: this.playerRupees }
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Periodic backend sync failed:', error);
+        // Don't disrupt game flow on sync failures
+      }
+    };
+    
+    // Start periodic sync
+    this.time.addEvent({
+      delay: syncInterval,
+      callback: performSync,
+      loop: true
+    });
+    
+    console.log(`Started periodic backend sync every ${syncInterval / 1000} seconds`);
+  }
+
+  /**
+   * Setup debug helpers for testing money synchronization
+   */
+  private setupDebugHelpers(): void {
+    // Add dhaniverse debug object to global window
+    (window as any).dhaniverse = {
+      ...(window as any).dhaniverse,
+      
+      // Money management
+      getRupees: () => this.playerRupees,
+      setRupees: (amount: number) => {
+        console.log(`Debug: Setting rupees from ${this.playerRupees} to ${amount}`);
+        this.updateRupees(amount);
+      },
+      addRupees: (amount: number) => {
+        console.log(`Debug: Adding ${amount} rupees`);
+        this.addPlayerRupees(amount);
+      },
+      
+      // Backend sync functions
+      refreshPlayerState: () => this.refreshPlayerStateFromBackend(),
+      syncToBackend: (rupees?: number) => this.syncRupeesToBackend(rupees || this.playerRupees),
+      
+      // Banking and stock market status
+      getBankingStatus: () => ({
+        bankingUIOpen: document.getElementById('banking-ui-container')?.classList.contains('active') || false,
+        bankAccountData: this.bankNPCManager?.getBankAccountData() || null
+      }),
+      
+      getStockMarketStatus: () => ({
+        stockMarketUIOpen: document.getElementById('stock-market-ui-container')?.classList.contains('active') || false,
+        marketData: this.stockMarketManager?.getMarketStatus() || null
+      }),
+      
+      // Testing functions
+      testBankingSync: async () => {
+        console.log('Testing banking sync...');
+        const oldRupees = this.playerRupees;
+        this.updateRupees(oldRupees + 1000);
+        await this.syncRupeesToBackend(this.playerRupees);
+        await this.refreshPlayerStateFromBackend();
+        console.log(`Banking sync test: ${oldRupees} -> ${this.playerRupees}`);
+      },
+      
+      testStockMarketSync: async () => {
+        console.log('Testing stock market sync...');
+        const oldRupees = this.playerRupees;
+        this.updateRupees(oldRupees - 500);
+        await this.syncRupeesToBackend(this.playerRupees);
+        await this.refreshPlayerStateFromBackend();
+        console.log(`Stock market sync test: ${oldRupees} -> ${this.playerRupees}`);
+      }
+    };
+    
+    console.log('Debug helpers added to window.dhaniverse:', Object.keys((window as any).dhaniverse));
   }
 
   // Method to get current rupees
@@ -423,6 +613,23 @@ export class MainScene extends Scene implements MainGameScene {
     }
   }
 
+  // Handle updatePlayerRupees events from banking and stock market UIs
+  private handleUpdatePlayerRupees(event: Event): void {
+    const customEvent = event as CustomEvent;
+    if (customEvent.detail && typeof customEvent.detail.rupees === 'number') {
+      const newRupees = customEvent.detail.rupees;
+      console.log('Game received updatePlayerRupees event:', newRupees);
+      
+      // Update the local rupees count
+      this.updateRupees(newRupees);
+      
+      // If this is from a UI closing, ensure everything is in sync
+      if (customEvent.detail.closeUI) {
+        console.log('UI closed, syncing final state with backend');
+      }
+    }
+  }
+
   // Handle chat messages sent from HUD
   private handleSendChat(event: Event): void {
     const customEvent = event as ChatEvent;
@@ -452,8 +659,18 @@ export class MainScene extends Scene implements MainGameScene {
       this.webSocketManager.disconnect();
     }
 
+    // Cleanup managers
+    if (this.bankNPCManager) {
+      this.bankNPCManager.destroy();
+    }
+    
+    if (this.stockMarketManager) {
+      this.stockMarketManager.destroy();
+    }
+
     // Remove event listeners
     window.removeEventListener('rupee-update', this.handleRupeeUpdateBound);
+    window.removeEventListener('updatePlayerRupees', this.handleUpdatePlayerRupeesBound);
     window.removeEventListener('stop-game', this.handleStopGameBound);
     window.removeEventListener('send-chat', this.handleSendChatBound);
     window.removeEventListener('typing-start', this.handleTypingStart);
