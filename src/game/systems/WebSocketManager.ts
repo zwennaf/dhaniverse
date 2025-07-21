@@ -257,34 +257,44 @@ export class WebSocketManager {
         }
 
         // Check if there's already a connection for this player in localStorage
-        const connectionInfo = localStorage.getItem('dhaniverse_connection');
-        const userId = localStorage.getItem('dhaniverse_user_id');
-        
+        const connectionInfo = localStorage.getItem("dhaniverse_connection");
+        const userId = localStorage.getItem("dhaniverse_user_id");
+
         // Create a unique device identifier if it doesn't exist
-        let deviceId = localStorage.getItem('dhaniverse_device_id');
+        let deviceId = localStorage.getItem("dhaniverse_device_id");
         if (!deviceId) {
-            deviceId = `device-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-            localStorage.setItem('dhaniverse_device_id', deviceId);
+            deviceId = `device-${Date.now()}-${Math.random()
+                .toString(36)
+                .substring(2, 15)}`;
+            localStorage.setItem("dhaniverse_device_id", deviceId);
         }
-        
+
         if (connectionInfo) {
             try {
                 const connectionData = JSON.parse(connectionInfo);
                 const now = Date.now();
-                
+
                 // If this is the same device and connection is active, don't create a new one
-                if (connectionData.deviceId === deviceId && 
+                if (
+                    connectionData.deviceId === deviceId &&
                     connectionData.userId === userId &&
-                    this.ws && 
-                    this.ws.readyState === WebSocket.OPEN) {
-                    console.log("Already have an active connection on this device. Preventing duplicate connection.");
+                    this.ws &&
+                    this.ws.readyState === WebSocket.OPEN
+                ) {
+                    console.log(
+                        "Already have an active connection on this device. Preventing duplicate connection."
+                    );
                     return;
                 }
-                
+
                 // If connection is less than 30 seconds old on another device, don't replace it
-                if (connectionData.deviceId !== deviceId && 
-                    now - connectionData.timestamp < 30000) {
-                    console.log("Active connection exists on another device. Not replacing it.");
+                if (
+                    connectionData.deviceId !== deviceId &&
+                    now - connectionData.timestamp < 30000
+                ) {
+                    console.log(
+                        "Active connection exists on another device. Not replacing it."
+                    );
                     return;
                 }
             } catch (e) {
@@ -308,14 +318,17 @@ export class WebSocketManager {
 
             this.ws = null;
         }
-        
+
         // Store connection info in localStorage with device ID
-        localStorage.setItem('dhaniverse_connection', JSON.stringify({
-            timestamp: Date.now(),
-            username: username,
-            userId: userId,
-            deviceId: deviceId
-        }));
+        localStorage.setItem(
+            "dhaniverse_connection",
+            JSON.stringify({
+                timestamp: Date.now(),
+                username: username,
+                userId: userId,
+                deviceId: deviceId,
+            })
+        );
 
         // Reset intentional disconnect flag for new connection
         this.intentionalDisconnect = false;
@@ -960,49 +973,82 @@ export class WebSocketManager {
      */
     public sendChat(message: string): void {
         // Generate a unique message ID to prevent duplicates
-        const messageId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        
+        const messageId = `chat-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
+
         // Check if this message was recently sent (within last 2 seconds)
-        const recentMessages = localStorage.getItem('dhaniverse_recent_chats');
+        const recentMessages = localStorage.getItem("dhaniverse_recent_chats");
         if (recentMessages) {
             try {
                 const messages = JSON.parse(recentMessages);
                 const now = Date.now();
-                
+
                 // Filter out messages older than 2 seconds
-                const recentMessagesList = messages.filter((msg: any) => now - msg.timestamp < 2000);
-                
+                const recentMessagesList = messages.filter(
+                    (msg: any) => now - msg.timestamp < 2000
+                );
+
                 // Check if this message content was recently sent
-                if (recentMessagesList.some((msg: any) => msg.content === message)) {
+                if (
+                    recentMessagesList.some(
+                        (msg: any) => msg.content === message
+                    )
+                ) {
                     console.log("Duplicate chat message detected, ignoring");
                     return;
                 }
-                
+
                 // Update recent messages list
-                recentMessagesList.push({ content: message, timestamp: now, id: messageId });
-                localStorage.setItem('dhaniverse_recent_chats', JSON.stringify(recentMessagesList));
+                recentMessagesList.push({
+                    content: message,
+                    timestamp: now,
+                    id: messageId,
+                });
+                localStorage.setItem(
+                    "dhaniverse_recent_chats",
+                    JSON.stringify(recentMessagesList)
+                );
             } catch (e) {
                 // Invalid JSON, create new list
-                localStorage.setItem('dhaniverse_recent_chats', JSON.stringify([
-                    { content: message, timestamp: Date.now(), id: messageId }
-                ]));
+                localStorage.setItem(
+                    "dhaniverse_recent_chats",
+                    JSON.stringify([
+                        {
+                            content: message,
+                            timestamp: Date.now(),
+                            id: messageId,
+                        },
+                    ])
+                );
             }
         } else {
             // No recent messages, create new list
-            localStorage.setItem('dhaniverse_recent_chats', JSON.stringify([
-                { content: message, timestamp: Date.now(), id: messageId }
-            ]));
+            localStorage.setItem(
+                "dhaniverse_recent_chats",
+                JSON.stringify([
+                    { content: message, timestamp: Date.now(), id: messageId },
+                ])
+            );
         }
-        
+
         if (this.ws && this.ws.readyState === WebSocket.OPEN && this.playerId) {
             // Queue the chat message with high priority and include the message ID
-            this.queueMessage("chat", { message, id: messageId }, MessagePriority.HIGH);
+            this.queueMessage(
+                "chat",
+                { message, id: messageId },
+                MessagePriority.HIGH
+            );
         } else {
             // Queue the message anyway, it will be sent when connection is restored
             console.warn(
                 "Cannot send chat immediately: not connected or not authenticated. Message queued."
             );
-            this.queueMessage("chat", { message, id: messageId }, MessagePriority.HIGH);
+            this.queueMessage(
+                "chat",
+                { message, id: messageId },
+                MessagePriority.HIGH
+            );
         }
     }
 }

@@ -428,7 +428,9 @@ export class MainScene extends Scene implements MainGameScene {
           }
         } catch (apiError) {
           // If player state doesn't exist yet, create it
-          if (apiError.message && apiError.message.includes('404')) {
+          if (typeof apiError === 'object' && apiError !== null && 
+              'message' in apiError && typeof apiError.message === 'string' && 
+              apiError.message.includes('404')) {
             console.log('Player state not found, creating initial state...');
             try {
               // Create initial player state with current rupees
