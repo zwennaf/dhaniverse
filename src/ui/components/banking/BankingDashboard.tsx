@@ -124,7 +124,14 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     try {
       const result = await bankingApi.deposit(amount);
       if (result.success) {
-        setBankBalance(result.data.balance);
+        // Check if result.data and result.data.balance exist
+        if (result.data && typeof result.data.balance === 'number') {
+          setBankBalance(result.data.balance);
+        } else {
+          // If balance is not in the response, increment the current balance
+          setBankBalance(prevBalance => prevBalance + amount);
+        }
+        
         setTotalRupeesChange(prev => prev - amount);
         
         // Update player state in backend
