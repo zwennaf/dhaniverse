@@ -22,7 +22,7 @@ export const Constants = {
             
             // If deployed on Vercel (frontend), use the API domain
             if (host.includes('vercel.app')) {
-                return 'ws://dhaniverseapi.deno.dev/ws';
+                return 'wss://dhaniverseapi.deno.dev/ws';
             }
             
             // If deployed on the same domain (Deno Deploy), use same domain
