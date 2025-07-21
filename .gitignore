@@ -22,7 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
+.dfx
+.azle
 .vercel
 
 public/maps/fullmap

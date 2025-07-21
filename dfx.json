@@ -1,0 +1,12 @@
+
+{
+  "canisters": {
+    "dhaniverse_frontend": {
+      "source": ["dist"],
+      "type": "assets",
+      "frontend": {
+        "entrypoint": "dist/index.html"
+      }
+    }
+  }
+}
