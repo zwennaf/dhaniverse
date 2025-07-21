@@ -38,7 +38,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
   
   // ICP Integration State
   const [walletManager] = useState(() => new WalletManager());
-  const [icpService] = useState(() => new ICPActorService(process.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'));
+  const [icpService] = useState(() => new ICPActorService(import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'));
   const [dualStorageManager] = useState(() => new DualStorageManager(icpService, walletManager));
   const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
   const [storageMode, setStorageMode] = useState<StorageMode>('local');

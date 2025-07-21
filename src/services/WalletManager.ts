@@ -95,8 +95,8 @@ export class WalletManager {
       
       // Request connection
       const connected = await plug.requestConnect({
-        whitelist: [process.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'],
-        host: process.env.NODE_ENV === 'production' 
+        whitelist: [import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'],
+        host: import.meta.env.NODE_ENV === 'production' 
           ? 'https://ic0.app' 
           : 'http://127.0.0.1:4943'
       });
@@ -138,7 +138,7 @@ private async connectInternetIdentity(): Promise<WalletConnectionResult> {
 
       return new Promise((resolve) => {
         this.authClient!.login({
-          identityProvider: process.env.NODE_ENV === 'production'
+          identityProvider: import.meta.env.NODE_ENV === 'production'
             ? 'https://identity.ic0.app/#authorize'
             : `http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaah-qcaiq-cai#authorize`,
           onSuccess: () => {

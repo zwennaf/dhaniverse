@@ -1,4 +1,4 @@
- import { IDL, query, update, ic } from "azle";
+import { IDL, query, update } from "azle";
 import {
     BankAccount,
     Transaction,
@@ -63,7 +63,7 @@ export default class DhaniverseCanister {
         })
     )
     deposit(amount: number): DepositResponse {
-        const callerPrincipal = ic.caller().toString();
+        const callerPrincipal = "demo-user"; // For demo purposes - in production use proper caller identification
 
         if (amount <= 0) {
             throw new Error("Deposit amount must be positive");
@@ -105,7 +105,7 @@ export default class DhaniverseCanister {
         })
     )
     withdraw(amount: number): WithdrawResponse {
-        const callerPrincipal = ic.caller().toString();
+        const callerPrincipal = "demo-user"; // For demo purposes - in production use proper caller identification
 
         if (amount <= 0) {
             return {

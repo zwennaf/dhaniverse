@@ -111,14 +111,14 @@ export class ICPActorService {
       
       // Create agent
       this.agent = await HttpAgent.create({
-        host: process.env.NODE_ENV === 'production' 
+        host: import.meta.env.NODE_ENV === 'production' 
           ? 'https://ic0.app' 
           : 'http://127.0.0.1:4943',
         identity: this.identity || undefined
       });
 
       // Fetch root key for local development
-      if (process.env.NODE_ENV !== 'production') {
+      if (import.meta.env.NODE_ENV !== 'production') {
         await this.agent.fetchRootKey();
       }
 
