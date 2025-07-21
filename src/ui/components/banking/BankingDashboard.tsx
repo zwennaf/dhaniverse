@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import DepositWithdrawPanel from './DepositWithdrawPanel';
 import FixedDepositPanel from './FixedDepositPanel';
 import { bankingApi, fixedDepositApi, playerStateApi } from '../../../utils/api';
+import { WalletManager, WalletStatus } from '../../../services/WalletManager';
+import { ICPActorService } from '../../../services/ICPActorService';
+import { DualStorageManager, StorageMode } from '../../../services/DualStorageManager';
 
 interface FixedDeposit {
   _id?: string;
@@ -33,6 +36,48 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // ICP Integration State
+  const [walletManager] = useState(() => new WalletManager());
+  const [icpService] = useState(() => new ICPActorService(process.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'));
+  const [dualStorageManager] = useState(() => new DualStorageManager(icpService, walletManager));
+  const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
+  const [storageMode, setStorageMode] = useState<StorageMode>('local');
+  const [syncInProgress, setSyncInProgress] = useState(false);
+  const [showWalletPrompt, setShowWalletPrompt] = useState(false);
+  
+  // Initialize ICP services
+  useEffect(() => {
+    const initializeICP = async () => {
+      // Listen for wallet status changes
+      walletManager.onConnectionChange((status) => {
+        setWalletStatus(status);
+        if (status.connected) {
+          setShowWalletPrompt(false);
+          // Connect ICP service with wallet identity
+          const identity = walletManager.getIdentity();
+          if (identity) {
+            icpService.connect(identity).then((connected) => {
+              if (connected) {
+                dualStorageManager.setStorageMode('hybrid');
+                setStorageMode('hybrid');
+              }
+            });
+          }
+        } else {
+          dualStorageManager.setStorageMode('local');
+          setStorageMode('local');
+        }
+      });
+
+      // Check initial wallet status
+      const initialStatus = walletManager.getConnectionStatus();
+      setWalletStatus(initialStatus);
+      setStorageMode(dualStorageManager.getStorageMode());
+    };
+
+    initializeICP();
+  }, []);
+
   // Enhanced close handler that communicates final rupee state
   const handleClose = () => {
     // Calculate final rupees after all banking transactions
@@ -53,7 +98,63 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     // Call the original onClose function
     onClose();
   };
+
+  // Wallet connection handlers
+  const handleConnectWallet = async () => {
+    try {
+      const result = await walletManager.connectWallet();
+      if (result.success) {
+        console.log('Wallet connected successfully');
+        // Optionally sync existing data to blockchain
+        setShowWalletPrompt(false);
+      } else {
+        console.error('Failed to connect wallet:', result.error);
+        setError(`Failed to connect wallet: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Wallet connection error:', error);
+      setError(`Wallet connection error: ${error}`);
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    walletManager.disconnectWallet();
+    setShowWalletPrompt(false);
+  };
+
+  const handleSyncToBlockchain = async () => {
+    if (syncInProgress) return;
+    
+    setSyncInProgress(true);
+    try {
+      const result = await dualStorageManager.syncToBlockchain();
+      if (result.success) {
+        console.log(`Synced ${result.syncedTransactions} transactions to blockchain`);
+        if (result.conflicts > 0) {
+          setError(`Sync completed with ${result.conflicts} conflicts resolved`);
+        }
+      } else {
+        setError(`Sync failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      setError(`Sync error: ${error}`);
+    } finally {
+      setSyncInProgress(false);
+    }
+  };
   
+  // Show wallet prompt after initial load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!walletStatus.connected) {
+        setShowWalletPrompt(true);
+      }
+    }, 2000); // Show prompt after 2 seconds
+
+    return () => clearTimeout(timer);
+  }, [walletStatus.connected]);
+
   // Load data from backend
   useEffect(() => {
     const loadBankingData = async () => {
@@ -294,7 +395,22 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
       <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 className="text-2xl font-bold text-white">Dhaniverse Banking</h2>          <button
+          <div className="flex items-center space-x-4">
+            <h2 className="text-2xl font-bold text-white">Dhaniverse Banking</h2>
+            {/* Blockchain Status Indicator */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+              <span className="text-sm text-gray-300">
+                {walletStatus.connected ? `Connected (${walletStatus.walletType?.toUpperCase()})` : 'Local Mode'}
+              </span>
+              {storageMode === 'hybrid' && (
+                <span className="px-2 py-1 bg-blue-600 text-xs rounded-full text-white">
+                  Blockchain Enhanced
+                </span>
+              )}
+            </div>
+          </div>
+          <button
             onClick={handleClose}
             className="text-gray-400 hover:text-white transition-colors"
           >
@@ -303,6 +419,34 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             </svg>
           </button>
         </div>
+
+        {/* Wallet Connection Prompt */}
+        {!walletStatus.connected && showWalletPrompt && (
+          <div className="bg-blue-900/50 border border-blue-700 p-4 mx-6 mt-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-blue-300 font-medium">Connect ICP Wallet for Enhanced Features</h3>
+                <p className="text-blue-200 text-sm mt-1">
+                  Get tamper-proof records and compete on blockchain leaderboards
+                </p>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleConnectWallet}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Connect Wallet
+                </button>
+                <button
+                  onClick={() => setShowWalletPrompt(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Tabs */}
         <div className="flex border-b border-gray-700">
@@ -326,6 +470,18 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
           >
             Fixed Deposits ({fixedDeposits.length})
           </button>
+          {walletStatus.connected && (
+            <button
+              onClick={() => setActiveTab('blockchain')}
+              className={`px-6 py-3 font-medium transition-colors ${
+                activeTab === 'blockchain'
+                  ? 'text-blue-400 border-b-2 border-blue-400'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Blockchain
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -348,12 +504,55 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
           ) : (
             <>
               {activeTab === 'account' && (
-                <DepositWithdrawPanel
-                  playerRupees={playerRupees + totalRupeesChange}
-                  bankBalance={bankBalance}
-                  onDeposit={handleDeposit}
-                  onWithdraw={handleWithdraw}
-                />
+                <div>
+                  <DepositWithdrawPanel
+                    playerRupees={playerRupees + totalRupeesChange}
+                    bankBalance={bankBalance}
+                    onDeposit={handleDeposit}
+                    onWithdraw={handleWithdraw}
+                  />
+                  
+                  {/* Blockchain Actions */}
+                  {walletStatus.connected && (
+                    <div className="mt-6 p-4 bg-gray-700 rounded-lg">
+                      <h3 className="text-lg font-medium text-white mb-3">Blockchain Actions</h3>
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={handleSyncToBlockchain}
+                          disabled={syncInProgress}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {syncInProgress ? 'Syncing...' : 'Sync to Blockchain'}
+                        </button>
+                        <button
+                          onClick={handleDisconnectWallet}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                        >
+                          Disconnect Wallet
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-300 mt-2">
+                        Principal: {walletStatus.principal?.slice(0, 20)}...
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Connect Wallet Button for Account Tab */}
+                  {!walletStatus.connected && (
+                    <div className="mt-6 p-4 bg-gray-700 rounded-lg text-center">
+                      <h3 className="text-lg font-medium text-white mb-2">Enhance Your Banking</h3>
+                      <p className="text-gray-300 mb-4">
+                        Connect your ICP wallet for tamper-proof records and blockchain verification
+                      </p>
+                      <button
+                        onClick={handleConnectWallet}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Connect ICP Wallet
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               
               {activeTab === 'fd' && (
@@ -363,6 +562,84 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                   onCreateFD={handleCreateFD}
                   onClaimFD={handleClaimFD}
                 />
+              )}
+              
+              {activeTab === 'blockchain' && walletStatus.connected && (
+                <div className="space-y-6">
+                  <div className="bg-gray-700 rounded-lg p-6">
+                    <h3 className="text-xl font-bold text-white mb-4">Blockchain Status</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-sm text-gray-400">Storage Mode</div>
+                        <div className="text-lg font-medium text-white capitalize">{storageMode}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">Wallet Type</div>
+                        <div className="text-lg font-medium text-white">{walletStatus.walletType?.toUpperCase()}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">Principal ID</div>
+                        <div className="text-sm font-mono text-blue-300 break-all">{walletStatus.principal}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-400">Connection Status</div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-green-400">Connected</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-700 rounded-lg p-6">
+                    <h3 className="text-xl font-bold text-white mb-4">Sync Management</h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-white font-medium">Sync to Blockchain</div>
+                          <div className="text-sm text-gray-400">Upload local transactions to ICP canister</div>
+                        </div>
+                        <button
+                          onClick={handleSyncToBlockchain}
+                          disabled={syncInProgress}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {syncInProgress ? 'Syncing...' : 'Sync Now'}
+                        </button>
+                      </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-white font-medium">Disconnect Wallet</div>
+                          <div className="text-sm text-gray-400">Return to local-only mode</div>
+                        </div>
+                        <button
+                          onClick={handleDisconnectWallet}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-700 rounded-lg p-6">
+                    <h3 className="text-xl font-bold text-white mb-4">Transaction Sources</h3>
+                    <div className="text-sm text-gray-400 mb-2">
+                      Your transactions are now enhanced with blockchain verification
+                    </div>
+                    <div className="flex space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                        <span className="text-blue-300">Blockchain Verified</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                        <span className="text-gray-300">Local Only</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </>
           )}

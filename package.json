@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "vite",
         "host": "vite --host",
-        "build": "tsc -p tsconfig.frontend.json && vite build",
+        "build": "tsc && vite build",
         "preview": "vite preview",
         "server": "deno run -A --env-file=server/.env --watch server/index.ts"
     },
@@ -16,13 +16,14 @@
         "vite": "^6.2.0"
     },
     "dependencies": {
+        "@dfinity/agent": "^3.0.0",
+        "@dfinity/auth-client": "^3.0.0",
         "@google-cloud/local-auth": "^3.0.1",
         "@types/node": "^22.14.1",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.2",
         "autoprefixer": "^10.4.21",
         "clsx": "^2.1.1",
-        "esbuild-plugin-tsc": "^0.5.0",
         "framer-motion": "^12.7.2",
         "google-auth-library": "^9.15.1",
         "lucide-react": "^0.488.0",
@@ -34,18 +35,5 @@
         "tailwind-merge": "^3.2.0",
         "tailwindcss": "^3.4.11",
         "tailwindcss-animate": "^1.0.7"
-    },
-    "description": "![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)",
-    "main": "postcss.config.js",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/Gursimrxn/dhaniverse.git"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
-    "bugs": {
-        "url": "https://github.com/Gursimrxn/dhaniverse/issues"
-    },
-    "homepage": "https://github.com/Gursimrxn/dhaniverse#readme"
+    }
 }

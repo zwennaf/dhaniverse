@@ -403,49 +403,26 @@ export class MainScene extends Scene implements MainGameScene {
         // Import API here to avoid circular dependency
         const { playerStateApi } = await import('../../utils/api.ts');
         
-        try {
-          // Get current state from backend
-          const response = await playerStateApi.get();
+        // Get current state from backend
+        const response = await playerStateApi.get();
+        
+        if (response.success && response.data) {
+          const backendRupees = response.data.financial?.rupees || this.playerRupees;
           
-          if (response.success && response.data) {
-            const backendRupees = response.data.financial?.rupees || this.playerRupees;
+          // Only update if there's a significant difference (to avoid constant updates)
+          if (Math.abs(backendRupees - this.playerRupees) > 0) {
+            console.log(`Backend sync: updating rupees from ${this.playerRupees} to ${backendRupees}`);
+            this.playerRupees = backendRupees;
             
-            // Only update if there's a significant difference (to avoid constant updates)
-            if (Math.abs(backendRupees - this.playerRupees) > 0) {
-              console.log(`Backend sync: updating rupees from ${this.playerRupees} to ${backendRupees}`);
-              this.playerRupees = backendRupees;
-              
-              // Update UI
-              import('../game.ts').then(({ updateGameHUD }) => {
-                updateGameHUD(this.playerRupees);
-              });
-              
-              // Dispatch event to update all UI components
-              window.dispatchEvent(new CustomEvent('rupee-update', {
-                detail: { rupees: this.playerRupees }
-              }));
-            }
-          }
-        } catch (apiError) {
-          // If player state doesn't exist yet, create it
-          if (typeof apiError === 'object' && apiError !== null && 
-              'message' in apiError && typeof apiError.message === 'string' && 
-              apiError.message.includes('404')) {
-            console.log('Player state not found, creating initial state...');
-            try {
-              // Create initial player state with current rupees
-              await playerStateApi.update({
-                financial: {
-                  rupees: this.playerRupees,
-                  totalWealth: this.playerRupees
-                }
-              });
-              console.log('Created initial player state with rupees:', this.playerRupees);
-            } catch (createError) {
-              console.error('Failed to create initial player state:', createError);
-            }
-          } else {
-            console.error('Failed to get player state:', apiError);
+            // Update UI
+            import('../game.ts').then(({ updateGameHUD }) => {
+              updateGameHUD(this.playerRupees);
+            });
+            
+            // Dispatch event to update all UI components
+            window.dispatchEvent(new CustomEvent('rupee-update', {
+              detail: { rupees: this.playerRupees }
+            }));
           }
         }
       } catch (error) {

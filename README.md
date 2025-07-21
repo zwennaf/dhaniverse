@@ -1,68 +1,81 @@
-
-
 # 🌍 Dhaniverse — Gamified Financial Management App 💸🎮
-  ![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)
 
-> "We're not just making financial education fun — we're making it *relevant* to young India's unique challenges."
+![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)
+
+> "We're not just making financial education fun — we're making it _relevant_ to young India's unique challenges."
 
 Welcome to **Dhaniverse**, a 2D open-world RPG game that transforms the way Gen Z and Millennials learn about personal finance. It’s where **fun meets finance**, **strategy meets savings**, and **gaming meets growth**. 🎯
 
 ---
 
-
 ## 🚀 About the Project
 
 **Dhaniverse** is more than just a game — it's an **immersive financial literacy platform** built with ❤️ to teach **real-world money skills** through play. Learn how to save, invest, budget, and even run startups — all in a low-risk, high-reward virtual universe.
 
-- 🎓 Perfect for students and young professionals
-- 🧠 Built with behavioral economics + gamification
-- 🏦 Real-life financial simulations and decision-making
+-   🎓 Perfect for students and young professionals
+-   🧠 Built with behavioral economics + gamification
+-   🏦 Real-life financial simulations and decision-making
 
 ---
 
 ## 🛠 Tech Stack
 
-| 🧩 Frontend | ⚙️ Backend | 🎨 Design | 📦 Packages |
-|------------|------------|------------|------------|
-| `React.js` with `TypeScript` | `Deno` with `MongoDB` | `Figma` | `@dhaniverse/map-optimizer` |
-| `Phaser 3` for WebGL 2D rendering | `WebSocket` for real-time multiplayer | `Tiled Map Editor` | Chunked map loading system |
-| Modular ESModules Architecture | `JWT` auth with token management | Interactive UI & Game Flow | Binary map optimization |
-| `Vite` build system | `Oak` framework for REST APIs | Responsive design patterns | Encryption & security layers |
+| 🧩 Frontend                       | ⚙️ Backend                            | 🎨 Design                  | 📦 Packages                  |
+| --------------------------------- | ------------------------------------- | -------------------------- | ---------------------------- |
+| `React.js` with `TypeScript`      | `Deno` with `MongoDB`                 | `Figma`                    | `@dhaniverse/map-optimizer`  |
+| `Phaser 3` for WebGL 2D rendering | `WebSocket` for real-time multiplayer | `Tiled Map Editor`         | Chunked map loading system   |
+| Modular ESModules Architecture    | `JWT` auth with token management      | Interactive UI & Game Flow | Binary map optimization      |
+| `Vite` build system               | `Oak` framework for REST APIs         | Responsive design patterns | Encryption & security layers |
+
+### 🔗 Blockchain Integration (ICP)
+
+| 🌐 ICP Features                           | 🔧 Implementation            | 🎯 Purpose                       |
+| ----------------------------------------- | ---------------------------- | -------------------------------- |
+| `Azle Framework` for TypeScript canisters | On-chain banking ledger      | Tamper-proof financial records   |
+| `Internet Computer Protocol`              | Decentralized leaderboards   | Verifiable trading achievements  |
+| `Principal-based Authentication`          | Plug wallet integration      | Secure user identity management  |
+| `Dual Storage Strategy`                   | Hybrid local/blockchain data | Progressive enhancement approach |
 
 ---
 
 ## 🎮 Gameplay & Features
 
 ### 🔑 Core Gameplay Elements
-- **RPG-style map exploration** with chunked loading and dynamic optimization 🗺️
-- **Habit-building missions** to practice budgeting, saving, and investing 💰
-- **Real-world finance simulations** like stock trading, tax planning, and side hustles 📊
-- **Real-time multiplayer** with WebSocket connections and chat system 👥
-- **Advanced error handling** with graceful degradation and retry mechanisms 🛡️
+
+-   **RPG-style map exploration** with chunked loading and dynamic optimization 🗺️
+-   **Habit-building missions** to practice budgeting, saving, and investing 💰
+-   **Real-world finance simulations** like stock trading, tax planning, and side hustles 📊
+-   **Real-time multiplayer** with WebSocket connections and chat system 👥
+-   **Advanced error handling** with graceful degradation and retry mechanisms 🛡️
 
 ### 🚀 Technical Features
-- **High-performance map optimization** with binary chunking and encryption
-- **Smart loading system** with predictive caching and memory management
-- **Real-time multiplayer** infrastructure with room-based gameplay
-- **Comprehensive error handling** chain for robust user experience
-- **WebGL optimization** with automatic fallback and recovery systems
-- **Modular architecture** with separate packages for specialized functionality
+
+-   **High-performance map optimization** with binary chunking and encryption
+-   **Smart loading system** with predictive caching and memory management
+-   **Real-time multiplayer** infrastructure with room-based gameplay
+-   **Comprehensive error handling** chain for robust user experience
+-   **WebGL optimization** with automatic fallback and recovery systems
+-   **Modular architecture** with separate packages for specialized functionality
+-   **🔗 Blockchain Integration** with ICP for tamper-proof financial education
+-   **🏆 Decentralized Leaderboards** with verifiable trading achievements
+-   **💰 On-chain Banking** with optional wallet connection for enhanced features
 
 ### 💡 Use Cases
-- 🔹 Curriculum add-on for schools and colleges
-- 🔹 Fintech onboarding for Gen Z users
-- 🔹 Self-paced learning tool for individuals
+
+-   🔹 Curriculum add-on for schools and colleges
+-   🔹 Fintech onboarding for Gen Z users
+-   🔹 Self-paced learning tool for individuals
 
 ---
 
 ## 💼 Business & Monetization Strategy
 
-| 💰 Model | 📈 Description |
-|---------|----------------|
-| **Freemium** | Basic access free, advanced levels behind subscription |
-| **In-Game Purchases** | Cosmetic upgrades, power-ups, financial tools |
-| **Premium Zones** | Unlock deeper simulations like Startup Street & Investor Island |
-| **Ethical In-Game Ads** | Contextual, skippable ads from relevant brands |
+| 💰 Model                | 📈 Description                                                  |
+| ----------------------- | --------------------------------------------------------------- |
+| **Freemium**            | Basic access free, advanced levels behind subscription          |
+| **In-Game Purchases**   | Cosmetic upgrades, power-ups, financial tools                   |
+| **Premium Zones**       | Unlock deeper simulations like Startup Street & Investor Island |
+| **Ethical In-Game Ads** | Contextual, skippable ads from relevant brands                  |
 
 > 🎯 Target Age Group: 18–35 years | 🌐 Global Scale: Localized content for different currencies, regions
 
@@ -71,16 +84,22 @@ Welcome to **Dhaniverse**, a 2D open-world RPG game that transforms the way Gen 
 ## � Project Structure
 
 ### 🏗️ Architecture Overview
+
 ```
 dhaniverse/
 ├── 📦 packages/                 # Modular packages
-│   └── map-optimizer/          # High-performance map optimization
+│   ├── map-optimizer/          # High-performance map optimization
+│   │   ├── src/
+│   │   │   ├── chunker/        # Map chunking algorithms
+│   │   │   ├── manager/        # Chunk management system
+│   │   │   ├── parser/         # Binary map parsing
+│   │   │   └── types/          # TypeScript definitions
+│   │   └── package.json
+│   └── icp-canister/           # 🔗 ICP blockchain integration
 │       ├── src/
-│       │   ├── chunker/        # Map chunking algorithms
-│       │   ├── manager/        # Chunk management system
-│       │   ├── parser/         # Binary map parsing
-│       │   └── types/          # TypeScript definitions
-│       └── package.json
+│       │   ├── index.ts        # Main canister implementation
+│       │   └── types.ts        # Blockchain data models
+│       └── dfx.json            # ICP deployment configuration
 ├── 🎮 src/                     # Game client source
 │   ├── game/
 │   │   ├── entities/           # Player, NPCs, interactive objects
@@ -111,35 +130,47 @@ dhaniverse/
 ### 🔧 Key Systems
 
 #### 🗺️ Map Optimization Package
-- **Binary chunking** for faster loading
-- **AES-256 encryption** for security
-- **Smart caching** with LRU eviction
-- **Memory management** with WebGL optimization
-- **Error recovery** with graceful degradation
+
+-   **Binary chunking** for faster loading
+-   **AES-256 encryption** for security
+-   **Smart caching** with LRU eviction
+-   **Memory management** with WebGL optimization
+-   **Error recovery** with graceful degradation
 
 #### 🌐 Multiplayer Infrastructure
-- **WebSocket server** with room-based sessions
-- **Real-time chat** with message broadcasting
-- **Player synchronization** with position interpolation
-- **Connection management** with automatic reconnection
-- **Anti-tampering** measures and rate limiting
+
+-   **WebSocket server** with room-based sessions
+-   **Real-time chat** with message broadcasting
+-   **Player synchronization** with position interpolation
+-   **Connection management** with automatic reconnection
+-   **Anti-tampering** measures and rate limiting
 
 #### 🎯 Financial Simulation Systems
-- **Stock market** with real-time price updates
-- **Banking system** with fixed deposits and transactions
-- **Portfolio management** with profit/loss tracking
-- **Building interactions** (Bank, Stock Market, etc.)
-- **Progress tracking** with level and experience systems
+
+-   **Stock market** with real-time price updates
+-   **Banking system** with fixed deposits and transactions
+-   **Portfolio management** with profit/loss tracking
+-   **Building interactions** (Bank, Stock Market, etc.)
+-   **Progress tracking** with level and experience systems
+
+#### 🔗 ICP Blockchain Integration
+
+-   **On-chain Banking Ledger** - Player balances stored immutably on Internet Computer
+-   **Decentralized Leaderboards** - Trading achievements verified and tamper-proof
+-   **Progressive Enhancement** - Works without wallet, enhanced with ICP connection
+-   **Dual Storage Strategy** - Seamless fallback between blockchain and traditional storage
+-   **Principal-based Security** - Secure user authentication via ICP identity system
+-   **WCHL25 Hackathon Ready** - Demonstrates real blockchain utility in financial education
 
 ---
 
 ## �🔭 Future Scope & Expansion
 
-- 📱 Mobile App + Wearables Integration
-- 🤖 AI-powered Personal Finance Advisors
-- 🧑‍🎓 School & College Partnerships
-- 💳 Real-world banking & investing integrations
-- 🌐 B2B: Banks, Fintechs, Edtechs, Governments
+-   📱 Mobile App + Wearables Integration
+-   🤖 AI-powered Personal Finance Advisors
+-   🧑‍🎓 School & College Partnerships
+-   💳 Real-world banking & investing integrations
+-   🌐 B2B: Banks, Fintechs, Edtechs, Governments
 
 > 💼 **Market Potential**: ₹15,000 Cr Indian Financial Literacy Market  
 > 🌍 **Global Reach**: 1.8 Billion+ Gen Zs entering financial independence  
@@ -150,7 +181,35 @@ dhaniverse/
 ## 🧠 Learnings & Inspiration
 
 We designed Dhaniverse with one goal: **Make learning finance a journey — not a chore.**  
-By combining **Phaser-powered gameplay**, **financial APIs**, and **community-driven content**, we aim to empower the next generation to *play smart, save smarter*.
+By combining **Phaser-powered gameplay**, **financial APIs**, and **community-driven content**, we aim to empower the next generation to _play smart, save smarter_.
+
+---
+
+## 🏆 WCHL25 Hackathon Integration
+
+### 🎯 Blockchain Utility Demonstration
+
+Dhaniverse showcases **practical blockchain integration** that enhances rather than replaces traditional systems:
+
+-   **🔐 Tamper-proof Financial Records**: Player banking data stored immutably on ICP
+-   **🏅 Verifiable Achievements**: Stock trading leaderboards that can't be manipulated
+-   **🌐 Decentralized Identity**: Principal-based authentication for secure, portable user profiles
+-   **📊 Educational Transparency**: On-chain data proves learning progress and financial literacy gains
+
+### 🚀 Technical Innovation
+
+-   **Progressive Enhancement**: Game works perfectly without blockchain, enhanced with ICP
+-   **Dual Storage Architecture**: Intelligent switching between local and on-chain data
+-   **Real-world Application**: Blockchain solves actual problems in financial education
+-   **User-friendly Onboarding**: Optional wallet connection doesn't disrupt gameplay flow
+
+### 🎮 Hackathon Demo Flow
+
+1. **Traditional Gameplay**: Start playing immediately without any blockchain setup
+2. **Wallet Connection**: Optional ICP wallet integration for enhanced features
+3. **On-chain Banking**: Deposit/withdraw with immutable transaction records
+4. **Leaderboard Competition**: Compete on tamper-proof trading performance rankings
+5. **Data Verification**: Demonstrate blockchain data integrity and transparency
 
 ---
 
@@ -160,6 +219,7 @@ We 💙 open-source collaboration!
 Interested in contributing? Help us expand quests, optimize performance, or integrate global financial systems.
 
 ### 🚀 Development Setup
+
 ```bash
 # Clone the repo
 git clone https://github.com/Gursimrxn/dhaniverse.git
@@ -181,18 +241,27 @@ npm run build        # Build for production
 cd packages/map-optimizer
 npm run build        # Build map optimization package
 npm run dev          # Watch mode for package development
+
+# ICP Canister development
+cd packages/icp-canister
+npm run start        # Start local ICP replica
+npm run deploy       # Deploy canister to local network
+npm run build        # Build canister for deployment
 ```
 
 ### 🏗️ Building & Deployment
-- **Frontend**: Built with Vite, deployed on Vercel
-- **Backend**: Deno runtime, deployed on Deno Deploy
-- **Database**: MongoDB with connection pooling
-- **WebSocket**: Separate service for real-time features
+
+-   **Frontend**: Built with Vite, deployed on Vercel
+-   **Backend**: Deno runtime, deployed on Deno Deploy
+-   **Database**: MongoDB with connection pooling
+-   **WebSocket**: Separate service for real-time features
 
 ## 🌐 Live Demo
+
 Experience Dhaniverse in action: **https://dhaniverse.vercel.app**
 
 ### 🎮 Quick Start
+
 1. **Visit the demo** and create your account
 2. **Explore the world** using WASD keys
 3. **Enter buildings** with SPACE/ENTER when prompted
@@ -203,10 +272,11 @@ Experience Dhaniverse in action: **https://dhaniverse.vercel.app**
 ---
 
 ## 🏆 Awards & Recognition
-- 🥇 Featured in **GitHub's trending repositories**
-- 🎯 **Gamification Excellence** in EdTech category
-- 🚀 **Innovation in Financial Literacy** award finalist
+
+-   🥇 Featured in **GitHub's trending repositories**
+-   🎯 **Gamification Excellence** in EdTech category
+-   🚀 **Innovation in Financial Literacy** award finalist
 
 ---
 
-*Built with ❤️ for the next generation of financially savvy individuals*
+_Built with ❤️ for the next generation of financially savvy individuals_

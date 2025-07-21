@@ -1,11 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
+import { WalletManager, WalletStatus } from "../../../services/WalletManager";
+import { ICPActorService } from "../../../services/ICPActorService";
+import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 
 interface GameHUDProps {
     rupees?: number;
     username?: string;
+    walletManager?: WalletManager;
+    icpService?: ICPActorService;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
+const GameHUD: React.FC<GameHUDProps> = ({ 
+    rupees = 25000, 
+    walletManager,
+    icpService 
+}) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
         { id: string; username: string; message: string }[]
@@ -13,6 +22,10 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
     const [isChatFocused, setIsChatFocused] = useState(false);
+    
+    // Blockchain status
+    const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
+    const [networkHealthy, setNetworkHealthy] = useState(true);
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -22,6 +35,33 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
         // Make sure typing is disabled initially
         window.dispatchEvent(new Event("typing-end"));
     }, []);
+
+    // Initialize blockchain status monitoring
+    useEffect(() => {
+        if (walletManager) {
+            // Listen for wallet status changes
+            walletManager.onConnectionChange((status) => {
+                setWalletStatus(status);
+            });
+
+            // Set initial status
+            setWalletStatus(walletManager.getConnectionStatus());
+        }
+
+        // Monitor network health
+        const healthStatus = NetworkHealthMonitor.getHealthStatus();
+        setNetworkHealthy(healthStatus.overallHealthy);
+
+        // Check health periodically
+        const healthCheckInterval = setInterval(() => {
+            const status = NetworkHealthMonitor.getHealthStatus();
+            setNetworkHealthy(status.overallHealthy);
+        }, 10000); // Check every 10 seconds
+
+        return () => {
+            clearInterval(healthCheckInterval);
+        };
+    }, [walletManager]);
 
     // Listen for rupee updates
     useEffect(() => {
@@ -187,10 +227,31 @@ const GameHUD: React.FC<GameHUDProps> = ({ rupees = 25000 }) => {
 
     return (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1000] font-['Pixeloid',Arial,sans-serif]">
-            {/* Rupee counter */}
-            <div className="absolute top-5 right-5 p-2 px-3 rounded-lg flex items-center text-[#FFD700] text-shadow-lg text-2xl font-bold">
-                <span className="mr-1.5 text-3xl">₹</span>
-                <span>{currentRupees}</span>
+            {/* Top right status area */}
+            <div className="absolute top-5 right-5 flex flex-col items-end space-y-2">
+                {/* Blockchain status indicator */}
+                {walletManager && (
+                    <div className="flex items-center space-x-2 bg-black/60 rounded-lg px-3 py-1 backdrop-blur">
+                        <div className={`w-2 h-2 rounded-full ${
+                            walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'
+                        }`}></div>
+                        <span className="text-xs text-white">
+                            {walletStatus.connected ? 'Blockchain' : 'Local'}
+                        </span>
+                        {!networkHealthy && (
+                            <div className="w-2 h-2 rounded-full bg-yellow-400" title="Network issues detected"></div>
+                        )}
+                    </div>
+                )}
+                
+                {/* Rupee counter */}
+                <div className="p-2 px-3 rounded-lg flex items-center text-[#FFD700] text-shadow-lg text-2xl font-bold">
+                    <span className="mr-1.5 text-3xl">₹</span>
+                    <span>{currentRupees}</span>
+                    {walletStatus.connected && (
+                        <div className="ml-2 w-3 h-3 bg-blue-400 rounded-full" title="Blockchain verified"></div>
+                    )}
+                </div>
             </div>
 
             {/* Chat window - always visible */}

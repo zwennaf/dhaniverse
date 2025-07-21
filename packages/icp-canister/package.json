@@ -1,0 +1,13 @@
+{
+    "name": "dhaniverse-icp-canister",
+    "version": "1.0.0",
+    "description": "ICP canister for Dhaniverse blockchain integration",
+    "scripts": {
+        "build": "azle build",
+        "deploy": "dfx deploy",
+        "start": "dfx start --clean --background"
+    },
+    "dependencies": {
+        "azle": "^0.32.0"
+    }
+}
