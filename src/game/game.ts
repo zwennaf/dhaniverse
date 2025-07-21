@@ -47,8 +47,8 @@ export function startGame(username: string): void {
     loadingText.style.zIndex = "1000";
     gameContainer.appendChild(loadingText);
 
-    // Get any room code from local storage
-    const roomCode = localStorage.getItem("dhaniverse_room_code") || "";
+    // No room codes - use global room for all players
+    const roomCode = "";
 
     // Configure the game
     const config: Phaser.Types.Core.GameConfig = {

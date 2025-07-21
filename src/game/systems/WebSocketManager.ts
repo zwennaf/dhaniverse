@@ -258,13 +258,33 @@ export class WebSocketManager {
 
         // Check if there's already a connection for this player in localStorage
         const connectionInfo = localStorage.getItem('dhaniverse_connection');
+        const userId = localStorage.getItem('dhaniverse_user_id');
+        
+        // Create a unique device identifier if it doesn't exist
+        let deviceId = localStorage.getItem('dhaniverse_device_id');
+        if (!deviceId) {
+            deviceId = `device-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            localStorage.setItem('dhaniverse_device_id', deviceId);
+        }
+        
         if (connectionInfo) {
             try {
                 const connectionData = JSON.parse(connectionInfo);
                 const now = Date.now();
-                // If connection is less than 5 seconds old, don't create a new one
-                if (now - connectionData.timestamp < 5000) {
-                    console.log("Another connection was recently established. Preventing duplicate connection.");
+                
+                // If this is the same device and connection is active, don't create a new one
+                if (connectionData.deviceId === deviceId && 
+                    connectionData.userId === userId &&
+                    this.ws && 
+                    this.ws.readyState === WebSocket.OPEN) {
+                    console.log("Already have an active connection on this device. Preventing duplicate connection.");
+                    return;
+                }
+                
+                // If connection is less than 30 seconds old on another device, don't replace it
+                if (connectionData.deviceId !== deviceId && 
+                    now - connectionData.timestamp < 30000) {
+                    console.log("Active connection exists on another device. Not replacing it.");
                     return;
                 }
             } catch (e) {
@@ -289,10 +309,12 @@ export class WebSocketManager {
             this.ws = null;
         }
         
-        // Store connection info in localStorage to prevent duplicates
+        // Store connection info in localStorage with device ID
         localStorage.setItem('dhaniverse_connection', JSON.stringify({
             timestamp: Date.now(),
-            username: username
+            username: username,
+            userId: userId,
+            deviceId: deviceId
         }));
 
         // Reset intentional disconnect flag for new connection
@@ -302,16 +324,12 @@ export class WebSocketManager {
             this.connectionStatusText.setText("Connecting...").setVisible(true);
         }
 
-        // Get room code from game registry
-        this.roomCode = this.scene.game.registry.get("roomCode") || "";
+        // Use global room for all players - no room codes
+        this.roomCode = "";
 
         try {
-            // Construct WebSocket URL with room code if available
-            const wsUrl = this.roomCode
-                ? `${Constants.WS_SERVER_URL}?room=${encodeURIComponent(
-                      this.roomCode
-                  )}`
-                : Constants.WS_SERVER_URL;
+            // Use the base WebSocket URL without room parameters
+            const wsUrl = Constants.WS_SERVER_URL;
 
             console.log(`Connecting to WebSocket server: ${wsUrl}`);
             this.ws = new WebSocket(wsUrl);
