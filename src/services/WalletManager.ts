@@ -33,6 +33,19 @@ export class WalletManager {
     this.initializeAuthClient();
   }
 
+  private getIdentityProviderUrl(): string {
+    if (import.meta.env.NODE_ENV === 'production') {
+      return 'https://identity.ic0.app/#authorize';
+    }
+    
+    // For local development, use environment variables or fallback to default
+    const canisterId = import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai';
+    const host = import.meta.env.VITE_LOCAL_HOST || '127.0.0.1';
+    const port = import.meta.env.VITE_LOCAL_PORT || '4943';
+    
+    return `http://${host}:${port}/?canisterId=${canisterId}#authorize`;
+  }
+
   private async initializeAuthClient(): Promise<void> {
     try {
       this.authClient = await AuthClient.create({
@@ -138,9 +151,7 @@ private async connectInternetIdentity(): Promise<WalletConnectionResult> {
 
       return new Promise((resolve) => {
         this.authClient!.login({
-          identityProvider: import.meta.env.NODE_ENV === 'production'
-            ? 'https://identity.ic0.app/#authorize'
-            : `http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaah-qcaiq-cai#authorize`,
+          identityProvider: this.getIdentityProviderUrl(),
           onSuccess: () => {
             this.currentIdentity = this.authClient!.getIdentity();
             const principal = this.currentIdentity.getPrincipal().toString();
