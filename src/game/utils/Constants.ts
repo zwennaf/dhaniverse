@@ -12,25 +12,22 @@ export const Constants = {
     // WebSocket settings - dynamic URL based on environment
     get WS_SERVER_URL() {
         if (import.meta.env.DEV) {
-            return "ws://localhost:8000/ws";
+            return "ws://localhost:8001/ws";
         }
         
-        // For production, determine the correct WebSocket URL
+        // For production, use the dedicated WebSocket server
         if (typeof window !== 'undefined') {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host;
-            
-            // If deployed on Vercel (frontend), use the API domain
-            if (host.includes('vercel.app')) {
-                return 'wss://dhaniverseapi.deno.dev/ws';
+            // If deployed on Vercel (frontend), use the Azure WebSocket server
+            if (window.location.host.includes('vercel.app')) {
+                return 'wss://dhaniverse-ws.azurewebsites.net/ws';
             }
             
-            // If deployed on the same domain (Deno Deploy), use same domain
-            return `${protocol}//${host}/ws`;
+            // For other deployments, use the Azure WebSocket server
+            return 'wss://dhaniverse-ws.azurewebsites.net/ws';
         }
         
         // Fallback
-        return 'wss://dhaniverseapi.deno.dev/ws';
+        return 'wss://dhaniverse-ws.azurewebsites.net/ws';
     },
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 3, // Only send updates when player moves more than this amount

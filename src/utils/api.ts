@@ -24,32 +24,103 @@ const handleApiResponse = async (response: Response) => {
 // ======================
 
 export const playerStateApi = {
-  // Get player state
+  // Get player state - creates a new one if it doesn't exist
   get: async () => {
-    const response = await fetch(`${API_BASE}/game/player-state`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiResponse(response);
+    try {
+      const response = await fetch(`${API_BASE}/game/player-state`, {
+        headers: getAuthHeaders(),
+      });
+      
+      // If player state doesn't exist (404), create a new one with default values
+      if (response.status === 404) {
+        console.log('Player state not found, creating initial state...');
+        
+        // Create default player state
+        const defaultState = {
+          financial: {
+            rupees: 25000,
+            totalWealth: 25000
+          }
+        };
+        
+        // Create the player state
+        const createResponse = await fetch(`${API_BASE}/game/player-state`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(defaultState),
+        });
+        
+        // Return the newly created state
+        return handleApiResponse(createResponse);
+      }
+      
+      return handleApiResponse(response);
+    } catch (error) {
+      console.error('Error in player state API:', error);
+      
+      // Return a default state object if all else fails
+      return {
+        success: true,
+        data: {
+          financial: {
+            rupees: 25000,
+            totalWealth: 25000
+          }
+        }
+      };
+    }
   },
 
   // Update player rupees
   updateRupees: async (rupees: number, operation: 'set' | 'add' | 'subtract' = 'set') => {
-    const response = await fetch(`${API_BASE}/game/player-state/rupees`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ rupees, operation }),
-    });
-    return handleApiResponse(response);
+    try {
+      const response = await fetch(`${API_BASE}/game/player-state/rupees`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ rupees, operation }),
+      });
+      
+      // If player state doesn't exist (404), create it first then update rupees
+      if (response.status === 404) {
+        console.log('Player state not found when updating rupees, creating it first...');
+        
+        // Create default player state with the specified rupees
+        await playerStateApi.update({
+          financial: {
+            rupees: rupees,
+            totalWealth: rupees
+          }
+        });
+        
+        // Return a successful response
+        return {
+          success: true,
+          data: {
+            rupees: rupees
+          }
+        };
+      }
+      
+      return handleApiResponse(response);
+    } catch (error) {
+      console.error('Error updating rupees:', error);
+      throw error;
+    }
   },
 
   // Update full player state
   update: async (stateData: any) => {
-    const response = await fetch(`${API_BASE}/game/player-state`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(stateData),
-    });
-    return handleApiResponse(response);
+    try {
+      const response = await fetch(`${API_BASE}/game/player-state`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(stateData),
+      });
+      return handleApiResponse(response);
+    } catch (error) {
+      console.error('Error updating player state:', error);
+      throw error;
+    }
   }
 };
 

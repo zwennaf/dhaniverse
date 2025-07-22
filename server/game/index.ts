@@ -17,7 +17,6 @@ import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
 import gameRouter from "./src/routes/gameRouter.ts";
-import wsRouter from "./src/routes/wsRouter.ts";
 
 // Initialize database connection
 async function initializeDatabase() {
@@ -111,9 +110,7 @@ app.use(authRouter.allowedMethods());
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 
-// WebSocket routes
-app.use(wsRouter.routes());
-app.use(wsRouter.allowedMethods());
+// WebSocket functionality has been moved to a dedicated server in server/ws
 
 // Start the server with database initialization
 async function startServer() {

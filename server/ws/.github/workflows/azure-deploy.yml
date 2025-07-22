@@ -1,0 +1,30 @@
+name: Deploy WebSocket Server to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/ws/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+          
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'dhaniverse-ws'
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZURE_WEBSOCKET_PUBLISH_PROFILE }}
+          package: server/ws
