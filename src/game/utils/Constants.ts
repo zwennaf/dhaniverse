@@ -25,11 +25,11 @@ export const Constants = {
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
     // Font settings for consistent styling
-    PLAYER_NAME_FONT: "Pixeloid",
+    PLAYER_NAME_FONT: "tickerbit",
     PLAYER_NAME_SIZE: "24px",
     PLAYER_NAME_COLOR: "#ffffff",
-    PLAYER_NAME_BACKGROUND: "#00000080",
-    PLAYER_NAME_PADDING: { x: 4, y: 2 },
+    PLAYER_NAME_BACKGROUND: "#00000050",
+    PLAYER_NAME_PADDING: { x: 6, y: 0 },
     // NPC name styling (different color to distinguish from players)
     NPC_NAME_FONT: "Pixeloid",
     NPC_NAME_SIZE: "16px",

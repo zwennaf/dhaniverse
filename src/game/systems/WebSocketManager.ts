@@ -484,10 +484,10 @@ export class WebSocketManager {
                 fontSize: Constants.PLAYER_NAME_SIZE,
                 color: Constants.PLAYER_NAME_COLOR,
                 align: "center",
-                backgroundColor: Constants.PLAYER_NAME_BACKGROUND,
                 padding: Constants.PLAYER_NAME_PADDING,
+                letterSpacing: 2
             })
-            .setOrigin(0.5);
+            .setOrigin(0.5, 3);
 
         this.otherPlayers.set(playerData.id, {
             sprite: otherPlayer,
