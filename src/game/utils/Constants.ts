@@ -11,11 +11,11 @@ export const Constants = {
 
     // WebSocket settings - dynamic URL based on environment variables
     get WS_SERVER_URL() {
-        // Use environment variable in production
-        if (!import.meta.env.DEV && import.meta.env.WS_SERVER_URL) {
-            return import.meta.env.WS_SERVER_URL;
+        // For production environments, use the environment variable
+        if (import.meta.env.VITE_WS_SERVER_URL) {
+            return import.meta.env.VITE_WS_SERVER_URL;
         }
-        
+
         // For local development
         return "ws://localhost:8001/ws";
     },
