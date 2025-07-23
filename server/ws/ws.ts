@@ -27,10 +27,12 @@ interface Connection {
     lastActivity: number;
     lastPing: number;
     lastChatTime?: number;
+    lastUpdateTime?: number;
     authenticated: boolean;
     position: { x: number; y: number };
     animation?: string;
     userId?: string;
+    pendingUpdate?: { x: number; y: number; animation?: string };
 }
 
 // Message types
@@ -72,18 +74,16 @@ async function handleAuthentication(
     try {
         // Prevent rapid authentication attempts
         const now = Date.now();
-        const lastAuth = pendingAuthentications.get(message.token);
-        if (lastAuth && now - lastAuth < 1000) {
-            // 1 second debounce
+        const authKey = `${connection.id}-${message.token}`;
+        const lastAuth = pendingAuthentications.get(authKey);
+        if (lastAuth && now - lastAuth < 2000) {
+            // 2 second debounce per connection
             console.log(
-                `Ignoring rapid authentication attempt for token: ${message.token.substring(
-                    0,
-                    10
-                )}...`
+                `Ignoring rapid authentication attempt for connection: ${connection.id}`
             );
             return;
         }
-        pendingAuthentications.set(message.token, now);
+        pendingAuthentications.set(authKey, now);
 
         // Get the auth server URL based on environment
         const authServerUrl =
@@ -167,7 +167,7 @@ async function handleAuthentication(
         cleanupStaleConnectionsForUser(userId, connection.id);
 
         // Clean up the pending authentication
-        pendingAuthentications.delete(message.token);
+        pendingAuthentications.delete(authKey);
 
         // Send connection confirmation
         connection.socket.send(
@@ -242,11 +242,48 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
         return;
     }
 
+    // Stricter rate limiting for position updates (max 5 updates per second)
+    const now = Date.now();
+    if (!connection.lastUpdateTime) {
+        connection.lastUpdateTime = 0;
+    }
+
+    if (now - connection.lastUpdateTime < 200) { // 200ms = 5 updates per second max
+        // Store the update but don't broadcast immediately to prevent spam
+        connection.pendingUpdate = {
+            x: message.x,
+            y: message.y,
+            animation: message.animation,
+        };
+        return;
+    }
+
+    connection.lastUpdateTime = now;
+
+    // Use pending update if available, otherwise use current message
+    const updateData = connection.pendingUpdate || {
+        x: message.x,
+        y: message.y,
+        animation: message.animation,
+    };
+    
+    // Clear pending update
+    connection.pendingUpdate = undefined;
+
+    // Only update if position actually changed significantly
+    const positionChanged = Math.abs(connection.position.x - updateData.x) > 2 || 
+                           Math.abs(connection.position.y - updateData.y) > 2;
+    const animationChanged = connection.animation !== updateData.animation;
+
+    if (!positionChanged && !animationChanged) {
+        return; // Skip update if nothing significant changed
+    }
+
     // Update player position
-    connection.position.x = message.x;
-    connection.position.y = message.y;
-    if (message.animation) {
-        connection.animation = message.animation;
+    connection.position.x = updateData.x;
+    connection.position.y = updateData.y;
+    if (updateData.animation) {
+        connection.animation = updateData.animation;
     }
 
     // Broadcast position update to other players
@@ -471,10 +508,9 @@ function broadcastOnlineUsersCount() {
 setInterval(() => {
     const now = Date.now();
 
-    // Clean up inactive connections
+    // Clean up inactive connections (reduced timeout to 3 minutes)
     connections.forEach((connection, id) => {
-        // Close connections that have been inactive for more than 5 minutes
-        if (now - connection.lastActivity > 5 * 60 * 1000) {
+        if (now - connection.lastActivity > 3 * 60 * 1000) {
             console.log(`Closing inactive connection: ${id}`);
             connection.socket.close(
                 1000,
@@ -484,10 +520,10 @@ setInterval(() => {
         }
     });
 
-    // Clean up old pending authentications (older than 30 seconds)
-    pendingAuthentications.forEach((timestamp, token) => {
-        if (now - timestamp > 30 * 1000) {
-            pendingAuthentications.delete(token);
+    // Clean up old pending authentications (older than 10 seconds)
+    pendingAuthentications.forEach((timestamp, authKey) => {
+        if (now - timestamp > 10 * 1000) {
+            pendingAuthentications.delete(authKey);
         }
     });
 
@@ -502,13 +538,13 @@ setInterval(() => {
         }
     });
 
-    // Log connection stats
-    console.log(
-        `Connection stats: Total=${
-            connections.size
-        }, Authenticated=${getOnlineUsersCount()}`
-    );
-}, 60 * 1000); // Check every minute
+    // Log connection stats (less frequently)
+    if (Math.random() < 0.1) { // Only log 10% of the time
+        console.log(
+            `Connection stats: Total=${connections.size}, Authenticated=${getOnlineUsersCount()}`
+        );
+    }
+}, 30 * 1000); // Check every 30 seconds instead of 60
 
 // Send periodic ping to keep connections alive
 setInterval(() => {
@@ -517,13 +553,14 @@ setInterval(() => {
             connection.authenticated &&
             connection.socket.readyState === WebSocket.OPEN
         ) {
-            // Only send ping if we haven't received a ping recently
-            if (Date.now() - connection.lastPing > 30 * 1000) {
+            // Only send ping if we haven't received activity recently
+            if (Date.now() - connection.lastActivity > 45 * 1000) {
                 connection.socket.send(JSON.stringify({ type: "ping" }));
+                connection.lastPing = Date.now();
             }
         }
     });
-}, 30 * 1000); // Send ping every 30 seconds
+}, 45 * 1000); // Send ping every 45 seconds instead of 30
 
 console.log(`✅ WebSocket server listening on port ${PORT}`);
 

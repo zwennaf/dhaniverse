@@ -23,10 +23,10 @@ export const Constants = {
         return "ws://localhost:8001";
     },
     WS_RECONNECT_DELAY: 5000,
-    WS_POSITION_THRESHOLD: 3, // Only send updates when player moves more than this amount
+    WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
     // Font settings for consistent styling
     PLAYER_NAME_FONT: "Pixeloid",
-    PLAYER_NAME_SIZE: "18px",
+    PLAYER_NAME_SIZE: "24px",
     PLAYER_NAME_COLOR: "#ffffff",
     PLAYER_NAME_BACKGROUND: "#00000080",
     PLAYER_NAME_PADDING: { x: 4, y: 2 },
@@ -68,7 +68,7 @@ export const Constants = {
     DIALOG_INSTRUCTION_COLOR: "#aaaaaa",
 
     // Debug settings
-    SHOW_DEBUG_VISUALS: false,
+    SHOW_DEBUG_VISUALS: true,
     COLLISION_COLOR: 0xff0000,
     COLLISION_ALPHA: 0.3,
 };

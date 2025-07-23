@@ -22,6 +22,8 @@ export function startGame(username: string): void {
         return;
     }
 
+    console.log("Starting new game instance for username:", username);
+
     gameContainer = document.getElementById("game-container");
 
     if (!gameContainer) {

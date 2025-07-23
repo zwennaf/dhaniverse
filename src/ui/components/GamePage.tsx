@@ -11,23 +11,39 @@ const GamePage: React.FC = () => {
    
   useEffect(() => {
     if (!isLoaded) return;
+    
     // Redirect unauthenticated users
     if (!isSignedIn) {
       navigate('/sign-in');
       return;
-    }    // Get in-game username from our auth system
+    }
+    
+    // Get in-game username from our auth system
     const gameUsername = user?.gameUsername;
     if (!gameUsername) {
       navigate('/profile');
       return;
     }
+    
+    console.log("GamePage useEffect: Starting game for", gameUsername);
+    
     // All good: start game
     document.body.classList.add('game-active');
     const gameContainer = document.getElementById('game-container');
     if (gameContainer) gameContainer.style.display = 'block';
     setIsLoading(false);
-    setTimeout(() => startGame(gameUsername as string), 100);    return () => {
+    
+    // Start game with a slight delay
+    const gameStartTimeout = setTimeout(() => {
+      console.log("GamePage: Calling startGame");
+      startGame(gameUsername as string);
+    }, 100);
+
+    return () => {
+      console.log("GamePage: Cleanup - stopping game");
+      clearTimeout(gameStartTimeout);
       stopGame();
+      
       const gameContainer = document.getElementById('game-container');
       if (gameContainer) {
         gameContainer.style.display = 'none';
@@ -36,6 +52,7 @@ const GamePage: React.FC = () => {
           gameContainer.removeChild(gameContainer.firstChild);
         }
       }
+      
       const hudContainer = document.getElementById('hud-container');
       if (hudContainer) {
         hudContainer.style.display = 'none';
@@ -44,9 +61,10 @@ const GamePage: React.FC = () => {
           hudContainer.removeChild(hudContainer.firstChild);
         }
       }
+      
       document.body.classList.remove('game-active');
     };
-  }, [isLoaded, isSignedIn, user, navigate]);
+  }, [isLoaded, isSignedIn, user?.gameUsername, navigate]); // More specific dependency
    
   if (isLoading || !isLoaded) {
     return (
