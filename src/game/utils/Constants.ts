@@ -9,25 +9,15 @@ export const Constants = {
     BUILDING_INTERACTION_DISTANCE: 100,
     INTERACTION_DISTANCE: 100,
 
-    // WebSocket settings - dynamic URL based on environment
+    // WebSocket settings - dynamic URL based on environment variables
     get WS_SERVER_URL() {
-        if (import.meta.env.DEV) {
-            return "ws://localhost:8001/ws";
+        // Use environment variable in production
+        if (!import.meta.env.DEV && import.meta.env.WS_SERVER_URL) {
+            return import.meta.env.WS_SERVER_URL;
         }
         
-        // For production, use the dedicated WebSocket server
-        if (typeof window !== 'undefined') {
-            // If deployed on Vercel (frontend), use the Azure WebSocket server
-            if (window.location.host.includes('vercel.app')) {
-                return 'wss://dhaniverse-ws.azurewebsites.net/ws';
-            }
-            
-            // For other deployments, use the Azure WebSocket server
-            return 'wss://dhaniverse-ws.azurewebsites.net/ws';
-        }
-        
-        // Fallback
-        return 'wss://dhaniverse-ws.azurewebsites.net/ws';
+        // For local development
+        return "ws://localhost:8001/ws";
     },
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 3, // Only send updates when player moves more than this amount
