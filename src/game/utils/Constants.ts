@@ -16,11 +16,11 @@ export const Constants = {
             window.location.hostname !== "localhost" &&
             window.location.hostname !== "127.0.0.1"
         ) {
-            return "wss://dhaniverse-ws-e7caeuhsf4fcc9by.canadacentral-01.azurewebsites.net/ws";
+            return "wss://dhaniverse-ws.azurewebsites.net";
         }
 
         // For local development
-        return "ws://localhost:8001/ws";
+        return "ws://localhost:8001";
     },
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 3, // Only send updates when player moves more than this amount

@@ -3,7 +3,7 @@ import { load } from "https://deno.land/std@0.217.0/dotenv/mod.ts";
 // Load environment variables
 await load({ export: true });
 
-const PORT = parseInt(Deno.env.get("PORT") || "8001");
+const PORT = parseInt(Deno.env.get("PORT") || "8000");
 // JWT secret is used by the auth server for token validation
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",");
 
@@ -91,6 +91,8 @@ async function handleAuthentication(
                 ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") ||
                   "https://dhaniverseapi.deno.dev"
                 : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
+
+        console.log(`Validating token with auth server: ${authServerUrl}`);
 
         // Validate token with the main backend server
         const response = await fetch(`${authServerUrl}/auth/validate-token`, {

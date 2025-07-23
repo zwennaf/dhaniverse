@@ -1,8 +1,10 @@
-name: CI/CD – Deploy Deno WebSocket to Azure
+name: Deploy WebSocket Server to Azure
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'server/ws/**'
   workflow_dispatch:
 
 jobs:
@@ -10,42 +12,129 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Package WebSocket server folder
+      - name: Setup Node.js (for Azure deployment tools)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Deno
+        run: |
+          curl -fsSL https://deno.land/x/install/install.sh | sh
+          echo "$HOME/.deno/bin" >> $GITHUB_PATH
+
+      - name: Create deployment package
         run: |
           cd server/ws
-          zip -r ../../deno-ws.zip . -x "*.git*" -x "*.env"
+          # Create package.json for Azure to recognize the app
+          cat > package.json << 'EOF'
+          {
+            "name": "dhaniverse-ws",
+            "version": "1.0.0",
+            "description": "WebSocket server for Dhaniverse",
+            "main": "server.js",
+            "scripts": {
+              "start": "deno run --allow-net --allow-env --allow-read ws.ts"
+            },
+            "engines": {
+              "node": ">=18.0.0"
+            }
+          }
+          EOF
+          
+          # Create startup script for Azure
+          cat > server.js << 'EOF'
+          const { spawn } = require('child_process');
+          const port = process.env.PORT || 8000;
+          
+          // Set PORT environment variable for Deno
+          process.env.PORT = port;
+          
+          const deno = spawn('deno', ['run', '--allow-net', '--allow-env', '--allow-read', 'ws.ts'], {
+            stdio: 'inherit',
+            env: process.env
+          });
+          
+          deno.on('close', (code) => {
+            console.log(`Deno process exited with code ${code}`);
+            process.exit(code);
+          });
+          EOF
+          
+          # Create web.config for Azure
+          cat > web.config << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <system.webServer>
+              <handlers>
+                <add name="iisnode" path="server.js" verb="*" modules="iisnode"/>
+              </handlers>
+              <rewrite>
+                <rules>
+                  <rule name="DynamicContent">
+                    <conditions>
+                      <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
+                    </conditions>
+                    <action type="Rewrite" url="server.js"/>
+                  </rule>
+                </rules>
+              </rewrite>
+              <iisnode 
+                node_env="%node_env%" 
+                nodeProcessCountPerApplication="1"
+                maxConcurrentRequestsPerProcess="1024"
+                maxNamedPipeConnectionRetry="3"
+                namedPipeConnectionTimeout="30000"
+                maxNamedPipeConnectionPoolSize="512"
+                maxNamedPipePooledConnectionAge="30000"
+                asyncCompletionThreadCount="0"
+                initialRequestBufferSize="4096"
+                maxRequestBufferSize="65536"
+                watchedFiles="*.js"
+                uncFileChangesPollingInterval="5000"
+                gracefulShutdownTimeout="60000"
+                loggingEnabled="true"
+                logDirectoryNameSuffix="logs"
+                debuggingEnabled="false"
+                debuggerPortRange="5058-6058"
+                debuggerPathSegment="debug"
+                maxLogFileSizeInKB="128"
+                appendToExistingLog="false"
+                logFileFlushInterval="5000"
+                devErrorsEnabled="false"
+                flushResponse="false"
+                enableXFF="false"
+                promoteServerVars="" />
+            </system.webServer>
+          </configuration>
+          EOF
+          
+          zip -r ../../ws-deploy.zip . -x "*.env*"
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy the WebSocket server
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name:     "dhaniverse-ws"
-          slot-name:    "Production"
-          package:      deno-ws.zip
-          
+          app-name: 'dhaniverse-ws'
+          slot-name: 'Production'
+          package: ws-deploy.zip
+
       - name: Configure App Settings
         uses: azure/CLI@v1
         with:
           inlineScript: |
             az webapp config appsettings set --name dhaniverse-ws --resource-group dhaniverse-rg \
               --settings \
-              PORT=8000 \
               DENO_ENV=production \
               JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               ALLOWED_ORIGINS="https://dhaniverse.vercel.app" \
               AUTH_SERVER_URL="https://dhaniverseapi.deno.dev" \
-              PRODUCTION_AUTH_SERVER_URL="https://dhaniverseapi.deno.dev"
-              
-      - name: Configure Deno Runtime
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az webapp config set --name dhaniverse-ws --resource-group dhaniverse-rg \
-              --startup-file "deno run --allow-net --allow-env --allow-read ws.ts"
+              PRODUCTION_AUTH_SERVER_URL="https://dhaniverseapi.deno.dev" \
+              WEBSITE_NODE_DEFAULT_VERSION="18.17.0" \
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false
