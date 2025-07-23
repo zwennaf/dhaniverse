@@ -1,9 +1,9 @@
-import { Router, RouterContext } from "https://deno.land/x/oak@v17.1.3/mod.ts";
-import { oakCors } from "https://deno.land/x/cors@v1.2.2/mod.ts";
+import { Router, RouterContext } from "oak";
+import { oakCors } from "cors";
 import { config } from "../config/config.ts";
 import { mongodb } from "../db/mongo.ts";
 import { verifyToken } from "../auth/jwt.ts";
-import { ObjectId } from "npm:mongodb@5.6.0";
+import { ObjectId, InsertOneResult } from "mongodb";
 import {
   PlayerStateDocument,
   BankAccountDocument,

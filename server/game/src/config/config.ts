@@ -21,7 +21,15 @@ export const config = {
   // MongoDB Configuration
   mongodb: {
     url: Deno.env.get("MONGODB_URI") || "mongodb://localhost:27017",
-    dbName: Deno.env.get("DB_NAME") || "dhaniverse"
+    dbName: (() => {
+      const mongoUri = Deno.env.get("MONGODB_URI");
+      if (mongoUri) {
+        // Extract database name from MongoDB URI
+        const match = mongoUri.match(/\/([^/?]+)(\?|$)/);
+        return match ? match[1] : "dhaniverse";
+      }
+      return Deno.env.get("DB_NAME") || "dhaniverse";
+    })()
   },
   
   corsOrigins: parseAllowedOrigins(),

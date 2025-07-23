@@ -4,11 +4,13 @@ import { load } from "std/dotenv/mod.ts";
 // Load the .env file with more flexible options
 await load({ 
   export: true,
-  allowEmptyValues: true,
-  defaults: {
-    NODE_ENV: Deno.env.get("DENO_ENV") || "development"
-  }
+  allowEmptyValues: true
 });
+
+// Set default NODE_ENV if not provided
+if (!Deno.env.get("NODE_ENV")) {
+  Deno.env.set("NODE_ENV", Deno.env.get("DENO_ENV") || "development");
+}
 
 import { Application } from "oak";
 import { oakCors } from "cors";

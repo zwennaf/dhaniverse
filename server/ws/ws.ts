@@ -63,11 +63,23 @@ async function handleAuthentication(
   message: AuthMessage
 ) {
   try {
-    // Verify JWT token
-    const key = new TextEncoder().encode(JWT_SECRET);
-    const payload = await verify(message.token, key);
+    // Get the auth server URL based on environment
+    const authServerUrl = Deno.env.get("DENO_ENV") === "production" 
+      ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") || "https://dhaniverseapi.deno.dev"
+      : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
+    
+    // Validate token with the main backend server
+    const response = await fetch(`${authServerUrl}/auth/validate-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token: message.token }),
+    });
 
-    if (!payload || !payload.sub) {
+    const data = await response.json();
+
+    if (!response.ok || !data.valid) {
       connection.socket.send(
         JSON.stringify({
           type: "error",
@@ -78,7 +90,7 @@ async function handleAuthentication(
       return;
     }
 
-    const userId = payload.sub as string;
+    const userId = data.userId;
 
     // Check for existing connection with this user ID
     const existingConnectionId = userConnections.get(userId);
@@ -97,7 +109,8 @@ async function handleAuthentication(
 
     // Update connection with authenticated user info
     connection.authenticated = true;
-    connection.username = message.gameUsername;
+    // Use the provided game username or fall back to the one from the token validation
+    connection.username = message.gameUsername || data.gameUsername;
     userConnections.set(userId, connection.id);
 
     // Send connection confirmation

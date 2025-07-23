@@ -13,6 +13,22 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Create .env file for production
+        run: |
+          cd server/ws
+          echo "# Server configuration" > .env.production
+          echo "PORT=8001" >> .env.production
+          echo "DENO_ENV=production" >> .env.production
+          echo "SERVER_DOMAIN=dhaniverse-ws.azurewebsites.net" >> .env.production
+          echo "# JWT configuration" >> .env.production
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env.production
+          echo "# CORS settings" >> .env.production
+          echo "ALLOWED_ORIGINS=https://dhaniverse.vercel.app" >> .env.production
+          echo "# Auth server URLs" >> .env.production
+          echo "AUTH_SERVER_URL=https://dhaniverseapi.deno.dev" >> .env.production
+          echo "PRODUCTION_AUTH_SERVER_URL=https://dhaniverseapi.deno.dev" >> .env.production
+          mv .env.production .env
+
       - name: Package server/ws folder
         run: |
           cd server/ws
@@ -31,3 +47,16 @@ jobs:
           app-name:     "dhaniverse-ws"
           slot-name:    "Production"
           package:      deno-ws.zip
+          
+      - name: Configure App Settings
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az webapp config appsettings set --name dhaniverse-ws --resource-group dhaniverse-rg \
+              --settings \
+              DENO_ENV=production \
+              SERVER_DOMAIN=dhaniverse-ws.azurewebsites.net \
+              JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              ALLOWED_ORIGINS="https://dhaniverse.vercel.app" \
+              AUTH_SERVER_URL="https://dhaniverseapi.deno.dev" \
+              PRODUCTION_AUTH_SERVER_URL="https://dhaniverseapi.deno.dev"

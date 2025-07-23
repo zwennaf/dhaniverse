@@ -248,6 +248,58 @@ authRouter.get("/auth/me", async (ctx: Context) => {
   }
 });
 
+// Token validation endpoint for WebSocket server
+authRouter.post("/auth/validate-token", async (ctx: Context) => {
+  try {
+    const body = await ctx.request.body.json();
+    const { token } = body;
+
+    if (!token) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Token is required" };
+      return;
+    }
+
+    const verified = await verifyToken(token);
+
+    if (!verified) {
+      ctx.response.status = 401;
+      ctx.response.body = { 
+        valid: false,
+        error: "Invalid token"
+      };
+      return;
+    }
+
+    // Find user by ID in MongoDB
+    const users = mongodb.getCollection<UserDocument>("users");
+    const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+    
+    if (!userDoc) {
+      ctx.response.status = 404;
+      ctx.response.body = { 
+        valid: false,
+        error: "User not found" 
+      };
+      return;
+    }
+
+    ctx.response.body = {
+      valid: true,
+      userId: userDoc._id?.toString() || "",
+      email: userDoc.email,
+      gameUsername: userDoc.gameUsername
+    };
+  } catch (error) {
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      valid: false,
+      error: "Internal server error" 
+    };
+    console.error("Token validation error:", error);
+  }
+});
+
 // Update user profile endpoint
 authRouter.put("/auth/profile", async (ctx: Context) => {
   try {

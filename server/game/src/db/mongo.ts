@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, Document, ObjectId } from "mongodb";
+import { MongoClient, Db, Collection, ObjectId } from "npm:mongodb@6.3.0";
 import { config } from "../config/config.ts";
 import type {
     UserDocument,
@@ -30,10 +30,35 @@ class MongoDatabase {
                     : "❌ Invalid format"
             );
 
-            // Create client with connection string
-            this.client = new MongoClient(config.mongodb.url);
+            // Debug: Log connection details (without password)
+            const urlParts = config.mongodb.url.split("@");
+            if (urlParts.length > 1) {
+                console.log(
+                    "📍 Connecting to cluster:",
+                    urlParts[1].split("/")[0]
+                );
+                console.log("📍 Database name:", config.mongodb.dbName);
+            }
 
-            // Connect to MongoDB
+            // Try URL encoding the password in case there are special characters
+            let connectionUrl = config.mongodb.url;
+
+            // Extract and re-encode password if needed
+            const urlMatch = connectionUrl.match(
+                /mongodb\+srv:\/\/([^:]+):([^@]+)@(.+)/
+            );
+            if (urlMatch) {
+                const [, username, password, rest] = urlMatch;
+                const encodedPassword = encodeURIComponent(password);
+                connectionUrl = `mongodb+srv://${username}:${encodedPassword}@${rest}`;
+                console.log("📍 Using URL-encoded password");
+            }
+
+            // Create client with connection string (npm mongodb driver)
+            this.client = new MongoClient(connectionUrl);
+
+            // Try different connection approaches
+            console.log("📍 Attempting connection...");
             await this.client.connect();
 
             // Set database instance
@@ -46,11 +71,11 @@ class MongoDatabase {
 
             // List collections (optional)
             try {
-                const collections = await this.db.listCollections().toArray();
+                const collections = await this.db.listCollectionNames();
                 console.log(
                     `📊 Collections: ${
                         collections.length > 0
-                            ? collections.map((c) => c.name).join(", ")
+                            ? collections.join(", ")
                             : "None (new database)"
                     }`
                 );

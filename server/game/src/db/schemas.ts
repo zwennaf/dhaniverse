@@ -1,7 +1,7 @@
 // Database schemas and interfaces for MongoDB collections
-import { ObjectId } from "npm:mongodb@5.6.0";
+import { ObjectId, Document } from "mongodb";
 
-export interface UserDocument {
+export interface UserDocument extends Document {
   _id?: ObjectId;
   email: string;
   passwordHash: string;
@@ -23,7 +23,7 @@ export interface UserDocument {
   isActive: boolean;
 }
 
-export interface PlayerStateDocument {
+export interface PlayerStateDocument extends Document {
   _id?: ObjectId;
   userId: string;
   // Position data
@@ -64,7 +64,7 @@ export interface PlayerStateDocument {
   lastUpdated: Date;
 }
 
-export interface BankAccountDocument {
+export interface BankAccountDocument extends Document {
   _id?: ObjectId;
   userId: string;
   balance: number;
@@ -79,7 +79,7 @@ export interface BankAccountDocument {
   lastUpdated: Date;
 }
 
-export interface FixedDepositDocument {
+export interface FixedDepositDocument extends Document {
   _id?: ObjectId;
   userId: string;
   accountId: string; // Reference to bank account
@@ -95,7 +95,7 @@ export interface FixedDepositDocument {
   updatedAt: Date;
 }
 
-export interface StockPortfolioDocument {
+export interface StockPortfolioDocument extends Document {
   _id?: ObjectId;
   userId: string;
   holdings: Array<{
@@ -116,7 +116,7 @@ export interface StockPortfolioDocument {
   lastUpdated: Date;
 }
 
-export interface StockTransactionDocument {
+export interface StockTransactionDocument extends Document {
   _id?: ObjectId;
   userId: string;
   stockId: string;
@@ -129,11 +129,12 @@ export interface StockTransactionDocument {
   portfolioId: string; // Reference to portfolio
 }
 
-export interface GameSessionDocument {
+export interface GameSessionDocument extends Document {
   _id?: ObjectId;
   userId: string;
   sessionId: string;
-  startTime: Date;  endTime?: Date;
+  startTime: Date;
+  endTime?: Date;
   duration?: number; // in milliseconds
   activitiesPerformed: Array<{
     activity: string;
@@ -144,7 +145,7 @@ export interface GameSessionDocument {
   rupeesSpentInSession: number;
 }
 
-export interface ChatMessageDocument {
+export interface ChatMessageDocument extends Document {
   _id?: ObjectId;
   userId: string;
   username: string;
@@ -155,7 +156,7 @@ export interface ChatMessageDocument {
 }
 
 // Real-time multiplayer session data
-export interface MultiplayerSessionDocument {
+export interface MultiplayerSessionDocument extends Document {
   _id?: ObjectId;
   roomCode: string;
   hostUserId: string;
@@ -173,7 +174,7 @@ export interface MultiplayerSessionDocument {
 }
 
 // Individual user connection session
-export interface UserSessionDocument {
+export interface UserSessionDocument extends Document {
   _id?: ObjectId;
   userId: string;
   connectionId: string;
@@ -185,7 +186,7 @@ export interface UserSessionDocument {
 }
 
 // Leaderboards and achievements
-export interface LeaderboardDocument {
+export interface LeaderboardDocument extends Document {
   _id?: ObjectId;
   category: 'wealth' | 'trading_profit' | 'banking_returns' | 'playtime';
   period: 'daily' | 'weekly' | 'monthly' | 'all_time';
@@ -199,7 +200,7 @@ export interface LeaderboardDocument {
   lastUpdated: Date;
 }
 
-export interface AchievementDocument {
+export interface AchievementDocument extends Document {
   _id?: ObjectId;
   userId: string;
   achievementId: string;
