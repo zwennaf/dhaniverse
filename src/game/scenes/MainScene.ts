@@ -640,15 +640,47 @@ export class MainScene extends Scene implements MainGameScene {
 
   // Handle typing state
   private handleTypingStart(): void {
-    console.log("MainScene: Typing started - disabling movement");
+    console.log("MainScene: Typing started - disabling movement keys");
     this.isTyping = true;
-    // Don't disable the keyboard - just use the isTyping flag to prevent movement
+    
+    // Disable WASD keys and E key to allow typing these characters in chat
+    if (this.input.keyboard) {
+      // Disable WASD keys
+      if (this.wasd) {
+        this.wasd.up.enabled = false;
+        this.wasd.down.enabled = false;
+        this.wasd.left.enabled = false;
+        this.wasd.right.enabled = false;
+      }
+      
+      // Find and disable the E key
+      const eKey = this.input.keyboard.keys.find(key => key && key.keyCode === Phaser.Input.Keyboard.KeyCodes.E);
+      if (eKey) {
+        eKey.enabled = false;
+      }
+    }
   }
 
   private handleTypingEnd(): void {
-    console.log("MainScene: Typing ended - enabling movement");
+    console.log("MainScene: Typing ended - re-enabling movement keys");
     this.isTyping = false;
-    // No need to re-enable the keyboard since we never disabled it
+    
+    // Re-enable WASD keys and E key for movement and interaction
+    if (this.input.keyboard) {
+      // Re-enable WASD keys
+      if (this.wasd) {
+        this.wasd.up.enabled = true;
+        this.wasd.down.enabled = true;
+        this.wasd.left.enabled = true;
+        this.wasd.right.enabled = true;
+      }
+      
+      // Find and re-enable the E key
+      const eKey = this.input.keyboard.keys.find(key => key && key.keyCode === Phaser.Input.Keyboard.KeyCodes.E);
+      if (eKey) {
+        eKey.enabled = true;
+      }
+    }
   }
   // Cleanup method called when scene is destroyed
   destroy(): void {

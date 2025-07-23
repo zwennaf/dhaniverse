@@ -202,7 +202,16 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // Handle chat input key events
     const handleChatKeyDown = (e: React.KeyboardEvent) => {
-        // Don't prevent default for WASD keys - let them work normally in the input
+        // Explicitly handle WASD, E, and Space keys to ensure they can be typed in chat
+        const gameControlKeys = ['w', 'a', 's', 'd', 'e', 'W', 'A', 'S', 'D', 'E', ' '];
+        if (gameControlKeys.includes(e.key)) {
+            // Stop propagation to prevent the game from handling these keys
+            e.stopPropagation();
+            // Don't prevent default so the key can be typed in the input
+            return;
+        }
+        
+        // Handle special keys
         if (e.key === "Escape") {
             e.preventDefault();
             setIsChatFocused(false);
