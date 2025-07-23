@@ -1,12 +1,10 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { load } from "https://deno.land/std@0.217.0/dotenv/mod.ts";
-import { verify } from "https://deno.land/x/djwt@v3.0.1/mod.ts";
 
 // Load environment variables
 await load({ export: true });
 
 const PORT = parseInt(Deno.env.get("PORT") || "8001");
-const JWT_SECRET = Deno.env.get("JWT_SECRET") || crypto.randomUUID();
+// JWT secret is used by the auth server for token validation
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",");
 
 // Track server start time
@@ -56,10 +54,6 @@ interface ChatMessage {
 
 interface PingMessage {
     type: "ping";
-}
-
-interface PongMessage {
-    type: "pong";
 }
 
 type ClientMessage = AuthMessage | UpdateMessage | ChatMessage | PingMessage;
@@ -157,16 +151,16 @@ async function handleAuthentication(
         connection.authenticated = true;
         connection.username = gameUsername;
         connection.userId = userId;
-        
+
         // Track this connection for the user
         userConnections.set(userId, connection.id);
-        
+
         // Add to connectionsByUserId for better cleanup
         if (!connectionsByUserId.has(userId)) {
             connectionsByUserId.set(userId, new Set());
         }
         connectionsByUserId.get(userId)?.add(connection.id);
-        
+
         // Clean up any stale connections for this user
         cleanupStaleConnectionsForUser(userId, connection.id);
 
@@ -217,7 +211,9 @@ async function handleAuthentication(
         broadcastOnlineUsersCount();
 
         console.log(
-            `User authenticated: ${connection.username} (${connection.id}) - Online users: ${getOnlineUsersCount()}`
+            `User authenticated: ${connection.username} (${
+                connection.id
+            }) - Online users: ${getOnlineUsersCount()}`
         );
     } catch (error) {
         console.error(`Authentication error: ${error}`);
@@ -283,8 +279,9 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
         if (!connection.lastChatTime) {
             connection.lastChatTime = 0;
         }
-        
-        if (now - connection.lastChatTime < 500) { // 500ms between messages
+
+        if (now - connection.lastChatTime < 500) {
+            // 500ms between messages
             connection.socket.send(
                 JSON.stringify({
                     type: "error",
@@ -294,7 +291,7 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
             );
             return;
         }
-        
+
         connection.lastChatTime = now;
 
         // Validate message content
@@ -327,7 +324,9 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
             message: trimmedMessage,
         });
 
-        console.log(`Chat message from ${connection.username}: ${trimmedMessage}`);
+        console.log(
+            `Chat message from ${connection.username}: ${trimmedMessage}`
+        );
     } catch (error) {
         console.error(`Error handling chat message: ${error}`);
         // Send error to client but don't close connection
@@ -342,22 +341,30 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
 }
 
 // Clean up stale connections for a user
-function cleanupStaleConnectionsForUser(userId: string, currentConnectionId: string) {
+function cleanupStaleConnectionsForUser(
+    userId: string,
+    currentConnectionId: string
+) {
     const userConnectionIds = connectionsByUserId.get(userId);
     if (!userConnectionIds) return;
-    
+
     // Close all other connections for this user
-    userConnectionIds.forEach(connectionId => {
+    userConnectionIds.forEach((connectionId) => {
         if (connectionId !== currentConnectionId) {
             const connection = connections.get(connectionId);
             if (connection && connection.socket.readyState === WebSocket.OPEN) {
-                console.log(`Closing stale connection ${connectionId} for user ${userId}`);
-                connection.socket.close(1000, "User connected from another session");
+                console.log(
+                    `Closing stale connection ${connectionId} for user ${userId}`
+                );
+                connection.socket.close(
+                    1000,
+                    "User connected from another session"
+                );
                 connections.delete(connectionId);
             }
         }
     });
-    
+
     // Reset the set to only contain the current connection
     connectionsByUserId.set(userId, new Set([currentConnectionId]));
 }
@@ -372,14 +379,16 @@ function handleDisconnect(connectionId: string) {
         // Remove from userConnections map
         if (connection.userId) {
             // Remove from connectionsByUserId
-            const userConnectionIds = connectionsByUserId.get(connection.userId);
+            const userConnectionIds = connectionsByUserId.get(
+                connection.userId
+            );
             if (userConnectionIds) {
                 userConnectionIds.delete(connectionId);
                 if (userConnectionIds.size === 0) {
                     connectionsByUserId.delete(connection.userId);
                 }
             }
-            
+
             // If this was the active connection for the user, remove it
             if (userConnections.get(connection.userId) === connectionId) {
                 userConnections.delete(connection.userId);
@@ -393,19 +402,21 @@ function handleDisconnect(connectionId: string) {
                 id: connectionId,
                 username: connection.username,
             });
-            
+
             // Broadcast updated online users count after disconnect
             broadcastOnlineUsersCount();
         }
 
         console.log(
-            `Connection closed: ${connectionId}, remaining: ${connections.size} - Online users: ${getOnlineUsersCount()}`
+            `Connection closed: ${connectionId}, remaining: ${
+                connections.size
+            } - Online users: ${getOnlineUsersCount()}`
         );
     }
 }
 
 // Broadcast message to all connections
-function broadcast(message: any) {
+function broadcast(message: Record<string, unknown>) {
     const messageStr = JSON.stringify(message);
     connections.forEach((connection) => {
         if (
@@ -418,7 +429,7 @@ function broadcast(message: any) {
 }
 
 // Broadcast message to all connections except the sender
-function broadcastToOthers(senderId: string, message: any) {
+function broadcastToOthers(senderId: string, message: Record<string, unknown>) {
     const messageStr = JSON.stringify(message);
     connections.forEach((connection) => {
         if (
@@ -435,7 +446,10 @@ function broadcastToOthers(senderId: string, message: any) {
 function getOnlineUsersCount(): number {
     let count = 0;
     connections.forEach((connection) => {
-        if (connection.authenticated && connection.socket.readyState === WebSocket.OPEN) {
+        if (
+            connection.authenticated &&
+            connection.socket.readyState === WebSocket.OPEN
+        ) {
             count++;
         }
     });
@@ -474,18 +488,24 @@ setInterval(() => {
             pendingAuthentications.delete(token);
         }
     });
-    
+
     // Clean up zombie connections (connections that are closed but not properly removed)
     connections.forEach((connection, id) => {
-        if (connection.socket.readyState === WebSocket.CLOSED || 
-            connection.socket.readyState === WebSocket.CLOSING) {
+        if (
+            connection.socket.readyState === WebSocket.CLOSED ||
+            connection.socket.readyState === WebSocket.CLOSING
+        ) {
             console.log(`Cleaning up zombie connection: ${id}`);
             handleDisconnect(id);
         }
     });
-    
+
     // Log connection stats
-    console.log(`Connection stats: Total=${connections.size}, Authenticated=${getOnlineUsersCount()}`);
+    console.log(
+        `Connection stats: Total=${
+            connections.size
+        }, Authenticated=${getOnlineUsersCount()}`
+    );
 }, 60 * 1000); // Check every minute
 
 // Send periodic ping to keep connections alive
@@ -506,8 +526,9 @@ setInterval(() => {
 console.log(`✅ WebSocket server listening on port ${PORT}`);
 
 // Start the server
-serve(
-    (req) => {
+Deno.serve({
+    port: PORT,
+    handler: (req: Request) => {
         const url = new URL(req.url);
 
         // Handle CORS preflight requests
@@ -565,20 +586,20 @@ serve(
                 }
             );
         }
-        
+
         // Handle online users count endpoint
         if (url.pathname === "/online") {
             return new Response(
                 JSON.stringify({
                     status: "ok",
                     onlineUsers: getOnlineUsersCount(),
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
                 }),
                 {
                     headers: {
                         "Content-Type": "application/json",
                         "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "no-cache, no-store, must-revalidate"
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
                     },
                 }
             );
@@ -658,7 +679,9 @@ serve(
 
                         default:
                             console.warn(
-                                `Unknown message type: ${(message as any).type}`
+                                `Unknown message type: ${
+                                    (message as { type: string }).type
+                                }`
                             );
                     }
                 } catch (error) {
@@ -681,5 +704,4 @@ serve(
             return new Response("WebSocket upgrade failed", { status: 400 });
         }
     },
-    { port: PORT }
-);
+});
