@@ -9,11 +9,14 @@ export const Constants = {
     BUILDING_INTERACTION_DISTANCE: 100,
     INTERACTION_DISTANCE: 100,
 
-    // WebSocket settings - dynamic URL based on environment variables
+    // WebSocket settings - hardcoded URLs
     get WS_SERVER_URL() {
-        // For production environments, use the environment variable
-        if (import.meta.env.VITE_WS_SERVER_URL) {
-            return import.meta.env.VITE_WS_SERVER_URL;
+        // Check if we're in production (deployed environment)
+        if (
+            window.location.hostname !== "localhost" &&
+            window.location.hostname !== "127.0.0.1"
+        ) {
+            return "wss://dhaniverse-ws-e7caeuhsf4fcc9by.canadacentral-01.azurewebsites.net/ws";
         }
 
         // For local development
