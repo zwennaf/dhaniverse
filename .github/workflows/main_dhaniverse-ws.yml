@@ -27,7 +27,17 @@ jobs:
 
       - name: Create deployment package
         run: |
-          cd server/ws
+          # Create a clean deployment directory
+          mkdir -p deploy-ws
+          
+          # Copy WebSocket server files
+          cp -r server/ws/* deploy-ws/
+          
+          # Remove any .env files from the deployment
+          rm -f deploy-ws/.env*
+          
+          cd deploy-ws
+          
           # Create package.json for Azure to recognize the app
           cat > package.json << 'EOF'
           {
@@ -36,31 +46,64 @@ jobs:
             "description": "WebSocket server for Dhaniverse",
             "main": "server.js",
             "scripts": {
-              "start": "deno run --allow-net --allow-env --allow-read ws.ts"
+              "start": "node server.js"
             },
             "engines": {
               "node": ">=18.0.0"
-            }
+            },
+            "dependencies": {}
           }
           EOF
           
-          # Create startup script for Azure
+          # Create startup script for Azure with better error handling
           cat > server.js << 'EOF'
           const { spawn } = require('child_process');
-          const port = process.env.PORT || 8000;
+          const fs = require('fs');
           
-          // Set PORT environment variable for Deno
-          process.env.PORT = port;
-          
-          const deno = spawn('deno', ['run', '--allow-net', '--allow-env', '--allow-read', 'ws.ts'], {
-            stdio: 'inherit',
-            env: process.env
-          });
-          
-          deno.on('close', (code) => {
-            console.log(`Deno process exited with code ${code}`);
-            process.exit(code);
-          });
+          // Check if Deno is installed
+          try {
+            const port = process.env.PORT || 8000;
+            console.log(`Starting WebSocket server on port ${port}`);
+            
+            // Create logs directory if it doesn't exist
+            if (!fs.existsSync('./logs')) {
+              fs.mkdirSync('./logs');
+            }
+            
+            // Log file for debugging
+            const logStream = fs.createWriteStream('./logs/server.log', { flags: 'a' });
+            
+            // Set PORT environment variable for Deno
+            process.env.PORT = port;
+            
+            // Start Deno process
+            const deno = spawn('deno', ['run', '--allow-net', '--allow-env', '--allow-read', 'ws.ts'], {
+              env: process.env
+            });
+            
+            // Pipe output to both console and log file
+            deno.stdout.pipe(process.stdout);
+            deno.stderr.pipe(process.stderr);
+            deno.stdout.pipe(logStream);
+            deno.stderr.pipe(logStream);
+            
+            deno.on('close', (code) => {
+              console.log(`Deno process exited with code ${code}`);
+              logStream.write(`Deno process exited with code ${code} at ${new Date().toISOString()}\n`);
+              
+              // Don't exit the Node process, let Azure restart it if needed
+              if (code !== 0) {
+                console.log('Restarting Deno process in 5 seconds...');
+                setTimeout(() => {
+                  console.log('Restarting Deno process now');
+                  process.exit(1); // Exit with error code so Azure will restart
+                }, 5000);
+              }
+            });
+          } catch (error) {
+            console.error('Failed to start Deno:', error);
+            process.exit(1);
+          }
           EOF
           
           # Create web.config for Azure
@@ -111,7 +154,7 @@ jobs:
           </configuration>
           EOF
           
-          zip -r ../../ws-deploy.zip . -x "*.env*"
+          zip -r ../../ws-deploy.zip .
 
       - name: Azure Login
         uses: azure/login@v2
