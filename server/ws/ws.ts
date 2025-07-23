@@ -14,411 +14,672 @@ const SERVER_START_TIME = Date.now();
 
 // Player data interface
 interface PlayerData {
-  id: string;
-  username: string;
-  x: number;
-  y: number;
-  animation?: string;
+    id: string;
+    username: string;
+    x: number;
+    y: number;
+    animation?: string;
 }
 
 // Connection tracking
 interface Connection {
-  id: string;
-  username: string;
-  socket: WebSocket;
-  lastActivity: number;
-  authenticated: boolean;
-  position: { x: number; y: number };
-  animation?: string;
+    id: string;
+    username: string;
+    socket: WebSocket;
+    lastActivity: number;
+    lastPing: number;
+    lastChatTime?: number;
+    authenticated: boolean;
+    position: { x: number; y: number };
+    animation?: string;
+    userId?: string;
 }
 
 // Message types
 interface AuthMessage {
-  type: "authenticate";
-  token: string;
-  gameUsername: string;
+    type: "authenticate";
+    token: string;
+    gameUsername: string;
 }
 
 interface UpdateMessage {
-  type: "update";
-  x: number;
-  y: number;
-  animation?: string;
+    type: "update";
+    x: number;
+    y: number;
+    animation?: string;
 }
 
 interface ChatMessage {
-  type: "chat";
-  message: string;
+    type: "chat";
+    message: string;
 }
 
-type ClientMessage = AuthMessage | UpdateMessage | ChatMessage;
+interface PingMessage {
+    type: "ping";
+}
+
+interface PongMessage {
+    type: "pong";
+}
+
+type ClientMessage = AuthMessage | UpdateMessage | ChatMessage | PingMessage;
 
 // Server state
 const connections = new Map<string, Connection>();
 const userConnections = new Map<string, string>(); // userId -> connectionId
+const pendingAuthentications = new Map<string, number>(); // userId -> timestamp
+const connectionsByUserId = new Map<string, Set<string>>(); // userId -> Set of connectionIds (for cleanup)
 
 // Authentication handler
 async function handleAuthentication(
-  connection: Connection,
-  message: AuthMessage
+    connection: Connection,
+    message: AuthMessage
 ) {
-  try {
-    // Get the auth server URL based on environment
-    const authServerUrl = Deno.env.get("DENO_ENV") === "production" 
-      ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") || "https://dhaniverseapi.deno.dev"
-      : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
-    
-    // Validate token with the main backend server
-    const response = await fetch(`${authServerUrl}/auth/validate-token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token: message.token }),
-    });
+    try {
+        // Prevent rapid authentication attempts
+        const now = Date.now();
+        const lastAuth = pendingAuthentications.get(message.token);
+        if (lastAuth && now - lastAuth < 1000) {
+            // 1 second debounce
+            console.log(
+                `Ignoring rapid authentication attempt for token: ${message.token.substring(
+                    0,
+                    10
+                )}...`
+            );
+            return;
+        }
+        pendingAuthentications.set(message.token, now);
 
-    const data = await response.json();
+        // Get the auth server URL based on environment
+        const authServerUrl =
+            Deno.env.get("DENO_ENV") === "production"
+                ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") ||
+                  "https://dhaniverseapi.deno.dev"
+                : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
 
-    if (!response.ok || !data.valid) {
-      connection.socket.send(
-        JSON.stringify({
-          type: "error",
-          error: "authentication_failed",
-          message: "Invalid token",
-        })
-      );
-      return;
-    }
-
-    const userId = data.userId;
-
-    // Check for existing connection with this user ID
-    const existingConnectionId = userConnections.get(userId);
-    if (existingConnectionId && existingConnectionId !== connection.id) {
-      const existingConnection = connections.get(existingConnectionId);
-      if (existingConnection) {
-        // Close the existing connection
-        existingConnection.socket.close(
-          1000,
-          "Replaced by newer connection"
-        );
-        connections.delete(existingConnectionId);
-        console.log(`Closed existing connection for user ${userId}`);
-      }
-    }
-
-    // Update connection with authenticated user info
-    connection.authenticated = true;
-    // Use the provided game username or fall back to the one from the token validation
-    connection.username = message.gameUsername || data.gameUsername;
-    userConnections.set(userId, connection.id);
-
-    // Send connection confirmation
-    connection.socket.send(
-      JSON.stringify({
-        type: "connect",
-        id: connection.id,
-      })
-    );
-
-    // Send list of existing players
-    const players: PlayerData[] = [];
-    connections.forEach((conn) => {
-      if (conn.id !== connection.id && conn.authenticated) {
-        players.push({
-          id: conn.id,
-          username: conn.username,
-          x: conn.position.x,
-          y: conn.position.y,
-          animation: conn.animation,
+        // Validate token with the main backend server
+        const response = await fetch(`${authServerUrl}/auth/validate-token`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token: message.token }),
         });
-      }
-    });
 
-    connection.socket.send(
-      JSON.stringify({
-        type: "players",
-        players,
-      })
-    );
+        const data = await response.json();
 
-    // Notify other players about the new player
-    broadcastToOthers(connection.id, {
-      type: "playerJoined",
-      player: {
-        id: connection.id,
-        username: connection.username,
-        x: connection.position.x,
-        y: connection.position.y,
-      },
-    });
+        if (!response.ok || !data.valid) {
+            connection.socket.send(
+                JSON.stringify({
+                    type: "error",
+                    error: "authentication_failed",
+                    message: "Invalid token",
+                })
+            );
+            return;
+        }
 
-    console.log(
-      `User authenticated: ${connection.username} (${connection.id})`
-    );
-  } catch (error) {
-    console.error(`Authentication error: ${error}`);
-    connection.socket.send(
-      JSON.stringify({
-        type: "error",
-        error: "authentication_failed",
-        message: "Authentication failed",
-      })
-    );
-  }
+        const userId = data.userId;
+        const gameUsername = message.gameUsername || data.gameUsername;
+
+        // Check if this connection is already authenticated for this user
+        if (connection.authenticated && connection.userId === userId) {
+            console.log(
+                `User ${gameUsername} already authenticated on this connection`
+            );
+            return;
+        }
+
+        // Check for existing connection with this user ID
+        const existingConnectionId = userConnections.get(userId);
+        if (existingConnectionId && existingConnectionId !== connection.id) {
+            const existingConnection = connections.get(existingConnectionId);
+            if (
+                existingConnection &&
+                existingConnection.socket.readyState === WebSocket.OPEN
+            ) {
+                // Close the existing connection gracefully and replace with new one
+                existingConnection.socket.close(
+                    1000,
+                    "Replaced by newer connection"
+                );
+                connections.delete(existingConnectionId);
+                console.log(
+                    `Replaced existing connection for user ${userId} (${gameUsername})`
+                );
+            }
+            // Clean up the mapping
+            userConnections.delete(userId);
+        }
+
+        // Update connection with authenticated user info
+        connection.authenticated = true;
+        connection.username = gameUsername;
+        connection.userId = userId;
+        
+        // Track this connection for the user
+        userConnections.set(userId, connection.id);
+        
+        // Add to connectionsByUserId for better cleanup
+        if (!connectionsByUserId.has(userId)) {
+            connectionsByUserId.set(userId, new Set());
+        }
+        connectionsByUserId.get(userId)?.add(connection.id);
+        
+        // Clean up any stale connections for this user
+        cleanupStaleConnectionsForUser(userId, connection.id);
+
+        // Clean up the pending authentication
+        pendingAuthentications.delete(message.token);
+
+        // Send connection confirmation
+        connection.socket.send(
+            JSON.stringify({
+                type: "connect",
+                id: connection.id,
+            })
+        );
+
+        // Send list of existing players
+        const players: PlayerData[] = [];
+        connections.forEach((conn) => {
+            if (conn.id !== connection.id && conn.authenticated) {
+                players.push({
+                    id: conn.id,
+                    username: conn.username,
+                    x: conn.position.x,
+                    y: conn.position.y,
+                    animation: conn.animation,
+                });
+            }
+        });
+
+        connection.socket.send(
+            JSON.stringify({
+                type: "players",
+                players,
+            })
+        );
+
+        // Notify other players about the new player
+        broadcastToOthers(connection.id, {
+            type: "playerJoined",
+            player: {
+                id: connection.id,
+                username: connection.username,
+                x: connection.position.x,
+                y: connection.position.y,
+            },
+        });
+
+        // Broadcast updated online users count
+        broadcastOnlineUsersCount();
+
+        console.log(
+            `User authenticated: ${connection.username} (${connection.id}) - Online users: ${getOnlineUsersCount()}`
+        );
+    } catch (error) {
+        console.error(`Authentication error: ${error}`);
+        connection.socket.send(
+            JSON.stringify({
+                type: "error",
+                error: "authentication_failed",
+                message: "Authentication failed",
+            })
+        );
+    }
 }
 
 // Position update handler
 function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
-  if (!connection.authenticated) {
-    connection.socket.send(
-      JSON.stringify({
-        type: "error",
-        error: "not_authenticated",
-        message: "You must authenticate first",
-      })
-    );
-    return;
-  }
+    if (!connection.authenticated) {
+        connection.socket.send(
+            JSON.stringify({
+                type: "error",
+                error: "not_authenticated",
+                message: "You must authenticate first",
+            })
+        );
+        return;
+    }
 
-  // Update player position
-  connection.position.x = message.x;
-  connection.position.y = message.y;
-  if (message.animation) {
-    connection.animation = message.animation;
-  }
+    // Update player position
+    connection.position.x = message.x;
+    connection.position.y = message.y;
+    if (message.animation) {
+        connection.animation = message.animation;
+    }
 
-  // Broadcast position update to other players
-  broadcastToOthers(connection.id, {
-    type: "playerUpdate",
-    player: {
-      id: connection.id,
-      username: connection.username,
-      x: connection.position.x,
-      y: connection.position.y,
-      animation: connection.animation,
-    },
-  });
+    // Broadcast position update to other players
+    broadcastToOthers(connection.id, {
+        type: "playerUpdate",
+        player: {
+            id: connection.id,
+            username: connection.username,
+            x: connection.position.x,
+            y: connection.position.y,
+            animation: connection.animation,
+        },
+    });
 }
 
 // Chat message handler
 function handleChatMessage(connection: Connection, message: ChatMessage) {
-  if (!connection.authenticated) {
-    connection.socket.send(
-      JSON.stringify({
-        type: "error",
-        error: "not_authenticated",
-        message: "You must authenticate first",
-      })
-    );
-    return;
-  }
+    if (!connection.authenticated) {
+        connection.socket.send(
+            JSON.stringify({
+                type: "error",
+                error: "not_authenticated",
+                message: "You must authenticate first",
+            })
+        );
+        return;
+    }
 
-  // Generate a unique message ID
-  const messageId = `chat-${Date.now()}-${Math.random()
-    .toString(36)
-    .substring(2, 9)}`;
+    try {
+        // Basic rate limiting for chat messages (prevent spam)
+        const now = Date.now();
+        if (!connection.lastChatTime) {
+            connection.lastChatTime = 0;
+        }
+        
+        if (now - connection.lastChatTime < 500) { // 500ms between messages
+            connection.socket.send(
+                JSON.stringify({
+                    type: "error",
+                    error: "rate_limited",
+                    message: "Please wait before sending another message",
+                })
+            );
+            return;
+        }
+        
+        connection.lastChatTime = now;
 
-  // Broadcast chat message to all players (including sender)
-  broadcast({
-    type: "chat",
-    id: messageId,
-    username: connection.username,
-    message: message.message,
-  });
+        // Validate message content
+        if (!message.message || message.message.trim().length === 0) {
+            return;
+        }
+
+        // Limit message length
+        const trimmedMessage = message.message.trim().substring(0, 500);
+
+        // Generate a unique message ID
+        const messageId = `chat-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
+
+        // Send acknowledgment to sender first to prevent client from retrying
+        connection.socket.send(
+            JSON.stringify({
+                type: "chatAck",
+                id: messageId,
+                message: trimmedMessage,
+            })
+        );
+
+        // Broadcast chat message to all players (including sender)
+        broadcast({
+            type: "chat",
+            id: messageId,
+            username: connection.username,
+            message: trimmedMessage,
+        });
+
+        console.log(`Chat message from ${connection.username}: ${trimmedMessage}`);
+    } catch (error) {
+        console.error(`Error handling chat message: ${error}`);
+        // Send error to client but don't close connection
+        connection.socket.send(
+            JSON.stringify({
+                type: "error",
+                error: "chat_error",
+                message: "Failed to process chat message",
+            })
+        );
+    }
+}
+
+// Clean up stale connections for a user
+function cleanupStaleConnectionsForUser(userId: string, currentConnectionId: string) {
+    const userConnectionIds = connectionsByUserId.get(userId);
+    if (!userConnectionIds) return;
+    
+    // Close all other connections for this user
+    userConnectionIds.forEach(connectionId => {
+        if (connectionId !== currentConnectionId) {
+            const connection = connections.get(connectionId);
+            if (connection && connection.socket.readyState === WebSocket.OPEN) {
+                console.log(`Closing stale connection ${connectionId} for user ${userId}`);
+                connection.socket.close(1000, "User connected from another session");
+                connections.delete(connectionId);
+            }
+        }
+    });
+    
+    // Reset the set to only contain the current connection
+    connectionsByUserId.set(userId, new Set([currentConnectionId]));
 }
 
 // Disconnect handler
 function handleDisconnect(connectionId: string) {
-  const connection = connections.get(connectionId);
-  if (connection) {
-    // Remove from connections map
-    connections.delete(connectionId);
+    const connection = connections.get(connectionId);
+    if (connection) {
+        // Remove from connections map
+        connections.delete(connectionId);
 
-    // Remove from userConnections map
-    for (const [userId, connId] of userConnections.entries()) {
-      if (connId === connectionId) {
-        userConnections.delete(userId);
-        break;
-      }
+        // Remove from userConnections map
+        if (connection.userId) {
+            // Remove from connectionsByUserId
+            const userConnectionIds = connectionsByUserId.get(connection.userId);
+            if (userConnectionIds) {
+                userConnectionIds.delete(connectionId);
+                if (userConnectionIds.size === 0) {
+                    connectionsByUserId.delete(connection.userId);
+                }
+            }
+            
+            // If this was the active connection for the user, remove it
+            if (userConnections.get(connection.userId) === connectionId) {
+                userConnections.delete(connection.userId);
+            }
+        }
+
+        // Notify other players if this was an authenticated connection
+        if (connection.authenticated) {
+            broadcastToOthers(connectionId, {
+                type: "playerDisconnect",
+                id: connectionId,
+                username: connection.username,
+            });
+            
+            // Broadcast updated online users count after disconnect
+            broadcastOnlineUsersCount();
+        }
+
+        console.log(
+            `Connection closed: ${connectionId}, remaining: ${connections.size} - Online users: ${getOnlineUsersCount()}`
+        );
     }
-
-    // Notify other players if this was an authenticated connection
-    if (connection.authenticated) {
-      broadcastToOthers(connectionId, {
-        type: "playerDisconnect",
-        id: connectionId,
-        username: connection.username,
-      });
-    }
-
-    console.log(
-      `Connection closed: ${connectionId}, remaining: ${connections.size}`
-    );
-  }
 }
 
 // Broadcast message to all connections
 function broadcast(message: any) {
-  const messageStr = JSON.stringify(message);
-  connections.forEach((connection) => {
-    if (
-      connection.authenticated &&
-      connection.socket.readyState === WebSocket.OPEN
-    ) {
-      connection.socket.send(messageStr);
-    }
-  });
+    const messageStr = JSON.stringify(message);
+    connections.forEach((connection) => {
+        if (
+            connection.authenticated &&
+            connection.socket.readyState === WebSocket.OPEN
+        ) {
+            connection.socket.send(messageStr);
+        }
+    });
 }
 
 // Broadcast message to all connections except the sender
 function broadcastToOthers(senderId: string, message: any) {
-  const messageStr = JSON.stringify(message);
-  connections.forEach((connection) => {
-    if (
-      connection.id !== senderId &&
-      connection.authenticated &&
-      connection.socket.readyState === WebSocket.OPEN
-    ) {
-      connection.socket.send(messageStr);
-    }
-  });
+    const messageStr = JSON.stringify(message);
+    connections.forEach((connection) => {
+        if (
+            connection.id !== senderId &&
+            connection.authenticated &&
+            connection.socket.readyState === WebSocket.OPEN
+        ) {
+            connection.socket.send(messageStr);
+        }
+    });
+}
+
+// Get count of authenticated users
+function getOnlineUsersCount(): number {
+    let count = 0;
+    connections.forEach((connection) => {
+        if (connection.authenticated && connection.socket.readyState === WebSocket.OPEN) {
+            count++;
+        }
+    });
+    return count;
+}
+
+// Broadcast online users count to all authenticated connections
+function broadcastOnlineUsersCount() {
+    const onlineCount = getOnlineUsersCount();
+    broadcast({
+        type: "onlineUsersCount",
+        count: onlineCount,
+    });
 }
 
 // Set up connection cleanup interval
 setInterval(() => {
-  const now = Date.now();
-  connections.forEach((connection, id) => {
-    // Close connections that have been inactive for more than 5 minutes
-    if (now - connection.lastActivity > 5 * 60 * 1000) {
-      console.log(`Closing inactive connection: ${id}`);
-      connection.socket.close(
-        1000,
-        "Connection timeout due to inactivity"
-      );
-      handleDisconnect(id);
-    }
-  });
+    const now = Date.now();
+
+    // Clean up inactive connections
+    connections.forEach((connection, id) => {
+        // Close connections that have been inactive for more than 5 minutes
+        if (now - connection.lastActivity > 5 * 60 * 1000) {
+            console.log(`Closing inactive connection: ${id}`);
+            connection.socket.close(
+                1000,
+                "Connection timeout due to inactivity"
+            );
+            handleDisconnect(id);
+        }
+    });
+
+    // Clean up old pending authentications (older than 30 seconds)
+    pendingAuthentications.forEach((timestamp, token) => {
+        if (now - timestamp > 30 * 1000) {
+            pendingAuthentications.delete(token);
+        }
+    });
+    
+    // Clean up zombie connections (connections that are closed but not properly removed)
+    connections.forEach((connection, id) => {
+        if (connection.socket.readyState === WebSocket.CLOSED || 
+            connection.socket.readyState === WebSocket.CLOSING) {
+            console.log(`Cleaning up zombie connection: ${id}`);
+            handleDisconnect(id);
+        }
+    });
+    
+    // Log connection stats
+    console.log(`Connection stats: Total=${connections.size}, Authenticated=${getOnlineUsersCount()}`);
 }, 60 * 1000); // Check every minute
+
+// Send periodic ping to keep connections alive
+setInterval(() => {
+    connections.forEach((connection) => {
+        if (
+            connection.authenticated &&
+            connection.socket.readyState === WebSocket.OPEN
+        ) {
+            // Only send ping if we haven't received a ping recently
+            if (Date.now() - connection.lastPing > 30 * 1000) {
+                connection.socket.send(JSON.stringify({ type: "ping" }));
+            }
+        }
+    });
+}, 30 * 1000); // Send ping every 30 seconds
 
 console.log(`✅ WebSocket server listening on port ${PORT}`);
 
 // Start the server
-serve((req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    const origin = req.headers.get("Origin");
-    if (origin && (ALLOWED_ORIGINS.includes(origin) || Deno.env.get("DENO_ENV") === "development")) {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": origin,
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
-          "Access-Control-Allow-Credentials": "true",
-        },
-      });
-    }
-    return new Response(null, { status: 204 });
-  }
+serve(
+    (req) => {
+        const url = new URL(req.url);
 
-  // Handle health check endpoint
-  if (req.url.endsWith("/health")) {
-    return new Response(
-      JSON.stringify({
-        status: "ok",
-        connections: connections.size,
-        uptime: Math.floor((Date.now() - SERVER_START_TIME) / 1000), // in seconds
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
+        // Handle CORS preflight requests
+        if (req.method === "OPTIONS") {
+            const origin = req.headers.get("Origin");
+            if (
+                origin &&
+                (ALLOWED_ORIGINS.includes(origin) ||
+                    Deno.env.get("DENO_ENV") === "development")
+            ) {
+                return new Response(null, {
+                    status: 204,
+                    headers: {
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                        "Access-Control-Allow-Headers":
+                            "Content-Type, Authorization, Upgrade, Connection",
+                        "Access-Control-Allow-Credentials": "true",
+                    },
+                });
+            }
+            return new Response(null, { status: 204 });
+        }
 
-  // Handle info endpoint
-  if (req.url.endsWith("/info")) {
-    return new Response(
-      JSON.stringify({
-        status: "ok",
-        connections: connections.size,
-        environment: Deno.env.get("DENO_ENV") || "development",
-      }),
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  }
-
-  // Handle WebSocket upgrade
-  try {
-    const { socket, response } = Deno.upgradeWebSocket(req);
-    const connectionId = crypto.randomUUID();
-
-    // Create a new connection
-    const connection: Connection = {
-      id: connectionId,
-      username: "",
-      socket,
-      lastActivity: Date.now(),
-      authenticated: false,
-      position: { x: 0, y: 0 },
-    };
-
-    connections.set(connectionId, connection);
-    console.log(
-      `New connection: ${connectionId}, total connections: ${connections.size}`
-    );
-
-    // WebSocket event handlers
-    socket.onopen = () => {
-      console.log(`WebSocket connection opened: ${connectionId}`);
-    };
-
-    socket.onmessage = async (event) => {
-      try {
-        const message = JSON.parse(event.data) as ClientMessage;
-        connection.lastActivity = Date.now();
-
-        switch (message.type) {
-          case "authenticate":
-            await handleAuthentication(connection, message);
-            break;
-
-          case "update":
-            handlePositionUpdate(connection, message);
-            break;
-
-          case "chat":
-            handleChatMessage(connection, message);
-            break;
-
-          default:
-            console.warn(
-              `Unknown message type: ${(message as any).type}`
+        // Handle health check endpoint
+        if (url.pathname === "/health") {
+            return new Response(
+                JSON.stringify({
+                    status: "ok",
+                    connections: connections.size,
+                    uptime: Math.floor((Date.now() - SERVER_START_TIME) / 1000), // in seconds
+                }),
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                }
             );
         }
-      } catch (error) {
-        console.error(`Error handling message: ${error}`);
-      }
-    };
 
-    socket.onclose = () => {
-      handleDisconnect(connectionId);
-    };
+        // Handle info endpoint
+        if (url.pathname === "/info") {
+            return new Response(
+                JSON.stringify({
+                    status: "ok",
+                    connections: connections.size,
+                    environment: Deno.env.get("DENO_ENV") || "development",
+                }),
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                }
+            );
+        }
+        
+        // Handle online users count endpoint
+        if (url.pathname === "/online") {
+            return new Response(
+                JSON.stringify({
+                    status: "ok",
+                    onlineUsers: getOnlineUsersCount(),
+                    timestamp: Date.now()
+                }),
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "no-cache, no-store, must-revalidate"
+                    },
+                }
+            );
+        }
 
-    socket.onerror = (error) => {
-      console.error(`WebSocket error for ${connectionId}:`, error);
-      handleDisconnect(connectionId);
-    };
+        // Check if this is a WebSocket upgrade request
+        const upgrade = req.headers.get("upgrade");
+        const connection = req.headers.get("connection");
 
-    return response;
-  } catch (err) {
-    console.error("WebSocket upgrade failed:", err);
-    return new Response("WebSocket upgrade failed", { status: 400 });
-  }
-}, { port: PORT });
+        if (
+            upgrade !== "websocket" ||
+            !connection?.toLowerCase().includes("upgrade")
+        ) {
+            return new Response(
+                "WebSocket endpoint - use WebSocket connection",
+                {
+                    status: 400,
+                    headers: {
+                        "Content-Type": "text/plain",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                }
+            );
+        }
+
+        // Handle WebSocket upgrade
+        try {
+            const { socket, response } = Deno.upgradeWebSocket(req);
+            const connectionId = crypto.randomUUID();
+
+            // Create a new connection
+            const connection: Connection = {
+                id: connectionId,
+                username: "",
+                socket,
+                lastActivity: Date.now(),
+                lastPing: Date.now(),
+                authenticated: false,
+                position: { x: 0, y: 0 },
+            };
+
+            connections.set(connectionId, connection);
+            console.log(
+                `New connection: ${connectionId}, total connections: ${connections.size}`
+            );
+
+            // WebSocket event handlers
+            socket.onopen = () => {
+                console.log(`WebSocket connection opened: ${connectionId}`);
+            };
+
+            socket.onmessage = async (event) => {
+                try {
+                    const message = JSON.parse(event.data) as ClientMessage;
+                    connection.lastActivity = Date.now();
+
+                    switch (message.type) {
+                        case "authenticate":
+                            await handleAuthentication(connection, message);
+                            break;
+
+                        case "update":
+                            handlePositionUpdate(connection, message);
+                            break;
+
+                        case "chat":
+                            handleChatMessage(connection, message);
+                            break;
+
+                        case "ping":
+                            // Respond to ping with pong
+                            connection.lastPing = Date.now();
+                            connection.socket.send(
+                                JSON.stringify({ type: "pong" })
+                            );
+                            break;
+
+                        default:
+                            console.warn(
+                                `Unknown message type: ${(message as any).type}`
+                            );
+                    }
+                } catch (error) {
+                    console.error(`Error handling message: ${error}`);
+                }
+            };
+
+            socket.onclose = () => {
+                handleDisconnect(connectionId);
+            };
+
+            socket.onerror = (error) => {
+                console.error(`WebSocket error for ${connectionId}:`, error);
+                handleDisconnect(connectionId);
+            };
+
+            return response;
+        } catch (err) {
+            console.error("WebSocket upgrade failed:", err);
+            return new Response("WebSocket upgrade failed", { status: 400 });
+        }
+    },
+    { port: PORT }
+);
