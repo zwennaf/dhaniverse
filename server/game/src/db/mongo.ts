@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, ObjectId } from "npm:mongodb@6.3.0";
+import { MongoClient, Db, Collection, Document, ObjectId } from "mongodb";
 import { config } from "../config/config.ts";
 import type {
     UserDocument,
@@ -30,36 +30,27 @@ class MongoDatabase {
                     : "❌ Invalid format"
             );
 
-            // Debug: Log connection details (without password)
-            const urlParts = config.mongodb.url.split("@");
-            if (urlParts.length > 1) {
-                console.log(
-                    "📍 Connecting to cluster:",
-                    urlParts[1].split("/")[0]
-                );
-                console.log("📍 Database name:", config.mongodb.dbName);
-            }
+            // Create client with better connection options
+            this.client = new MongoClient(config.mongodb.url, {
+                serverSelectionTimeoutMS: 10000, // 10 seconds
+                connectTimeoutMS: 10000, // 10 seconds
+                socketTimeoutMS: 45000, // 45 seconds
+                maxPoolSize: 10,
+                minPoolSize: 1,
+                maxIdleTimeMS: 30000,
+                retryWrites: true,
+                retryReads: true,
+                compressors: ['zlib'],
+            });
 
-            // Try URL encoding the password in case there are special characters
-            let connectionUrl = config.mongodb.url;
-
-            // Extract and re-encode password if needed
-            const urlMatch = connectionUrl.match(
-                /mongodb\+srv:\/\/([^:]+):([^@]+)@(.+)/
-            );
-            if (urlMatch) {
-                const [, username, password, rest] = urlMatch;
-                const encodedPassword = encodeURIComponent(password);
-                connectionUrl = `mongodb+srv://${username}:${encodedPassword}@${rest}`;
-                console.log("📍 Using URL-encoded password");
-            }
-
-            // Create client with connection string (npm mongodb driver)
-            this.client = new MongoClient(connectionUrl);
-
-            // Try different connection approaches
-            console.log("📍 Attempting connection...");
-            await this.client.connect();
+            // Connect to MongoDB with timeout
+            console.log("⏳ Attempting connection...");
+            await Promise.race([
+                this.client.connect(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
+                )
+            ]);
 
             // Set database instance
             this.db = this.client.db(config.mongodb.dbName);
@@ -71,11 +62,11 @@ class MongoDatabase {
 
             // List collections (optional)
             try {
-                const collections = await this.db.listCollectionNames();
+                const collections = await this.db.listCollections().toArray();
                 console.log(
                     `📊 Collections: ${
                         collections.length > 0
-                            ? collections.join(", ")
+                            ? collections.map((c) => c.name).join(", ")
                             : "None (new database)"
                     }`
                 );
