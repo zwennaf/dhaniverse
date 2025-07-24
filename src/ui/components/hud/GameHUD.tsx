@@ -29,6 +29,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
+    const chatContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Ensure initial state is correct
     useEffect(() => {
@@ -143,6 +144,28 @@ const GameHUD: React.FC<GameHUDProps> = ({
             messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
         }
     }, [chatMessages]);
+    
+    // Handle clicks outside the chat to unfocus it
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            // Only check if chat is currently focused
+            if (isChatFocused && chatContainerRef.current && chatInputRef.current) {
+                // Check if the click was outside the chat container
+                if (!chatContainerRef.current.contains(event.target as Node)) {
+                    setIsChatFocused(false);
+                    chatInputRef.current.blur();
+                    window.dispatchEvent(new Event("typing-end"));
+                }
+            }
+        };
+        
+        // Add click listener to the document
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isChatFocused]);
 
     // Handle keyboard events - MUCH simpler approach
     useEffect(() => {
@@ -265,6 +288,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
             {/* Chat window - always visible */}
             <div
+                ref={chatContainerRef}
                 className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-[14px] text-white pointer-events-auto backdrop-blur transition-opacity duration-300 ${
                     isChatFocused ? "opacity-100" : "opacity-60"
                 }`}
