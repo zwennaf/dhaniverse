@@ -8,6 +8,6 @@
         "start": "dfx start --clean --background"
     },
     "dependencies": {
-        "azle": "^0.32.0"
+        "azle": "0.32.0"
     }
 }

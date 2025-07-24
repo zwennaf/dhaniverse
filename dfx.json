@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "canisters": {
+    "dhaniverse_backend": {
+      "type": "azle",
+      "main": "packages/icp-canister/src/index.ts",
+      "build": [
+        "cd packages/icp-canister && npm install",
+        "npx azle dhaniverse_backend"
+      ],
+      "wasm": ".azle/dhaniverse_backend/dhaniverse_backend.wasm",
+      "gzip": true,
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "declarations": {
+        "output": "src/declarations/dhaniverse_backend",
+        "node_compatibility": true
+      }
+    },
+    "dhaniverse_frontend": {
+      "type": "assets",
+      "source": ["dist/"],
+      "dependencies": ["dhaniverse_backend"]
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral",
+      "replica": {
+        "subnet_type": "system"
+      }
+    },
+    "ic": {
+      "providers": ["https://ic0.app"],
+      "type": "persistent"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  }
+}
