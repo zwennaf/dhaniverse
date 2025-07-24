@@ -55,8 +55,8 @@ export function startGame(username: string): void {
     // Configure the game
     const config: Phaser.Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: "100%",
+        height: "100%",
         parent: "game-container",
         backgroundColor: "#2d2d2d",
         scene: [MainScene],
@@ -70,6 +70,8 @@ export function startGame(username: string): void {
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH,
+            width: "100%",
+            height: "100%",
         },
         render: {
             pixelArt: false,
@@ -127,6 +129,9 @@ export function startGame(username: string): void {
                     gameContainer.removeChild(loadingText);
                     loadingText = null;
                 }
+
+                // Setup resize handling after game is ready
+                setupResizeHandling();
             });
         } catch (error) {
             console.error("Error initializing game:", error);
@@ -145,9 +150,31 @@ export function stopGame(): void {
     // Notify MainScene and systems to stop and disconnect first
     window.dispatchEvent(new Event("stopGame"));
 
+    // Clean up resize timeout
+    if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = null;
+    }
+
+    // Clean up resize event listeners
+    if (resizeHandler) {
+        window.removeEventListener("resize", resizeHandler);
+        resizeHandler = null;
+    }
+    if (orientationHandler) {
+        window.removeEventListener("orientationchange", orientationHandler);
+        orientationHandler = null;
+    }
+
     if (game) {
         game.destroy(true);
         game = null;
+    }
+
+    // Reset game container
+    if (gameContainer) {
+        gameContainer.style.display = "none";
+        gameContainer = null;
     }
 
     // Unmount React HUD to free memory
@@ -182,12 +209,12 @@ export async function refreshPlayerState(): Promise<void> {
 }
 
 // Expose functions globally for debugging
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
     (window as any).dhaniverse = {
         refreshPlayerState,
         getCurrentGame,
         stopGame,
-        startGame
+        startGame,
     };
 }
 
@@ -197,7 +224,7 @@ if (typeof window !== 'undefined') {
 async function loadPlayerStateAndInitializeHUD(): Promise<void> {
     try {
         console.log("Loading player state from backend...");
-        
+
         // Load player state from backend
         const response = await playerStateApi.get();
 
@@ -208,7 +235,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
             console.log("Player state loaded successfully:", {
                 rupees,
                 totalWealth: playerState.financial?.totalWealth,
-                level: playerState.progress?.level
+                level: playerState.progress?.level,
             });
 
             // Initialize HUD with actual rupees from database
@@ -218,10 +245,14 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
             if (game) {
                 const initializeScene = () => {
                     if (!game) return; // Additional null check
-                    const mainScene = game.scene.getScene("MainScene") as MainScene;
+                    const mainScene = game.scene.getScene(
+                        "MainScene"
+                    ) as MainScene;
                     if (mainScene && mainScene.scene.isActive()) {
                         mainScene.initializePlayerRupees(rupees);
-                        console.log(`MainScene initialized with ${rupees} rupees`);
+                        console.log(
+                            `MainScene initialized with ${rupees} rupees`
+                        );
                     } else {
                         // Scene not ready yet, try again in 100ms
                         setTimeout(initializeScene, 100);
@@ -235,10 +266,11 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
         }
     } catch (error) {
         console.error("Error loading player state from backend:", error);
-        
+
         // Show user-friendly error message
         if (loadingText) {
-            loadingText.textContent = "Loading game data failed, using defaults...";
+            loadingText.textContent =
+                "Loading game data failed, using defaults...";
             setTimeout(() => {
                 if (loadingText && gameContainer) {
                     gameContainer.removeChild(loadingText);
@@ -246,11 +278,11 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
                 }
             }, 2000);
         }
-        
+
         // Fallback to default if API fails
         const defaultRupees = 25000;
         console.log("Using default rupees:", defaultRupees);
-        
+
         initializeHUD(defaultRupees);
 
         // Initialize MainScene with fallback
@@ -260,7 +292,9 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
                 const mainScene = game.scene.getScene("MainScene") as MainScene;
                 if (mainScene && mainScene.scene.isActive()) {
                     mainScene.initializePlayerRupees(defaultRupees);
-                    console.log(`MainScene initialized with default ${defaultRupees} rupees`);
+                    console.log(
+                        `MainScene initialized with default ${defaultRupees} rupees`
+                    );
                 } else {
                     // Scene not ready yet, try again in 100ms
                     setTimeout(initializeScene, 100);
@@ -271,12 +305,68 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
     }
 }
 
-// Handle window resizing
-window.addEventListener("resize", () => {
-    if (game) {
-        game.scale.resize(window.innerWidth, window.innerHeight);
+// Handle window resizing with debouncing and proper cleanup
+let resizeTimeout: number | null = null;
+let resizeHandler: (() => void) | null = null;
+let orientationHandler: (() => void) | null = null;
+
+function setupResizeHandling(): void {
+    if (!game || !gameContainer) return;
+
+    // Remove any existing listeners
+    if (resizeHandler) {
+        window.removeEventListener("resize", resizeHandler);
     }
-});
+    if (orientationHandler) {
+        window.removeEventListener("orientationchange", orientationHandler);
+    }
+
+    // Create new resize handler
+    resizeHandler = () => {
+        if (!game || !gameContainer) return;
+
+        // Clear any existing timeout
+        if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
+        }
+
+        // Debounce resize to avoid excessive calls
+        resizeTimeout = window.setTimeout(() => {
+            if (!game || !gameContainer) return;
+
+            const newWidth = window.innerWidth;
+            const newHeight = window.innerHeight;
+
+            // Update game container size
+            gameContainer.style.width = "100%";
+            gameContainer.style.height = "100vh";
+
+            // Force Phaser to resize the canvas
+            game.scale.setGameSize(newWidth, newHeight);
+            game.scale.refresh();
+
+            // Trigger custom resize event for game systems
+            game.events.emit("game-resize", newWidth, newHeight);
+
+            console.log(`Game resized to: ${newWidth}x${newHeight}`);
+        }, 50); // Reduced debounce for more responsive resizing
+    };
+
+    // Create orientation change handler
+    orientationHandler = () => {
+        // Small delay to allow orientation change to complete
+        setTimeout(() => {
+            if (resizeHandler) resizeHandler();
+        }, 200);
+    };
+
+    // Add event listeners
+    window.addEventListener("resize", resizeHandler);
+    window.addEventListener("orientationchange", orientationHandler);
+
+    // Initial resize to ensure proper sizing
+    resizeHandler();
+}
 
 // Simple, focused browser key prevention - only prevent truly problematic browser shortcuts
 window.addEventListener("keydown", (event) => {
