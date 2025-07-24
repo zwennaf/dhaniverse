@@ -1,289 +1,166 @@
-import { Identity } from '@dfinity/agent';
-import { AuthClient } from '@dfinity/auth-client';
+import { Web3WalletService, WalletType, WalletInfo, WalletStatus as Web3WalletStatus } from './Web3WalletService';
 
 export interface WalletStatus {
-  connected: boolean;
-  principal?: string;
-  walletType?: 'plug' | 'stoic' | 'ii';
-  error?: string;
+    connected: boolean;
+    address?: string;
+    walletType?: WalletType;
+    error?: string;
+    isConnecting?: boolean;
+    lastConnected?: number;
+    balance?: string;
 }
 
 export interface WalletConnectionResult {
-  success: boolean;
-  principal?: string;
-  identity?: Identity;
-  error?: string;
-}
-
-export interface AuthResult {
-  success: boolean;
-  identity?: Identity;
-  principal?: string;
-  error?: string;
+    success: boolean;
+    address?: string;
+    walletType?: WalletType;
+    error?: string;
 }
 
 export class WalletManager {
-  private authClient: AuthClient | null = null;
-  private currentIdentity: Identity | null = null;
-  private connectionStatus: WalletStatus = { connected: false };
-  private connectionCallbacks: ((status: WalletStatus) => void)[] = [];
-  private authCallbacks: ((identity: Identity | null) => void)[] = [];
+    private web3Service: Web3WalletService;
+    private connectionCallbacks: ((status: WalletStatus) => void)[] = [];
 
-  constructor() {
-    this.initializeAuthClient();
-  }
-
-  private getIdentityProviderUrl(): string {
-    if (import.meta.env.NODE_ENV === 'production') {
-      return 'https://identity.ic0.app/#authorize';
+    constructor() {
+        this.web3Service = new Web3WalletService();
+        this.setupEventListeners();
     }
-    
-    // For local development, use environment variables or fallback to default
-    const canisterId = import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai';
-    const host = import.meta.env.VITE_LOCAL_HOST || '127.0.0.1';
-    const port = import.meta.env.VITE_LOCAL_PORT || '4943';
-    
-    return `http://${host}:${port}/?canisterId=${canisterId}#authorize`;
-  }
 
-  private async initializeAuthClient(): Promise<void> {
-    try {
-      this.authClient = await AuthClient.create({
-        idleOptions: {
-          idleTimeout: 1000 * 60 * 30, // 30 minutes
-          disableDefaultIdleCallback: true
+    private setupEventListeners(): void {
+        this.web3Service.onStatusChange((status: Web3WalletStatus) => {
+            const walletStatus: WalletStatus = {
+                connected: status.connected,
+                address: status.address,
+                walletType: status.walletType,
+                error: status.error,
+                isConnecting: status.isConnecting,
+                balance: status.balance
+            };
+            this.notifyConnectionChange(walletStatus);
+        });
+    }
+
+    // Wallet Connection
+    async connectWallet(walletType?: WalletType): Promise<WalletConnectionResult> {
+        if (walletType) {
+            const result = await this.web3Service.connectWallet(walletType);
+            const status = this.web3Service.getStatus();
+            return {
+                success: result.success,
+                address: status.address,
+                walletType: status.walletType,
+                error: result.error
+            };
+        } else {
+            return await this.autoDetectAndConnect();
         }
-      });
+    }
 
-      // Check if already authenticated
-      if (await this.authClient.isAuthenticated()) {
-        this.currentIdentity = this.authClient.getIdentity();
-        this.updateConnectionStatus({
-          connected: true,
-          principal: this.currentIdentity.getPrincipal().toString(),
-          walletType: 'ii'
+    // Check if specific wallet is available
+    isWalletAvailable(walletType: WalletType): boolean {
+        const wallets = this.web3Service.getAvailableWallets();
+        const wallet = wallets.find(w => w.type === walletType);
+        return wallet?.installed || false;
+    }
+
+    // Auto-detect and connect to available wallet
+    async autoDetectAndConnect(): Promise<WalletConnectionResult> {
+        console.log("🔍 Auto-detecting wallets...");
+        
+        const result = await this.web3Service.autoConnect();
+        const status = this.web3Service.getStatus();
+        
+        return {
+            success: result.success,
+            address: status.address,
+            walletType: status.walletType,
+            error: result.error
+        };
+    }
+
+    // Get wallet installation URLs
+    getWalletInstallUrl(walletType: WalletType): string {
+        const wallets = this.web3Service.getAvailableWallets();
+        const wallet = wallets.find(w => w.type === walletType);
+        return wallet?.downloadUrl || '';
+    }
+
+    // Get available wallets
+    getAvailableWallets(): Array<{
+        type: WalletType;
+        name: string;
+        available: boolean;
+    }> {
+        return this.web3Service.getAvailableWallets().map(wallet => ({
+            type: wallet.type,
+            name: wallet.name,
+            available: wallet.installed
+        }));
+    }
+
+    disconnectWallet(): void {
+        this.web3Service.disconnectWallet();
+    }
+
+    getConnectionStatus(): WalletStatus {
+        const status = this.web3Service.getStatus();
+        return {
+            connected: status.connected,
+            address: status.address,
+            walletType: status.walletType,
+            error: status.error,
+            isConnecting: status.isConnecting,
+            balance: status.balance
+        };
+    }
+
+    // Get Web3 service for banking operations
+    getWeb3Service(): Web3WalletService {
+        return this.web3Service;
+    }
+
+    // Event Management
+    onConnectionChange(callback: (status: WalletStatus) => void): void {
+        this.connectionCallbacks.push(callback);
+    }
+
+    removeConnectionCallback(callback: (status: WalletStatus) => void): void {
+        const index = this.connectionCallbacks.indexOf(callback);
+        if (index > -1) {
+            this.connectionCallbacks.splice(index, 1);
+        }
+    }
+
+    private notifyConnectionChange(status: WalletStatus): void {
+        this.connectionCallbacks.forEach(callback => callback(status));
+    }
+
+    // Legacy methods for compatibility
+    getIdentity(): any {
+        return null; // Not needed for Web3 wallets
+    }
+
+    getPrincipal(): string | null {
+        return this.getConnectionStatus().address || null;
+    }
+
+    authenticate(): Promise<any> {
+        const status = this.getConnectionStatus();
+        return Promise.resolve({
+            success: status.connected,
+            address: status.address,
+            error: status.error
         });
-      }
-    } catch (error) {
-      console.error('Failed to initialize auth client:', error);
     }
-  }  // Wallet Connection
-  async connectWallet(): Promise<WalletConnectionResult> {
-    try {
-      // Try Plug wallet first
-      const plugResult = await this.connectPlug();
-      if (plugResult.success) {
-        return plugResult;
-      }
 
-      // Fallback to Internet Identity
-      return await this.connectInternetIdentity();
-    } catch (error) {
-      const errorMessage = `Failed to connect wallet: ${error}`;
-      console.error(errorMessage);
-      
-      this.updateConnectionStatus({
-        connected: false,
-        error: errorMessage
-      });
-
-      return {
-        success: false,
-        error: errorMessage
-      };
-    }
-  }
-
-  private async connectPlug(): Promise<WalletConnectionResult> {
-    try {
-      // Check if Plug is available
-      if (!(window as any).ic?.plug) {
-        return {
-          success: false,
-          error: 'Plug wallet not installed'
-        };
-      }
-
-      const plug = (window as any).ic.plug;
-      
-      // Request connection
-      const connected = await plug.requestConnect({
-        whitelist: [import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'],
-        host: import.meta.env.NODE_ENV === 'production' 
-          ? 'https://ic0.app' 
-          : 'http://127.0.0.1:4943'
-      });
-
-      if (!connected) {
-        return {
-          success: false,
-          error: 'User rejected connection'
-        };
-      }
-
-      // Get principal
-      const principal = await plug.agent.getPrincipal();
-      
-      this.currentIdentity = plug.agent._identity;
-      this.updateConnectionStatus({
-        connected: true,
-        principal: principal.toString(),
-        walletType: 'plug'
-      });
-
-      return {
-        success: true,
-        principal: principal.toString(),
-        identity: this.currentIdentity || undefined
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Plug connection failed: ${error}`
-      };
-    }
-  }  
-private async connectInternetIdentity(): Promise<WalletConnectionResult> {
-    try {
-      if (!this.authClient) {
-        throw new Error('Auth client not initialized');
-      }
-
-      return new Promise((resolve) => {
-        this.authClient!.login({
-          identityProvider: this.getIdentityProviderUrl(),
-          onSuccess: () => {
-            this.currentIdentity = this.authClient!.getIdentity();
-            const principal = this.currentIdentity.getPrincipal().toString();
-            
-            this.updateConnectionStatus({
-              connected: true,
-              principal,
-              walletType: 'ii'
-            });
-
-            resolve({
-              success: true,
-              principal,
-              identity: this.currentIdentity || undefined
-            });
-          },
-          onError: (error) => {
-            const errorMessage = `Internet Identity login failed: ${error}`;
-            this.updateConnectionStatus({
-              connected: false,
-              error: errorMessage
-            });
-
-            resolve({
-              success: false,
-              error: errorMessage
-            });
-          }
+    onAuthChange(callback: (identity: any) => void): void {
+        // For compatibility - convert connection changes to auth changes
+        this.onConnectionChange((status) => {
+            callback(status.connected ? { address: status.address } : null);
         });
-      });
-    } catch (error) {
-      return {
-        success: false,
-        error: `Internet Identity connection failed: ${error}`
-      };
-    }
-  }
-
-  disconnectWallet(): void {
-    try {
-      // Disconnect Plug if connected
-      if (this.connectionStatus.walletType === 'plug' && (window as any).ic?.plug) {
-        (window as any).ic.plug.disconnect();
-      }
-
-      // Logout from Internet Identity
-      if (this.connectionStatus.walletType === 'ii' && this.authClient) {
-        this.authClient.logout();
-      }
-
-      this.currentIdentity = null;
-      this.updateConnectionStatus({ connected: false });
-      
-      // Notify auth callbacks
-      this.authCallbacks.forEach(callback => callback(null));
-    } catch (error) {
-      console.error('Error disconnecting wallet:', error);
-    }
-  }
-
-  getConnectionStatus(): WalletStatus {
-    return { ...this.connectionStatus };
-  } 
- // Authentication
-  async authenticate(): Promise<AuthResult> {
-    if (!this.connectionStatus.connected || !this.currentIdentity) {
-      return {
-        success: false,
-        error: 'No wallet connected'
-      };
     }
 
-    try {
-      // Verify identity is still valid
-      const principal = this.currentIdentity.getPrincipal();
-      
-      if (principal.isAnonymous()) {
-        return {
-          success: false,
-          error: 'Anonymous identity not allowed'
-        };
-      }
-
-      return {
-        success: true,
-        identity: this.currentIdentity || undefined,
-        principal: principal.toString()
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Authentication failed: ${error}`
-      };
+    removeAuthCallback(callback: (identity: any) => void): void {
+        // For compatibility
     }
-  }
-
-  getIdentity(): Identity | null {
-    return this.currentIdentity;
-  }
-
-  getPrincipal(): string | null {
-    if (!this.currentIdentity) return null;
-    return this.currentIdentity.getPrincipal().toString();
-  }
-
-  // Event Management
-  onConnectionChange(callback: (status: WalletStatus) => void): void {
-    this.connectionCallbacks.push(callback);
-  }
-
-  onAuthChange(callback: (identity: Identity | null) => void): void {
-    this.authCallbacks.push(callback);
-  }
-
-  removeConnectionCallback(callback: (status: WalletStatus) => void): void {
-    const index = this.connectionCallbacks.indexOf(callback);
-    if (index > -1) {
-      this.connectionCallbacks.splice(index, 1);
-    }
-  }
-
-  removeAuthCallback(callback: (identity: Identity | null) => void): void {
-    const index = this.authCallbacks.indexOf(callback);
-    if (index > -1) {
-      this.authCallbacks.splice(index, 1);
-    }
-  }
-
-  private updateConnectionStatus(status: Partial<WalletStatus>): void {
-    this.connectionStatus = { ...this.connectionStatus, ...status };
-    
-    // Notify all connection callbacks
-    this.connectionCallbacks.forEach(callback => callback(this.connectionStatus));
-  }
 }

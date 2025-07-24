@@ -16,7 +16,9 @@ export class ICPIntegrationManager {
     // Initialize services
     this.walletManager = new WalletManager();
     this.icpService = new ICPActorService(
-      import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'
+      import.meta.env.VITE_DHANIVERSE_CANISTER_ID || 
+      import.meta.env.REACT_APP_CANISTER_ID || 
+      'rdmx6-jaaaa-aaaah-qcaiq-cai'
     );
     this.dualStorageManager = new DualStorageManager(this.icpService, this.walletManager);
   }

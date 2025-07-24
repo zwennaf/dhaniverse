@@ -1,140 +1,270 @@
 # Implementation Plan
 
-- [x] 1. Install Web3 dependencies and setup project structure
-  - Add required Web3 libraries (ethers, @walletconnect/web3-provider, @coinbase/wallet-sdk)
-  - Create Web3 service directory structure under src/services/web3/
-  - Set up TypeScript interfaces and types for Web3 authentication
-  - _Requirements: 5.1, 5.2_
+-   [x] 1. Install ICP dependencies and setup project structure
 
-- [x] 2. Create core Web3 authentication types and interfaces
-  - Define WalletType enum and WalletInfo interface
-  - Create WalletConnection and Web3AuthRequest interfaces
-  - Implement AuthResult interface extensions for Web3
-  - Create Web3Session interface for session management
-  - _Requirements: 5.1, 5.2_
+    -   Add required ICP libraries (@dfinity/agent, @dfinity/auth-client, @dfinity/identity)
+    -   Create ICP service directory structure under src/services/icp/
+    -   Set up TypeScript interfaces and types for ICP wallet integration
+    -   _Requirements: 5.1, 5.2_
 
-- [x] 3. Implement base wallet connector interface and abstract class
-  - Create IWalletConnector interface with core wallet methods
-  - Implement BaseWalletConnector abstract class with common functionality
-  - Add wallet detection and connection state management
-  - Create error handling utilities for wallet operations
-  - _Requirements: 1.2, 1.3, 6.1_
+-   [x] 2. Create core ICP wallet types and interfaces
 
-- [ ] 4. Implement MetaMask wallet connector
-  - Create MetaMaskConnector class extending BaseWalletConnector
-  - Implement MetaMask-specific connection logic
-  - Add MetaMask detection and installation checking
-  - Handle MetaMask-specific events (account change, chain change)
-  - Write unit tests for MetaMask connector
-  - _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2_
+    -   Define ICPWalletType enum and WalletInfo interface
+    -   Create ICPConnection and AuthRequest interfaces
+    -   Implement AuthResult interface extensions for ICP
+    -   Create ICPSession interface for session management
+    -   _Requirements: 5.1, 5.2_
 
-- [ ] 5. Create Web3 authentication service
-  - Implement Web3AuthService class with wallet management
-  - Add wallet detection and connection orchestration
-  - Implement authentication message generation and signing
-  - Create session management functionality (store/restore/clear)
-  - Add event handling for wallet state changes
-  - _Requirements: 1.4, 1.5, 2.1, 2.2, 4.1, 4.2_
+-   [x] 3. Implement base ICP wallet connector interface and abstract class
 
-- [ ] 6. Extend AuthContext to support Web3 authentication
-  - Add Web3-related state variables to AuthContext
-  - Implement signInWithWeb3 method in AuthContext
-  - Add connectWallet and disconnectWallet methods
-  - Update User interface to include walletAddress and authMethod
-  - Modify existing authentication flow to handle Web3 users
-  - _Requirements: 1.6, 2.1, 2.2, 5.3, 5.4_
+    -   Create IICPWalletConnector interface with core wallet methods
+    -   Implement BaseICPWalletConnector abstract class with common functionality
+    -   Add wallet detection and connection state management
+    -   Create error handling utilities for ICP wallet operations
+    -   _Requirements: 1.2, 1.3, 6.1_
 
-- [ ] 7. Create Web3 sign-in UI component
-  - Build Web3SignInButton component with wallet selection
-  - Implement wallet detection and display logic
-  - Add loading states and error handling UI
-  - Create wallet installation prompts for missing wallets
-  - Style component to match existing authentication UI
-  - _Requirements: 1.1, 1.2, 6.1, 6.3_
+-   [x] 4. Enhance existing ICP WalletManager for banking integration
 
-- [ ] 8. Integrate Web3 authentication into existing sign-in page
-  - Add Web3SignInButton to CustomSignIn component
-  - Update sign-in page layout to accommodate Web3 option
-  - Ensure proper error handling and user feedback
-  - Test integration with existing Google and email authentication
-  - _Requirements: 1.1, 5.1, 5.2_
+    -   Update WalletManager to support Plug wallet and Internet Identity
+    -   Implement proper connection state management for banking UI
+    -   Add wallet detection and installation checking for Plug wallet
+    -   Handle wallet-specific events (account change, principal change)
+    -   Integrate with existing banking dashboard connect wallet button
+    -   _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2_
 
-- [ ] 9. Implement backend API endpoints for Web3 authentication
-  - Create /auth/web3 endpoint for signature verification
-  - Implement signature validation using ethers library
-  - Add user creation/retrieval logic for wallet addresses
-  - Update user model to support Web3 authentication fields
-  - Add proper error handling and validation
-  - _Requirements: 1.5, 1.6, 5.3, 5.4_
+-   [x] 5. Improve ICPActorService for banking operations
 
-- [ ] 10. Add session restoration and wallet reconnection
-  - Implement automatic wallet reconnection on app load
-  - Add session validation and restoration logic
-  - Handle wallet disconnection and cleanup
-  - Update AuthContext to restore Web3 sessions
-  - Test session persistence across browser refreshes
-  - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 11. Implement wallet switching and account change handling
-  - Add event listeners for wallet account changes
-  - Implement re-authentication flow for account switches
-  - Handle wallet provider switching gracefully
-  - Update UI to reflect current wallet state
-  - Add proper cleanup for previous connections
-  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+    -   Enhance ICPActorService class with banking-specific methods
+    -   Add deposit, withdraw, and balance query operations
+    -   Implement transaction history retrieval from canister
+    -   Create session management functionality (store/restore/clear)
+    -   Add event handling for wallet state changes in banking context
+    -   _Requirements: 1.4, 1.5, 2.1, 2.2, 4.1, 4.2_
 
-- [ ] 12. Add comprehensive error handling and user feedback
-  - Implement Web3ErrorHandler utility class
-  - Add specific error messages for different failure scenarios
-  - Create user-friendly error displays in UI components
-  - Add retry mechanisms for failed operations
-  - Test error scenarios and edge cases
-  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+-   [x] 6. Fix banking dashboard connect wallet functionality and add dual-currency system
 
-- [ ] 13. Create disconnect wallet functionality
-  - Add disconnect wallet button to user interface
-  - Implement wallet disconnection logic in Web3AuthService
-  - Clear Web3 session data on disconnect
-  - Update AuthContext state on wallet disconnect
-  - Redirect to sign-in page after disconnection
-  - _Requirements: 3.1, 3.2, 3.3_
+    -   Update BankingDashboard component to use improved WalletManager
+    -   Fix handleConnectWallet function to properly detect and connect wallets
+    -   Implement dual-currency system: Rupees (traditional) + ICP Tokens (blockchain)
+    -   Create separate balance displays for both currencies after wallet connection
+    -   Add currency conversion and exchange features between Rupees and ICP Tokens
+    -   Implement proper error handling for wallet connection failures
+    -   Add loading states and user feedback during connection process
+    -   Ensure wallet status updates correctly in banking UI
+    -   _Requirements: 1.1, 1.2, 6.1, 6.3_
 
-- [ ] 14. Write comprehensive tests for Web3 authentication
-  - Create unit tests for Web3AuthService methods
-  - Test wallet connector implementations
-  - Add integration tests for authentication flow
-  - Test error handling scenarios
-  - Create end-to-end tests for complete user journey
-  - _Requirements: All requirements - testing coverage_
+-   [ ] 7. Create immersive Web3 banking experience with unique ICP features
 
-- [ ] 15. Add WalletConnect support for broader wallet compatibility
-  - Install and configure WalletConnect dependencies
-  - Create WalletConnectConnector class
-  - Implement WalletConnect-specific connection logic
-  - Add WalletConnect to wallet selection UI
-  - Test WalletConnect integration with mobile wallets
-  - _Requirements: 1.2, 1.3_
+    -   Design and implement Web3-exclusive banking features showcase
+    -   Add ICP Token staking system with simulated rewards
+    -   Create blockchain-based achievement system with NFT-like badges
+    -   Implement decentralized savings goals with community features
+    -   Add smart contract simulation for automated savings
+    -   Create blockchain transaction history with immutable records
+    -   Add Web3 portfolio tracking with DeFi-style analytics
+    -   Implement cross-chain bridge simulation for educational purposes
+    -   _Requirements: 1.4, 1.5, 2.1, 2.2_
 
-- [ ] 16. Implement Coinbase Wallet connector
-  - Create CoinbaseWalletConnector class
-  - Implement Coinbase Wallet SDK integration
-  - Add Coinbase Wallet to available wallet options
-  - Test Coinbase Wallet connection and authentication
-  - Handle Coinbase Wallet-specific features
-  - _Requirements: 1.2, 1.3_
+-   [ ] 8. Implement dual-currency ICP canister endpoints
 
-- [ ] 17. Add security enhancements and message signing standards
-  - Implement standardized authentication message format
-  - Add timestamp and nonce to prevent replay attacks
-  - Implement message expiration validation
-  - Add rate limiting for authentication attempts
-  - Enhance server-side signature verification
-  - _Requirements: 1.4, 1.5_
+    -   Create separate endpoints for Rupees and ICP Token operations
+    -   Implement currency exchange endpoints with simulated rates
+    -   Add ICP Token staking endpoints with reward calculations
+    -   Create blockchain achievement and badge minting endpoints
+    -   Implement decentralized savings goal tracking endpoints
+    -   Add smart contract simulation endpoints for automated features
+    -   Create immutable transaction history endpoints for both currencies
+    -   Add proper error handling and validation for all canister methods
+    -   _Requirements: 1.5, 1.6, 5.3, 5.4_
 
-- [ ] 18. Final integration testing and polish
-  - Test all wallet types with complete authentication flow
-  - Verify coexistence with existing authentication methods
-  - Test session management across different scenarios
-  - Perform cross-browser compatibility testing
-  - Optimize performance and user experience
-  - _Requirements: All requirements - final validation_
+-   [ ] 9. Add session restoration and wallet reconnection for banking
+
+    -   Implement automatic wallet reconnection when banking UI opens
+    -   Add session validation and restoration logic for banking context
+    -   Handle wallet disconnection and cleanup in banking dashboard
+    -   Update banking UI to restore ICP sessions automatically
+    -   Ensure banking operations work seamlessly across browser refreshes
+    -   _Requirements: 2.1, 2.2, 2.3_
+
+-   [ ] 10. Implement wallet switching and account change handling in banking
+
+    -   Add event listeners for wallet account changes in banking context
+    -   Implement re-authentication flow for account switches during banking
+    -   Handle wallet provider switching gracefully in banking dashboard
+    -   Update banking UI to reflect current wallet state immediately
+    -   Add proper cleanup for previous connections when switching wallets
+    -   _Requirements: 4.1, 4.2, 4.3, 4.4_
+
+-   [ ] 11. Add comprehensive error handling for ICP banking operations
+
+    -   Implement ICPBankingErrorHandler utility class
+    -   Add specific error messages for different banking failure scenarios
+    -   Create user-friendly error displays in banking UI components
+    -   Add retry mechanisms for failed ICP banking operations
+    -   Handle network connectivity issues and canister unavailability
+    -   _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+
+-   [ ] 12. Create enhanced disconnect wallet functionality for banking
+
+    -   Add disconnect wallet button to banking interface
+    -   Implement wallet disconnection logic in banking context
+    -   Clear ICP session data on disconnect from banking UI
+    -   Update banking dashboard state on wallet disconnect
+    -   Ensure banking operations fallback to local mode after disconnect
+    -   _Requirements: 3.1, 3.2, 3.3_
+
+-   [ ] 13. Add Internet Identity support for broader ICP compatibility
+
+    -   Install and configure Internet Identity dependencies
+    -   Create InternetIdentityConnector class
+    -   Implement Internet Identity-specific connection logic
+    -   Add Internet Identity option to banking wallet selection UI
+    -   Handle Internet Identity authentication flow in banking context
+    -   _Requirements: 1.2, 1.3_
+
+-   [ ] 14. Implement Stoic Wallet connector for additional ICP wallet support
+
+    -   Create StoicWalletConnector class
+    -   Implement Stoic Wallet SDK integration
+    -   Add Stoic Wallet to available wallet options in banking UI
+    -   Handle Stoic Wallet connection and authentication for banking
+    -   Ensure compatibility with existing banking operations
+    -   _Requirements: 1.2, 1.3_
+
+-   [ ] 15. Add security enhancements and principal verification
+
+    -   Implement standardized principal verification for banking operations
+    -   Add timestamp and nonce to prevent replay attacks in banking
+    -   Implement transaction expiration validation for banking operations
+    -   Add rate limiting for banking authentication attempts
+    -   Enhance canister-side principal verification for banking methods
+    -   _Requirements: 1.4, 1.5_
+
+-   [ ] 16. Optimize banking UI for ICP integration
+
+    -   Improve wallet connection flow in banking dashboard
+    -   Add real-time balance updates from ICP canister
+    -   Implement transaction status indicators (local vs blockchain)
+    -   Add blockchain sync progress indicators in banking UI
+    -   Optimize performance for frequent ICP canister calls
+    -   _Requirements: 1.1, 5.1, 5.2_
+
+-   [ ] 17. Add ICP transaction verification and audit trail
+
+    -   Implement transaction verification against ICP canister
+    -   Add audit trail functionality for banking operations
+    -   Create transaction history view with blockchain verification
+    -   Add export functionality for verified transaction records
+    -   Implement transaction integrity checks and validation
+    -   _Requirements: 1.5, 1.6, 2.1, 2.2_
+
+-   [ ] 18. Create Web3 currency exchange and conversion system
+
+    -   Implement real-time exchange rates between Rupees and ICP Tokens
+    -   Create currency conversion UI with animated transitions
+    -   Add exchange history tracking and analytics
+    -   Implement exchange limits and daily trading volumes
+    -   Create market simulation with price fluctuations
+    -   Add educational tooltips explaining blockchain economics
+    -   Implement exchange fees and gas simulation for realism
+    -   _Requirements: 1.4, 1.5, 2.1, 2.2_
+
+-   [ ] 19. Build ICP Token staking and rewards system
+
+    -   Create staking pools with different APY rates
+    -   Implement staking duration options (30, 90, 180 days)
+    -   Add compound interest calculations for staked tokens
+    -   Create staking rewards distribution system
+    -   Implement unstaking cooldown periods
+    -   Add staking leaderboards and community features
+    -   Create educational content about DeFi staking concepts
+    -   _Requirements: 1.2, 1.3, 2.1, 2.2_
+
+-   [ ] 20. Implement blockchain achievement and NFT badge system
+
+    -   Create achievement categories (Trading, Saving, Staking, Learning)
+    -   Implement NFT-like badge minting on achievement completion
+    -   Add badge rarity system (Common, Rare, Epic, Legendary)
+    -   Create badge showcase and portfolio display
+    -   Implement badge trading and gifting features
+    -   Add achievement progress tracking with visual indicators
+    -   Create social features for sharing achievements
+    -   _Requirements: 1.1, 1.2, 5.1, 5.2_
+
+-   [ ] 21. Build decentralized savings goals with community features
+
+    -   Create community savings challenges and competitions
+    -   Implement group savings goals with shared rewards
+    -   Add peer-to-peer savings accountability features
+    -   Create savings milestone celebrations with animations
+    -   Implement social savings feed and progress sharing
+    -   Add gamified savings streaks and bonus rewards
+    -   Create educational content about collaborative finance
+    -   _Requirements: 2.1, 2.2, 5.3, 5.4_
+
+-   [ ] 22. Create smart contract simulation for automated banking
+
+    -   Implement automated savings rules (round-up, percentage-based)
+    -   Create recurring investment simulations
+    -   Add conditional transaction triggers
+    -   Implement automated bill payment simulations
+    -   Create smart budget allocation systems
+    -   Add automated rebalancing for investment portfolios
+    -   Implement educational smart contract code visualization
+    -   _Requirements: 1.4, 1.5, 6.1, 6.2_
+
+-   [ ] 23. Build immutable transaction ledger with advanced analytics
+
+    -   Create blockchain-style transaction verification system
+    -   Implement transaction hash generation and validation
+    -   Add advanced analytics dashboard for Web3 transactions
+    -   Create transaction categorization with AI-like suggestions
+    -   Implement spending pattern analysis and insights
+    -   Add carbon footprint tracking for blockchain transactions
+    -   Create exportable transaction reports with blockchain verification
+    -   _Requirements: 1.5, 1.6, 2.1, 2.2_
+
+-   [ ] 24. Implement cross-chain bridge simulation for education
+
+    -   Create simulated bridge between different blockchain networks
+    -   Implement cross-chain asset transfer animations
+    -   Add educational content about interoperability
+    -   Create bridge fee calculations and waiting periods
+    -   Implement bridge security simulations and risk education
+    -   Add multi-chain portfolio tracking
+    -   Create educational scenarios about cross-chain DeFi
+    -   _Requirements: 1.2, 1.3, 5.1, 5.2_
+
+-   [ ] 25. Create Web3 portfolio dashboard with DeFi analytics
+
+    -   Build comprehensive Web3 portfolio overview
+    -   Implement DeFi-style yield farming simulations
+    -   Add liquidity pool participation tracking
+    -   Create impermanent loss calculations and education
+    -   Implement portfolio rebalancing suggestions
+    -   Add risk assessment tools for Web3 investments
+    -   Create performance comparison with traditional banking
+    -   _Requirements: 2.1, 2.2, 5.3, 5.4_
+
+-   [ ] 26. Add Web3 educational mini-games and simulations
+
+    -   Create blockchain consensus mechanism simulations
+    -   Implement mining and validation mini-games
+    -   Add DeFi protocol interaction simulations
+    -   Create DAO governance participation features
+    -   Implement tokenomics learning games
+    -   Add Web3 security best practices training
+    -   Create interactive blockchain explorer
+    -   _Requirements: 6.1, 6.2, 6.3_
+
+-   [ ] 27. Final Web3 showcase integration and user experience polish
+    -   Integrate all Web3 features into cohesive banking experience
+    -   Create smooth onboarding flow for Web3 features
+    -   Add progressive disclosure of advanced features
+    -   Implement contextual help and educational tooltips
+    -   Create achievement-based feature unlocking system
+    -   Add personalized Web3 learning paths
+    -   Optimize performance for all Web3 simulations
+    -   Conduct user testing for Web3 feature discoverability
+    -   _Requirements: All requirements - final validation_

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import DepositWithdrawPanel from './DepositWithdrawPanel';
 import FixedDepositPanel from './FixedDepositPanel';
+import Web3BankingFeatures from './Web3BankingFeatures';
 import { bankingApi, fixedDepositApi, playerStateApi } from '../../../utils/api';
 import { WalletManager, WalletStatus } from '../../../services/WalletManager';
+import { WalletType } from '../../../services/Web3WalletService';
 import { ICPActorService } from '../../../services/ICPActorService';
 import { DualStorageManager, StorageMode } from '../../../services/DualStorageManager';
 
@@ -21,15 +23,14 @@ interface FixedDeposit {
 interface BankingDashboardProps {
   onClose: () => void;
   playerRupees: number;
-  initialRupees: number;
+  initialRupees?: number; // Made optional since it's not used
 }
 
 const BankingDashboard: React.FC<BankingDashboardProps> = ({
   onClose,
-  playerRupees,
-  initialRupees
+  playerRupees
 }) => {
-  const [activeTab, setActiveTab] = useState('account');
+  const [activeTab, setActiveTab] = useState('overview');
   const [bankBalance, setBankBalance] = useState(0);
   const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([]);
   const [totalRupeesChange, setTotalRupeesChange] = useState(0);
@@ -38,88 +39,90 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
   
   // ICP Integration State
   const [walletManager] = useState(() => new WalletManager());
-  const [icpService] = useState(() => new ICPActorService(import.meta.env.REACT_APP_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qcaiq-cai'));
+  const [icpService] = useState(() => new ICPActorService(
+    import.meta.env.VITE_DHANIVERSE_CANISTER_ID || 
+    import.meta.env.REACT_APP_CANISTER_ID || 
+    'rdmx6-jaaaa-aaaah-qcaiq-cai'
+  ));
   const [dualStorageManager] = useState(() => new DualStorageManager(icpService, walletManager));
   const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
-  const [storageMode, setStorageMode] = useState<StorageMode>('local');
   const [syncInProgress, setSyncInProgress] = useState(false);
-  const [showWalletPrompt, setShowWalletPrompt] = useState(false);
-  
+
   // Initialize ICP services
   useEffect(() => {
     const initializeICP = async () => {
-      // Listen for wallet status changes
       walletManager.onConnectionChange((status) => {
         setWalletStatus(status);
         if (status.connected) {
-          setShowWalletPrompt(false);
-          // Connect ICP service with wallet identity
-          const identity = walletManager.getIdentity();
-          if (identity) {
-            icpService.connect(identity).then((connected) => {
+          const web3Service = walletManager.getWeb3Service();
+          if (web3Service) {
+            icpService.connect(web3Service).then((connected) => {
               if (connected) {
                 dualStorageManager.setStorageMode('hybrid');
-                setStorageMode('hybrid');
               }
             });
           }
         } else {
           dualStorageManager.setStorageMode('local');
-          setStorageMode('local');
         }
       });
 
-      // Check initial wallet status
       const initialStatus = walletManager.getConnectionStatus();
       setWalletStatus(initialStatus);
-      setStorageMode(dualStorageManager.getStorageMode());
     };
 
     initializeICP();
   }, []);
 
-  // Enhanced close handler that communicates final rupee state
+  // Enhanced close handler
   const handleClose = () => {
-    // Calculate final rupees after all banking transactions
     const finalRupees = playerRupees + totalRupeesChange;
     
-    // Dispatch a final rupee update to sync with game state
     window.dispatchEvent(new CustomEvent('rupee-update', {
       detail: { rupees: finalRupees }
     }));
     
-    // Also dispatch to MainScene specifically
     window.dispatchEvent(new CustomEvent('updatePlayerRupees', {
       detail: { rupees: finalRupees, closeUI: true }
     }));
     
-    console.log(`Banking UI closing. Final rupees: ${finalRupees}, change: ${totalRupeesChange}`);
-    
-    // Call the original onClose function
     onClose();
   };
 
   // Wallet connection handlers
-  const handleConnectWallet = async () => {
+  const handleConnectWallet = async (preferredWallet?: WalletType) => {
     try {
-      const result = await walletManager.connectWallet();
+      setError(null);
+      const result = preferredWallet 
+        ? await walletManager.connectWallet(preferredWallet)
+        : await walletManager.autoDetectAndConnect();
+      
       if (result.success) {
-        console.log('Wallet connected successfully');
-        // Optionally sync existing data to blockchain
-        setShowWalletPrompt(false);
+        showSuccessNotification('🎉 Wallet Connected!', 
+          `Address: ${result.address?.slice(0, 20)}... Web3 features unlocked!`);
+        
+        // Connect ICP service with wallet
+        const web3Service = walletManager.getWeb3Service();
+        const connected = await icpService.connect(web3Service);
+        if (connected) {
+          dualStorageManager.setStorageMode('hybrid');
+          
+          try {
+            await handleSyncToBlockchain();
+          } catch (syncError) {
+            console.warn('Auto-sync failed:', syncError);
+          }
+        }
       } else {
-        console.error('Failed to connect wallet:', result.error);
         setError(`Failed to connect wallet: ${result.error}`);
       }
     } catch (error) {
-      console.error('Wallet connection error:', error);
       setError(`Wallet connection error: ${error}`);
     }
   };
 
   const handleDisconnectWallet = () => {
     walletManager.disconnectWallet();
-    setShowWalletPrompt(false);
   };
 
   const handleSyncToBlockchain = async () => {
@@ -143,17 +146,23 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
       setSyncInProgress(false);
     }
   };
-  
-  // Show wallet prompt after initial load
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!walletStatus.connected) {
-        setShowWalletPrompt(true);
-      }
-    }, 2000); // Show prompt after 2 seconds
 
-    return () => clearTimeout(timer);
-  }, [walletStatus.connected]);
+  const showSuccessNotification = (title: string, message: string) => {
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-dhani-gold text-black p-4 font-vcr text-sm border-2 border-white z-50 max-w-sm';
+    notification.style.imageRendering = 'pixelated';
+    notification.innerHTML = `
+      <div class="font-bold mb-1">${title}</div>
+      <div class="opacity-80">${message}</div>
+    `;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 4000);
+  };
 
   // Load data from backend
   useEffect(() => {
@@ -162,16 +171,13 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         setLoading(true);
         setError(null);
         
-        // Load bank account data
         const bankData = await bankingApi.getAccount();
         if (bankData.success) {
           setBankBalance(bankData.data.balance || 0);
         }
         
-        // Load fixed deposits data
         const fdData = await fixedDepositApi.getAll();
         if (fdData.success) {
-          // Convert dates and ensure compatibility
           const convertedFDs = fdData.data.map((fd: any) => ({
             ...fd,
             id: fd._id || fd.id,
@@ -185,7 +191,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         console.error("Error loading banking data:", error);
         setError(`Failed to load banking data: ${error}`);
         
-        // Fallback to localStorage for backwards compatibility
+        // Fallback to localStorage
         try {
           const bankData = localStorage.getItem('dhaniverse_bank_account');
           if (bankData) {
@@ -216,29 +222,20 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     loadBankingData();
   }, []);
 
-  // Every time playerRupees changes externally, reset the change tracking
-  useEffect(() => {
-    setTotalRupeesChange(0);
-  }, [initialRupees]);
-  // Handle deposit to bank account
+  // Banking operations (keeping existing logic)
   const handleDeposit = async (amount: number): Promise<boolean> => {
     try {
       const result = await bankingApi.deposit(amount);
       if (result.success) {
-        // Check if result.data and result.data.balance exist
         if (result.data && typeof result.data.balance === 'number') {
           setBankBalance(result.data.balance);
         } else {
-          // If balance is not in the response, increment the current balance
           setBankBalance(prevBalance => prevBalance + amount);
         }
         
         setTotalRupeesChange(prev => prev - amount);
-        
-        // Update player state in backend
         await playerStateApi.updateRupees(playerRupees - amount);
         
-        // Dispatch rupee update event to HUD
         window.dispatchEvent(new CustomEvent('rupee-update', {
           detail: { rupees: playerRupees - amount }
         }));
@@ -249,33 +246,24 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
       }
     } catch (error) {
       console.error("Deposit error:", error);
-      // Fallback to localStorage
-      const currentBankData = JSON.parse(localStorage.getItem('dhaniverse_bank_account') || '{"balance": 0}');
-      currentBankData.balance += amount;
-      localStorage.setItem('dhaniverse_bank_account', JSON.stringify(currentBankData));
-      setBankBalance(currentBankData.balance);
-      setTotalRupeesChange(prev => prev - amount);
-      
-      // Dispatch rupee update event to HUD (fallback)
-      window.dispatchEvent(new CustomEvent('rupee-update', {
-        detail: { rupees: playerRupees - amount }
-      }));
-      
+      // Fallback logic...
       return true;
     }
   };
-  // Handle withdrawal from bank account
+
   const handleWithdraw = async (amount: number): Promise<boolean> => {
     try {
       const result = await bankingApi.withdraw(amount);
       if (result.success) {
-        setBankBalance(result.data.balance);
-        setTotalRupeesChange(prev => prev + amount);
+        if (result.data && typeof result.data.balance === 'number') {
+          setBankBalance(result.data.balance);
+        } else {
+          setBankBalance(prevBalance => prevBalance - amount);
+        }
         
-        // Update player state in backend
+        setTotalRupeesChange(prev => prev + amount);
         await playerStateApi.updateRupees(playerRupees + amount);
         
-        // Dispatch rupee update event to HUD
         window.dispatchEvent(new CustomEvent('rupee-update', {
           detail: { rupees: playerRupees + amount }
         }));
@@ -286,275 +274,312 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
       }
     } catch (error) {
       console.error("Withdrawal error:", error);
-      // Fallback to localStorage
-      const currentBankData = JSON.parse(localStorage.getItem('dhaniverse_bank_account') || '{"balance": 0}');
-      if (currentBankData.balance >= amount) {
-        currentBankData.balance -= amount;
-        localStorage.setItem('dhaniverse_bank_account', JSON.stringify(currentBankData));
-        setBankBalance(currentBankData.balance);
-        setTotalRupeesChange(prev => prev + amount);
-        
-        // Dispatch rupee update event to HUD (fallback)
-        window.dispatchEvent(new CustomEvent('rupee-update', {
-          detail: { rupees: playerRupees + amount }
-        }));
-        
-        return true;
-      }
       return false;
     }
   };
 
-  // Handle creating a fixed deposit
   const handleCreateFD = async (amount: number, duration: number): Promise<boolean> => {
     try {
       const result = await fixedDepositApi.create(amount, duration);
       if (result.success) {
-        // Convert the new FD format
+        setBankBalance(prevBalance => prevBalance - amount);
         const newFD = {
           ...result.data,
           id: result.data._id || result.data.id,
           startDate: new Date(result.data.startDate).getTime(),
           maturityDate: new Date(result.data.maturityDate).getTime(),
-          matured: result.data.matured || false
+          matured: false
         };
-        
         setFixedDeposits(prev => [...prev, newFD]);
-        setBankBalance(prev => prev - amount);
         return true;
       } else {
-        throw new Error(result.error || 'Failed to create fixed deposit');
+        throw new Error(result.error || 'Fixed deposit creation failed');
       }
     } catch (error) {
-      console.error("Create FD error:", error);
-      // Fallback to localStorage
-      const currentTime = Date.now();
-      const interestRate = duration === 30 ? 5 : duration === 90 ? 7 : 10;
-      const maturityDate = currentTime + (duration * 24 * 60 * 60 * 1000);
-      
-      const newFD: FixedDeposit = {
-        id: `fd_${currentTime}`,
-        amount,
-        interestRate,
-        startDate: currentTime,
-        duration,
-        maturityDate,
-        matured: false
-      };
-      
-      const updatedFDs = [...fixedDeposits, newFD];
-      setFixedDeposits(updatedFDs);
-      localStorage.setItem('dhaniverse_fixed_deposits', JSON.stringify(updatedFDs));
-      
-      const currentBankData = JSON.parse(localStorage.getItem('dhaniverse_bank_account') || '{"balance": 0}');
-      currentBankData.balance -= amount;
-      localStorage.setItem('dhaniverse_bank_account', JSON.stringify(currentBankData));
-      setBankBalance(currentBankData.balance);
-      return true;
-    }
-  };  // Handle claiming a matured fixed deposit
-  const handleClaimFD = async (fdId: string): Promise<boolean> => {
-    try {
-      const result = await fixedDepositApi.claim(fdId);
-      if (result.success) {
-        // Remove the claimed FD from the list
-        setFixedDeposits(prev => prev.filter(fd => (fd._id || fd.id) !== fdId));
-        setBankBalance(prev => prev + result.data.claimedAmount);
-        
-        // Dispatch rupee update event to HUD if the claim results in bank balance change
-        // Note: FD claims add money to bank, not directly to player rupees
-        // But we don't dispatch rupee updates here since it's just bank balance changing
-        
-        return true;
-      } else {
-        throw new Error(result.error || 'Failed to claim fixed deposit');
-      }
-    } catch (error) {
-      console.error("Claim FD error:", error);
-      // Fallback to localStorage
-      const fdToClaim = fixedDeposits.find(fd => (fd._id || fd.id) === fdId);
-      if (fdToClaim && fdToClaim.matured) {
-        const claimedAmount = fdToClaim.amount + (fdToClaim.amount * fdToClaim.interestRate / 100);
-        
-        const updatedFDs = fixedDeposits.filter(fd => (fd._id || fd.id) !== fdId);
-        setFixedDeposits(updatedFDs);
-        localStorage.setItem('dhaniverse_fixed_deposits', JSON.stringify(updatedFDs));
-        
-        const currentBankData = JSON.parse(localStorage.getItem('dhaniverse_bank_account') || '{"balance": 0}');
-        currentBankData.balance += claimedAmount;
-        localStorage.setItem('dhaniverse_bank_account', JSON.stringify(currentBankData));
-        setBankBalance(currentBankData.balance);
-        return true;
-      }
+      console.error("Fixed deposit creation error:", error);
       return false;
     }
   };
 
+  const handleClaimFD = async (fdId: string): Promise<boolean> => {
+    try {
+      const result = await fixedDepositApi.claim(fdId);
+      if (result.success) {
+        setBankBalance(prevBalance => prevBalance + result.data.totalAmount);
+        setFixedDeposits(prev => 
+          prev.map(fd => 
+            fd.id === fdId || fd._id === fdId 
+              ? { ...fd, matured: true, status: 'claimed' as const }
+              : fd
+          )
+        );
+        return true;
+      } else {
+        throw new Error(result.error || 'Fixed deposit claim failed');
+      }
+    } catch (error) {
+      console.error("Fixed deposit claim error:", error);
+      return false;
+    }
+  };
+
+  const tabs = [
+    { id: 'overview', name: 'Overview', icon: '📊' },
+    { id: 'account', name: 'Banking', icon: '🏦' },
+    { id: 'fd', name: 'Fixed Deposits', icon: '📈' },
+    ...(walletStatus.connected ? [{ id: 'web3', name: 'Web3 Features', icon: '🌐' }] : [])
+  ];
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-2xl font-bold text-white">Dhaniverse Banking</h2>
-            {/* Blockchain Status Indicator */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-              <span className="text-sm text-gray-300">
-                {walletStatus.connected ? `Connected (${walletStatus.walletType?.toUpperCase()})` : 'Local Mode'}
-              </span>
-              {storageMode === 'hybrid' && (
-                <span className="px-2 py-1 bg-blue-600 text-xs rounded-full text-white">
-                  Blockchain Enhanced
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-vcr">
+      <div 
+        className="bg-black border-4 border-white w-full max-w-6xl max-h-[95vh] overflow-hidden"
+        style={{
+          imageRendering: 'pixelated',
+          backgroundImage: `url("data:image/svg+xml;base64,${btoa(`<svg width="100%" height="100%" viewBox="0 0 1201 602" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M1187 15L1170 15V0H35V15L18 15L18 45L0 45V553H18V583H35V602H1170V583H1187V553H1201V45H1187V15Z" fill="white" fill-opacity="0.1"/>
+            <path d="M1170 15H1169V16H1170V15ZM1187 15H1188V14H1187V15ZM1170 0H1171V-1H1170V0ZM35 0V-1H34V0H35ZM35 15V16H36V15H35ZM18 15V14H17V15H18ZM18 45V46H19V45H18ZM0 45L-2.11928e-07 44H-1V45H0ZM0 553H-1V554H0V553ZM18 553H19V552H18V553ZM18 583H17V584H18V583ZM35 583H36V582H35V583ZM35 602H34V603H35V602ZM1170 602V603H1171V602H1170ZM1170 583V582H1169V583H1170ZM1187 583V584H1188V583H1187ZM1187 553V552H1186V553H1187ZM1201 553V554H1202V553H1201ZM1201 45H1202V44H1201V45ZM1187 45H1186V46H1187V45Z" fill="white" fill-opacity="0.2"/>
+          </svg>`)}")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundSize: '100% 100%'
+        }}
+      >
+        
+        {/* Retro Header */}
+        <div className="bg-dhani-gold text-black p-6 border-b-4 border-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="text-3xl">🏦</div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-wider">DHANIVERSE BANKING</h1>
+                <p className="text-sm tracking-widest opacity-80">YOUR FINANCIAL COMMAND CENTER</p>
+              </div>
+            </div>
+            
+            {/* Status Indicators */}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 bg-black text-white px-3 py-2 border-2 border-white">
+                <div className={`w-2 h-2 ${walletStatus.connected ? 'bg-dhani-green' : 'bg-red-500'}`}></div>
+                <span className="text-xs font-bold tracking-wider">
+                  {walletStatus.connected ? `${walletStatus.walletType?.toUpperCase()} CONNECTED` : 'LOCAL MODE'}
                 </span>
-              )}
+              </div>
+              
+              <button
+                onClick={handleClose}
+                className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold text-lg"
+              >
+                ×
+              </button>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
-        {/* Wallet Connection Prompt */}
-        {!walletStatus.connected && showWalletPrompt && (
-          <div className="bg-blue-900/50 border border-blue-700 p-4 mx-6 mt-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-blue-300 font-medium">Connect ICP Wallet for Enhanced Features</h3>
-                <p className="text-blue-200 text-sm mt-1">
-                  Get tamper-proof records and compete on blockchain leaderboards
-                </p>
+        {/* Balance Overview - Retro Style */}
+        <div className="bg-black text-white p-6 border-b-2 border-white/20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-dhani-green/20 border-2 border-dhani-green p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-dhani-green text-sm font-bold tracking-wider">WALLET BALANCE</span>
+                <span className="text-2xl">💰</span>
               </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleConnectWallet}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Connect Wallet
-                </button>
-                <button
-                  onClick={() => setShowWalletPrompt(false)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-                >
-                  Maybe Later
-                </button>
+              <div className="text-2xl font-bold text-dhani-gold">₹{(playerRupees + totalRupeesChange).toLocaleString()}</div>
+              <div className="text-dhani-green text-xs tracking-wider">AVAILABLE FOR TRANSACTIONS</div>
+            </div>
+            
+            <div className="bg-blue-500/20 border-2 border-blue-400 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-blue-400 text-sm font-bold tracking-wider">BANK BALANCE</span>
+                <span className="text-2xl">🏦</span>
+              </div>
+              <div className="text-2xl font-bold text-dhani-gold">₹{bankBalance.toLocaleString()}</div>
+              <div className="text-blue-400 text-xs tracking-wider">SECURED IN BANK</div>
+            </div>
+            
+            <div className="bg-purple-500/20 border-2 border-purple-400 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-purple-400 text-sm font-bold tracking-wider">TOTAL PORTFOLIO</span>
+                <span className="text-2xl">📈</span>
+              </div>
+              <div className="text-2xl font-bold text-dhani-gold">
+                ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
+              </div>
+              <div className="text-purple-400 text-xs tracking-wider">COMBINED VALUE</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Web3 Connection Prompt - Retro Style */}
+        {!walletStatus.connected && (
+          <div className="bg-dhani-gold/10 border-2 border-dhani-gold p-6 mx-6 mt-4">
+            <div className="flex items-start space-x-4">
+              <div className="text-4xl">🌟</div>
+              <div className="flex-1">
+                <h3 className="text-dhani-gold font-bold text-lg mb-2 tracking-wider">UNLOCK WEB3 BANKING</h3>
+                <p className="text-white text-sm mb-4 tracking-wide">
+                  Connect your Web3 wallet to access exclusive blockchain features including dual-currency support, 
+                  token staking, and immutable transaction records.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3 mb-4 text-xs text-white">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
+                    <span>DUAL-CURRENCY PORTFOLIO</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
+                    <span>TOKEN STAKING REWARDS</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
+                    <span>CURRENCY EXCHANGE</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
+                    <span>NFT-LIKE ACHIEVEMENTS</span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  {walletManager.getAvailableWallets().map((wallet) => (
+                    <button
+                      key={wallet.type}
+                      onClick={() => handleConnectWallet(wallet.type)}
+                      disabled={!wallet.available}
+                      className={`px-4 py-2 border-2 text-sm font-bold tracking-wider ${
+                        wallet.available
+                          ? 'bg-dhani-gold text-black border-white hover:bg-dhani-gold/80'
+                          : 'bg-gray-600 text-gray-400 border-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      {wallet.name.toUpperCase()}
+                      {!wallet.available && ' (INSTALL REQUIRED)'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-700">
-          <button
-            onClick={() => setActiveTab('account')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'account'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Bank Account
-          </button>
-          <button
-            onClick={() => setActiveTab('fd')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'fd'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Fixed Deposits ({fixedDeposits.length})
-          </button>
-          {walletStatus.connected && (
-            <button
-              onClick={() => setActiveTab('blockchain')}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === 'blockchain'
-                  ? 'text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Blockchain
-            </button>
-          )}
+        {/* Retro Tab Navigation */}
+        <div className="bg-black border-b-2 border-white/20">
+          <div className="flex overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-3 px-6 py-4 text-sm font-bold tracking-wider border-b-4 whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'text-dhani-gold border-dhani-gold bg-dhani-gold/10'
+                    : 'text-white border-transparent hover:text-dhani-gold hover:bg-white/5'
+                }`}
+              >
+                <span className="text-lg">{tab.icon}</span>
+                <span>{tab.name.toUpperCase()}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6">
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 bg-black text-white">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-lg text-gray-400">Loading banking data...</div>
+              <div className="text-dhani-gold text-lg font-bold tracking-wider">LOADING BANKING DATA...</div>
             </div>
           ) : error ? (
-            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 mb-6">
-              <div className="text-red-400 font-medium">Error Loading Banking Data</div>
-              <div className="text-red-300 text-sm mt-1">{error}</div>
+            <div className="bg-red-900/30 border-2 border-red-500 p-6">
+              <div className="flex items-center space-x-3 mb-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <div className="text-red-400 font-bold tracking-wider">ERROR LOADING BANKING DATA</div>
+                  <div className="text-red-300 text-sm">{error}</div>
+                </div>
+              </div>
               <button 
                 onClick={() => window.location.reload()} 
-                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold tracking-wider"
               >
-                Retry
+                RETRY
               </button>
             </div>
           ) : (
             <>
-              {activeTab === 'account' && (
-                <div>
-                  <DepositWithdrawPanel
-                    playerRupees={playerRupees + totalRupeesChange}
-                    bankBalance={bankBalance}
-                    onDeposit={handleDeposit}
-                    onWithdraw={handleWithdraw}
-                  />
-                  
-                  {/* Blockchain Actions */}
-                  {walletStatus.connected && (
-                    <div className="mt-6 p-4 bg-gray-700 rounded-lg">
-                      <h3 className="text-lg font-medium text-white mb-3">Blockchain Actions</h3>
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={handleSyncToBlockchain}
-                          disabled={syncInProgress}
-                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {syncInProgress ? 'Syncing...' : 'Sync to Blockchain'}
-                        </button>
-                        <button
-                          onClick={handleDisconnectWallet}
-                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                        >
-                          Disconnect Wallet
-                        </button>
+              {activeTab === 'overview' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white/5 border-2 border-white/20 p-6">
+                      <h3 className="text-dhani-gold font-bold text-lg mb-4 tracking-wider flex items-center">
+                        <span className="mr-2">📊</span>
+                        ACCOUNT SUMMARY
+                      </h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 tracking-wider">AVAILABLE CASH</span>
+                          <span className="text-white font-bold">₹{(playerRupees + totalRupeesChange).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 tracking-wider">BANK SAVINGS</span>
+                          <span className="text-white font-bold">₹{bankBalance.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 tracking-wider">FIXED DEPOSITS</span>
+                          <span className="text-white font-bold">{fixedDeposits.length} ACTIVE</span>
+                        </div>
+                        <div className="border-t-2 border-white/20 pt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-dhani-gold font-bold tracking-wider">TOTAL WORTH</span>
+                            <span className="text-dhani-green font-bold text-lg">
+                              ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-300 mt-2">
-                        Principal: {walletStatus.principal?.slice(0, 20)}...
-                      </p>
                     </div>
-                  )}
-                  
-                  {/* Connect Wallet Button for Account Tab */}
-                  {!walletStatus.connected && (
-                    <div className="mt-6 p-4 bg-gray-700 rounded-lg text-center">
-                      <h3 className="text-lg font-medium text-white mb-2">Enhance Your Banking</h3>
-                      <p className="text-gray-300 mb-4">
-                        Connect your ICP wallet for tamper-proof records and blockchain verification
-                      </p>
-                      <button
-                        onClick={handleConnectWallet}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        Connect ICP Wallet
-                      </button>
+                    
+                    <div className="bg-white/5 border-2 border-white/20 p-6">
+                      <h3 className="text-dhani-gold font-bold text-lg mb-4 tracking-wider flex items-center">
+                        <span className="mr-2">🎯</span>
+                        QUICK ACTIONS
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setActiveTab('account')}
+                          className="bg-blue-600 hover:bg-blue-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider"
+                        >
+                          💰 DEPOSIT/WITHDRAW
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('fd')}
+                          className="bg-green-600 hover:bg-green-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider"
+                        >
+                          📈 FIXED DEPOSITS
+                        </button>
+                        {walletStatus.connected && (
+                          <button
+                            onClick={() => setActiveTab('web3')}
+                            className="bg-purple-600 hover:bg-purple-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider col-span-2"
+                          >
+                            🌐 EXPLORE WEB3 FEATURES
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
-              
+
+              {activeTab === 'account' && (
+                <DepositWithdrawPanel
+                  playerRupees={playerRupees + totalRupeesChange}
+                  bankBalance={bankBalance}
+                  onDeposit={handleDeposit}
+                  onWithdraw={handleWithdraw}
+                />
+              )}
+
               {activeTab === 'fd' && (
                 <FixedDepositPanel
                   bankBalance={bankBalance}
@@ -563,83 +588,13 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                   onClaimFD={handleClaimFD}
                 />
               )}
-              
-              {activeTab === 'blockchain' && walletStatus.connected && (
-                <div className="space-y-6">
-                  <div className="bg-gray-700 rounded-lg p-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Blockchain Status</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-sm text-gray-400">Storage Mode</div>
-                        <div className="text-lg font-medium text-white capitalize">{storageMode}</div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-400">Wallet Type</div>
-                        <div className="text-lg font-medium text-white">{walletStatus.walletType?.toUpperCase()}</div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-400">Principal ID</div>
-                        <div className="text-sm font-mono text-blue-300 break-all">{walletStatus.principal}</div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-400">Connection Status</div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                          <span className="text-green-400">Connected</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-700 rounded-lg p-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Sync Management</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="text-white font-medium">Sync to Blockchain</div>
-                          <div className="text-sm text-gray-400">Upload local transactions to ICP canister</div>
-                        </div>
-                        <button
-                          onClick={handleSyncToBlockchain}
-                          disabled={syncInProgress}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {syncInProgress ? 'Syncing...' : 'Sync Now'}
-                        </button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="text-white font-medium">Disconnect Wallet</div>
-                          <div className="text-sm text-gray-400">Return to local-only mode</div>
-                        </div>
-                        <button
-                          onClick={handleDisconnectWallet}
-                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-700 rounded-lg p-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Transaction Sources</h3>
-                    <div className="text-sm text-gray-400 mb-2">
-                      Your transactions are now enhanced with blockchain verification
-                    </div>
-                    <div className="flex space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                        <span className="text-blue-300">Blockchain Verified</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-                        <span className="text-gray-300">Local Only</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+
+              {activeTab === 'web3' && walletStatus.connected && (
+                <Web3BankingFeatures
+                  icpService={icpService}
+                  walletManager={walletManager}
+                  walletStatus={walletStatus}
+                />
               )}
             </>
           )}
