@@ -10,6 +10,12 @@ interface GameHUDProps {
     icpService?: ICPActorService;
 }
 
+interface ConnectedPlayer {
+    id: string;
+    username: string;
+    joinedAt: number;
+}
+
 const GameHUD: React.FC<GameHUDProps> = ({ 
     rupees = 25000, 
     walletManager,
@@ -22,6 +28,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
     const [isChatFocused, setIsChatFocused] = useState(false);
+    
+    // Player connection tracking
+    const [connectedPlayers, setConnectedPlayers] = useState<ConnectedPlayer[]>([]);
+    const [onlineCount, setOnlineCount] = useState(0);
     
     // Blockchain status
     const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
@@ -79,6 +89,83 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 handleRupeeUpdate
             );
     }, [rupees]);
+
+    // Listen for player connection events
+    useEffect(() => {
+        const handlePlayerJoined = (e: any) => {
+            const { player } = e.detail;
+            if (player && player.username) {
+                setConnectedPlayers(prev => {
+                    // Remove any existing entry with same id or username to avoid duplicates
+                    const filtered = prev.filter(p => p.id !== player.id && p.username !== player.username);
+                    return [...filtered, {
+                        id: player.id,
+                        username: player.username,
+                        joinedAt: Date.now()
+                    }];
+                });
+
+                // Add a system message to chat when someone joins
+                setChatMessages(prev => {
+                    const joinMessage = {
+                        id: `join-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        username: "System",
+                        message: `${player.username} joined the game`
+                    };
+                    const newMessages = [...prev, joinMessage];
+                    return newMessages.length > 50 ? newMessages.slice(-50) : newMessages;
+                });
+            }
+        };
+
+        const handlePlayerDisconnect = (e: any) => {
+            const { id, username } = e.detail;
+            
+            // Remove player from connected list
+            setConnectedPlayers(prev => prev.filter(p => p.id !== id));
+
+            // Add a system message to chat when someone leaves
+            if (username) {
+                setChatMessages(prev => {
+                    const leaveMessage = {
+                        id: `leave-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        username: "System",
+                        message: `${username} left the game`
+                    };
+                    const newMessages = [...prev, leaveMessage];
+                    return newMessages.length > 50 ? newMessages.slice(-50) : newMessages;
+                });
+            }
+        };
+
+        const handleOnlineUsersCount = (e: any) => {
+            const { count } = e.detail;
+            setOnlineCount(count);
+        };
+
+        const handleExistingPlayers = (e: any) => {
+            const { players } = e.detail;
+            if (Array.isArray(players)) {
+                setConnectedPlayers(players.map(player => ({
+                    id: player.id,
+                    username: player.username,
+                    joinedAt: Date.now()
+                })));
+            }
+        };
+
+        window.addEventListener("playerJoined" as any, handlePlayerJoined);
+        window.addEventListener("playerDisconnect" as any, handlePlayerDisconnect);
+        window.addEventListener("onlineUsersCount" as any, handleOnlineUsersCount);
+        window.addEventListener("existingPlayers" as any, handleExistingPlayers);
+
+        return () => {
+            window.removeEventListener("playerJoined" as any, handlePlayerJoined);
+            window.removeEventListener("playerDisconnect" as any, handlePlayerDisconnect);
+            window.removeEventListener("onlineUsersCount" as any, handleOnlineUsersCount);
+            window.removeEventListener("existingPlayers" as any, handleExistingPlayers);
+        };
+    }, []);
 
     // Listen for incoming chat messages
     useEffect(() => {
@@ -258,7 +345,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     };
 
     return (
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1000] font-['Pixeloid',Arial,sans-serif]">
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1000] font-['Tickerbit',Arial,sans-serif]">
             {/* Top right status area */}
             <div className="absolute top-5 right-5 flex flex-col items-end space-y-2">
                 {/* Blockchain status indicator */}
@@ -286,63 +373,101 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
+            {/* Player connection display */}
+            <div className="absolute bottom-[45vh] left-5 w-[28ch] pointer-events-none">
+                {/* Online count */}
+                <div className="mb-2 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
+                    <span className="text-dhani-green">●</span> {onlineCount} online
+                </div>
+                
+                {/* Connected players list */}
+                {connectedPlayers.length > 0 && (
+                    <div className="space-y-1 max-h-[15vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        {connectedPlayers.slice(-8).map((player) => (
+                            <div 
+                                key={player.id} 
+                                className="text-white/70 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex items-center animate-fade-in"
+                            >
+                                <span className="text-dhani-green mr-2">▸</span>
+                                <span className="text-white">{player.username}</span>
+                                <span className="text-white/40 ml-2 text-xs">joined</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/60 rounded-lg p-1.5 text-[14px] text-white pointer-events-auto backdrop-blur transition-opacity duration-300 ${
-                    isChatFocused ? "opacity-100" : "opacity-60"
+                className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/70 rounded-lg p-2 text-[14px] text-white pointer-events-auto backdrop-blur-sm border border-white/10 transition-all duration-300 ${
+                    isChatFocused ? "opacity-100 border-dhani-green/30 shadow-lg shadow-dhani-green/10" : "opacity-75"
                 }`}
             >
+                {/* Chat messages area */}
                 <div
-                    className="h-[20vh] overflow-y-auto mb-1 break-words max-w-fit"
+                    className="h-[20vh] overflow-y-auto mb-2 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
                     ref={messagesRef}
                 >
                     {chatMessages.length === 0 ? (
-                        <div className="text-gray-400 italic">
+                        <div className="text-white/50 italic text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider p-2">
                             No messages yet. Press / to chat.
                         </div>
                     ) : (
                         chatMessages.map((msg, idx) => (
-                            <div key={idx} className="mb-0.5 leading-[1.2]">
-                                <span
-                                    className={`text-sm tracking-tighter ${
-                                        msg.username === "System"
-                                            ? "text-gray-400 italic"
-                                            : "text-dhani-green text-lg"
-                                    }`}
-                                >
-                                    {msg.username === "System"
-                                        ? ""
-                                        : `${msg.username}:`}
-                                </span>
-                                <span
-                                    className={`tracking-wider ${
-                                        msg.username === "System"
-                                            ? "text-gray-400 italic text-sm"
-                                            : ""
-                                    }`}
-                                >
-                                    {msg.username === "System" ? "" : " "}
-                                    {msg.message}
-                                </span>
+                            <div key={idx} className="mb-1.5 leading-[1.3] px-1">
+                                <div className="flex items-start space-x-2">
+                                    <span
+                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex-shrink-0 ${
+                                            msg.username === "System"
+                                                ? "text-yellow-400 italic"
+                                                : "text-dhani-green"
+                                        }`}
+                                    >
+                                        {msg.username === "System"
+                                            ? "⚡"
+                                            : `${msg.username}:`}
+                                    </span>
+                                    <span
+                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider break-words ${
+                                            msg.username === "System"
+                                                ? "text-yellow-300 italic"
+                                                : "text-white"
+                                        }`}
+                                    >
+                                        {msg.message}
+                                    </span>
+                                </div>
                             </div>
                         ))
                     )}
                 </div>
 
-                <input
-                    ref={chatInputRef}
-                    className="w-full px-1.5 py-1 border-none rounded bg-white/10 text-[14px] text-white outline-none placeholder-white/60"
-                    type="text"
-                    placeholder={
-                        isChatFocused ? "Type a message..." : "Press / to chat"
-                    }
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onFocus={handleChatFocus}
-                    onBlur={handleChatBlur}
-                    onKeyDown={handleChatKeyDown}
-                />
+                {/* Chat input */}
+                <div className="relative">
+                    <input
+                        ref={chatInputRef}
+                        className={`w-full px-3 py-2 border rounded-md bg-black/40 text-sm text-white outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider transition-all duration-200 ${
+                            isChatFocused 
+                                ? "border-dhani-green/50 bg-black/60 shadow-sm shadow-dhani-green/20" 
+                                : "border-white/20 hover:border-white/30"
+                        }`}
+                        type="text"
+                        placeholder={
+                            isChatFocused ? "Type a message..." : "Press / to chat"
+                        }
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onFocus={handleChatFocus}
+                        onBlur={handleChatBlur}
+                        onKeyDown={handleChatKeyDown}
+                    />
+                    {isChatFocused && (
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/40 text-xs font-['Tickerbit',Arial,sans-serif]">
+                            Enter
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

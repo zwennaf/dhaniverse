@@ -62,13 +62,19 @@ interface ChatMessage extends ServerMessageBase {
     message: string;
 }
 
+interface OnlineUsersCountMessage extends ServerMessageBase {
+    type: "onlineUsersCount";
+    count: number;
+}
+
 type ServerMessage =
     | ConnectMessage
     | PlayersMessage
     | PlayerJoinedMessage
     | PlayerUpdateMessage
     | PlayerDisconnectMessage
-    | ChatMessage;
+    | ChatMessage
+    | OnlineUsersCountMessage;
 
 export class WebSocketManager {
     private scene: MainGameScene;
@@ -412,10 +418,22 @@ export class WebSocketManager {
 
             case "players":
                 this.handleExistingPlayers(data.players);
+                // Dispatch event for UI
+                window.dispatchEvent(
+                    new CustomEvent("existingPlayers", {
+                        detail: { players: data.players },
+                    })
+                );
                 break;
 
             case "playerJoined":
                 this.handlePlayerJoined(data.player);
+                // Dispatch event for UI
+                window.dispatchEvent(
+                    new CustomEvent("playerJoined", {
+                        detail: { player: data.player },
+                    })
+                );
                 break;
 
             case "playerUpdate":
@@ -424,6 +442,21 @@ export class WebSocketManager {
 
             case "playerDisconnect":
                 this.handlePlayerDisconnect(data.id, data.username);
+                // Dispatch event for UI
+                window.dispatchEvent(
+                    new CustomEvent("playerDisconnect", {
+                        detail: { id: data.id, username: data.username },
+                    })
+                );
+                break;
+
+            case "onlineUsersCount":
+                // Dispatch event for UI
+                window.dispatchEvent(
+                    new CustomEvent("onlineUsersCount", {
+                        detail: { count: data.count },
+                    })
+                );
                 break;
 
             case "chat":
