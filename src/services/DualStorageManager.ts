@@ -119,4 +119,87 @@ export class DualStorageManager {
             needsSync: this.needsSync()
         };
     }
+
+    // Get balance - combining local and blockchain data based on mode
+    async getBalance(): Promise<number> {
+        try {
+            if (this.storageMode === 'blockchain' && this.icpService.isActorConnected()) {
+                const balanceData = await this.icpService.getBalance();
+                return balanceData.balance;
+            }
+            
+            // Default to local storage for 'local', 'hybrid', or when blockchain unavailable
+            const localData = this.getLocalBankingData();
+            return localData.bankAccount?.balance || 1000; // Default starting balance
+        } catch (error) {
+            console.error('Failed to get balance:', error);
+            return 0;
+        }
+    }
+
+    // Deposit money
+    async deposit(amount: number): Promise<boolean> {
+        try {
+            if (amount <= 0) {
+                throw new Error('Invalid deposit amount');
+            }
+
+            if (this.storageMode === 'blockchain' && this.icpService.isActorConnected()) {
+                const result = await this.icpService.deposit(amount);
+                return result.success;
+            }
+            
+            // Default to local storage for 'local', 'hybrid', or when blockchain unavailable
+            const localData = this.getLocalBankingData();
+            const currentBalance = localData.bankAccount?.balance || 1000;
+            const newBalance = currentBalance + amount;
+            
+            const updatedAccount = {
+                ...localData.bankAccount,
+                balance: newBalance,
+                lastUpdated: Date.now()
+            };
+            
+            localStorage.setItem('dhaniverse_bank_account', JSON.stringify(updatedAccount));
+            return true;
+        } catch (error) {
+            console.error('Failed to deposit:', error);
+            return false;
+        }
+    }
+
+    // Withdraw money
+    async withdraw(amount: number): Promise<boolean> {
+        try {
+            if (amount <= 0) {
+                throw new Error('Invalid withdrawal amount');
+            }
+
+            const currentBalance = await this.getBalance();
+            if (currentBalance < amount) {
+                throw new Error('Insufficient balance');
+            }
+
+            if (this.storageMode === 'blockchain' && this.icpService.isActorConnected()) {
+                const result = await this.icpService.withdraw(amount);
+                return result.success;
+            }
+            
+            // Default to local storage for 'local', 'hybrid', or when blockchain unavailable
+            const localData = this.getLocalBankingData();
+            const newBalance = currentBalance - amount;
+            
+            const updatedAccount = {
+                ...localData.bankAccount,
+                balance: newBalance,
+                lastUpdated: Date.now()
+            };
+            
+            localStorage.setItem('dhaniverse_bank_account', JSON.stringify(updatedAccount));
+            return true;
+        } catch (error) {
+            console.error('Failed to withdraw:', error);
+            return false;
+        }
+    }
 }

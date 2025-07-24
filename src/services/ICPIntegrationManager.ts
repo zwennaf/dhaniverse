@@ -105,14 +105,18 @@ export class ICPIntegrationManager {
     }
 
     try {
-      return await ICPErrorHandler.withRetryAndFallback(
-        () => this.icpService.recordTrade(profit, stockSymbol),
+      const result = await ICPErrorHandler.withRetryAndFallback(
+        async () => {
+          const tradeResult = await this.icpService.recordTrade(profit, stockSymbol);
+          return tradeResult.success;
+        },
         () => {
           console.log('Trade recorded locally (blockchain unavailable)');
           return true; // Record locally as fallback
         },
         'Record Trade'
       );
+      return result;
     } catch (error) {
       console.error('Failed to record trade:', error);
       return false;

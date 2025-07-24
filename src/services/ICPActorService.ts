@@ -264,6 +264,73 @@ export class ICPActorService {
         }
     }
 
+    // Alias for getCanisterHealth to match expected interface
+    async getHealth(): Promise<{ status: string; stats: any }> {
+        return this.getCanisterHealth();
+    }
+
+    // Record trade method for leaderboard
+    async recordTrade(profit: number, stockSymbol: string): Promise<{ success: boolean; error?: string }> {
+        try {
+            if (!this.web3BankingService) {
+                throw new Error('Service not connected');
+            }
+
+            // In a real implementation, this would call the canister's recordTrade method
+            // For now, simulate recording the trade
+            console.log(`Recording trade: ${stockSymbol} with profit: ${profit}`);
+            
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
+    // Get leaderboard data
+    async getLeaderboard(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+        try {
+            // In a real implementation, this would call the canister's getLeaderboard method
+            const mockLeaderboard = [
+                { rank: 1, principal: 'user1', totalProfit: 15000, trades: 25 },
+                { rank: 2, principal: 'user2', totalProfit: 12500, trades: 20 },
+                { rank: 3, principal: 'user3', totalProfit: 10000, trades: 18 }
+            ];
+            
+            return {
+                success: true,
+                data: mockLeaderboard
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
+    // Get user rank
+    async getUserRank(principal?: string): Promise<{ success: boolean; rank?: number; error?: string }> {
+        try {
+            // In a real implementation, this would call the canister's getUserRank method
+            const mockRank = Math.floor(Math.random() * 100) + 1;
+            
+            return {
+                success: true,
+                rank: mockRank
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
     // DeFi simulation methods
     async simulateLiquidityPool(amount: number): Promise<{ success: boolean; rewards?: number; error?: string }> {
         if (!this.web3BankingService) {

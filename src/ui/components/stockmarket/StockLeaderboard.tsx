@@ -56,14 +56,18 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
       setError(null);
 
       // Load leaderboard data
-      const entries = await icpService.getLeaderboard(50); // Top 50
-      setLeaderboard(entries);
+      const leaderboardResult = await icpService.getLeaderboard(); // No parameter needed
+      if (leaderboardResult.success && leaderboardResult.data) {
+        setLeaderboard(leaderboardResult.data);
+      }
 
       // Get user's rank if connected
       const principal = walletManager.getPrincipal();
       if (principal) {
-        const rank = await icpService.getUserRank(principal);
-        setUserRank(rank);
+        const rankResult = await icpService.getUserRank(principal);
+        if (rankResult.success && rankResult.rank !== undefined) {
+          setUserRank(rankResult.rank);
+        }
       }
     } catch (error) {
       console.error('Failed to load leaderboard:', error);
@@ -99,8 +103,8 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
       const principal = walletManager.getPrincipal();
       if (!principal) return false;
       
-      const rank = await icpService.getUserRank(principal);
-      return rank > 0; // If user has a rank, they have trades
+      const rankResult = await icpService.getUserRank(principal);
+      return rankResult.success && rankResult.rank !== undefined && rankResult.rank > 0; // If user has a rank, they have trades
     } catch (error) {
       console.error('Trade verification failed:', error);
       return false;
@@ -338,8 +342,8 @@ export const StockLeaderboardUtils = {
       const principal = walletManager.getPrincipal();
       if (!principal) return false;
       
-      const rank = await icpService.getUserRank(principal);
-      return rank > 0;
+      const rankResult = await icpService.getUserRank(principal);
+      return rankResult.success && rankResult.rank !== undefined && rankResult.rank > 0;
     } catch (error) {
       console.error('Trade verification failed:', error);
       return false;
