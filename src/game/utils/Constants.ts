@@ -25,7 +25,7 @@ export const Constants = {
     WS_RECONNECT_DELAY: 5000,
     WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
     // Font settings for consistent styling
-    PLAYER_NAME_FONT: "tickerbit",
+    PLAYER_NAME_FONT: "Tickerbit",
     PLAYER_NAME_SIZE: "24px",
     PLAYER_NAME_COLOR: "#ffffff",
     PLAYER_NAME_BACKGROUND: "#00000050",

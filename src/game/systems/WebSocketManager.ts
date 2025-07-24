@@ -1,6 +1,7 @@
 import { GameObjects } from "phaser";
 import { Player } from "../entities/Player.ts";
 import { Constants } from "../utils/Constants.ts";
+import { FontUtils } from "../utils/FontUtils.ts";
 import { MainGameScene } from "../scenes/MainScene.ts";
 
 interface PlayerData {
@@ -98,7 +99,7 @@ export class WebSocketManager {
         console.log("Creating new WebSocketManager instance");
         this.scene = scene;
         this.player = player;
-        
+
         this.connectionStatusText = this.scene.add
             .text(this.scene.cameras.main.width / 2, 20, "Connecting...", {
                 fontFamily: Constants.SYSTEM_TEXT_FONT,
@@ -218,7 +219,10 @@ export class WebSocketManager {
         }
 
         try {
-            console.log("Creating new WebSocket connection to:", Constants.WS_SERVER_URL);
+            console.log(
+                "Creating new WebSocket connection to:",
+                Constants.WS_SERVER_URL
+            );
             this.ws = new WebSocket(Constants.WS_SERVER_URL);
 
             this.ws.onopen = () => {
@@ -229,7 +233,9 @@ export class WebSocketManager {
                 WebSocketManager.globalConnectionLock = false;
 
                 if (this.connectionStatusText) {
-                    this.connectionStatusText.setText("Connected").setVisible(true);
+                    this.connectionStatusText
+                        .setText("Connected")
+                        .setVisible(true);
                     this.scene.time.delayedCall(2000, () => {
                         this.connectionStatusText?.setVisible(false);
                     });
@@ -237,7 +243,10 @@ export class WebSocketManager {
 
                 const token = localStorage.getItem("dhaniverse_token");
                 if (token) {
-                    this.sendMessage("authenticate", { token, gameUsername: username });
+                    this.sendMessage("authenticate", {
+                        token,
+                        gameUsername: username,
+                    });
                 }
 
                 window.dispatchEvent(new CustomEvent("websocket-connected"));
@@ -253,7 +262,9 @@ export class WebSocketManager {
             };
 
             this.ws.onclose = (event) => {
-                console.log(`WebSocket closed: code=${event.code}, reason=${event.reason}, intentional=${this.intentionalDisconnect}`);
+                console.log(
+                    `WebSocket closed: code=${event.code}, reason=${event.reason}, intentional=${this.intentionalDisconnect}`
+                );
                 this.connected = false;
                 this.isConnecting = false;
 
@@ -264,12 +275,16 @@ export class WebSocketManager {
                 }
 
                 if (event.code === 1000 && event.reason === "Reconnecting") {
-                    console.log("Normal reconnection, not triggering another reconnect");
+                    console.log(
+                        "Normal reconnection, not triggering another reconnect"
+                    );
                     return;
                 }
 
                 if (this.connectionStatusText) {
-                    this.connectionStatusText.setText("Reconnecting...").setVisible(true);
+                    this.connectionStatusText
+                        .setText("Reconnecting...")
+                        .setVisible(true);
                 }
 
                 // Only reconnect after a delay and if not already reconnecting
@@ -286,7 +301,6 @@ export class WebSocketManager {
                 WebSocketManager.globalConnectionLock = false;
                 window.dispatchEvent(new CustomEvent("websocket-error"));
             };
-
         } catch (error) {
             console.error("Failed to create WebSocket:", error);
             this.isConnecting = false;
@@ -307,19 +321,32 @@ export class WebSocketManager {
 
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.log("Max reconnect attempts reached");
-            this.connectionStatusText?.setText("Connection failed. Please refresh.").setVisible(true);
+            this.connectionStatusText
+                ?.setText("Connection failed. Please refresh.")
+                .setVisible(true);
             return;
         }
 
         this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
-        
-        console.log(`Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
-        
+        const delay = Math.min(
+            1000 * Math.pow(2, this.reconnectAttempts - 1),
+            30000
+        );
+
+        console.log(
+            `Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`
+        );
+
         setTimeout(() => {
             // Double-check state before reconnecting
-            if (!this.connected && !this.isConnecting && !this.intentionalDisconnect) {
-                console.log(`Executing reconnect attempt ${this.reconnectAttempts}`);
+            if (
+                !this.connected &&
+                !this.isConnecting &&
+                !this.intentionalDisconnect
+            ) {
+                console.log(
+                    `Executing reconnect attempt ${this.reconnectAttempts}`
+                );
                 this.connect(username);
             } else {
                 console.log("Skipping scheduled reconnect - state changed");
@@ -333,7 +360,7 @@ export class WebSocketManager {
         this.intentionalDisconnect = true;
         this.connected = false;
         this.isConnecting = false;
-        
+
         if (this.ws) {
             this.ws.close(1000, "Reset");
             this.ws = null;
@@ -362,10 +389,21 @@ export class WebSocketManager {
 
         // Update other players with interpolation
         this.otherPlayers.forEach((otherPlayer) => {
-            if (otherPlayer.targetX !== undefined && otherPlayer.targetY !== undefined) {
+            if (
+                otherPlayer.targetX !== undefined &&
+                otherPlayer.targetY !== undefined
+            ) {
                 const factor = 0.3;
-                otherPlayer.sprite.x = Phaser.Math.Linear(otherPlayer.sprite.x, otherPlayer.targetX, factor);
-                otherPlayer.sprite.y = Phaser.Math.Linear(otherPlayer.sprite.y, otherPlayer.targetY, factor);
+                otherPlayer.sprite.x = Phaser.Math.Linear(
+                    otherPlayer.sprite.x,
+                    otherPlayer.targetX,
+                    factor
+                );
+                otherPlayer.sprite.y = Phaser.Math.Linear(
+                    otherPlayer.sprite.y,
+                    otherPlayer.targetY,
+                    factor
+                );
                 otherPlayer.nameText.x = otherPlayer.sprite.x;
                 otherPlayer.nameText.y = otherPlayer.sprite.y - 50;
             }
@@ -380,20 +418,22 @@ export class WebSocketManager {
         const lastSentAnimation = this.player.getLastSentAnimation();
 
         // Check if significant change occurred
-        const movementDistance = this.lastPositionSent 
+        const movementDistance = this.lastPositionSent
             ? Math.sqrt(
-                Math.pow(currentPosition.x - this.lastPositionSent.x, 2) + 
-                Math.pow(currentPosition.y - this.lastPositionSent.y, 2)
-            ) : Infinity;
+                  Math.pow(currentPosition.x - this.lastPositionSent.x, 2) +
+                      Math.pow(currentPosition.y - this.lastPositionSent.y, 2)
+              )
+            : Infinity;
 
-        const shouldUpdate = movementDistance > Constants.WS_POSITION_THRESHOLD || 
-                           currentAnimation !== lastSentAnimation;
+        const shouldUpdate =
+            movementDistance > Constants.WS_POSITION_THRESHOLD ||
+            currentAnimation !== lastSentAnimation;
 
         if (shouldUpdate) {
             this.lastUpdateTime = time;
             const roundedPosition = {
                 x: Math.round(currentPosition.x),
-                y: Math.round(currentPosition.y)
+                y: Math.round(currentPosition.y),
             };
 
             this.sendMessage("update", {
@@ -464,7 +504,11 @@ export class WebSocketManager {
                     window.dispatchEvent(
                         new CustomEvent("chat-message", {
                             detail: {
-                                id: data.id || `chat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                                id:
+                                    data.id ||
+                                    `chat-${Date.now()}-${Math.random()
+                                        .toString(36)
+                                        .substring(2, 9)}`,
                                 username: data.username,
                                 message: data.message,
                             },
@@ -513,14 +557,26 @@ export class WebSocketManager {
 
         const nameText = this.scene.add
             .text(playerData.x, playerData.y - 50, playerData.username, {
-                fontFamily: Constants.PLAYER_NAME_FONT,
+                fontFamily: FontUtils.getPlayerNameFont(),
                 fontSize: Constants.PLAYER_NAME_SIZE,
                 color: Constants.PLAYER_NAME_COLOR,
                 align: "center",
                 padding: Constants.PLAYER_NAME_PADDING,
-                letterSpacing: 2
+                letterSpacing: 2,
             })
             .setOrigin(0.5, 3);
+
+        // Ensure font is loaded and refresh the text if needed
+        FontUtils.ensureFontLoaded(
+            "Tickerbit",
+            Constants.PLAYER_NAME_SIZE
+        ).then(() => {
+            nameText.setStyle({
+                fontFamily: FontUtils.getPlayerNameFont(),
+                fontSize: Constants.PLAYER_NAME_SIZE,
+                color: Constants.PLAYER_NAME_COLOR,
+            });
+        });
 
         this.otherPlayers.set(playerData.id, {
             sprite: otherPlayer,
@@ -598,7 +654,9 @@ export class WebSocketManager {
     public sendChat(message: string): void {
         if (!message.trim()) return;
 
-        const messageId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const messageId = `chat-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
         this.sendMessage("chat", { message: message.trim(), id: messageId });
     }
 }

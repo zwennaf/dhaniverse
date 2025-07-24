@@ -5,11 +5,14 @@ import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
+import { FontUtils } from './game/utils/FontUtils.ts';
 
 let hudRootRef: ReactDOM.Root | null = null;
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize game fonts first
+  await FontUtils.initializeGameFonts();
   // Get root container for React
   const rootElement = document.getElementById('root');
   

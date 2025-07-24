@@ -68,6 +68,56 @@ export class MainScene extends Scene implements MainGameScene {
   }
 
   /**
+   * Load Tickerbit font and ensure it's ready before creating text objects
+   */
+  private async loadTickerbitFont(): Promise<void> {
+    return new Promise((resolve) => {
+      try {
+        // Use the Font Loading API to ensure the font is loaded
+        if ('fonts' in document) {
+          document.fonts.load('24px Tickerbit').then(() => {
+            console.log('Tickerbit font loaded successfully via Font Loading API');
+            
+            // Additional check: create a temporary text object to force font loading in Phaser
+            const tempText = this.add.text(-1000, -1000, 'Test', {
+              fontFamily: 'Tickerbit, Arial, sans-serif',
+              fontSize: '24px'
+            });
+            
+            // Wait a bit then destroy it and resolve
+            this.time.delayedCall(200, () => {
+              tempText.destroy();
+              resolve();
+            });
+            
+          }).catch((error) => {
+            console.warn('Font Loading API failed:', error);
+            // Still resolve to continue with fallback fonts
+            resolve();
+          });
+        } else {
+          console.warn('Font Loading API not supported, using fallback');
+          // Create a temporary text object to force font loading in Phaser
+          const tempText = this.add.text(-1000, -1000, 'Test', {
+            fontFamily: 'Tickerbit, Arial, sans-serif',
+            fontSize: '24px'
+          });
+          
+          // Wait a bit then destroy it and resolve
+          this.time.delayedCall(300, () => {
+            tempText.destroy();
+            resolve();
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to load Tickerbit font:', error);
+        // Font will fallback to Arial, sans-serif
+        resolve();
+      }
+    });
+  }
+
+  /**
    * Initialize player rupees from database
    */
   public initializePlayerRupees(rupees: number): void {
@@ -172,6 +222,13 @@ export class MainScene extends Scene implements MainGameScene {
 
   // Create takes care of establishing game elements
   create(): void {
+    // Ensure Tickerbit font is loaded before creating any text objects
+    this.loadTickerbitFont().then(() => {
+      this.createGameElements();
+    });
+  }
+
+  private createGameElements(): void {
     // Create game container - all game elements should be added to this container
     this.gameContainer = this.add.container(0, 0);
 

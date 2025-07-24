@@ -1,5 +1,6 @@
 import { Scene, GameObjects, Types } from "phaser";
 import { Constants } from "../utils/Constants.ts";
+import { FontUtils } from "../utils/FontUtils.ts";
 
 export class Player {
     private scene: Scene;
@@ -50,10 +51,10 @@ export class Player {
             body.setDamping(true);
             body.setDrag(0.85, 0.85);
         }
-        // Create username text
+        // Create username text with proper font loading
         this.nameText = scene.add
             .text(x, y + 350, this.username, {
-                fontFamily: Constants.PLAYER_NAME_FONT,
+                fontFamily: FontUtils.getPlayerNameFont(),
                 fontSize: Constants.PLAYER_NAME_SIZE,
                 color: Constants.PLAYER_NAME_COLOR,
                 align: "center",
@@ -61,6 +62,15 @@ export class Player {
                 padding: Constants.PLAYER_NAME_PADDING,
             })
             .setOrigin(0.5,3);
+            
+        // Ensure font is loaded and refresh the text if needed
+        FontUtils.ensureFontLoaded('Tickerbit', Constants.PLAYER_NAME_SIZE).then(() => {
+            this.nameText.setStyle({
+                fontFamily: FontUtils.getPlayerNameFont(),
+                fontSize: Constants.PLAYER_NAME_SIZE,
+                color: Constants.PLAYER_NAME_COLOR,
+            });
+        });
     }
 
     update(deltaFactor: number = 1): void {

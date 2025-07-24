@@ -16,10 +16,10 @@ interface ConnectedPlayer {
     joinedAt: number;
 }
 
-const GameHUD: React.FC<GameHUDProps> = ({ 
-    rupees = 25000, 
+const GameHUD: React.FC<GameHUDProps> = ({
+    rupees = 25000,
     walletManager,
-    icpService 
+    icpService,
 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
@@ -28,13 +28,17 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
     const [isChatFocused, setIsChatFocused] = useState(false);
-    
+
     // Player connection tracking
-    const [connectedPlayers, setConnectedPlayers] = useState<ConnectedPlayer[]>([]);
+    const [connectedPlayers, setConnectedPlayers] = useState<ConnectedPlayer[]>(
+        []
+    );
     const [onlineCount, setOnlineCount] = useState(0);
-    
+
     // Blockchain status
-    const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
+    const [walletStatus, setWalletStatus] = useState<WalletStatus>({
+        connected: false,
+    });
     const [networkHealthy, setNetworkHealthy] = useState(true);
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
@@ -95,45 +99,59 @@ const GameHUD: React.FC<GameHUDProps> = ({
         const handlePlayerJoined = (e: any) => {
             const { player } = e.detail;
             if (player && player.username) {
-                setConnectedPlayers(prev => {
+                setConnectedPlayers((prev) => {
                     // Remove any existing entry with same id or username to avoid duplicates
-                    const filtered = prev.filter(p => p.id !== player.id && p.username !== player.username);
-                    return [...filtered, {
-                        id: player.id,
-                        username: player.username,
-                        joinedAt: Date.now()
-                    }];
+                    const filtered = prev.filter(
+                        (p) =>
+                            p.id !== player.id && p.username !== player.username
+                    );
+                    return [
+                        ...filtered,
+                        {
+                            id: player.id,
+                            username: player.username,
+                            joinedAt: Date.now(),
+                        },
+                    ];
                 });
 
                 // Add a system message to chat when someone joins
-                setChatMessages(prev => {
+                setChatMessages((prev) => {
                     const joinMessage = {
-                        id: `join-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        id: `join-${Date.now()}-${Math.random()
+                            .toString(36)
+                            .substring(2, 9)}`,
                         username: "System",
-                        message: `${player.username} joined the game`
+                        message: `${player.username} joined the game`,
                     };
                     const newMessages = [...prev, joinMessage];
-                    return newMessages.length > 50 ? newMessages.slice(-50) : newMessages;
+                    return newMessages.length > 50
+                        ? newMessages.slice(-50)
+                        : newMessages;
                 });
             }
         };
 
         const handlePlayerDisconnect = (e: any) => {
             const { id, username } = e.detail;
-            
+
             // Remove player from connected list
-            setConnectedPlayers(prev => prev.filter(p => p.id !== id));
+            setConnectedPlayers((prev) => prev.filter((p) => p.id !== id));
 
             // Add a system message to chat when someone leaves
             if (username) {
-                setChatMessages(prev => {
+                setChatMessages((prev) => {
                     const leaveMessage = {
-                        id: `leave-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        id: `leave-${Date.now()}-${Math.random()
+                            .toString(36)
+                            .substring(2, 9)}`,
                         username: "System",
-                        message: `${username} left the game`
+                        message: `${username} left the game`,
                     };
                     const newMessages = [...prev, leaveMessage];
-                    return newMessages.length > 50 ? newMessages.slice(-50) : newMessages;
+                    return newMessages.length > 50
+                        ? newMessages.slice(-50)
+                        : newMessages;
                 });
             }
         };
@@ -146,24 +164,47 @@ const GameHUD: React.FC<GameHUDProps> = ({
         const handleExistingPlayers = (e: any) => {
             const { players } = e.detail;
             if (Array.isArray(players)) {
-                setConnectedPlayers(players.map(player => ({
-                    id: player.id,
-                    username: player.username,
-                    joinedAt: Date.now()
-                })));
+                setConnectedPlayers(
+                    players.map((player) => ({
+                        id: player.id,
+                        username: player.username,
+                        joinedAt: Date.now(),
+                    }))
+                );
             }
         };
 
         window.addEventListener("playerJoined" as any, handlePlayerJoined);
-        window.addEventListener("playerDisconnect" as any, handlePlayerDisconnect);
-        window.addEventListener("onlineUsersCount" as any, handleOnlineUsersCount);
-        window.addEventListener("existingPlayers" as any, handleExistingPlayers);
+        window.addEventListener(
+            "playerDisconnect" as any,
+            handlePlayerDisconnect
+        );
+        window.addEventListener(
+            "onlineUsersCount" as any,
+            handleOnlineUsersCount
+        );
+        window.addEventListener(
+            "existingPlayers" as any,
+            handleExistingPlayers
+        );
 
         return () => {
-            window.removeEventListener("playerJoined" as any, handlePlayerJoined);
-            window.removeEventListener("playerDisconnect" as any, handlePlayerDisconnect);
-            window.removeEventListener("onlineUsersCount" as any, handleOnlineUsersCount);
-            window.removeEventListener("existingPlayers" as any, handleExistingPlayers);
+            window.removeEventListener(
+                "playerJoined" as any,
+                handlePlayerJoined
+            );
+            window.removeEventListener(
+                "playerDisconnect" as any,
+                handlePlayerDisconnect
+            );
+            window.removeEventListener(
+                "onlineUsersCount" as any,
+                handleOnlineUsersCount
+            );
+            window.removeEventListener(
+                "existingPlayers" as any,
+                handleExistingPlayers
+            );
         };
     }, []);
 
@@ -231,12 +272,16 @@ const GameHUD: React.FC<GameHUDProps> = ({
             messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
         }
     }, [chatMessages]);
-    
+
     // Handle clicks outside the chat to unfocus it
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             // Only check if chat is currently focused
-            if (isChatFocused && chatContainerRef.current && chatInputRef.current) {
+            if (
+                isChatFocused &&
+                chatContainerRef.current &&
+                chatInputRef.current
+            ) {
                 // Check if the click was outside the chat container
                 if (!chatContainerRef.current.contains(event.target as Node)) {
                     setIsChatFocused(false);
@@ -245,12 +290,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 }
             }
         };
-        
+
         // Add click listener to the document
-        document.addEventListener('mousedown', handleClickOutside);
-        
+        document.addEventListener("mousedown", handleClickOutside);
+
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener("mousedown", handleClickOutside);
         };
     }, [isChatFocused]);
 
@@ -313,14 +358,26 @@ const GameHUD: React.FC<GameHUDProps> = ({
     // Handle chat input key events
     const handleChatKeyDown = (e: React.KeyboardEvent) => {
         // Explicitly handle WASD, E, and Space keys to ensure they can be typed in chat
-        const gameControlKeys = ['w', 'a', 's', 'd', 'e', 'W', 'A', 'S', 'D', 'E', ' '];
+        const gameControlKeys = [
+            "w",
+            "a",
+            "s",
+            "d",
+            "e",
+            "W",
+            "A",
+            "S",
+            "D",
+            "E",
+            " ",
+        ];
         if (gameControlKeys.includes(e.key)) {
             // Stop propagation to prevent the game from handling these keys
             e.stopPropagation();
             // Don't prevent default so the key can be typed in the input
             return;
         }
-        
+
         // Handle special keys
         if (e.key === "Escape") {
             e.preventDefault();
@@ -345,30 +402,40 @@ const GameHUD: React.FC<GameHUDProps> = ({
     };
 
     return (
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1000] font-['Tickerbit',Arial,sans-serif]">
+        <div className="absolute top-2 left-2 w-full h-full pointer-events-none z-[1000] font-['Tickerbit',Arial,sans-serif]">
             {/* Top right status area */}
             <div className="absolute top-5 right-5 flex flex-col items-end space-y-2">
                 {/* Blockchain status indicator */}
                 {walletManager && (
                     <div className="flex items-center space-x-2 bg-black/60 rounded-lg px-3 py-1 backdrop-blur">
-                        <div className={`w-2 h-2 rounded-full ${
-                            walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'
-                        }`}></div>
+                        <div
+                            className={`w-2 h-2 rounded-full ${
+                                walletStatus.connected
+                                    ? "bg-green-400"
+                                    : "bg-gray-400"
+                            }`}
+                        ></div>
                         <span className="text-xs text-white">
-                            {walletStatus.connected ? 'Blockchain' : 'Local'}
+                            {walletStatus.connected ? "Blockchain" : "Local"}
                         </span>
                         {!networkHealthy && (
-                            <div className="w-2 h-2 rounded-full bg-yellow-400" title="Network issues detected"></div>
+                            <div
+                                className="w-2 h-2 rounded-full bg-yellow-400"
+                                title="Network issues detected"
+                            ></div>
                         )}
                     </div>
                 )}
-                
+
                 {/* Rupee counter */}
                 <div className="p-2 px-3 rounded-lg flex items-center text-[#FFD700] text-shadow-lg text-2xl font-bold">
                     <span className="mr-1.5 text-3xl">₹</span>
                     <span>{currentRupees}</span>
                     {walletStatus.connected && (
-                        <div className="ml-2 w-3 h-3 bg-blue-400 rounded-full" title="Blockchain verified"></div>
+                        <div
+                            className="ml-2 w-3 h-3 bg-blue-400 rounded-full"
+                            title="Blockchain verified"
+                        ></div>
                     )}
                 </div>
             </div>
@@ -377,20 +444,25 @@ const GameHUD: React.FC<GameHUDProps> = ({
             <div className="absolute bottom-[45vh] left-5 w-[28ch] pointer-events-none">
                 {/* Online count */}
                 <div className="mb-2 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
-                    <span className="text-dhani-green">●</span> {onlineCount} online
+                    <span className="text-dhani-green">●</span> {onlineCount}{" "}
+                    online
                 </div>
-                
+
                 {/* Connected players list */}
                 {connectedPlayers.length > 0 && (
                     <div className="space-y-1 max-h-[15vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         {connectedPlayers.slice(-8).map((player) => (
-                            <div 
-                                key={player.id} 
+                            <div
+                                key={player.id}
                                 className="text-white/70 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex items-center animate-fade-in"
                             >
                                 <span className="text-dhani-green mr-2">▸</span>
-                                <span className="text-white">{player.username}</span>
-                                <span className="text-white/40 ml-2 text-xs">joined</span>
+                                <span className="text-white">
+                                    {player.username}
+                                </span>
+                                <span className="text-white/40 ml-2 text-xs">
+                                    joined
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -400,8 +472,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-5 left-5 w-[28ch] max-h-[40vh] flex flex-col bg-black/70 rounded-lg p-2 text-[14px] text-white pointer-events-auto backdrop-blur-sm border border-white/10 transition-all duration-300 ${
-                    isChatFocused ? "opacity-100 border-dhani-green/30 shadow-lg shadow-dhani-green/10" : "opacity-75"
+                className={`absolute bottom-0 left-0 w-[28ch] max-h-[40vh] flex flex-col bg-black/70 rounded-tr-lg p-2 text-[14px] text-white pointer-events-auto backdrop-blur-sm border border-white/10 transition-all duration-300 ${
+                    isChatFocused
+                        ? "opacity-100 border-dhani-green/30 shadow-lg shadow-dhani-green/10"
+                        : "opacity-75"
                 }`}
             >
                 {/* Chat messages area */}
@@ -415,23 +489,26 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         </div>
                     ) : (
                         chatMessages.map((msg, idx) => (
-                            <div key={idx} className="mb-1.5 leading-[1.3] px-1">
+                            <div
+                                key={idx}
+                                className="mb-1.5 leading-[1.3] px-1"
+                            >
                                 <div className="flex items-start space-x-2">
                                     <span
                                         className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex-shrink-0 ${
                                             msg.username === "System"
-                                                ? "text-yellow-400 italic"
+                                                ? "text-yellow-100 italic"
                                                 : "text-dhani-green"
                                         }`}
                                     >
                                         {msg.username === "System"
-                                            ? "⚡"
+                                            ? ""
                                             : `${msg.username}:`}
                                     </span>
                                     <span
                                         className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider break-words ${
                                             msg.username === "System"
-                                                ? "text-yellow-300 italic"
+                                                ? "text-cyan-100 italic"
                                                 : "text-white"
                                         }`}
                                     >
@@ -448,13 +525,15 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     <input
                         ref={chatInputRef}
                         className={`w-full px-3 py-2 border rounded-md bg-black/40 text-sm text-white outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider transition-all duration-200 ${
-                            isChatFocused 
-                                ? "border-dhani-green/50 bg-black/60 shadow-sm shadow-dhani-green/20" 
+                            isChatFocused
+                                ? "border-dhani-green/50 bg-black/60 shadow-sm shadow-dhani-green/20"
                                 : "border-white/20 hover:border-white/30"
                         }`}
                         type="text"
                         placeholder={
-                            isChatFocused ? "Type a message..." : "Press / to chat"
+                            isChatFocused
+                                ? "Type a message..."
+                                : "Press / to chat"
                         }
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
