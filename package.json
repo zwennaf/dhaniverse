@@ -8,22 +8,15 @@
         "host": "vite --host",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "test": "vitest",
-        "test:run": "vitest run",
-        "test:ui": "vitest --ui",
         "server:game": "deno run -A --unstable-detect-cjs --env-file=server/game/.env --watch server/game/index.ts",
         "server:ws": "deno run -A --env-file=server/ws/.env --watch server/ws/ws.ts",
         "server": "start-servers.bat"
     },
     "devDependencies": {
-        "@testing-library/jest-dom": "^6.6.3",
         "@vitejs/plugin-react": "4.7.0",
-        "@vitest/ui": "^3.2.4",
         "concurrently": "9.2.0",
-        "jsdom": "^26.1.0",
         "typescript": "5.8.3",
-        "vite": "^6.2.0",
-        "vitest": "^3.2.4"
+        "vite": "^6.2.0"
     },
     "dependencies": {
         "@coinbase/wallet-sdk": "4.3.7",
@@ -33,7 +26,7 @@
         "@types/node": "24.1.0",
         "@types/react": "19.1.8",
         "@types/react-dom": "19.1.6",
-        "@walletconnect/web3-provider": "^1.8.0",
+        "@walletconnect/ethereum-provider": "^2.16.1",
         "autoprefixer": "10.4.21",
         "clsx": "^2.1.1",
         "ethers": "6.15.0",
@@ -45,8 +38,8 @@
         "react": "19.1.0",
         "react-dom": "19.1.0",
         "react-router-dom": "7.7.0",
-        "tailwind-merge": "3.3.1",
-        "tailwindcss": "4.1.11",
+        "tailwind-merge": "^3.2.1",
+        "tailwindcss": "^3.4.11",
         "tailwindcss-animate": "1.0.7"
     }
 }

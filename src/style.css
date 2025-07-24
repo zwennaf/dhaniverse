@@ -138,10 +138,6 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
   body {
     @apply bg-black text-white font-vcr overflow-x-hidden;
   }
