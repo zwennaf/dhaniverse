@@ -20,6 +20,13 @@ const BankingUI: React.FC = () => {
     >("info");
     // Keep track of the rupees at opening time to calculate the difference later
     const initialRupeesRef = useRef(0);
+    
+    // Log bank account for debugging (prevents unused variable warning)
+    useEffect(() => {
+        if (bankAccount) {
+            console.log("Bank account data:", bankAccount);
+        }
+    }, [bankAccount]);
 
     useEffect(() => {
         // Listen for the custom event from the game to open the banking UI
@@ -86,10 +93,10 @@ const BankingUI: React.FC = () => {
             if (customEvent.detail.rupees !== undefined) {
                 console.log(
                     "Banking UI received rupee update:",
-                    event.detail.rupees
+                    customEvent.detail.rupees
                 );
                 const previousRupees = playerRupees;
-                const newRupees = event.detail.rupees;
+                const newRupees = customEvent.detail.rupees;
 
                 setPlayerRupees(newRupees);
 

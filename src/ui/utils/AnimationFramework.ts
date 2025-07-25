@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface AnimationConfig {
   duration?: number;
   easing?: string;

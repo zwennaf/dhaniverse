@@ -131,7 +131,7 @@ export const A11yTesting: React.FC<A11yTestingProps> = ({
           </ul>
         </div>
       )}
-      <style jsx>{`
+      <style>{`
         .a11y-testing-active *:focus {
           outline: 3px solid #F1CD36 !important;
           outline-offset: 2px !important;
