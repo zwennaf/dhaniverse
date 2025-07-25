@@ -1,1426 +1,1766 @@
 /* stylelint-disable at-rule-no-unknown */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #000000;
+    color-scheme: light dark;
+    color: rgba(255, 255, 255, 0.87);
+    background-color: #000000;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 @font-face {
-  font-family: 'Pixeloid';
-  src: url('/fonts/PixeloidSansBold.ttf') format('truetype');
+    font-family: "Pixeloid";
+    src: url("/fonts/PixeloidSansBold.ttf") format("truetype");
 }
 @font-face {
-  font-family: 'VCR OSD Mono';
-  src: url('/fonts/VCR_OSD_MONO_1.001.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+    font-family: "VCR OSD Mono";
+    src: url("/fonts/VCR_OSD_MONO_1.001.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
 }
 @font-face {
-  font-family: 'Tickerbit';
-  src: url('/fonts/Tickerbit-regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+    font-family: "Tickerbit";
+    src: url("/fonts/Tickerbit-regular.ttf") format("truetype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
 }
 @font-face {
-  font-family: 'Robert';
-  src: url('/fonts/Robert.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+    font-family: "Robert";
+    src: url("/fonts/Robert.otf") format("opentype");
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
 }
 .pixeloid {
-  font-family: 'Pixeloid', sans-serif;
-  font-weight: 700;
-  font-size: 1.2em;
+    font-family: "Pixeloid", sans-serif;
+    font-weight: 700;
+    font-size: 1.2em;
 }
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+        --primary: 222.2 47.4% 11.2%;
+        --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
+        --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+        --sidebar-background: 0 0% 98%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+        --sidebar-foreground: 240 5.3% 26.1%;
 
-    --sidebar-primary: 240 5.9% 10%;
+        --sidebar-primary: 240 5.9% 10%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-primary-foreground: 0 0% 98%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+        --sidebar-accent: 240 4.8% 95.9%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+        --sidebar-accent-foreground: 240 5.9% 10%;
 
-    --sidebar-border: 220 13% 91%;
+        --sidebar-border: 220 13% 91%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+        --sidebar-ring: 217.2 91.2% 59.8%;
+    }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+        --card: 222.2 84% 4.9%;
+        --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+        --popover: 222.2 84% 4.9%;
+        --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+        --primary: 210 40% 98%;
+        --primary-foreground: 222.2 47.4% 11.2%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+        --secondary: 217.2 32.6% 17.5%;
+        --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+        --accent: 217.2 32.6% 17.5%;
+        --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+        --border: 217.2 32.6% 17.5%;
+        --input: 217.2 32.6% 17.5%;
+        --ring: 212.7 26.8% 83.9%;
+        --sidebar-background: 240 5.9% 10%;
+        --sidebar-foreground: 240 4.8% 95.9%;
+        --sidebar-primary: 224.3 76.3% 48%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 240 3.7% 15.9%;
+        --sidebar-accent-foreground: 240 4.8% 95.9%;
+        --sidebar-border: 240 3.7% 15.9%;
+        --sidebar-ring: 217.2 91.2% 59.8%;
+    }
 }
 
 @layer base {
-  body {
-    @apply bg-black text-white font-vcr overflow-x-hidden;
-  }
+    body {
+        @apply bg-black text-white font-vcr overflow-x-hidden;
+    }
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+    font-size: 3.2em;
+    line-height: 1.1;
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+    height: 6em;
+    padding: 1.5em;
+    will-change: filter;
+    transition: filter 300ms;
 }
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+    filter: drop-shadow(0 0 2em #646cffaa);
 }
 .logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #3178c6aa);
+    filter: drop-shadow(0 0 2em #3178c6aa);
 }
 
 .card {
-  padding: 2em;
+    padding: 2em;
 }
 
 .read-the-docs {
-  color: #888;
+    color: #888;
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    font-family: inherit;
+    background-color: #1a1a1a;
+    cursor: pointer;
+    transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+    border-color: #646cff;
 }
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+    outline: 4px auto -webkit-focus-ring-color;
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+    :root {
+        color: #213547;
+        background-color: #ffffff;
+    }
+    a:hover {
+        color: #747bff;
+    }
+    button {
+        background-color: #f9f9f9;
+    }
 }
 
 @layer components {
-  /* Pixelated Design System Foundation */
-  .pixelated-container {
-    @apply font-vcr;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-  }
+    /* Pixelated Design System Foundation */
+    .pixelated-container {
+        @apply font-vcr;
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+    }
 
-  .pixelated-border {
-    border-style: solid;
-    border-image: none;
-  }
+    .pixelated-border {
+        border-style: solid;
+        border-image: none;
+    }
 
-  .pixelated-border-thin {
-    @apply pixelated-border border-2;
-  }
+    .pixelated-border-thin {
+        @apply pixelated-border border-2;
+    }
 
-  .pixelated-border-medium {
-    @apply pixelated-border border-4;
-  }
+    .pixelated-border-medium {
+        @apply pixelated-border border-4;
+    }
 
-  .pixelated-border-thick {
-    @apply pixelated-border border-8;
-  }
+    .pixelated-border-thick {
+        @apply pixelated-border border-8;
+    }
 
-  .pixelated-button {
-    @apply pixelated-container pixelated-border-thin font-bold tracking-wider uppercase transition-all duration-300;
-    background-clip: padding-box;
-    position: relative;
-  }
+    .pixelated-button {
+        @apply pixelated-container pixelated-border-thin font-bold tracking-wider uppercase transition-all duration-300;
+        background-clip: padding-box;
+        position: relative;
+    }
 
-  .pixelated-button:hover {
-    @apply scale-105;
-    filter: brightness(1.1);
-  }
+    .pixelated-button:hover {
+        @apply scale-105;
+        filter: brightness(1.1);
+    }
 
-  .pixelated-button:active {
-    @apply scale-95;
-    filter: brightness(0.9);
-  }
+    .pixelated-button:active {
+        @apply scale-95;
+        filter: brightness(0.9);
+    }
 
-  /* Enhanced Pixelated Banking UI Design System */
-  .pixelated-banking-container {
-    @apply font-vcr;
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-  }
+    /* Enhanced Pixelated Banking UI Design System */
+    .pixelated-banking-container {
+        @apply font-vcr;
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+    }
 
-  .pixelated-banking-border {
-    --pixel-size: 2px;
-    --border-color: #F1CD36;
-    border: var(--pixel-size) solid var(--border-color);
-    position: relative;
-  }
+    .pixelated-banking-border {
+        --pixel-size: 2px;
+        --border-color: #f1cd36;
+        border: var(--pixel-size) solid var(--border-color);
+        position: relative;
+    }
 
-  .pixelated-banking-border::before {
-    content: '';
-    position: absolute;
-    top: calc(-1 * var(--pixel-size));
-    left: calc(-1 * var(--pixel-size));
-    right: calc(-1 * var(--pixel-size));
-    bottom: calc(-1 * var(--pixel-size));
-    background: var(--border-color);
-    clip-path: polygon(
-      0 var(--pixel-size),
-      var(--pixel-size) var(--pixel-size),
-      var(--pixel-size) 0,
-      calc(100% - var(--pixel-size)) 0,
-      calc(100% - var(--pixel-size)) var(--pixel-size),
-      100% var(--pixel-size),
-      100% calc(100% - var(--pixel-size)),
-      calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
-      calc(100% - var(--pixel-size)) 100%,
-      var(--pixel-size) 100%,
-      var(--pixel-size) calc(100% - var(--pixel-size)),
-      0 calc(100% - var(--pixel-size))
-    );
-    z-index: -1;
-    pointer-events: none;
-  }
+    .pixelated-banking-border::before {
+        content: "";
+        position: absolute;
+        top: calc(-1 * var(--pixel-size));
+        left: calc(-1 * var(--pixel-size));
+        right: calc(-1 * var(--pixel-size));
+        bottom: calc(-1 * var(--pixel-size));
+        background: var(--border-color);
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        z-index: -1;
+        pointer-events: none;
+    }
 
-  .pixelated-banking-button {
-    @apply font-vcr font-bold tracking-wider transition-all duration-300;
-    --pixel-size: 3px;
-    --button-color: #F1CD36;
-    --button-text: #000000;
-    background: var(--button-color);
-    color: var(--button-text);
-    border: none;
-    position: relative;
-    clip-path: polygon(
-      0 var(--pixel-size),
-      var(--pixel-size) var(--pixel-size),
-      var(--pixel-size) 0,
-      calc(100% - var(--pixel-size)) 0,
-      calc(100% - var(--pixel-size)) var(--pixel-size),
-      100% var(--pixel-size),
-      100% calc(100% - var(--pixel-size)),
-      calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
-      calc(100% - var(--pixel-size)) 100%,
-      var(--pixel-size) 100%,
-      var(--pixel-size) calc(100% - var(--pixel-size)),
-      0 calc(100% - var(--pixel-size))
-    );
-  }
+    .pixelated-banking-button {
+        @apply font-vcr font-bold tracking-wider transition-all duration-300;
+        --pixel-size: 3px;
+        --button-color: #f1cd36;
+        --button-text: #000000;
+        background: var(--button-color);
+        color: var(--button-text);
+        border: none;
+        position: relative;
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+    }
 
-  .pixelated-banking-button:hover {
-    --button-color: #D4B429;
-    transform: translateY(-1px);
-    filter: drop-shadow(0 2px 4px rgba(241, 205, 54, 0.3));
-  }
+    .pixelated-banking-button:hover {
+        --button-color: #d4b429;
+        transform: translateY(-1px);
+        filter: drop-shadow(0 2px 4px rgba(241, 205, 54, 0.3));
+    }
 
-  .pixelated-banking-button:active {
-    transform: translateY(0);
-    filter: drop-shadow(0 1px 2px rgba(241, 205, 54, 0.2));
-  }
+    .pixelated-banking-button:active {
+        transform: translateY(0);
+        filter: drop-shadow(0 1px 2px rgba(241, 205, 54, 0.2));
+    }
 
-  .pixelated-banking-button:disabled {
-    --button-color: #666666;
-    --button-text: #999999;
-    cursor: not-allowed;
-    transform: none;
-    filter: none;
-  }
+    .pixelated-banking-button:disabled {
+        --button-color: #666666;
+        --button-text: #999999;
+        cursor: not-allowed;
+        transform: none;
+        filter: none;
+    }
 
-  .pixelated-banking-input {
-    @apply font-vcr bg-black text-white border-2 border-white/20 px-3 py-2;
-    image-rendering: pixelated;
-    transition: border-color 0.3s ease;
-  }
+    .pixelated-banking-input {
+        @apply font-vcr bg-black text-white border-2 border-white/20 px-3 py-2;
+        image-rendering: pixelated;
+        transition: border-color 0.3s ease;
+    }
 
-  .pixelated-banking-input:focus {
-    @apply border-dhani-gold outline-none;
-    box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
-  }
+    .pixelated-banking-input:focus {
+        @apply border-dhani-gold outline-none;
+        box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
+    }
 
-  .pixelated-banking-card {
-    @apply bg-black/80 border-2 border-white/20 p-4;
-    --card-pixel-size: 4px;
-    position: relative;
-    clip-path: polygon(
-      0 var(--card-pixel-size),
-      var(--card-pixel-size) var(--card-pixel-size),
-      var(--card-pixel-size) 0,
-      calc(100% - var(--card-pixel-size)) 0,
-      calc(100% - var(--card-pixel-size)) var(--card-pixel-size),
-      100% var(--card-pixel-size),
-      100% calc(100% - var(--card-pixel-size)),
-      calc(100% - var(--card-pixel-size)) calc(100% - var(--card-pixel-size)),
-      calc(100% - var(--card-pixel-size)) 100%,
-      var(--card-pixel-size) 100%,
-      var(--card-pixel-size) calc(100% - var(--card-pixel-size)),
-      0 calc(100% - var(--card-pixel-size))
-    );
-  }
+    .pixelated-banking-card {
+        @apply bg-black/80 border-2 border-white/20 p-4;
+        --card-pixel-size: 4px;
+        position: relative;
+        clip-path: polygon(
+            0 var(--card-pixel-size),
+            var(--card-pixel-size) var(--card-pixel-size),
+            var(--card-pixel-size) 0,
+            calc(100% - var(--card-pixel-size)) 0,
+            calc(100% - var(--card-pixel-size)) var(--card-pixel-size),
+            100% var(--card-pixel-size),
+            100% calc(100% - var(--card-pixel-size)),
+            calc(100% - var(--card-pixel-size))
+                calc(100% - var(--card-pixel-size)),
+            calc(100% - var(--card-pixel-size)) 100%,
+            var(--card-pixel-size) 100%,
+            var(--card-pixel-size) calc(100% - var(--card-pixel-size)),
+            0 calc(100% - var(--card-pixel-size))
+        );
+    }
 
-  .pixelated-banking-card-gold {
-    @apply pixelated-banking-card border-dhani-gold;
-    background: rgba(241, 205, 54, 0.1);
-  }
+    .pixelated-banking-card-gold {
+        @apply pixelated-banking-card border-dhani-gold;
+        background: rgba(241, 205, 54, 0.1);
+    }
 
-  .pixelated-banking-card-success {
-    @apply pixelated-banking-card border-green-500;
-    background: rgba(76, 166, 76, 0.1);
-  }
+    .pixelated-banking-card-success {
+        @apply pixelated-banking-card border-green-500;
+        background: rgba(76, 166, 76, 0.1);
+    }
 
-  .pixelated-banking-card-error {
-    @apply pixelated-banking-card border-red-500;
-    background: rgba(220, 38, 38, 0.1);
-  }
+    .pixelated-banking-card-error {
+        @apply pixelated-banking-card border-red-500;
+        background: rgba(220, 38, 38, 0.1);
+    }
 
-  .pixelated-banking-tab {
-    @apply font-vcr font-bold tracking-wider px-4 py-2 transition-all duration-300;
-    --tab-pixel-size: 2px;
-    position: relative;
-    background: transparent;
-    color: #FFFFFF;
-    border: 2px solid transparent;
-    border-bottom: none;
-  }
+    .pixelated-banking-tab {
+        @apply font-vcr font-bold tracking-wider px-4 py-2 transition-all duration-300;
+        --tab-pixel-size: 2px;
+        position: relative;
+        background: transparent;
+        color: #ffffff;
+        border: 2px solid transparent;
+        border-bottom: none;
+    }
 
-  .pixelated-banking-tab.active {
-    background: rgba(241, 205, 54, 0.1);
-    color: #F1CD36;
-    border-color: #F1CD36;
-    border-bottom: 2px solid #000000;
-  }
+    .pixelated-banking-tab.active {
+        background: rgba(241, 205, 54, 0.1);
+        color: #f1cd36;
+        border-color: #f1cd36;
+        border-bottom: 2px solid #000000;
+    }
 
-  .pixelated-banking-tab:hover:not(.active) {
-    background: rgba(255, 255, 255, 0.05);
-    color: #F1CD36;
-  }
+    .pixelated-banking-tab:hover:not(.active) {
+        background: rgba(255, 255, 255, 0.05);
+        color: #f1cd36;
+    }
 
-  .pixelated-banking-progress {
-    @apply w-full bg-gray-700 h-3 relative overflow-hidden;
-    --progress-pixel-size: 1px;
-    clip-path: polygon(
-      0 var(--progress-pixel-size),
-      var(--progress-pixel-size) var(--progress-pixel-size),
-      var(--progress-pixel-size) 0,
-      calc(100% - var(--progress-pixel-size)) 0,
-      calc(100% - var(--progress-pixel-size)) var(--progress-pixel-size),
-      100% var(--progress-pixel-size),
-      100% calc(100% - var(--progress-pixel-size)),
-      calc(100% - var(--progress-pixel-size)) calc(100% - var(--progress-pixel-size)),
-      calc(100% - var(--progress-pixel-size)) 100%,
-      var(--progress-pixel-size) 100%,
-      var(--progress-pixel-size) calc(100% - var(--progress-pixel-size)),
-      0 calc(100% - var(--progress-pixel-size))
-    );
-  }
+    .pixelated-banking-progress {
+        @apply w-full bg-gray-700 h-3 relative overflow-hidden;
+        --progress-pixel-size: 1px;
+        clip-path: polygon(
+            0 var(--progress-pixel-size),
+            var(--progress-pixel-size) var(--progress-pixel-size),
+            var(--progress-pixel-size) 0,
+            calc(100% - var(--progress-pixel-size)) 0,
+            calc(100% - var(--progress-pixel-size)) var(--progress-pixel-size),
+            100% var(--progress-pixel-size),
+            100% calc(100% - var(--progress-pixel-size)),
+            calc(100% - var(--progress-pixel-size))
+                calc(100% - var(--progress-pixel-size)),
+            calc(100% - var(--progress-pixel-size)) 100%,
+            var(--progress-pixel-size) 100%,
+            var(--progress-pixel-size) calc(100% - var(--progress-pixel-size)),
+            0 calc(100% - var(--progress-pixel-size))
+        );
+    }
 
-  .pixelated-banking-progress-bar {
-    @apply h-full bg-dhani-gold transition-all duration-500 ease-out;
-    image-rendering: pixelated;
-  }
+    .pixelated-banking-progress-bar {
+        @apply h-full bg-dhani-gold transition-all duration-500 ease-out;
+        image-rendering: pixelated;
+    }
 
-  .pixelated-banking-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(241, 205, 54, 0.3) transparent;
-  }
+    .pixelated-banking-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(241, 205, 54, 0.3) transparent;
+    }
 
-  .pixelated-banking-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
+    .pixelated-banking-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
 
-  .pixelated-banking-scrollbar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-  }
+    .pixelated-banking-scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+    }
 
-  .pixelated-banking-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(241, 205, 54, 0.3);
-    border: 1px solid rgba(241, 205, 54, 0.5);
-  }
+    .pixelated-banking-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(241, 205, 54, 0.3);
+        border: 1px solid rgba(241, 205, 54, 0.5);
+    }
 
-  .pixelated-banking-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(241, 205, 54, 0.5);
-  }
+    .pixelated-banking-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(241, 205, 54, 0.5);
+    }
 
-  /* Pixelated banking animations */
-  .pixelated-banking-pulse {
-    animation: pixelated-banking-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
+    /* Pixelated banking animations */
+    .pixelated-banking-pulse {
+        animation: pixelated-banking-pulse 2s cubic-bezier(0.4, 0, 0.6, 1)
+            infinite;
+    }
 
-  @keyframes pixelated-banking-pulse {
-    0%, 100% {
-      opacity: 1;
-      filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
+    @keyframes pixelated-banking-pulse {
+        0%,
+        100% {
+            opacity: 1;
+            filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
+        }
+        50% {
+            opacity: 0.7;
+            filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+        }
+    }
+
+    .pixelated-banking-glow {
+        filter: drop-shadow(0 0 4px rgba(241, 205, 54, 0.4));
+        transition: filter 0.3s ease;
+    }
+
+    .pixelated-banking-glow:hover {
+        filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+    }
+
+    .pixelated-banking-slide-in {
+        animation: pixelated-banking-slide-in 0.3s ease-out;
+    }
+
+    @keyframes pixelated-banking-slide-in {
+        from {
+            transform: translateX(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .pixelated-banking-fade-in {
+        animation: pixelated-banking-fade-in 0.5s ease-out;
+    }
+
+    @keyframes pixelated-banking-fade-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .pixelated-banking-number-transition {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .pixelated-banking-icon {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+    }
+
+    .pixelated-card {
+        @apply pixelated-container pixelated-border-thin bg-black;
+        position: relative;
+        background-clip: padding-box;
+    }
+
+    .pixelated-input {
+        @apply pixelated-container pixelated-border-thin bg-gray-800 text-white px-3 py-2 font-vcr;
+        outline: none;
+        transition: border-color 0.3s ease;
+    }
+
+    .pixelated-input:focus {
+        @apply border-dhani-gold;
+        box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
+    }
+
+    .pixelated-text-primary {
+        @apply text-white font-vcr;
+    }
+
+    .pixelated-text-accent {
+        @apply text-dhani-gold font-vcr font-bold tracking-wider;
+    }
+
+    .pixelated-text-muted {
+        @apply text-gray-400 font-vcr;
+    }
+
+    /* Enhanced Pixelated Animations */
+    .pixelated-fade-in {
+        animation: pixelatedFadeIn 0.5s ease-out;
+    }
+
+    .pixelated-slide-up {
+        animation: pixelatedSlideUp 0.4s ease-out;
+    }
+
+    .pixelated-pulse {
+        animation: pixelatedPulse 2s infinite;
+    }
+
+    .pixelated-glow {
+        position: relative;
+    }
+
+    .pixelated-glow::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        background: linear-gradient(45deg, #f1cd36, #fff8df, #f1cd36);
+        border-radius: 0;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .pixelated-glow:hover::after {
+        opacity: 0.3;
+    }
+
+    /* Pixelated Loading Spinner */
+    .pixelated-spinner {
+        @apply inline-block;
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(
+            45deg,
+            #f1cd36 25%,
+            transparent 25%,
+            transparent 75%,
+            #f1cd36 75%
+        );
+        background-size: 8px 8px;
+        animation: pixelatedSpin 1s linear infinite;
+    }
+
+    /* Pixelated Progress Bar */
+    .pixelated-progress {
+        @apply pixelated-border-thin bg-gray-800 overflow-hidden;
+        height: 8px;
+    }
+
+    .pixelated-progress-fill {
+        @apply bg-dhani-gold h-full transition-all duration-500 ease-out;
+        background-image: repeating-linear-gradient(
+            90deg,
+            #f1cd36 0px,
+            #f1cd36 4px,
+            #fff8df 4px,
+            #fff8df 8px
+        );
+    }
+
+    /* Pixelated Status Indicators */
+    .pixelated-status-dot {
+        @apply inline-block;
+        width: 8px;
+        height: 8px;
+        background: currentColor;
+        image-rendering: pixelated;
+    }
+
+    .pixelated-status-success {
+        @apply text-dhani-green;
+    }
+
+    .pixelated-status-error {
+        @apply text-red-500;
+    }
+
+    .pixelated-status-warning {
+        @apply text-yellow-500;
+    }
+
+    .pixelated-status-info {
+        @apply text-blue-500;
+    }
+
+    /* Pixelated Notification */
+    .pixelated-notification {
+        @apply pixelated-card pixelated-border-medium p-4 font-vcr;
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 1000;
+        max-width: 400px;
+        animation: pixelatedSlideIn 0.3s ease-out;
+    }
+
+    .pixelated-notification-success {
+        @apply border-dhani-green bg-green-900/20;
+    }
+
+    .pixelated-notification-error {
+        @apply border-red-500 bg-red-900/20;
+    }
+
+    /* Pixelated Scrollbar */
+    .pixelated-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #f1cd36 transparent;
+    }
+
+    .pixelated-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .pixelated-scrollbar::-webkit-scrollbar-track {
+        background: #1a1a1a;
+    }
+
+    .pixelated-scrollbar::-webkit-scrollbar-thumb {
+        background: #f1cd36;
+        border-radius: 0;
+    }
+
+    .pixelated-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #fff8df;
+    }
+
+    /* Gradient eclipse background styling */
+    .gradient-eclipse {
+        @apply fixed inset-0 z-[-2] overflow-hidden;
+        background: radial-gradient(
+            circle at 50% 15%,
+            rgba(180, 138, 0, 0.5) 0%,
+            rgba(82, 63, 0, 0.4) 20%,
+            rgba(28, 24, 10, 0.3) 40%,
+            rgba(0, 0, 0, 1) 90%
+        );
+    }
+
+    .gradient-overlay {
+        @apply fixed inset-0 z-[-1] bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none;
+        background-image: linear-gradient(
+                to bottom,
+                transparent 50%,
+                rgba(0, 0, 0, 0.8) 100%
+            ),
+            repeating-linear-gradient(
+                90deg,
+                rgba(255, 199, 0, 0.03) 0px,
+                rgba(255, 199, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 60px
+            ),
+            repeating-linear-gradient(
+                0deg,
+                rgba(255, 199, 0, 0.03) 0px,
+                rgba(255, 199, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 60px
+            );
+    }
+
+    /* Pixel corners styling for card elements */
+    .pixel-corners {
+        --pixel-size: 6px;
+        --pixel-color: #ffc700;
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        position: relative;
+    }
+
+    .pixel-corners::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: transparent;
+        border: var(--pixel-size) solid var(--pixel-color);
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        pointer-events: none;
+    }
+    .pixel-corners-cta {
+        --pixel-size: 6px;
+        --pixel-color: transparent;
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        position: relative;
+    }
+
+    .pixel-corners-cta::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: transparent;
+        border: var(--pixel-size) solid var(--pixel-color);
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        pointer-events: none;
+    }
+
+    .nav-corners {
+        --pixel-size: 7px;
+        --pixel-color: #3a3834;
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        position: relative;
+    }
+
+    .nav-corners::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: transparent;
+        border: var(--pixel-size) solid var(--pixel-color);
+        clip-path: polygon(
+            0 var(--pixel-size),
+            var(--pixel-size) var(--pixel-size),
+            var(--pixel-size) 0,
+            calc(100% - var(--pixel-size)) 0,
+            calc(100% - var(--pixel-size)) var(--pixel-size),
+            100% var(--pixel-size),
+            100% calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+            calc(100% - var(--pixel-size)) 100%,
+            var(--pixel-size) 100%,
+            var(--pixel-size) calc(100% - var(--pixel-size)),
+            0 calc(100% - var(--pixel-size))
+        );
+        pointer-events: none;
+    }
+
+    .pixel-box {
+        --b: 2px; /* border thickness */
+        --c: #ffc700; /* border color */
+        --w: 2px; /* width of the border's step */
+
+        padding: var(--b);
+        position: relative;
+        border: 1px solid var(--c);
+        background-clip: padding-box;
+    }
+
+    .pixel-box::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--c);
+        padding: var(--b);
+        mask: conic-gradient(at var(--w) var(--w), #0000 75%, #000 0) 0 0 /
+            calc(100% - var(--w)) calc(100% - var(--w));
+        mask-composite: subtract;
+        pointer-events: none;
+    }
+
+    /* Animation for glowing pixel effect */
+    .pixel-glow {
+        animation: pixel-pulse 2s infinite alternate;
+    }
+
+    @keyframes pixel-pulse {
+        0% {
+            filter: drop-shadow(0 0 2px rgba(255, 199, 0, 0.3));
+        }
+        100% {
+            filter: drop-shadow(0 0 8px rgba(255, 199, 0, 0.7));
+        }
+    }
+
+    /* Scanline effect for retro CRT look */
+    .scanlines {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .scanlines::before {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        background: repeating-linear-gradient(
+            to bottom,
+            transparent 0%,
+            rgba(0, 0, 0, 0.05) 0.5%,
+            transparent 1%
+        );
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* Testimony card style */
+    .testimony-card {
+        @apply bg-dhani-darkgray p-4;
+        position: relative;
+        border: 0;
+        --pixel-card-size: 2px;
+        --pixel-card-color: #ffc700;
+        height: 100%;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .testimony-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: var(--pixel-card-size) solid var(--pixel-card-color);
+        pointer-events: none;
+        clip-path: polygon(
+            0 var(--pixel-card-size),
+            var(--pixel-card-size) var(--pixel-card-size),
+            var(--pixel-card-size) 0,
+            calc(100% - var(--pixel-card-size)) 0,
+            calc(100% - var(--pixel-card-size)) var(--pixel-card-size),
+            100% var(--pixel-card-size),
+            100% calc(100% - var(--pixel-card-size)),
+            calc(100% - var(--pixel-card-size))
+                calc(100% - var(--pixel-card-size)),
+            calc(100% - var(--pixel-card-size)) 100%,
+            var(--pixel-card-size) 100%,
+            var(--pixel-card-size) calc(100% - var(--pixel-card-size)),
+            0 calc(100% - var(--pixel-card-size))
+        );
+    }
+
+    /* Game building card style */
+    .game-building-card {
+        @apply overflow-hidden pixel-corners border-2 border-dhani-gold;
+    }
+
+    /* Override rounded corners for pixel-corners */
+    .pixel-corners,
+    .nav-corners,
+    button.pixel-corners {
+        border-radius: 0 !important;
+    }
+    /* Decorative blurred blobs */
+    .blob {
+        position: fixed;
+        border-radius: 9999px;
+        filter: blur(180px);
+        opacity: 0.25;
+        pointer-events: none;
+        z-index: -1;
+    }
+    .blob-1 {
+        width: 400px;
+        height: 400px;
+        background: rgba(255, 199, 0, 0.5);
+        top: 5%;
+        left: 15%;
+    }
+    .blob-2 {
+        width: 500px;
+        height: 500px;
+        background: rgba(0, 191, 255, 0.3);
+        bottom: 15%;
+        right: 20%;
+    }
+    .blob-3 {
+        width: 350px;
+        height: 350px;
+        background: rgba(255, 120, 0, 0.3);
+        top: 45%;
+        right: 10%;
+    }
+    /* Uncomment and style gradient overlay to stay fixed */
+    .gradient-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
+        background-image: linear-gradient(
+                to bottom,
+                transparent 50%,
+                rgba(0, 0, 0, 0.8) 100%
+            ),
+            repeating-linear-gradient(
+                90deg,
+                rgba(255, 199, 0, 0.03) 0px,
+                rgba(255, 199, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 60px
+            ),
+            repeating-linear-gradient(
+                0deg,
+                rgba(255, 199, 0, 0.03) 0px,
+                rgba(255, 199, 0, 0.03) 1px,
+                transparent 1px,
+                transparent 60px
+            );
+    }
+
+    /* Enforce pixelated corners for all pixel-cornered elements */
+    .pixel-corners,
+    .pixel-corners::after,
+    .nav-corners,
+    .nav-corners::after,
+    button.pixel-corners {
+        border-radius: 0 !important;
+    }
+
+    /* Make play button more pixel-perfect */
+    button.pixel-corners.bg-dhani-gold {
+        position: relative;
+        --pixel-btn-size: 4px;
+        background-clip: padding-box;
+        border: 0;
+    }
+
+    button.pixel-corners.bg-dhani-gold::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: #ffc700;
+        clip-path: polygon(
+            0 var(--pixel-btn-size),
+            var(--pixel-btn-size) var(--pixel-btn-size),
+            var(--pixel-btn-size) 0,
+            calc(100% - var(--pixel-btn-size)) 0,
+            calc(100% - var(--pixel-btn-size)) var(--pixel-btn-size),
+            100% var(--pixel-btn-size),
+            100% calc(100% - var(--pixel-btn-size)),
+            calc(100% - var(--pixel-btn-size))
+                calc(100% - var(--pixel-btn-size)),
+            calc(100% - var(--pixel-btn-size)) 100%,
+            var(--pixel-btn-size) 100%,
+            var(--pixel-btn-size) calc(100% - var(--pixel-btn-size)),
+            0 calc(100% - var(--pixel-btn-size))
+        );
+        z-index: -1;
+    }
+
+    /* behind video player blur */
+    .video-blob-green {
+        position: absolute;
+        width: 980px;
+        height: 700px;
+        background: #8fcb8f70;
+        filter: blur(150px);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        animation: blobPulse 5s ease-in-out infinite;
+    }
+
+    /* Smooth shimmer effect animation for highlighted buttons */
+    .shimmer-effect {
+        position: relative;
+        background: var(--shimmer-base-color, #fff8df);
+        color: var(--shimmer-text-color, #000);
+        border-color: transparent;
+        overflow: hidden;
+    }
+
+    .shimmer-effect::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        width: 120px;
+        height: 100%;
+        background: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 248, 197, 0.4) 25%,
+            rgba(255, 248, 199, 0.8) 100%,
+            rgba(255, 248, 197, 0.4) 75%,
+            rgba(255, 255, 255, 0) 100%
+        );
+        animation: shimmer-wave 2.2s infinite ease-in-out;
+        transform: skewX(-15deg);
+    }
+
+    @keyframes shimmer-wave {
+        0% {
+            left: -180px;
+        }
+        100% {
+            left: 100%;
+        }
+    }
+
+    /* Fade-in animation for player connections */
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* Custom scrollbar styles for chat and player list */
+    .scrollbar-thin {
+        scrollbar-width: thin;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+    }
+
+    .scrollbar-thumb-white\/20::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+    }
+
+    .scrollbar-track-transparent::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    @keyframes blobPulse {
+        0%,
+        100% {
+            transform: translate(-50%, -50%) scale(1);
+            background: #8fcb8f70;
+            filter: blur(150px);
+        }
+        50% {
+            transform: translate(-50%, -50%) scale(1);
+            background: #d1fbc770;
+            filter: blur(150px);
+        }
+    }
+
+    /* Advanced Banking UI Animations */
+    @keyframes scanlines {
+        0% {
+            transform: translateY(-100%);
+        }
+        100% {
+            transform: translateY(100vh);
+        }
+    }
+
+    @keyframes pixelGlow {
+        0%,
+        100% {
+            filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3)) brightness(1);
+        }
+        50% {
+            filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6)) brightness(1.1);
+        }
+    }
+
+    @keyframes pixelShake {
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+        10%,
+        30%,
+        50%,
+        70%,
+        90% {
+            transform: translateX(-2px);
+        }
+        20%,
+        40%,
+        60%,
+        80% {
+            transform: translateX(2px);
+        }
+    }
+
+    @keyframes slideInUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideInDown {
+        from {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideInLeft {
+        from {
+            transform: translateX(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideInRight {
+        from {
+            transform: translateX(20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes scaleIn {
+        from {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes bounceIn {
+        0% {
+            transform: scale(0.3);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.05);
+        }
+        70% {
+            transform: scale(0.9);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            transform: translateY(30px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes numberCount {
+        from {
+            transform: scale(1.2);
+            color: #f1cd36;
+        }
+        to {
+            transform: scale(1);
+            color: inherit;
+        }
+    }
+
+    /* Utility animation classes */
+    .animate-pixel-glow {
+        animation: pixelGlow 2s ease-in-out infinite;
+    }
+
+    .animate-pixel-shake {
+        animation: pixelShake 0.5s ease-in-out;
+    }
+
+    .animate-slide-in-up {
+        animation: slideInUp 0.3s ease-out;
+    }
+
+    .animate-slide-in-down {
+        animation: slideInDown 0.3s ease-out;
+    }
+
+    .animate-slide-in-left {
+        animation: slideInLeft 0.3s ease-out;
+    }
+
+    .animate-slide-in-right {
+        animation: slideInRight 0.3s ease-out;
+    }
+
+    .animate-scale-in {
+        animation: scaleIn 0.3s ease-out;
+    }
+
+    .animate-bounce-in {
+        animation: bounceIn 0.6s ease-out;
+    }
+
+    .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    .animate-number-count {
+        animation: numberCount 0.3s ease-out;
+    }
+
+    /* Final Polish Animations */
+    @keyframes shimmer {
+        0% {
+            transform: translateX(-100%);
+        }
+        100% {
+            transform: translateX(100%);
+        }
+    }
+
+    @keyframes glow {
+        0%,
+        100% {
+            box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
+        }
+        50% {
+            box-shadow: 0 0 20px rgba(241, 205, 54, 0.6),
+                0 0 30px rgba(241, 205, 54, 0.4);
+        }
+    }
+
+    @keyframes float {
+        0%,
+        100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    .animate-shimmer {
+        animation: shimmer 2s infinite;
+    }
+
+    .animate-glow {
+        animation: glow 2s ease-in-out infinite;
+    }
+
+    .animate-float {
+        animation: float 3s ease-in-out infinite;
+    }
+
+    /* Hardware acceleration utilities */
+    .transform-gpu {
+        transform: translateZ(0);
+        will-change: transform;
+    }
+
+    .will-change-transform {
+        will-change: transform;
+    }
+
+    .will-change-opacity {
+        will-change: opacity;
+    }
+
+    /* Performance optimized transitions */
+    .transition-transform-gpu {
+        transition: transform 0.3s ease-out;
+        transform: translateZ(0);
+    }
+
+    .transition-opacity-gpu {
+        transition: opacity 0.3s ease-out;
+        will-change: opacity;
+    }
+
+    /* Final polish utilities */
+    .pixelated-shadow {
+        filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.5));
+    }
+
+    .pixelated-glow {
+        filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+    }
+
+    .pixelated-border-glow {
+        box-shadow: 0 0 0 1px #f1cd36, 0 0 0 2px rgba(241, 205, 54, 0.5),
+            0 0 20px rgba(241, 205, 54, 0.3);
+    }
+
+    /* Pixelated Animation Keyframes */
+    @keyframes pixelatedFadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes pixelatedSlideUp {
+        0% {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes pixelatedSlideIn {
+        0% {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        100% {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes pixelatedPulse {
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.7;
+            transform: scale(1.05);
+        }
+    }
+
+    @keyframes pixelatedSpin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes pixelatedGlow {
+        0%,
+        100% {
+            box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
+        }
+        50% {
+            box-shadow: 0 0 20px rgba(241, 205, 54, 0.6);
+        }
+    }
+}
+/* En
+hanced Banking UI Animations */
+@keyframes animate-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes animate-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes animate-slide-in-left {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes animate-slide-in-right {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes animate-slide-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes animate-bounce-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
     }
     50% {
-      opacity: 0.7;
-      filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+        opacity: 1;
+        transform: scale(1.05);
     }
-  }
-
-  .pixelated-banking-glow {
-    filter: drop-shadow(0 0 4px rgba(241, 205, 54, 0.4));
-    transition: filter 0.3s ease;
-  }
-
-  .pixelated-banking-glow:hover {
-    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
-  }
-
-  .pixelated-banking-slide-in {
-    animation: pixelated-banking-slide-in 0.3s ease-out;
-  }
-
-  @keyframes pixelated-banking-slide-in {
-    from {
-      transform: translateX(-20px);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-
-  .pixelated-banking-fade-in {
-    animation: pixelated-banking-fade-in 0.5s ease-out;
-  }
-
-  @keyframes pixelated-banking-fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .pixelated-banking-number-transition {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .pixelated-banking-icon {
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-  }
-
-  .pixelated-card {
-    @apply pixelated-container pixelated-border-thin bg-black;
-    position: relative;
-    background-clip: padding-box;
-  }
-
-  .pixelated-input {
-    @apply pixelated-container pixelated-border-thin bg-gray-800 text-white px-3 py-2 font-vcr;
-    outline: none;
-    transition: border-color 0.3s ease;
-  }
-
-  .pixelated-input:focus {
-    @apply border-dhani-gold;
-    box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
-  }
-
-  .pixelated-text-primary {
-    @apply text-white font-vcr;
-  }
-
-  .pixelated-text-accent {
-    @apply text-dhani-gold font-vcr font-bold tracking-wider;
-  }
-
-  .pixelated-text-muted {
-    @apply text-gray-400 font-vcr;
-  }
-
-  /* Enhanced Pixelated Animations */
-  .pixelated-fade-in {
-    animation: pixelatedFadeIn 0.5s ease-out;
-  }
-
-  .pixelated-slide-up {
-    animation: pixelatedSlideUp 0.4s ease-out;
-  }
-
-  .pixelated-pulse {
-    animation: pixelatedPulse 2s infinite;
-  }
-
-  .pixelated-glow {
-    position: relative;
-  }
-
-  .pixelated-glow::after {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    background: linear-gradient(45deg, #F1CD36, #FFF8DF, #F1CD36);
-    border-radius: 0;
-    z-index: -1;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-
-  .pixelated-glow:hover::after {
-    opacity: 0.3;
-  }
-
-  /* Pixelated Loading Spinner */
-  .pixelated-spinner {
-    @apply inline-block;
-    width: 24px;
-    height: 24px;
-    background: linear-gradient(45deg, #F1CD36 25%, transparent 25%, transparent 75%, #F1CD36 75%);
-    background-size: 8px 8px;
-    animation: pixelatedSpin 1s linear infinite;
-  }
-
-  /* Pixelated Progress Bar */
-  .pixelated-progress {
-    @apply pixelated-border-thin bg-gray-800 overflow-hidden;
-    height: 8px;
-  }
-
-  .pixelated-progress-fill {
-    @apply bg-dhani-gold h-full transition-all duration-500 ease-out;
-    background-image: repeating-linear-gradient(
-      90deg,
-      #F1CD36 0px,
-      #F1CD36 4px,
-      #FFF8DF 4px,
-      #FFF8DF 8px
-    );
-  }
-
-  /* Pixelated Status Indicators */
-  .pixelated-status-dot {
-    @apply inline-block;
-    width: 8px;
-    height: 8px;
-    background: currentColor;
-    image-rendering: pixelated;
-  }
-
-  .pixelated-status-success {
-    @apply text-dhani-green;
-  }
-
-  .pixelated-status-error {
-    @apply text-red-500;
-  }
-
-  .pixelated-status-warning {
-    @apply text-yellow-500;
-  }
-
-  .pixelated-status-info {
-    @apply text-blue-500;
-  }
-
-  /* Pixelated Notification */
-  .pixelated-notification {
-    @apply pixelated-card pixelated-border-medium p-4 font-vcr;
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 1000;
-    max-width: 400px;
-    animation: pixelatedSlideIn 0.3s ease-out;
-  }
-
-  .pixelated-notification-success {
-    @apply border-dhani-green bg-green-900/20;
-  }
-
-  .pixelated-notification-error {
-    @apply border-red-500 bg-red-900/20;
-  }
-
-  /* Pixelated Scrollbar */
-  .pixelated-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: #F1CD36 transparent;
-  }
-
-  .pixelated-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .pixelated-scrollbar::-webkit-scrollbar-track {
-    background: #1A1A1A;
-  }
-
-  .pixelated-scrollbar::-webkit-scrollbar-thumb {
-    background: #F1CD36;
-    border-radius: 0;
-  }
-
-  .pixelated-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #FFF8DF;
-  }
-
-  /* Gradient eclipse background styling */
-  .gradient-eclipse {
-    @apply fixed inset-0 z-[-2] overflow-hidden;
-    background: radial-gradient(circle at 50% 15%, rgba(180, 138, 0, 0.5) 0%, rgba(82, 63, 0, 0.4) 20%, rgba(28, 24, 10, 0.3) 40%, rgba(0, 0, 0, 1) 90%);
-  }
-  
-  .gradient-overlay {
-    @apply fixed inset-0 z-[-1] bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none;
-    background-image: 
-      linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.8) 100%), 
-      repeating-linear-gradient(90deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px),
-      repeating-linear-gradient(0deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px);
-  }
-
-  /* Pixel corners styling for card elements */
-  .pixel-corners {
-    --pixel-size: 6px;
-    --pixel-color: #FFC700;
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    position: relative;
-  }
-
-  .pixel-corners::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    border: var(--pixel-size) solid var(--pixel-color);
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    pointer-events: none;
-  }
-  .pixel-corners-cta {
-    --pixel-size: 6px;
-    --pixel-color: transparent;
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    position: relative;
-  }
-
-  .pixel-corners-cta::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    border: var(--pixel-size) solid var(--pixel-color);
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    pointer-events: none;
-  }
-
-  .nav-corners {
-    --pixel-size: 7px;
-    --pixel-color: #3A3834;
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    position: relative;
-  }
-
-  .nav-corners::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: transparent;
-    border: var(--pixel-size) solid var(--pixel-color);
-    clip-path: 
-      polygon(
-        0 var(--pixel-size), 
-        var(--pixel-size) var(--pixel-size), 
-        var(--pixel-size) 0, 
-        calc(100% - var(--pixel-size)) 0, 
-        calc(100% - var(--pixel-size)) var(--pixel-size), 
-        100% var(--pixel-size), 
-        100% calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)), 
-        calc(100% - var(--pixel-size)) 100%, 
-        var(--pixel-size) 100%, 
-        var(--pixel-size) calc(100% - var(--pixel-size)), 
-        0 calc(100% - var(--pixel-size))
-      );
-    pointer-events: none;
-  }
-
-  .pixel-box {
-    --b: 2px;  /* border thickness */
-    --c: #FFC700; /* border color */
-    --w: 2px;  /* width of the border's step */
-    
-    padding: var(--b);
-    position: relative;
-    border: 1px solid var(--c);
-    background-clip: padding-box;
-  }
-
-  .pixel-box::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--c);
-    padding: var(--b);
-    mask:
-      conic-gradient(at var(--w) var(--w),#0000 75%,#000 0)
-       0 0/calc(100% - var(--w)) calc(100% - var(--w));
-    mask-composite: subtract;
-    pointer-events: none;
-  }
-  
-  /* Animation for glowing pixel effect */
-  .pixel-glow {
-    animation: pixel-pulse 2s infinite alternate;
-  }
-  
-  @keyframes pixel-pulse {
-    0% {
-      filter: drop-shadow(0 0 2px rgba(255, 199, 0, 0.3));
+    70% {
+        transform: scale(0.9);
     }
     100% {
-      filter: drop-shadow(0 0 8px rgba(255, 199, 0, 0.7));
+        opacity: 1;
+        transform: scale(1);
     }
-  }
-  
-  /* Scanline effect for retro CRT look */
-  .scanlines {
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .scanlines::before {
-    content: "";
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    background: repeating-linear-gradient(
-      to bottom,
-      transparent 0%,
-      rgba(0, 0, 0, 0.05) 0.5%,
-      transparent 1%
-    );
-    pointer-events: none;
-    z-index: 1;
-  }
-  
-  /* Testimony card style */
-  .testimony-card {
-    @apply bg-dhani-darkgray p-4;
-    position: relative;
-    border: 0;
-    --pixel-card-size: 2px;
-    --pixel-card-color: #FFC700;
-    height: 100%;
-    min-height: 150px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .testimony-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: var(--pixel-card-size) solid var(--pixel-card-color);
-    pointer-events: none;
-    clip-path: 
-      polygon(
-        0 var(--pixel-card-size), 
-        var(--pixel-card-size) var(--pixel-card-size), 
-        var(--pixel-card-size) 0, 
-        calc(100% - var(--pixel-card-size)) 0, 
-        calc(100% - var(--pixel-card-size)) var(--pixel-card-size), 
-        100% var(--pixel-card-size), 
-        100% calc(100% - var(--pixel-card-size)), 
-        calc(100% - var(--pixel-card-size)) calc(100% - var(--pixel-card-size)), 
-        calc(100% - var(--pixel-card-size)) 100%, 
-        var(--pixel-card-size) 100%, 
-        var(--pixel-card-size) calc(100% - var(--pixel-card-size)), 
-        0 calc(100% - var(--pixel-card-size))
-      );
-  }
-  
-  /* Game building card style */
-  .game-building-card {
-    @apply overflow-hidden pixel-corners border-2 border-dhani-gold;
-  }
+}
 
-  /* Override rounded corners for pixel-corners */
-  .pixel-corners, .nav-corners, button.pixel-corners {
-    border-radius: 0 !important;
-  }
-  /* Decorative blurred blobs */
-  .blob {
-    position: fixed;
-    border-radius: 9999px;
-    filter: blur(180px);
-    opacity: 0.25;
-    pointer-events: none;
-    z-index: -1;
-  }
-  .blob-1 {
-    width: 400px;
-    height: 400px;
-    background: rgba(255, 199, 0, 0.5);
-    top: 5%;
-    left: 15%;
-  }
-  .blob-2 {
-    width: 500px;
-    height: 500px;
-    background: rgba(0, 191, 255, 0.3);
-    bottom: 15%;
-    right: 20%;
-  }
-  .blob-3 {
-    width: 350px;
-    height: 350px;
-    background: rgba(255, 120, 0, 0.3);
-    top: 45%;
-    right: 10%;
-  }
-  /* Uncomment and style gradient overlay to stay fixed */
-  .gradient-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
-    background-image: 
-      linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.8) 100%),
-      repeating-linear-gradient(90deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px),
-      repeating-linear-gradient(0deg, rgba(255, 199, 0, 0.03) 0px, rgba(255, 199, 0, 0.03) 1px, transparent 1px, transparent 60px);
-  }
-
-  /* Enforce pixelated corners for all pixel-cornered elements */
-  .pixel-corners, 
-  .pixel-corners::after,
-  .nav-corners,
-  .nav-corners::after,
-  button.pixel-corners {
-    border-radius: 0 !important;
-  }
-  
-  /* Make play button more pixel-perfect */
-  button.pixel-corners.bg-dhani-gold {
-    position: relative;
-    --pixel-btn-size: 4px;
-    background-clip: padding-box;
-    border: 0;
-  }
-  
-  button.pixel-corners.bg-dhani-gold::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: #FFC700;
-    clip-path: 
-      polygon(
-        0 var(--pixel-btn-size), 
-        var(--pixel-btn-size) var(--pixel-btn-size), 
-        var(--pixel-btn-size) 0, 
-        calc(100% - var(--pixel-btn-size)) 0, 
-        calc(100% - var(--pixel-btn-size)) var(--pixel-btn-size), 
-        100% var(--pixel-btn-size), 
-        100% calc(100% - var(--pixel-btn-size)), 
-        calc(100% - var(--pixel-btn-size)) calc(100% - var(--pixel-btn-size)), 
-        calc(100% - var(--pixel-btn-size)) 100%, 
-        var(--pixel-btn-size) 100%, 
-        var(--pixel-btn-size) calc(100% - var(--pixel-btn-size)), 
-        0 calc(100% - var(--pixel-btn-size))
-      );
-    z-index: -1;
-  }
-
-  /* behind video player blur */
-  .video-blob-green {
-    position: absolute;
-    width: 980px;
-    height: 700px;
-    background: #8fcb8f70;
-    filter: blur(150px);
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-    animation: blobPulse 5s ease-in-out infinite;
-  }
-
-  /* Smooth shimmer effect animation for highlighted buttons */
-  .shimmer-effect {
-    position: relative;
-    background: var(--shimmer-base-color, #fff8df);
-    color: var(--shimmer-text-color, #000);
-    border-color: transparent;
-    overflow: hidden;
-  }
-
-  .shimmer-effect::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    width: 120px;
-    height: 100%;
-    background: linear-gradient(
-      to right, 
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 248, 197, 0.4) 25%, 
-      rgba(255, 248, 199, 0.8) 100%,
-      rgba(255, 248, 197, 0.4) 75%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    animation: shimmer-wave 2.2s infinite ease-in-out;
-    transform: skewX(-15deg);
-  }
-
-  @keyframes shimmer-wave {
-    0% {
-      left: -180px;
-    }
+@keyframes animate-pixel-glow {
+    0%,
     100% {
-      left: 100%;
+        filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
+        box-shadow: 0 0 4px rgba(241, 205, 54, 0.2);
     }
-  }
-
-  /* Fade-in animation for player connections */
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-in-out;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateX(-10px);
+    50% {
+        filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+        box-shadow: 0 0 12px rgba(241, 205, 54, 0.4);
     }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  /* Custom scrollbar styles for chat and player list */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .scrollbar-thumb-white\/10::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 2px;
-  }
-
-  .scrollbar-thumb-white\/20::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-  }
-
-  .scrollbar-track-transparent::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-  }
-
-
-@keyframes blobPulse {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    background: #8fcb8f70;
-    filter: blur(150px);
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1);
-    background: #d1fbc770;
-    filter: blur(150px);
-  }
 }
 
-/* Advanced Banking UI Animations */
-@keyframes scanlines {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
-}
-
-@keyframes pixelGlow {
-  0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3)) brightness(1);
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6)) brightness(1.1);
-  }
-}
-
-@keyframes pixelShake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-  20%, 40%, 60%, 80% { transform: translateX(2px); }
-}
-
-@keyframes slideInUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInDown {
-  from {
-    transform: translateY(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes bounceIn {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  70% {
-    transform: scale(0.9);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes numberCount {
-  from {
-    transform: scale(1.2);
-    color: #F1CD36;
-  }
-  to {
-    transform: scale(1);
-    color: inherit;
-  }
-}
-
-/* Utility animation classes */
-.animate-pixel-glow {
-  animation: pixelGlow 2s ease-in-out infinite;
-}
-
-.animate-pixel-shake {
-  animation: pixelShake 0.5s ease-in-out;
-}
-
-.animate-slide-in-up {
-  animation: slideInUp 0.3s ease-out;
-}
-
-.animate-slide-in-down {
-  animation: slideInDown 0.3s ease-out;
-}
-
-.animate-slide-in-left {
-  animation: slideInLeft 0.3s ease-out;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.3s ease-out;
+/* Apply animations as utility classes */
+.animate-fade-in {
+    animation: animate-fade-in 0.5s ease-out;
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s ease-out;
+    animation: animate-scale-in 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+    animation: animate-slide-in-left 0.4s ease-out;
+}
+
+.animate-slide-in-right {
+    animation: animate-slide-in-right 0.4s ease-out;
+}
+
+.animate-slide-in-up {
+    animation: animate-slide-in-up 0.4s ease-out;
 }
 
 .animate-bounce-in {
-  animation: bounceIn 0.6s ease-out;
+    animation: animate-bounce-in 0.6s ease-out;
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.5s ease-out;
+.animate-pixel-glow {
+    animation: animate-pixel-glow 2s ease-in-out infinite;
 }
 
-.animate-number-count {
-  animation: numberCount 0.3s ease-out;
+/* Enhanced Banking UI Container */
+.banking-ui-container {
+    pointer-events: none;
+    transition: all 0.3s ease;
 }
 
-/* Final Polish Animations */
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+.banking-ui-container.active {
+    pointer-events: all;
 }
 
-@keyframes glow {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(241, 205, 54, 0.6), 0 0 30px rgba(241, 205, 54, 0.4);
-  }
+/* Banking UI specific enhancements */
+.banking-status-overlay {
+    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.8);
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+.banking-message-notification {
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.animate-shimmer {
-  animation: shimmer 2s infinite;
+.banking-balance-indicator {
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(241, 205, 54, 0.2);
 }
 
-.animate-glow {
-  animation: glow 2s ease-in-out infinite;
+/* Pixelated loading state */
+.banking-loading-dots {
+    display: inline-flex;
+    gap: 4px;
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+.banking-loading-dots::after {
+    content: "";
+    width: 4px;
+    height: 4px;
+    background: currentColor;
+    animation: banking-loading-pulse 1.4s ease-in-out infinite both;
 }
 
-/* Hardware acceleration utilities */
-.transform-gpu {
-  transform: translateZ(0);
-  will-change: transform;
+.banking-loading-dots::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    background: currentColor;
+    animation: banking-loading-pulse 1.4s ease-in-out -0.16s infinite both;
 }
 
-.will-change-transform {
-  will-change: transform;
+@keyframes banking-loading-pulse {
+    0%,
+    80%,
+    100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+    40% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
-.will-change-opacity {
-  will-change: opacity;
+/* Enhanced gradient backgrounds for banking UI */
+.banking-gradient-bg {
+    background: linear-gradient(
+        135deg,
+        rgba(0, 0, 0, 0.95) 0%,
+        rgba(20, 20, 20, 0.9) 25%,
+        rgba(40, 40, 40, 0.85) 50%,
+        rgba(20, 20, 20, 0.9) 75%,
+        rgba(0, 0, 0, 0.95) 100%
+    );
 }
 
-/* Performance optimized transitions */
-.transition-transform-gpu {
-  transition: transform 0.3s ease-out;
-  transform: translateZ(0);
+.banking-card-glow {
+    position: relative;
 }
 
-.transition-opacity-gpu {
-  transition: opacity 0.3s ease-out;
-  will-change: opacity;
-}
-
-/* Final polish utilities */
-.pixelated-shadow {
-  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.5));
-}
-
-.pixelated-glow {
-  filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
-}
-
-.pixelated-border-glow {
-  box-shadow: 
-    0 0 0 1px #F1CD36,
-    0 0 0 2px rgba(241, 205, 54, 0.5),
-    0 0 20px rgba(241, 205, 54, 0.3);
-}
-
-/* Pixelated Animation Keyframes */
-@keyframes pixelatedFadeIn {
-  0% {
+.banking-card-glow::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(
+        45deg,
+        rgba(241, 205, 54, 0.1),
+        rgba(241, 205, 54, 0.3),
+        rgba(241, 205, 54, 0.1)
+    );
+    border-radius: inherit;
+    z-index: -1;
     opacity: 0;
-    transform: translateY(10px);
-  }
-  100% {
+    transition: opacity 0.3s ease;
+}
+
+.banking-card-glow:hover::before {
     opacity: 1;
-    transform: translateY(0);
-  }
+} /* En
+hanced scrollbar for banking dashboard tabs */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(241, 205, 54, 0.3) transparent;
 }
 
-@keyframes pixelatedSlideUp {
-  0% {
+.scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(241, 205, 54, 0.3);
+    border-radius: 2px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(241, 205, 54, 0.5);
+}
+
+.scrollbar-thumb-dhani-gold\/30::-webkit-scrollbar-thumb {
+    background-color: rgba(241, 205, 54, 0.3);
+}
+/* Modern Banking Dashboard Animations */
+@keyframes modern-fade-in {
+  from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(20px) scale(0.95);
   }
-  100% {
+  to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes pixelatedSlideIn {
-  0% {
+@keyframes modern-slide-in {
+  from {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translateX(-20px);
   }
-  100% {
+  to {
     opacity: 1;
     transform: translateX(0);
   }
 }
 
-@keyframes pixelatedPulse {
-  0%, 100% {
+@keyframes modern-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
     opacity: 1;
     transform: scale(1);
   }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
 }
 
-@keyframes pixelatedSpin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pixelatedGlow {
+@keyframes pulse-glow {
   0%, 100% {
     box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
   }
@@ -1428,211 +1768,115 @@ button:focus-visible {
     box-shadow: 0 0 20px rgba(241, 205, 54, 0.6);
   }
 }
-}
-/* En
-hanced Banking UI Animations */
-@keyframes animate-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
+/* Modern Banking UI Classes */
+.modern-fade-in {
+  animation: modern-fade-in 0.6s ease-out;
 }
 
-@keyframes animate-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.modern-slide-in {
+  animation: modern-slide-in 0.4s ease-out;
 }
 
-@keyframes animate-slide-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.modern-scale-in {
+  animation: modern-scale-in 0.3s ease-out;
 }
 
-@keyframes animate-slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
-@keyframes animate-slide-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Enhanced backdrop blur */
+.backdrop-blur-modern {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-@keyframes animate-bounce-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-  70% {
-    transform: scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* Smooth transitions for all interactive elements */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes animate-pixel-glow {
-  0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
-    box-shadow: 0 0 4px rgba(241, 205, 54, 0.2);
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
-    box-shadow: 0 0 12px rgba(241, 205, 54, 0.4);
-  }
+/* Modern glass effect */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Apply animations as utility classes */
-.animate-fade-in {
-  animation: animate-fade-in 0.5s ease-out;
+/* Improved scrollbar for modern design */
+.modern-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(241, 205, 54, 0.3) transparent;
 }
 
-.animate-scale-in {
-  animation: animate-scale-in 0.3s ease-out;
+.modern-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.animate-slide-in-left {
-  animation: animate-slide-in-left 0.4s ease-out;
+.modern-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.animate-slide-in-right {
-  animation: animate-slide-in-right 0.4s ease-out;
+.modern-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(241, 205, 54, 0.3);
+  border-radius: 3px;
 }
 
-.animate-slide-in-up {
-  animation: animate-slide-in-up 0.4s ease-out;
+.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(241, 205, 54, 0.5);
 }
 
-.animate-bounce-in {
-  animation: animate-bounce-in 0.6s ease-out;
+/* Loading spinner improvements */
+.modern-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(241, 205, 54, 0.2);
+  border-top: 3px solid #F1CD36;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-.animate-pixel-glow {
-  animation: animate-pixel-glow 2s ease-in-out infinite;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* Enhanced Banking UI Container */
-.banking-ui-container {
-  pointer-events: none;
+/* Enhanced button hover effects */
+.modern-button {
+  position: relative;
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
-.banking-ui-container.active {
-  pointer-events: all;
-}
-
-/* Banking UI specific enhancements */
-.banking-status-overlay {
-  backdrop-filter: blur(4px);
-  background: rgba(0, 0, 0, 0.8);
-}
-
-.banking-message-notification {
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.banking-balance-indicator {
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(241, 205, 54, 0.2);
-}
-
-/* Pixelated loading state */
-.banking-loading-dots {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.banking-loading-dots::after {
-  content: '';
-  width: 4px;
-  height: 4px;
-  background: currentColor;
-  animation: banking-loading-pulse 1.4s ease-in-out infinite both;
-}
-
-.banking-loading-dots::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  background: currentColor;
-  animation: banking-loading-pulse 1.4s ease-in-out -0.16s infinite both;
-}
-
-@keyframes banking-loading-pulse {
-  0%, 80%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Enhanced gradient backgrounds for banking UI */
-.banking-gradient-bg {
-  background: linear-gradient(135deg, 
-    rgba(0, 0, 0, 0.95) 0%, 
-    rgba(20, 20, 20, 0.9) 25%, 
-    rgba(40, 40, 40, 0.85) 50%, 
-    rgba(20, 20, 20, 0.9) 75%, 
-    rgba(0, 0, 0, 0.95) 100%
-  );
-}
-
-.banking-card-glow {
-  position: relative;
-}
-
-.banking-card-glow::before {
+.modern-button::before {
   content: '';
   position: absolute;
-  inset: -2px;
-  background: linear-gradient(45deg, 
-    rgba(241, 205, 54, 0.1), 
-    rgba(241, 205, 54, 0.3), 
-    rgba(241, 205, 54, 0.1)
-  );
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
 }
 
-.banking-card-glow:hover::before {
-  opacity: 1;
+.modern-button:hover::before {
+  left: 100%;
+}
+
+/* Card hover effects */
+.modern-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Notification improvements */
+.modern-notification {
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }

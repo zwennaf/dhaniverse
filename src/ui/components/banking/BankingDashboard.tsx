@@ -12,8 +12,9 @@ import { WalletType } from "../../../services/Web3WalletService";
 import { ICPActorService } from "../../../services/ICPActorService";
 import {
     DualStorageManager,
-    StorageMode,
 } from "../../../services/DualStorageManager";
+import { BankingPolish, PolishedButton, PolishedCard } from "../polish/FinalPolish";
+import { StatusIndicator, LoadingState } from "../feedback/StatusIndicators";
 
 interface FixedDeposit {
     _id?: string;
@@ -30,7 +31,6 @@ interface FixedDeposit {
 interface BankingDashboardProps {
     onClose: () => void;
     playerRupees: number;
-    initialRupees?: number; // Made optional since it's not used
 }
 
 const BankingDashboard: React.FC<BankingDashboardProps> = ({
@@ -199,36 +199,43 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
     const showSuccessNotification = (title: string, message: string) => {
         try {
+            // Create modern notification
             const notification = document.createElement("div");
             notification.className =
-                "fixed top-4 right-4 bg-dhani-gold text-black p-4 font-vcr text-sm border-2 border-white z-50 max-w-sm";
-            notification.style.imageRendering = "pixelated";
+                "fixed top-4 right-4 bg-gradient-to-r from-dhani-gold to-dhani-gold/90 text-black p-4 rounded-xl shadow-lg z-[60] max-w-sm transform translate-x-full transition-transform duration-300";
 
-            // Create title element
-            const titleDiv = document.createElement("div");
-            titleDiv.className = "font-bold mb-1";
-            titleDiv.textContent = title;
+            notification.innerHTML = `
+                <div class="flex items-start space-x-3">
+                    <div class="w-6 h-6 bg-black/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-sm">${title}</div>
+                        <div class="text-xs opacity-80 mt-1">${message}</div>
+                    </div>
+                </div>
+            `;
 
-            // Create message element
-            const messageDiv = document.createElement("div");
-            messageDiv.className = "opacity-80";
-            messageDiv.textContent = message;
-
-            // Append elements safely
-            notification.appendChild(titleDiv);
-            notification.appendChild(messageDiv);
             document.body.appendChild(notification);
 
+            // Animate in
+            requestAnimationFrame(() => {
+                notification.style.transform = 'translateX(0)';
+            });
+
+            // Animate out and remove
             setTimeout(() => {
-                if (document.body.contains(notification)) {
-                    document.body.removeChild(notification);
-                }
-            }, 4000);
+                notification.style.transform = 'translateX(full)';
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3500);
         } catch (error) {
-            // Fallback to console log if DOM manipulation fails
             console.log(`${title}: ${message}`);
-            // Also try simple alert as fallback
-            alert(`${title}\n${message}`);
         }
     };
 
@@ -423,402 +430,294 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-vcr">
-            <div
-                className="bg-black border-4 border-white w-full max-w-6xl max-h-[95vh]"
-                style={{
-                    imageRendering: "pixelated",
-                    backgroundImage: `url("data:image/svg+xml;base64,${btoa(`<svg width="100%" height="100%" viewBox="0 0 1201 602" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M1187 15L1170 15V0H35V15L18 15L18 45L0 45V553H18V583H35V602H1170V583H1187V553H1201V45H1187V15Z" fill="white" fill-opacity="0.1"/>
-            <path d="M1170 15H1169V16H1170V15ZM1187 15H1188V14H1187V15ZM1170 0H1171V-1H1170V0ZM35 0V-1H34V0H35ZM35 15V16H36V15H35ZM18 15V14H17V15H18ZM18 45V46H19V45H18ZM0 45L-2.11928e-07 44H-1V45H0ZM0 553H-1V554H0V553ZM18 553H19V552H18V553ZM18 583H17V584H18V583ZM35 583H36V582H35V583ZM35 602H34V603H35V602ZM1170 602V603H1171V602H1170ZM1170 583V582H1169V583H1170ZM1187 583V584H1188V583H1187ZM1187 553V552H1186V553H1187ZM1201 553V554H1202V553H1201ZM1201 45H1202V44H1201V45ZM1187 45H1186V46H1187V45Z" fill="white" fill-opacity="0.2"/>
-          </svg>`)}")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                    backgroundSize: "100% 100%",
-                }}
-            >
-                {/* Header */}
-                <div className="bg-dhani-gold text-black p-6 border-b-4 border-white">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                            {/* Pixelated Bank Icon */}
-                            <div className="w-12 h-12 bg-black flex items-center justify-center border-2 border-black">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
-                                    <rect x="2" y="10" width="20" height="2" fill="#F1CD36" />
-                                    <rect x="4" y="12" width="2" height="8" fill="#F1CD36" />
-                                    <rect x="8" y="12" width="2" height="8" fill="#F1CD36" />
-                                    <rect x="12" y="12" width="2" height="8" fill="#F1CD36" />
-                                    <rect x="16" y="12" width="2" height="8" fill="#F1CD36" />
-                                    <rect x="2" y="20" width="20" height="2" fill="#F1CD36" />
-                                    <rect x="10" y="6" width="4" height="4" fill="#F1CD36" />
-                                    <rect x="8" y="8" width="2" height="2" fill="#F1CD36" />
-                                    <rect x="14" y="8" width="2" height="2" fill="#F1CD36" />
-                                    <rect x="6" y="4" width="12" height="2" fill="#F1CD36" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-wider font-vcr">
-                                    DHANIVERSE BANKING
-                                </h1>
-                                <p className="text-sm tracking-widest opacity-80 font-vcr">
-                                    YOUR FINANCIAL COMMAND CENTER
-                                </p>
-                            </div>
+        <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center z-50 p-4">
+            {/* Backdrop blur overlay */}
+            <div className="absolute inset-0 backdrop-blur-md bg-black/60" onClick={handleClose} />
+            
+            {/* Main container - Modern minimal design */}
+            <BankingPolish className="relative w-full max-w-6xl h-full max-h-[95vh] bg-black/95 backdrop-blur-modern border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden modern-scale-in">
+                {/* Subtle gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-dhani-gold/5 via-transparent to-transparent pointer-events-none rounded-2xl" />
+                {/* Modern Header */}
+                <div className="relative flex items-center justify-between p-6 border-b border-dhani-gold/20 flex-shrink-0">
+                    <div className="flex items-center space-x-4">
+                        {/* Minimal Bank Icon */}
+                        <div className="w-10 h-10 bg-gradient-to-br from-dhani-gold to-dhani-gold/80 rounded-lg flex items-center justify-center">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-white tracking-tight">
+                                Dhaniverse Banking
+                            </h1>
+                            <p className="text-sm text-gray-400 hidden sm:block">
+                                Financial Command Center
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Status & Close */}
+                    <div className="flex items-center space-x-4">
+                        {/* Connection Status - Minimal */}
+                        <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
+                            <div className={`w-2 h-2 rounded-full ${walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'}`} />
+                            <span className="text-xs text-gray-300">
+                                {walletStatus.connected ? 'Web3 Connected' : 'Local Mode'}
+                            </span>
                         </div>
 
-                        {/* Enhanced Status Indicators */}
-                        <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2 bg-black text-white px-4 py-2 border-2 border-white font-vcr">
-                                <div
-                                    className={`w-3 h-3 ${
-                                        walletStatus.connected
-                                            ? "bg-dhani-green"
-                                            : "bg-red-500"
-                                    }`}
-                                ></div>
-                                <div>
-                                    <div className="text-xs font-bold tracking-wider">
-                                        {walletStatus.connected
-                                            ? `${walletStatus.walletType?.toUpperCase()} CONNECTED`
-                                            : "LOCAL MODE"}
-                                    </div>
-                                    {walletStatus.connected && walletStatus.address && (
-                                        <div className="text-xs text-dhani-gold">
-                                            {walletStatus.address.slice(0, 8)}...{walletStatus.address.slice(-6)}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleClose}
-                                className="w-12 h-12 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold text-xl font-vcr"
-                            >
-                                ×
-                            </button>
-                        </div>
+                        {/* Close Button - Minimal */}
+                        <button
+                            onClick={handleClose}
+                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
-                {/* Balance Overview */}
-                <div className="bg-black text-white p-6 border-b-2 border-white/20">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-dhani-green/20 border-2 border-dhani-green p-4">
+                {/* Modern Balance Cards */}
+                <div className="p-6 border-b border-dhani-gold/10 flex-shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Wallet Balance */}
+                        <div className="bg-gradient-to-br from-dhani-gold/10 to-dhani-gold/5 rounded-xl p-4 border border-dhani-gold/20 hover:border-dhani-gold/40 transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
-                                <span className="text-dhani-green text-sm font-bold tracking-wider font-vcr">
-                                    WALLET BALANCE
-                                </span>
-                                {/* Pixelated Wallet Icon */}
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
-                                    <rect x="2" y="6" width="20" height="12" fill="none" stroke="#4CA64C" strokeWidth="2" />
-                                    <rect x="4" y="8" width="16" height="8" fill="none" stroke="#4CA64C" strokeWidth="1" />
-                                    <rect x="16" y="10" width="4" height="4" fill="#4CA64C" />
-                                    <rect x="18" y="11" width="2" height="2" fill="none" stroke="white" strokeWidth="1" />
-                                    <rect x="4" y="4" width="14" height="2" fill="#4CA64C" />
-                                </svg>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-dhani-gold/20 rounded-lg flex items-center justify-center">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm text-gray-300">Wallet</span>
+                                </div>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
+                            <div className="text-2xl font-bold text-dhani-gold mb-1">
                                 ₹{(playerRupees + totalRupeesChange).toLocaleString()}
                             </div>
-                            <div className="text-dhani-green text-xs tracking-wider font-vcr">
-                                AVAILABLE FOR TRANSACTIONS
-                            </div>
-                            {/* Progress bar */}
-                            <div className="mt-3 w-full bg-gray-700 h-2">
-                                <div 
-                                    className="bg-dhani-green h-2 transition-all duration-500"
-                                    style={{ 
-                                        width: `${Math.min((playerRupees + totalRupeesChange) / 100000 * 100, 100)}%`,
-                                        imageRendering: 'pixelated'
-                                    }}
-                                />
-                            </div>
+                            <div className="text-xs text-gray-400">Available for transactions</div>
                         </div>
 
-                        <div className="bg-blue-500/20 border-2 border-blue-400 p-4">
+                        {/* Bank Balance */}
+                        <div className="bg-gradient-to-br from-white/5 to-white/2 rounded-xl p-4 border border-white/10 hover:border-white/20 transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
-                                <span className="text-blue-400 text-sm font-bold tracking-wider font-vcr">
-                                    BANK BALANCE
-                                </span>
-                                {/* Pixelated Bank Icon */}
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
-                                    <rect x="2" y="10" width="20" height="2" fill="#60A5FA" />
-                                    <rect x="4" y="12" width="2" height="8" fill="#60A5FA" />
-                                    <rect x="8" y="12" width="2" height="8" fill="#60A5FA" />
-                                    <rect x="12" y="12" width="2" height="8" fill="#60A5FA" />
-                                    <rect x="16" y="12" width="2" height="8" fill="#60A5FA" />
-                                    <rect x="2" y="20" width="20" height="2" fill="#60A5FA" />
-                                    <rect x="10" y="6" width="4" height="4" fill="#60A5FA" />
-                                    <rect x="8" y="8" width="2" height="2" fill="#60A5FA" />
-                                    <rect x="14" y="8" width="2" height="2" fill="#60A5FA" />
-                                    <rect x="6" y="4" width="12" height="2" fill="#60A5FA" />
-                                </svg>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                            <path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm text-gray-300">Bank</span>
+                                </div>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
+                            <div className="text-2xl font-bold text-white mb-1">
                                 ₹{bankBalance.toLocaleString()}
                             </div>
-                            <div className="text-blue-400 text-xs tracking-wider font-vcr">
-                                SECURED IN BANK
-                            </div>
-                            {/* Progress bar */}
-                            <div className="mt-3 w-full bg-gray-700 h-2">
-                                <div 
-                                    className="bg-blue-400 h-2 transition-all duration-500"
-                                    style={{ 
-                                        width: `${Math.min(bankBalance / 100000 * 100, 100)}%`,
-                                        imageRendering: 'pixelated'
-                                    }}
-                                />
-                            </div>
+                            <div className="text-xs text-gray-400">Secured deposits</div>
                         </div>
 
-                        <div className="bg-purple-500/20 border-2 border-purple-400 p-4">
+                        {/* Total Portfolio */}
+                        <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-xl p-4 border border-green-500/20 hover:border-green-500/40 transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
-                                <span className="text-purple-400 text-sm font-bold tracking-wider font-vcr">
-                                    TOTAL PORTFOLIO
-                                </span>
-                                {/* Pixelated Chart Icon */}
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
-                                    <rect x="2" y="2" width="20" height="20" fill="none" stroke="#A78BFA" strokeWidth="2" />
-                                    <rect x="6" y="16" width="2" height="4" fill="#A78BFA" />
-                                    <rect x="10" y="12" width="2" height="8" fill="#A78BFA" />
-                                    <rect x="14" y="8" width="2" height="12" fill="#A78BFA" />
-                                    <rect x="18" y="6" width="2" height="14" fill="#A78BFA" />
-                                </svg>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                            <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"/>
+                                            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"/>
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm text-gray-300">Total</span>
+                                </div>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
+                            <div className="text-2xl font-bold text-green-400 mb-1">
                                 ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
                             </div>
-                            <div className="text-purple-400 text-xs tracking-wider font-vcr">
-                                COMBINED VALUE
-                            </div>
-                            {/* Progress bar */}
-                            <div className="mt-3 w-full bg-gray-700 h-2">
-                                <div 
-                                    className="bg-purple-400 h-2 transition-all duration-500"
-                                    style={{ 
-                                        width: `${Math.min((playerRupees + totalRupeesChange + bankBalance) / 200000 * 100, 100)}%`,
-                                        imageRendering: 'pixelated'
-                                    }}
-                                />
-                            </div>
+                            <div className="text-xs text-gray-400">Combined portfolio</div>
                         </div>
                     </div>
                 </div>
 
-                {/* Web3 Connection Prompt - Retro Style */}
+                {/* Web3 Connection - Minimal */}
                 {!walletStatus.connected && (
-                    <div className="bg-dhani-gold/10 border-2 border-dhani-gold p-6 mx-6 mt-4">
-                        <div className="flex items-start space-x-4">
-                            <div className="text-4xl">🌟</div>
-                            <div className="flex-1">
-                                <h3 className="text-dhani-gold font-bold text-lg mb-2 tracking-wider">
-                                    UNLOCK WEB3 BANKING
-                                </h3>
-                                <p className="text-white text-sm mb-4 tracking-wide">
-                                    Connect your Web3 wallet to access exclusive
-                                    blockchain features including dual-currency
-                                    support, token staking, and immutable
-                                    transaction records.
-                                </p>
-
-                                <div className="grid grid-cols-2 gap-3 mb-4 text-xs text-white">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
-                                        <span>DUAL-CURRENCY PORTFOLIO</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
-                                        <span>TOKEN STAKING REWARDS</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
-                                        <span>CURRENCY EXCHANGE</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="w-1.5 h-1.5 bg-dhani-gold"></span>
-                                        <span>NFT-LIKE ACHIEVEMENTS</span>
-                                    </div>
+                    <div className="mx-6 mb-4 flex-shrink-0">
+                        <div className="bg-gradient-to-r from-dhani-gold/10 via-dhani-gold/5 to-transparent rounded-xl p-4 border border-dhani-gold/20">
+                            <div className="flex items-start space-x-4">
+                                <div className="w-10 h-10 bg-dhani-gold/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                    </svg>
                                 </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                    {walletManager
-                                        .getAvailableWallets()
-                                        .map((wallet) => (
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-semibold text-white mb-2">
+                                        Unlock Web3 Features
+                                    </h3>
+                                    <p className="text-sm text-gray-400 mb-4">
+                                        Connect your wallet for blockchain features, token staking, and dual-currency support.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {walletManager.getAvailableWallets().map((wallet) => (
                                             <button
                                                 key={wallet.type}
                                                 onClick={() => {
-                                                    console.log(
-                                                        "Wallet button clicked:",
-                                                        wallet.type,
-                                                        "Available:",
-                                                        wallet.available
-                                                    );
                                                     if (wallet.available) {
-                                                        handleConnectWallet(
-                                                            wallet.type
-                                                        );
+                                                        handleConnectWallet(wallet.type);
                                                     } else {
-                                                        setError(
-                                                            `${wallet.name} is not installed. Please install it first.`
-                                                        );
+                                                        setError(`${wallet.name} is not installed. Please install it first.`);
                                                     }
                                                 }}
                                                 disabled={!wallet.available}
-                                                className={`px-4 py-2 border-2 text-sm font-bold tracking-wider ${
+                                                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
                                                     wallet.available
-                                                        ? "bg-dhani-gold text-black border-white hover:bg-dhani-gold/80"
-                                                        : "bg-gray-600 text-gray-400 border-gray-500 cursor-not-allowed"
+                                                        ? 'bg-dhani-gold text-black hover:bg-dhani-gold/90'
+                                                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                                                 }`}
                                             >
-                                                {wallet.name.toUpperCase()}
-                                                {!wallet.available &&
-                                                    " (INSTALL REQUIRED)"}
+                                                {wallet.name}
+                                                {!wallet.available && ' (Install)'}
                                             </button>
                                         ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Retro Tab Navigation */}
-                <div className="bg-black border-b-2 border-white/20">
-                    <div className="flex overflow-x-auto">
+                {/* Modern Tab Navigation */}
+                <div className="px-6 border-b border-dhani-gold/10 flex-shrink-0">
+                    <div className="flex space-x-1 overflow-x-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center space-x-3 px-6 py-4 text-sm font-bold tracking-wider border-b-4 whitespace-nowrap ${
+                                className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium rounded-t-lg whitespace-nowrap transition-all duration-200 ${
                                     activeTab === tab.id
-                                        ? "text-dhani-gold border-dhani-gold bg-dhani-gold/10"
-                                        : "text-white border-transparent hover:text-dhani-gold hover:bg-white/5"
+                                        ? "text-dhani-gold bg-dhani-gold/10 border-b-2 border-dhani-gold"
+                                        : "text-gray-400 hover:text-white hover:bg-white/5"
                                 }`}
                             >
-                                <span className="text-lg">{tab.icon}</span>
-                                <span>{tab.name.toUpperCase()}</span>
+                                <span className="text-base">{tab.icon}</span>
+                                <span className="hidden sm:inline">{tab.name}</span>
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-6 bg-black text-white">
+                {/* Content Area - Modern & Clean */}
+                <div className="flex-1 overflow-y-auto p-6 min-h-0 modern-scrollbar">
                     {loading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="text-dhani-gold text-lg font-bold tracking-wider">
-                                LOADING BANKING DATA...
-                            </div>
+                        <div className="flex flex-col items-center justify-center py-20 modern-fade-in">
+                            <div className="modern-spinner mb-4" />
+                            <div className="text-gray-400 text-sm">Loading banking data...</div>
+                            <div className="text-xs text-gray-500 mt-2">Please wait while we secure your connection</div>
                         </div>
                     ) : error ? (
-                        <div className="bg-red-900/30 border-2 border-red-500 p-6">
-                            <div className="flex items-center space-x-3 mb-3">
-                                <span className="text-2xl">⚠️</span>
-                                <div>
-                                    <div className="text-red-400 font-bold tracking-wider">
-                                        ERROR LOADING BANKING DATA
-                                    </div>
-                                    <div className="text-red-300 text-sm">
-                                        {error}
-                                    </div>
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+                            <div className="flex items-start space-x-3">
+                                <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"/>
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-red-400 font-semibold mb-1">Error Loading Data</h3>
+                                    <p className="text-red-300 text-sm mb-4">{error}</p>
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                                    >
+                                        Retry
+                                    </button>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold tracking-wider"
-                            >
-                                RETRY
-                            </button>
                         </div>
                     ) : (
                         <>
                             {activeTab === "overview" && (
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="bg-white/5 border-2 border-white/20 p-6">
-                                            <h3 className="text-dhani-gold font-bold text-lg mb-4 tracking-wider flex items-center">
-                                                <span className="mr-2">📊</span>
-                                                ACCOUNT SUMMARY
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Account Summary */}
+                                        <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                                            <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mr-3">
+                                                    <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                                </svg>
+                                                Account Summary
                                             </h3>
-                                            <div className="space-y-3">
+                                            <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 tracking-wider">
-                                                        AVAILABLE CASH
-                                                    </span>
-                                                    <span className="text-white font-bold">
-                                                        ₹
-                                                        {(
-                                                            playerRupees +
-                                                            totalRupeesChange
-                                                        ).toLocaleString()}
+                                                    <span className="text-gray-400 text-sm">Available Cash</span>
+                                                    <span className="text-white font-semibold">
+                                                        ₹{(playerRupees + totalRupeesChange).toLocaleString()}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 tracking-wider">
-                                                        BANK SAVINGS
-                                                    </span>
-                                                    <span className="text-white font-bold">
-                                                        ₹
-                                                        {bankBalance.toLocaleString()}
+                                                    <span className="text-gray-400 text-sm">Bank Savings</span>
+                                                    <span className="text-white font-semibold">
+                                                        ₹{bankBalance.toLocaleString()}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 tracking-wider">
-                                                        FIXED DEPOSITS
-                                                    </span>
-                                                    <span className="text-white font-bold">
-                                                        {fixedDeposits.length}{" "}
-                                                        ACTIVE
+                                                    <span className="text-gray-400 text-sm">Fixed Deposits</span>
+                                                    <span className="text-white font-semibold">
+                                                        {fixedDeposits.length} Active
                                                     </span>
                                                 </div>
-                                                <div className="border-t-2 border-white/20 pt-3">
+                                                <div className="border-t border-white/10 pt-4">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-dhani-gold font-bold tracking-wider">
-                                                            TOTAL WORTH
-                                                        </span>
-                                                        <span className="text-dhani-green font-bold text-lg">
-                                                            ₹
-                                                            {(
-                                                                playerRupees +
-                                                                totalRupeesChange +
-                                                                bankBalance
-                                                            ).toLocaleString()}
+                                                        <span className="text-dhani-gold font-semibold">Total Worth</span>
+                                                        <span className="text-dhani-gold font-bold text-lg">
+                                                            ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="bg-white/5 border-2 border-white/20 p-6">
-                                            <h3 className="text-dhani-gold font-bold text-lg mb-4 tracking-wider flex items-center">
-                                                <span className="mr-2">🎯</span>
-                                                QUICK ACTIONS
+                                        {/* Quick Actions */}
+                                        <div className="bg-gradient-to-br from-dhani-gold/10 to-dhani-gold/5 rounded-xl p-6 border border-dhani-gold/20">
+                                            <h3 className="text-dhani-gold font-semibold text-lg mb-4 flex items-center">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mr-3">
+                                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                                </svg>
+                                                Quick Actions
                                             </h3>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <button
-                                                    onClick={() =>
-                                                        setActiveTab("account")
-                                                    }
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider"
+                                                    onClick={() => setActiveTab("account")}
+                                                    className="flex items-center justify-center space-x-2 p-3 bg-dhani-gold text-black font-medium rounded-lg hover:bg-dhani-gold/90 transition-colors duration-200"
                                                 >
-                                                    💰 DEPOSIT/WITHDRAW
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                    <span>Banking</span>
                                                 </button>
                                                 <button
-                                                    onClick={() =>
-                                                        setActiveTab("fd")
-                                                    }
-                                                    className="bg-green-600 hover:bg-green-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider"
+                                                    onClick={() => setActiveTab("fd")}
+                                                    className="flex items-center justify-center space-x-2 p-3 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors duration-200"
                                                 >
-                                                    📈 FIXED DEPOSITS
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                        <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                    <span>Fixed Deposits</span>
                                                 </button>
                                                 {walletStatus.connected && (
                                                     <button
-                                                        onClick={() =>
-                                                            setActiveTab("web3")
-                                                        }
-                                                        className="bg-purple-600 hover:bg-purple-700 text-white p-3 border-2 border-white text-sm font-bold tracking-wider col-span-2"
+                                                        onClick={() => setActiveTab("web3")}
+                                                        className="sm:col-span-2 flex items-center justify-center space-x-2 p-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white font-medium rounded-lg hover:from-purple-500/30 hover:to-blue-500/30 transition-all duration-200"
                                                     >
-                                                        🌐 EXPLORE WEB3 FEATURES
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        </svg>
+                                                        <span>Web3 Features</span>
                                                     </button>
                                                 )}
                                             </div>
@@ -829,9 +728,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                             {activeTab === "account" && (
                                 <DepositWithdrawPanel
-                                    playerRupees={
-                                        playerRupees + totalRupeesChange
-                                    }
+                                    playerRupees={playerRupees + totalRupeesChange}
                                     bankBalance={bankBalance}
                                     onDeposit={handleDeposit}
                                     onWithdraw={handleWithdraw}
@@ -850,14 +747,13 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                             {activeTab === "web3" && walletStatus.connected && (
                                 <Web3BankingFeatures
                                     icpService={icpService}
-                                    walletManager={walletManager}
                                     walletStatus={walletStatus}
                                 />
                             )}
                         </>
                     )}
                 </div>
-            </div>
+            </BankingPolish>
         </div>
     );
 };

@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import BankingDashboard from "./BankingDashboard";
-import {
-    StatusIndicator,
-    LoadingState,
-} from "../feedback/StatusIndicators";
+import { StatusIndicator, LoadingState } from "../feedback/StatusIndicators";
 import { AccessibleButton } from "../accessibility/AccessibleComponents";
 
 const BankingUI: React.FC = () => {
@@ -20,7 +17,7 @@ const BankingUI: React.FC = () => {
     >("info");
     // Keep track of the rupees at opening time to calculate the difference later
     const initialRupeesRef = useRef(0);
-    
+
     // Log bank account for debugging (prevents unused variable warning)
     useEffect(() => {
         if (bankAccount) {
@@ -337,7 +334,6 @@ const BankingUI: React.FC = () => {
                 <BankingDashboard
                     onClose={handleClose}
                     playerRupees={playerRupees}
-                    initialRupees={initialRupeesRef.current}
                 />
             </div>
 
