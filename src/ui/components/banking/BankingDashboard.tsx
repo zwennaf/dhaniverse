@@ -467,7 +467,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         {/* Close Button - Minimal */}
                         <button
                             onClick={handleClose}
-                            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-300 font-tickerbit flex justify-center items-center hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-red-600 hover:border-red-400"
+                            className="w-8 h-8 flex  justify-center text-red-400 hover:text-red-300 font-tickerbit  items-center hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-red-600 hover:border-red-400"
                         >x
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M18 6L6 18M6 6l12 12"/>
