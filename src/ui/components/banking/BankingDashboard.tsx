@@ -421,11 +421,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     };
 
     const tabs = [
-        { id: "overview", name: "Overview", icon: "📊" },
-        { id: "account", name: "Banking", icon: "🏦" },
-        { id: "fd", name: "Fixed Deposits", icon: "📈" },
+{ id: "overview", name: "Overview", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+        { id: "account", name: "Banking", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+        { id: "fd", name: "Fixed Deposits", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
         ...(walletStatus.connected
-            ? [{ id: "web3", name: "Web3 Features", icon: "🌐" }]
+            ? [{ id: "web3", name: "Web3 Features", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> }]
             : []),
     ];
 
@@ -470,10 +470,10 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         {/* Close Button - Minimal */}
                         <button
                             onClick={handleClose}
-                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-300 font-tickerbit flex justify-center items-center hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-red-600 hover:border-red-400"
+                        >x
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6L6 18M6 6l12 12"/>
                             </svg>
                         </button>
                     </div>

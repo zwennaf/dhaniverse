@@ -8,6 +8,7 @@ const BankingUI: React.FC = () => {
     const [playerRupees, setPlayerRupees] = useState(0);
     const [bankAccount, setBankAccount] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isClosing, setIsClosing] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<
         "connecting" | "connected" | "error"
     >("connecting");
@@ -25,6 +26,33 @@ const BankingUI: React.FC = () => {
         }
     }, [bankAccount]);
 
+    // Enhanced escape key handling with smooth animations
+    useEffect(() => {
+        const handleEscapeKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                if (isOpen && !isLoading && !isClosing) {
+                    // First escape: Close banking UI with smooth animation
+                    handleClose();
+                } else if (!isOpen && !isLoading && !isClosing) {
+                    // Second escape: Exit building (dispatch custom event)
+                    window.dispatchEvent(new CustomEvent("exitBuilding"));
+                }
+            }
+        };
+
+        // Add escape key listener when banking UI is active
+        if (isOpen || isLoading || isClosing) {
+            document.addEventListener("keydown", handleEscapeKey, { capture: true });
+        }
+
+        return () => {
+            document.removeEventListener("keydown", handleEscapeKey, { capture: true });
+        };
+    }, [isOpen, isLoading, isClosing]);
+
     useEffect(() => {
         // Listen for the custom event from the game to open the banking UI
         const handleOpenBankingUI = async (event: Event) => {
@@ -35,9 +63,6 @@ const BankingUI: React.FC = () => {
             );
 
             setIsLoading(true);
-            setConnectionStatus("connecting");
-            setMessage("Initializing banking system...");
-            setMessageType("info");
 
             try {
                 // Simulate connection delay for better UX
@@ -54,9 +79,7 @@ const BankingUI: React.FC = () => {
                     setBankAccount(customEvent.detail.bankAccount);
                 }
 
-                setConnectionStatus("connected");
-                setMessage("Banking system connected successfully!");
-                setMessageType("success");
+                
 
                 // Show the banking UI
                 setIsOpen(true);
@@ -142,23 +165,32 @@ const BankingUI: React.FC = () => {
         };
     }, [isOpen]);
 
-    // Close the banking UI with enhanced feedback
+    // Close the banking UI with smooth exit animation
     const handleClose = () => {
-        setMessage("Closing banking system...");
-        setMessageType("info");
-        setIsLoading(true);
+        if (isClosing) return; // Prevent multiple close attempts
+        
+        setIsClosing(true);
 
-        // Simulate closing delay for better UX
+        // Start exit animation
+        const container = document.getElementById("banking-ui-container");
+        if (container) {
+            container.style.transition = "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)";
+            container.style.opacity = "0";
+        }
+
+        // Complete the close after animation
         setTimeout(() => {
             setIsOpen(false);
-            setIsLoading(false);
+            setIsClosing(false);
             setMessage("");
             setConnectionStatus("connecting");
 
             // Remove the active class from the container
-            const container = document.getElementById("banking-ui-container");
             if (container) {
                 container.classList.remove("active");
+                container.style.opacity = "";
+                container.style.transform = "";
+                container.style.transition = "";
             }
 
             // Notify any game components that may need to know the banking UI was closed
@@ -166,8 +198,8 @@ const BankingUI: React.FC = () => {
         }, 500);
     };
 
-    // Render nothing if the banking UI is closed and not loading
-    if (!isOpen && !isLoading) return null;
+    // Render nothing if the banking UI is closed and not loading/closing
+    if (!isOpen && !isLoading && !isClosing) return null;
 
     // Show loading screen during initialization
     if (isLoading && !isOpen) {
