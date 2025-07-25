@@ -13,8 +13,7 @@ import { ICPActorService } from "../../../services/ICPActorService";
 import {
     DualStorageManager,
 } from "../../../services/DualStorageManager";
-import { BankingPolish, PolishedButton, PolishedCard } from "../polish/FinalPolish";
-import { StatusIndicator, LoadingState } from "../feedback/StatusIndicators";
+import { BankingPolish } from "../polish/FinalPolish";
 
 interface FixedDeposit {
     _id?: string;
@@ -167,9 +166,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         }
     };
 
-    const handleDisconnectWallet = () => {
-        walletManager.disconnectWallet();
-    };
+
 
     const handleSyncToBlockchain = async () => {
         if (syncInProgress) return;
@@ -430,9 +427,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     ];
 
     return (
-        <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 flex bg-black items-center justify-center z-50 p-4">
             {/* Backdrop blur overlay */}
-            <div className="absolute inset-0 backdrop-blur-md bg-black/60" onClick={handleClose} />
+            <div className="absolute inset-0 backdrop-blur-md" onClick={handleClose} />
             
             {/* Main container - Modern minimal design */}
             <BankingPolish className="relative w-full max-w-6xl h-full max-h-[95vh] bg-black/95 backdrop-blur-modern border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden modern-scale-in">
