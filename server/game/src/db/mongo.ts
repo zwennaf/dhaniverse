@@ -80,18 +80,19 @@ class MongoDatabase {
             this.isConnected = false;
 
             // Provide more specific error messages
-            if (error.message.includes("authentication")) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes("authentication")) {
                 console.log(
                     "💡 Authentication failed - check username/password in connection string"
                 );
             } else if (
-                error.message.includes("network") ||
-                error.message.includes("timeout")
+                errorMessage.includes("network") ||
+                errorMessage.includes("timeout")
             ) {
                 console.log(
                     "💡 Network error - check internet connection and IP whitelist"
                 );
-            } else if (error.message.includes("parse")) {
+            } else if (errorMessage.includes("parse")) {
                 console.log(
                     "💡 Connection string format error - verify the MongoDB URI format"
                 );
