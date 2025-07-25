@@ -5,6 +5,7 @@ import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
+import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
 
 let hudRootRef: ReactDOM.Root | null = null;
@@ -33,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize the stock market UI separately
   initializeStockMarketUI();
+  
+  // Initialize the ATM interface
+  initializeATMInterface();
 });
 
 // Function to initialize banking UI
@@ -69,6 +73,17 @@ function initializeStockMarketUI() {
   } else {
     console.error("Could not find stock-market-ui-container element");
   }
+}
+
+// Function to initialize ATM interface
+function initializeATMInterface() {
+  // Initialize the ATM interface (it doesn't need a container like React components)
+  const atmInterface = new ATMInterface();
+  
+  // Store reference globally for cleanup if needed
+  (window as any).atmInterface = atmInterface;
+  
+  console.log("ATM Interface initialized");
 }
 
 // Function to initialize HUD - will be called from game.ts when game starts

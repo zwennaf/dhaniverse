@@ -1,7 +1,6 @@
 // API utility functions for backend communication
-const API_BASE = import.meta.env.DEV
-    ? "http://localhost:8000"
-    : "https://dhaniverseapi.deno.dev";
+const API_BASE = "https://dhaniverseapi.deno.dev"
+   
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {

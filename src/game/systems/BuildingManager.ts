@@ -253,8 +253,13 @@ export class BuildingManager {
     } catch (error) {
       console.warn('Could not play door-open sound:', error);    }
     
-    // Notify the BankNPCManager or StockMarketManager that we've entered a building
+    // Notify the BankNPCManager, StockMarketManager, and ATMManager that we've entered a building
     const mainScene = this.scene;
+    
+    // Notify ATM manager about building entry
+    if (mainScene.atmManager && typeof mainScene.atmManager.onPlayerEnterBuilding === 'function') {
+      mainScene.atmManager.onPlayerEnterBuilding();
+    }
     
     if (buildingType === 'bank') {
       // Handle bank building entrance
@@ -326,13 +331,16 @@ export class BuildingManager {
     } else {
       this.transitionInProgress = false;
     }
-      // Notify NPCManagers that we're exiting the building
+      // Notify NPCManagers and ATMManager that we're exiting the building
     const mainScene = this.scene;
     if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onExitBuilding === 'function') {
       mainScene.bankNPCManager.onExitBuilding();
     }
     if (mainScene.stockMarketManager && typeof mainScene.stockMarketManager.onExitBuilding === 'function') {
       mainScene.stockMarketManager.onExitBuilding();
+    }
+    if (mainScene.atmManager && typeof mainScene.atmManager.onPlayerExitBuilding === 'function') {
+      mainScene.atmManager.onPlayerExitBuilding();
     }
     
     // Play sound effect if available
