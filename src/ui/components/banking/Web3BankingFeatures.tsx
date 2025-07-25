@@ -4,6 +4,8 @@ import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import Web3Achievements from "./Web3Achievements";
 import CurrencyExchange from "./CurrencyExchange";
 import DeFiSimulation from "./DeFiSimulation";
+import { AccessibleButton, AccessibleInput, AccessibleTabs } from "../accessibility/AccessibleComponents";
+import { StatusIndicator, StatusBadge, LoadingState } from "../feedback/StatusIndicators";
 
 interface Web3BankingFeaturesProps {
     icpService: ICPActorService;
@@ -168,122 +170,25 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
         );
     }
 
-    return (
-        <div className="space-y-6">
-            {/* Dual Balance Display */}
-            <div className="bg-gradient-to-r from-blue-900 to-purple-900 rounded-lg p-6">
-                <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-                    <span className="mr-2">💰</span>
-                    Dual-Currency Portfolio
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-black/20 rounded-lg p-4">
-                        <div className="text-yellow-400 text-sm font-medium">
-                            Traditional Currency
-                        </div>
-                        <div className="text-2xl font-bold text-yellow-400">
-                            ₹{dualBalance.rupeesBalance.toLocaleString()}
-                        </div>
-                        <div className="text-yellow-300 text-xs">Rupees</div>
-                    </div>
-                    <div className="bg-black/20 rounded-lg p-4">
-                        <div className="text-blue-400 text-sm font-medium">
-                            Blockchain Currency
-                        </div>
-                        <div className="text-2xl font-bold text-blue-400">
-                            {dualBalance.icpTokenBalance.toFixed(4)}
-                        </div>
-                        <div className="text-blue-300 text-xs">Web3 Tokens</div>
+    const tabsData = [
+        {
+            id: "overview",
+            label: "Overview",
+            content: (
+                <div className="space-y-6 animate-fade-in-up">
+                    <div className="text-center text-white">
+                        <h4 className="text-xl font-bold mb-4">Web3 Banking Dashboard</h4>
+                        <p className="text-gray-300">
+                            Welcome to the future of banking with blockchain technology
+                        </p>
                     </div>
                 </div>
-                <div className="mt-4 text-center">
-                    <div className="text-gray-300 text-sm">
-                        Exchange Rate: 1 ₹ = {exchangeRate} Token • Last
-                        Updated:{" "}
-                        {new Date(dualBalance.lastUpdated).toLocaleTimeString()}
-                    </div>
-                </div>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
-                {[
-                    { id: "overview", name: "Overview", icon: "📊" },
-                    { id: "exchange", name: "Exchange", icon: "🔄" },
-                    { id: "staking", name: "Staking", icon: "🏦" },
-                    { id: "defi", name: "DeFi Lab", icon: "🧪" },
-                    { id: "achievements", name: "Achievements", icon: "🏆" },
-                ].map((tab) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 flex items-center justify-center py-2 px-4 rounded-md transition-colors ${
-                            activeTab === tab.id
-                                ? "bg-blue-600 text-white"
-                                : "text-gray-400 hover:text-white hover:bg-gray-700"
-                        }`}
-                    >
-                        <span className="mr-2">{tab.icon}</span>
-                        {tab.name}
-                    </button>
-                ))}
-            </div>
-
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-900/50 border border-red-700 rounded-lg p-4">
-                    <div className="text-red-400 font-medium">Error</div>
-                    <div className="text-red-300 text-sm">{error}</div>
-                    <button
-                        onClick={() => setError(null)}
-                        className="mt-2 text-red-400 hover:text-red-300 text-sm underline"
-                    >
-                        Dismiss
-                    </button>
-                </div>
-            )}
-
-            {/* Tab Content */}
-            {activeTab === "overview" && (
-                <div className="space-y-4">
-                    <div className="bg-gray-700 rounded-lg p-6">
-                        <h4 className="text-lg font-bold text-white mb-4">
-                            🌟 Web3 Banking Overview
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-gray-800 rounded-lg p-4">
-                                <h5 className="text-blue-300 font-medium mb-2">
-                                    Total Portfolio Value
-                                </h5>
-                                <div className="text-2xl font-bold text-white">
-                                    ₹
-                                    {(
-                                        dualBalance.rupeesBalance +
-                                        dualBalance.icpTokenBalance /
-                                            exchangeRate
-                                    ).toLocaleString()}
-                                </div>
-                                <div className="text-gray-400 text-sm">
-                                    Combined value in Rupees
-                                </div>
-                            </div>
-                            <div className="bg-gray-800 rounded-lg p-4">
-                                <h5 className="text-green-300 font-medium mb-2">
-                                    Active Stakes
-                                </h5>
-                                <div className="text-2xl font-bold text-white">
-                                    {stakingInfo.length}
-                                </div>
-                                <div className="text-gray-400 text-sm">
-                                    Earning rewards
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === "exchange" && (
+            ),
+        },
+        {
+            id: "exchange",
+            label: "Exchange",
+            content: (
                 <CurrencyExchange
                     rupeesBalance={dualBalance.rupeesBalance}
                     icpTokenBalance={dualBalance.icpTokenBalance}
@@ -302,7 +207,7 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
                                 amount
                             );
                             if (result.success) {
-                                await loadWeb3Data(); // Refresh balances
+                                await loadWeb3Data();
                                 return true;
                             }
                             return false;
@@ -312,133 +217,234 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
                         }
                     }}
                 />
-            )}
+            ),
+        },
+        {
+            id: "staking",
+            label: "Staking",
+            content: (
+                <div className="space-y-6 animate-fade-in-up">
+                    <div
+                        className="bg-white/5 border-2 border-white/20 p-6"
+                        style={{ imageRendering: "pixelated" }}
+                    >
+                        <h4 className="text-dhani-gold font-vcr font-bold text-lg tracking-wider mb-4 flex items-center">
+                            <span className="mr-3">🏦</span>
+                            TOKEN STAKING
+                        </h4>
 
-            {activeTab === "staking" && (
-                <div className="bg-gray-700 rounded-lg p-6">
-                    <h4 className="text-lg font-bold text-white mb-4 flex items-center">
-                        <span className="mr-2">🏦</span>
-                        Token Staking
-                    </h4>
-
-                    {/* Staking Form */}
-                    <div className="space-y-4 mb-6">
-                        <div>
-                            <label className="block text-gray-300 text-sm font-medium mb-2">
-                                Staking Amount (Tokens)
-                            </label>
-                            <input
+                        {/* Staking Form */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <AccessibleInput
+                                label="Staking Amount (Tokens)"
                                 type="number"
                                 value={stakingAmount}
-                                onChange={(e) =>
-                                    setStakingAmount(e.target.value)
-                                }
+                                onChange={setStakingAmount}
                                 placeholder="Enter amount to stake"
-                                className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white"
+                                helpText={`Available: ${dualBalance.icpTokenBalance.toFixed(
+                                    4
+                                )} Tokens`}
                             />
+
+                            <div className="space-y-2">
+                                <div className="text-white font-vcr font-bold text-sm tracking-wider">
+                                    STAKING DURATION
+                                </div>
+                                <div className="space-y-2">
+                                    {[
+                                        { value: 30, label: "30 DAYS", apy: 5 },
+                                        { value: 90, label: "90 DAYS", apy: 7 },
+                                        {
+                                            value: 180,
+                                            label: "180 DAYS",
+                                            apy: 10,
+                                        },
+                                    ].map((option) => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() =>
+                                                setStakingDuration(option.value)
+                                            }
+                                            className={`
+                                                w-full p-3 text-left border-2 font-vcr text-sm transition-all duration-200
+                                                ${
+                                                    stakingDuration ===
+                                                    option.value
+                                                        ? "bg-dhani-gold text-black border-dhani-gold animate-pixel-glow"
+                                                        : "bg-transparent text-white border-white/20 hover:border-dhani-gold hover:text-dhani-gold"
+                                                }
+                                            `}
+                                            style={{
+                                                imageRendering: "pixelated",
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold tracking-wider">
+                                                    {option.label}
+                                                </span>
+                                                <span
+                                                    className={
+                                                        stakingDuration ===
+                                                        option.value
+                                                            ? "text-black"
+                                                            : "text-dhani-gold"
+                                                    }
+                                                >
+                                                    {option.apy}% APY
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label className="block text-gray-300 text-sm font-medium mb-2">
-                                Staking Duration
-                            </label>
-                            <select
-                                value={stakingDuration}
-                                onChange={(e) =>
-                                    setStakingDuration(parseInt(e.target.value))
-                                }
-                                className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-white"
+                        {/* Staking Preview */}
+                        {stakingAmount && parseFloat(stakingAmount) > 0 && (
+                            <div
+                                className="bg-dhani-green/20 border-2 border-dhani-green p-4 mb-6 animate-bounce-in"
+                                style={{ imageRendering: "pixelated" }}
                             >
-                                <option value={30}>30 Days (5% APY)</option>
-                                <option value={90}>90 Days (7% APY)</option>
-                                <option value={180}>180 Days (10% APY)</option>
-                            </select>
-                        </div>
-
-                        {stakingAmount && (
-                            <div className="bg-green-900/30 rounded-lg p-4">
-                                <div className="text-green-300 text-sm font-medium">
-                                    Staking Preview
+                                <div className="text-dhani-green font-vcr font-bold text-sm tracking-wider mb-3">
+                                    STAKING PREVIEW
                                 </div>
-                                <div className="text-white">
-                                    Stake: {stakingAmount} Tokens • Duration:{" "}
-                                    {stakingDuration} days • APY:{" "}
-                                    {getStakingAPY(stakingDuration)}%
-                                </div>
-                                <div className="text-green-200 text-sm">
-                                    Estimated rewards:{" "}
-                                    {(
-                                        (((parseFloat(stakingAmount || "0") *
-                                            getStakingAPY(stakingDuration)) /
-                                            100) *
-                                            stakingDuration) /
-                                        365
-                                    ).toFixed(4)}{" "}
-                                    Tokens
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-vcr">
+                                    <div>
+                                        <div className="text-gray-400 tracking-wider">
+                                            STAKE AMOUNT
+                                        </div>
+                                        <div className="text-white font-bold">
+                                            {stakingAmount} TOKENS
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-400 tracking-wider">
+                                            DURATION
+                                        </div>
+                                        <div className="text-white font-bold">
+                                            {stakingDuration} DAYS
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-400 tracking-wider">
+                                            APY RATE
+                                        </div>
+                                        <div className="text-dhani-gold font-bold">
+                                            {getStakingAPY(stakingDuration)}%
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-gray-400 tracking-wider">
+                                            EST. REWARDS
+                                        </div>
+                                        <div className="text-dhani-green font-bold">
+                                            {(
+                                                (((parseFloat(stakingAmount) *
+                                                    getStakingAPY(
+                                                        stakingDuration
+                                                    )) /
+                                                    100) *
+                                                    stakingDuration) /
+                                                365
+                                            ).toFixed(4)}{" "}
+                                            TOKENS
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        <button
-                            onClick={handleStakeTokens}
-                            disabled={
-                                loading ||
-                                !stakingAmount ||
-                                parseFloat(stakingAmount) >
-                                    dualBalance.icpTokenBalance
-                            }
-                            className="w-full py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {loading ? "Processing Stake..." : "Stake Tokens"}
-                        </button>
-                    </div>
+                        {/* Stake Button */}
+                        <div className="mb-6">
+                            {loading ? (
+                                <LoadingState
+                                    message="Processing Stake..."
+                                    className="py-4"
+                                />
+                            ) : (
+                                <AccessibleButton
+                                    onClick={handleStakeTokens}
+                                    variant="primary"
+                                    size="lg"
+                                    disabled={
+                                        !stakingAmount ||
+                                        parseFloat(stakingAmount) <= 0 ||
+                                        parseFloat(stakingAmount) >
+                                            dualBalance.icpTokenBalance
+                                    }
+                                    ariaLabel={`Stake ${
+                                        stakingAmount || "0"
+                                    } tokens for ${stakingDuration} days`}
+                                    className="w-full animate-pixel-glow"
+                                >
+                                    <span className="mr-2">🏦</span>
+                                    STAKE TOKENS
+                                    {stakingAmount && (
+                                        <span className="ml-2 text-black/70">
+                                            ({stakingAmount} TOKENS)
+                                        </span>
+                                    )}
+                                </AccessibleButton>
+                            )}
+                        </div>
 
-                    {/* Active Stakes */}
-                    {stakingInfo.length > 0 && (
-                        <div>
-                            <h5 className="text-white font-medium mb-3">
-                                Active Stakes
-                            </h5>
-                            <div className="space-y-3">
-                                {stakingInfo.map((stake) => (
-                                    <div
-                                        key={stake.stakingId}
-                                        className="bg-gray-800 rounded-lg p-4"
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <div className="text-white font-medium">
-                                                    {stake.stakedAmount} Tokens
+                        {/* Active Stakes */}
+                        {stakingInfo.length > 0 && (
+                            <div>
+                                <h5 className="text-dhani-gold font-vcr font-bold text-lg tracking-wider mb-4">
+                                    ACTIVE STAKES
+                                </h5>
+                                <div className="space-y-4">
+                                    {stakingInfo.map((stake) => (
+                                        <div
+                                            key={stake.stakingId}
+                                            className="bg-dhani-green/20 border-2 border-dhani-green p-4 hover:scale-105 transition-all duration-300"
+                                            style={{
+                                                imageRendering: "pixelated",
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <div className="text-dhani-gold font-vcr font-bold text-lg">
+                                                        {stake.stakedAmount}{" "}
+                                                        TOKENS
+                                                    </div>
+                                                    <div className="text-white font-vcr text-sm">
+                                                        {stake.apy}% APY •
+                                                        MATURES:{" "}
+                                                        {new Date(
+                                                            stake.maturityDate
+                                                        ).toLocaleDateString()}
+                                                    </div>
                                                 </div>
-                                                <div className="text-gray-400 text-sm">
-                                                    {stake.apy}% APY • Matures:{" "}
-                                                    {new Date(
-                                                        stake.maturityDate
-                                                    ).toLocaleDateString()}
-                                                </div>
+                                                <StatusBadge
+                                                    type="success"
+                                                    text="Active"
+                                                    size="sm"
+                                                />
                                             </div>
-                                            <div className="text-right">
-                                                <div className="text-green-400 font-medium">
-                                                    +
+                                            <div className="flex justify-between items-center">
+                                                <div className="text-dhani-green font-vcr font-bold">
+                                                    CURRENT REWARDS: +
                                                     {stake.currentRewards.toFixed(
                                                         4
                                                     )}{" "}
-                                                    Tokens
-                                                </div>
-                                                <div className="text-gray-400 text-sm">
-                                                    Current Rewards
+                                                    TOKENS
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-            )}
-
-            {activeTab === "defi" && (
+            ),
+        },
+        {
+            id: "defi",
+            label: "DeFi Lab",
+            content: (
                 <DeFiSimulation
                     icpTokenBalance={dualBalance.icpTokenBalance}
                     rupeesBalance={dualBalance.rupeesBalance}
@@ -451,9 +457,12 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
                         }));
                     }}
                 />
-            )}
-
-            {activeTab === "achievements" && (
+            ),
+        },
+        {
+            id: "achievements",
+            label: "Achievements",
+            content: (
                 <Web3Achievements
                     rupeesBalance={dualBalance.rupeesBalance}
                     icpTokenBalance={dualBalance.icpTokenBalance}
@@ -473,7 +482,103 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
                         }
                     }}
                 />
+            ),
+        },
+    ];
+
+    return (
+        <div className="space-y-6">
+            {/* Dual Balance Display */}
+            <div className="bg-gradient-to-r from-blue-900 to-purple-900 rounded-lg p-6">
+                <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+                    <span className="mr-2">💰</span>
+                    Dual-Currency Portfolio
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div
+                        className="bg-yellow-500/20 border-2 border-yellow-400 p-4 hover:scale-105 transition-all duration-300 animate-slide-in-left"
+                        style={{ imageRendering: "pixelated" }}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-dhani-gold text-sm font-vcr font-bold tracking-wider">
+                                TRADITIONAL CURRENCY
+                            </div>
+                            <StatusIndicator type="success" size="sm" />
+                        </div>
+                        <div className="text-3xl font-bold text-dhani-gold font-vcr mb-2">
+                            ₹{dualBalance.rupeesBalance.toLocaleString()}
+                        </div>
+                        <div className="text-dhani-gold text-xs font-vcr tracking-wider">
+                            RUPEES BALANCE
+                        </div>
+                    </div>
+
+                    <div
+                        className="bg-blue-500/20 border-2 border-blue-400 p-4 hover:scale-105 transition-all duration-300 animate-slide-in-right"
+                        style={{ imageRendering: "pixelated" }}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="text-blue-400 text-sm font-vcr font-bold tracking-wider">
+                                BLOCKCHAIN CURRENCY
+                            </div>
+                            <StatusIndicator type="info" size="sm" />
+                        </div>
+                        <div className="text-3xl font-bold text-blue-400 font-vcr mb-2">
+                            {dualBalance.icpTokenBalance.toFixed(4)}
+                        </div>
+                        <div className="text-blue-400 text-xs font-vcr tracking-wider">
+                            WEB3 TOKENS
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    className="mt-6 text-center bg-black/20 border border-white/20 p-3"
+                    style={{ imageRendering: "pixelated" }}
+                >
+                    <div className="text-white font-vcr text-sm tracking-wider">
+                        EXCHANGE RATE: 1 ₹ = {exchangeRate} TOKEN • LAST
+                        UPDATED:{" "}
+                        {new Date(dualBalance.lastUpdated).toLocaleTimeString()}
+                    </div>
+                </div>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+                <div
+                    className="bg-red-500/20 border-2 border-red-500 p-4 animate-bounce-in"
+                    style={{ imageRendering: "pixelated" }}
+                >
+                    <div className="flex items-center space-x-3">
+                        <StatusIndicator type="error" size="md" />
+                        <div>
+                            <div className="text-red-400 font-vcr font-bold tracking-wider text-sm">
+                                WEB3 ERROR
+                            </div>
+                            <div className="text-red-300 font-vcr text-sm">
+                                {error}
+                            </div>
+                        </div>
+                    </div>
+                    <AccessibleButton
+                        onClick={() => setError(null)}
+                        variant="secondary"
+                        size="sm"
+                        className="mt-3"
+                    >
+                        DISMISS
+                    </AccessibleButton>
+                </div>
             )}
+
+            {/* Enhanced Tab Navigation */}
+            <AccessibleTabs
+                tabs={tabsData}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                className="animate-slide-in-up"
+            />
         </div>
     );
 };

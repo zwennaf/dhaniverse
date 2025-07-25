@@ -1,3 +1,4 @@
+/* stylelint-disable at-rule-no-unknown */
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
 @tailwind base;
@@ -209,6 +210,466 @@ button:focus-visible {
 }
 
 @layer components {
+  /* Pixelated Design System Foundation */
+  .pixelated-container {
+    @apply font-vcr;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixelated-border {
+    border-style: solid;
+    border-image: none;
+  }
+
+  .pixelated-border-thin {
+    @apply pixelated-border border-2;
+  }
+
+  .pixelated-border-medium {
+    @apply pixelated-border border-4;
+  }
+
+  .pixelated-border-thick {
+    @apply pixelated-border border-8;
+  }
+
+  .pixelated-button {
+    @apply pixelated-container pixelated-border-thin font-bold tracking-wider uppercase transition-all duration-300;
+    background-clip: padding-box;
+    position: relative;
+  }
+
+  .pixelated-button:hover {
+    @apply scale-105;
+    filter: brightness(1.1);
+  }
+
+  .pixelated-button:active {
+    @apply scale-95;
+    filter: brightness(0.9);
+  }
+
+  /* Enhanced Pixelated Banking UI Design System */
+  .pixelated-banking-container {
+    @apply font-vcr;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixelated-banking-border {
+    --pixel-size: 2px;
+    --border-color: #F1CD36;
+    border: var(--pixel-size) solid var(--border-color);
+    position: relative;
+  }
+
+  .pixelated-banking-border::before {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--pixel-size));
+    left: calc(-1 * var(--pixel-size));
+    right: calc(-1 * var(--pixel-size));
+    bottom: calc(-1 * var(--pixel-size));
+    background: var(--border-color);
+    clip-path: polygon(
+      0 var(--pixel-size),
+      var(--pixel-size) var(--pixel-size),
+      var(--pixel-size) 0,
+      calc(100% - var(--pixel-size)) 0,
+      calc(100% - var(--pixel-size)) var(--pixel-size),
+      100% var(--pixel-size),
+      100% calc(100% - var(--pixel-size)),
+      calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+      calc(100% - var(--pixel-size)) 100%,
+      var(--pixel-size) 100%,
+      var(--pixel-size) calc(100% - var(--pixel-size)),
+      0 calc(100% - var(--pixel-size))
+    );
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .pixelated-banking-button {
+    @apply font-vcr font-bold tracking-wider transition-all duration-300;
+    --pixel-size: 3px;
+    --button-color: #F1CD36;
+    --button-text: #000000;
+    background: var(--button-color);
+    color: var(--button-text);
+    border: none;
+    position: relative;
+    clip-path: polygon(
+      0 var(--pixel-size),
+      var(--pixel-size) var(--pixel-size),
+      var(--pixel-size) 0,
+      calc(100% - var(--pixel-size)) 0,
+      calc(100% - var(--pixel-size)) var(--pixel-size),
+      100% var(--pixel-size),
+      100% calc(100% - var(--pixel-size)),
+      calc(100% - var(--pixel-size)) calc(100% - var(--pixel-size)),
+      calc(100% - var(--pixel-size)) 100%,
+      var(--pixel-size) 100%,
+      var(--pixel-size) calc(100% - var(--pixel-size)),
+      0 calc(100% - var(--pixel-size))
+    );
+  }
+
+  .pixelated-banking-button:hover {
+    --button-color: #D4B429;
+    transform: translateY(-1px);
+    filter: drop-shadow(0 2px 4px rgba(241, 205, 54, 0.3));
+  }
+
+  .pixelated-banking-button:active {
+    transform: translateY(0);
+    filter: drop-shadow(0 1px 2px rgba(241, 205, 54, 0.2));
+  }
+
+  .pixelated-banking-button:disabled {
+    --button-color: #666666;
+    --button-text: #999999;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+
+  .pixelated-banking-input {
+    @apply font-vcr bg-black text-white border-2 border-white/20 px-3 py-2;
+    image-rendering: pixelated;
+    transition: border-color 0.3s ease;
+  }
+
+  .pixelated-banking-input:focus {
+    @apply border-dhani-gold outline-none;
+    box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
+  }
+
+  .pixelated-banking-card {
+    @apply bg-black/80 border-2 border-white/20 p-4;
+    --card-pixel-size: 4px;
+    position: relative;
+    clip-path: polygon(
+      0 var(--card-pixel-size),
+      var(--card-pixel-size) var(--card-pixel-size),
+      var(--card-pixel-size) 0,
+      calc(100% - var(--card-pixel-size)) 0,
+      calc(100% - var(--card-pixel-size)) var(--card-pixel-size),
+      100% var(--card-pixel-size),
+      100% calc(100% - var(--card-pixel-size)),
+      calc(100% - var(--card-pixel-size)) calc(100% - var(--card-pixel-size)),
+      calc(100% - var(--card-pixel-size)) 100%,
+      var(--card-pixel-size) 100%,
+      var(--card-pixel-size) calc(100% - var(--card-pixel-size)),
+      0 calc(100% - var(--card-pixel-size))
+    );
+  }
+
+  .pixelated-banking-card-gold {
+    @apply pixelated-banking-card border-dhani-gold;
+    background: rgba(241, 205, 54, 0.1);
+  }
+
+  .pixelated-banking-card-success {
+    @apply pixelated-banking-card border-green-500;
+    background: rgba(76, 166, 76, 0.1);
+  }
+
+  .pixelated-banking-card-error {
+    @apply pixelated-banking-card border-red-500;
+    background: rgba(220, 38, 38, 0.1);
+  }
+
+  .pixelated-banking-tab {
+    @apply font-vcr font-bold tracking-wider px-4 py-2 transition-all duration-300;
+    --tab-pixel-size: 2px;
+    position: relative;
+    background: transparent;
+    color: #FFFFFF;
+    border: 2px solid transparent;
+    border-bottom: none;
+  }
+
+  .pixelated-banking-tab.active {
+    background: rgba(241, 205, 54, 0.1);
+    color: #F1CD36;
+    border-color: #F1CD36;
+    border-bottom: 2px solid #000000;
+  }
+
+  .pixelated-banking-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+    color: #F1CD36;
+  }
+
+  .pixelated-banking-progress {
+    @apply w-full bg-gray-700 h-3 relative overflow-hidden;
+    --progress-pixel-size: 1px;
+    clip-path: polygon(
+      0 var(--progress-pixel-size),
+      var(--progress-pixel-size) var(--progress-pixel-size),
+      var(--progress-pixel-size) 0,
+      calc(100% - var(--progress-pixel-size)) 0,
+      calc(100% - var(--progress-pixel-size)) var(--progress-pixel-size),
+      100% var(--progress-pixel-size),
+      100% calc(100% - var(--progress-pixel-size)),
+      calc(100% - var(--progress-pixel-size)) calc(100% - var(--progress-pixel-size)),
+      calc(100% - var(--progress-pixel-size)) 100%,
+      var(--progress-pixel-size) 100%,
+      var(--progress-pixel-size) calc(100% - var(--progress-pixel-size)),
+      0 calc(100% - var(--progress-pixel-size))
+    );
+  }
+
+  .pixelated-banking-progress-bar {
+    @apply h-full bg-dhani-gold transition-all duration-500 ease-out;
+    image-rendering: pixelated;
+  }
+
+  .pixelated-banking-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(241, 205, 54, 0.3) transparent;
+  }
+
+  .pixelated-banking-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .pixelated-banking-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .pixelated-banking-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(241, 205, 54, 0.3);
+    border: 1px solid rgba(241, 205, 54, 0.5);
+  }
+
+  .pixelated-banking-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(241, 205, 54, 0.5);
+  }
+
+  /* Pixelated banking animations */
+  .pixelated-banking-pulse {
+    animation: pixelated-banking-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pixelated-banking-pulse {
+    0%, 100% {
+      opacity: 1;
+      filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
+    }
+    50% {
+      opacity: 0.7;
+      filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+    }
+  }
+
+  .pixelated-banking-glow {
+    filter: drop-shadow(0 0 4px rgba(241, 205, 54, 0.4));
+    transition: filter 0.3s ease;
+  }
+
+  .pixelated-banking-glow:hover {
+    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+  }
+
+  .pixelated-banking-slide-in {
+    animation: pixelated-banking-slide-in 0.3s ease-out;
+  }
+
+  @keyframes pixelated-banking-slide-in {
+    from {
+      transform: translateX(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .pixelated-banking-fade-in {
+    animation: pixelated-banking-fade-in 0.5s ease-out;
+  }
+
+  @keyframes pixelated-banking-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .pixelated-banking-number-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .pixelated-banking-icon {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  .pixelated-card {
+    @apply pixelated-container pixelated-border-thin bg-black;
+    position: relative;
+    background-clip: padding-box;
+  }
+
+  .pixelated-input {
+    @apply pixelated-container pixelated-border-thin bg-gray-800 text-white px-3 py-2 font-vcr;
+    outline: none;
+    transition: border-color 0.3s ease;
+  }
+
+  .pixelated-input:focus {
+    @apply border-dhani-gold;
+    box-shadow: 0 0 0 2px rgba(241, 205, 54, 0.2);
+  }
+
+  .pixelated-text-primary {
+    @apply text-white font-vcr;
+  }
+
+  .pixelated-text-accent {
+    @apply text-dhani-gold font-vcr font-bold tracking-wider;
+  }
+
+  .pixelated-text-muted {
+    @apply text-gray-400 font-vcr;
+  }
+
+  /* Enhanced Pixelated Animations */
+  .pixelated-fade-in {
+    animation: pixelatedFadeIn 0.5s ease-out;
+  }
+
+  .pixelated-slide-up {
+    animation: pixelatedSlideUp 0.4s ease-out;
+  }
+
+  .pixelated-pulse {
+    animation: pixelatedPulse 2s infinite;
+  }
+
+  .pixelated-glow {
+    position: relative;
+  }
+
+  .pixelated-glow::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, #F1CD36, #FFF8DF, #F1CD36);
+    border-radius: 0;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .pixelated-glow:hover::after {
+    opacity: 0.3;
+  }
+
+  /* Pixelated Loading Spinner */
+  .pixelated-spinner {
+    @apply inline-block;
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(45deg, #F1CD36 25%, transparent 25%, transparent 75%, #F1CD36 75%);
+    background-size: 8px 8px;
+    animation: pixelatedSpin 1s linear infinite;
+  }
+
+  /* Pixelated Progress Bar */
+  .pixelated-progress {
+    @apply pixelated-border-thin bg-gray-800 overflow-hidden;
+    height: 8px;
+  }
+
+  .pixelated-progress-fill {
+    @apply bg-dhani-gold h-full transition-all duration-500 ease-out;
+    background-image: repeating-linear-gradient(
+      90deg,
+      #F1CD36 0px,
+      #F1CD36 4px,
+      #FFF8DF 4px,
+      #FFF8DF 8px
+    );
+  }
+
+  /* Pixelated Status Indicators */
+  .pixelated-status-dot {
+    @apply inline-block;
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    image-rendering: pixelated;
+  }
+
+  .pixelated-status-success {
+    @apply text-dhani-green;
+  }
+
+  .pixelated-status-error {
+    @apply text-red-500;
+  }
+
+  .pixelated-status-warning {
+    @apply text-yellow-500;
+  }
+
+  .pixelated-status-info {
+    @apply text-blue-500;
+  }
+
+  /* Pixelated Notification */
+  .pixelated-notification {
+    @apply pixelated-card pixelated-border-medium p-4 font-vcr;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    max-width: 400px;
+    animation: pixelatedSlideIn 0.3s ease-out;
+  }
+
+  .pixelated-notification-success {
+    @apply border-dhani-green bg-green-900/20;
+  }
+
+  .pixelated-notification-error {
+    @apply border-red-500 bg-red-900/20;
+  }
+
+  /* Pixelated Scrollbar */
+  .pixelated-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #F1CD36 transparent;
+  }
+
+  .pixelated-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .pixelated-scrollbar::-webkit-scrollbar-track {
+    background: #1A1A1A;
+  }
+
+  .pixelated-scrollbar::-webkit-scrollbar-thumb {
+    background: #F1CD36;
+    border-radius: 0;
+  }
+
+  .pixelated-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #FFF8DF;
+  }
+
   /* Gradient eclipse background styling */
   .gradient-eclipse {
     @apply fixed inset-0 z-[-2] overflow-hidden;
@@ -649,7 +1110,7 @@ button:focus-visible {
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.3);
   }
-}
+
 
 @keyframes blobPulse {
   0%, 100% {
@@ -662,4 +1123,516 @@ button:focus-visible {
     background: #d1fbc770;
     filter: blur(150px);
   }
+}
+
+/* Advanced Banking UI Animations */
+@keyframes scanlines {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes pixelGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3)) brightness(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6)) brightness(1.1);
+  }
+}
+
+@keyframes pixelShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes numberCount {
+  from {
+    transform: scale(1.2);
+    color: #F1CD36;
+  }
+  to {
+    transform: scale(1);
+    color: inherit;
+  }
+}
+
+/* Utility animation classes */
+.animate-pixel-glow {
+  animation: pixelGlow 2s ease-in-out infinite;
+}
+
+.animate-pixel-shake {
+  animation: pixelShake 0.5s ease-in-out;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.3s ease-out;
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.6s ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.animate-number-count {
+  animation: numberCount 0.3s ease-out;
+}
+
+/* Final Polish Animations */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(241, 205, 54, 0.6), 0 0 30px rgba(241, 205, 54, 0.4);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Hardware acceleration utilities */
+.transform-gpu {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* Performance optimized transitions */
+.transition-transform-gpu {
+  transition: transform 0.3s ease-out;
+  transform: translateZ(0);
+}
+
+.transition-opacity-gpu {
+  transition: opacity 0.3s ease-out;
+  will-change: opacity;
+}
+
+/* Final polish utilities */
+.pixelated-shadow {
+  filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.5));
+}
+
+.pixelated-glow {
+  filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+}
+
+.pixelated-border-glow {
+  box-shadow: 
+    0 0 0 1px #F1CD36,
+    0 0 0 2px rgba(241, 205, 54, 0.5),
+    0 0 20px rgba(241, 205, 54, 0.3);
+}
+
+/* Pixelated Animation Keyframes */
+@keyframes pixelatedFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pixelatedSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pixelatedSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pixelatedPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes pixelatedSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pixelatedGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(241, 205, 54, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(241, 205, 54, 0.6);
+  }
+}
+}
+/* En
+hanced Banking UI Animations */
+@keyframes animate-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes animate-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes animate-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes animate-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes animate-slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes animate-bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes animate-pixel-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(241, 205, 54, 0.3));
+    box-shadow: 0 0 4px rgba(241, 205, 54, 0.2);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(241, 205, 54, 0.6));
+    box-shadow: 0 0 12px rgba(241, 205, 54, 0.4);
+  }
+}
+
+/* Apply animations as utility classes */
+.animate-fade-in {
+  animation: animate-fade-in 0.5s ease-out;
+}
+
+.animate-scale-in {
+  animation: animate-scale-in 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: animate-slide-in-left 0.4s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: animate-slide-in-right 0.4s ease-out;
+}
+
+.animate-slide-in-up {
+  animation: animate-slide-in-up 0.4s ease-out;
+}
+
+.animate-bounce-in {
+  animation: animate-bounce-in 0.6s ease-out;
+}
+
+.animate-pixel-glow {
+  animation: animate-pixel-glow 2s ease-in-out infinite;
+}
+
+/* Enhanced Banking UI Container */
+.banking-ui-container {
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.banking-ui-container.active {
+  pointer-events: all;
+}
+
+/* Banking UI specific enhancements */
+.banking-status-overlay {
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.banking-message-notification {
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.banking-balance-indicator {
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(241, 205, 54, 0.2);
+}
+
+/* Pixelated loading state */
+.banking-loading-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.banking-loading-dots::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  animation: banking-loading-pulse 1.4s ease-in-out infinite both;
+}
+
+.banking-loading-dots::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  animation: banking-loading-pulse 1.4s ease-in-out -0.16s infinite both;
+}
+
+@keyframes banking-loading-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Enhanced gradient backgrounds for banking UI */
+.banking-gradient-bg {
+  background: linear-gradient(135deg, 
+    rgba(0, 0, 0, 0.95) 0%, 
+    rgba(20, 20, 20, 0.9) 25%, 
+    rgba(40, 40, 40, 0.85) 50%, 
+    rgba(20, 20, 20, 0.9) 75%, 
+    rgba(0, 0, 0, 0.95) 100%
+  );
+}
+
+.banking-card-glow {
+  position: relative;
+}
+
+.banking-card-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, 
+    rgba(241, 205, 54, 0.1), 
+    rgba(241, 205, 54, 0.3), 
+    rgba(241, 205, 54, 0.1)
+  );
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.banking-card-glow:hover::before {
+  opacity: 1;
 }

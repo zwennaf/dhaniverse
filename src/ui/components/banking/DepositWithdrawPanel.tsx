@@ -12,7 +12,8 @@ const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
   bankBalance,
   onDeposit,
   onWithdraw
-}) => {  const [amount, setAmount] = useState(1000);
+}) => {
+  const [amount, setAmount] = useState(1000);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [transactionType, setTransactionType] = useState<'deposit' | 'withdraw'>('deposit');
@@ -152,7 +153,8 @@ const DepositWithdrawPanel: React.FC<DepositWithdrawPanelProps> = ({
           ))}
         </div>
       </div>
-        {/* Transaction Button */}
+        
+      {/* Transaction Button */}
       <button
         onClick={handleTransaction}
         disabled={isProcessing}

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { StatusIndicator, StatusBadge, LoadingState, ProgressBar } from '../feedback/StatusIndicators';
+import { AccessibleButton, AccessibleInput } from '../accessibility/AccessibleComponents';
 
 interface FixedDeposit {
   id?: string;
@@ -24,12 +26,14 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
   fixedDeposits,
   onCreateFD,
   onClaimFD
-}) => {  const [amount, setAmount] = useState(5000);
+}) => {
+  const [amount, setAmount] = useState('5000');
   const [duration, setDuration] = useState(90); // Days
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [isCreatingFD, setIsCreatingFD] = useState(false);
   const [claimingFDs, setClaimingFDs] = useState<Set<string>>(new Set());
+  const [validationError, setValidationError] = useState('');
   
   // Predefined durations in days
   const durations = [
@@ -68,26 +72,35 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
     return Math.round(amount + interest);
   };
   
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    if (!isNaN(value) && value >= 0) {
-      setAmount(value);
+  const handleAmountChange = (value: string) => {
+    setAmount(value);
+    setValidationError('');
+    setMessage('');
+    
+    const numValue = parseInt(value);
+    if (value && (isNaN(numValue) || numValue <= 0)) {
+      setValidationError('Please enter a valid amount greater than 0');
+    } else if (numValue < 1000) {
+      setValidationError('Minimum deposit amount is ₹1,000');
+    } else if (numValue > bankBalance) {
+      setValidationError('Amount exceeds available bank balance');
     }
   };
   
-  const handleDurationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDuration(parseInt(e.target.value));
+  const handleDurationChange = (newDuration: number) => {
+    setDuration(newDuration);
+    setMessage('');
   };
-    const handleCreateFD = async () => {
-    if (amount <= 0) {
+  const handleCreateFD = async () => {
+    const numAmount = parseInt(amount);
+    
+    if (!amount || isNaN(numAmount) || numAmount <= 0) {
       setMessage('Please enter a valid amount');
       setMessageType('error');
       return;
     }
     
-    if (amount > bankBalance) {
-      setMessage('Insufficient balance in your account!');
-      setMessageType('error');
+    if (validationError) {
       return;
     }
     
@@ -95,10 +108,11 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
     setMessage('');
     
     try {
-      const success = await onCreateFD(amount, duration);
+      const success = await onCreateFD(numAmount, duration);
       if (success) {
-        setMessage(`Fixed deposit of ₹${amount.toLocaleString()} created successfully!`);
+        setMessage(`Fixed deposit of ₹${numAmount.toLocaleString()} created successfully!`);
         setMessageType('success');
+        setAmount('5000'); // Reset to default
       } else {
         setMessage('Failed to create fixed deposit. Please try again.');
         setMessageType('error');
@@ -143,165 +157,301 @@ const FixedDepositPanel: React.FC<FixedDepositPanelProps> = ({
   };
   
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-yellow-400">Fixed Deposits</h2>
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Header with Status */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-dhani-gold font-vcr font-bold text-xl tracking-wider flex items-center">
+          <span className="mr-3">📈</span>
+          FIXED DEPOSITS
+        </h2>
+        <StatusBadge 
+          type={fixedDeposits.some(fd => fd.matured) ? 'success' : 'info'} 
+          text={`${fixedDeposits.length} Active`} 
+        />
+      </div>
       
-      {/* Create new FD section */}
-      <div className="bg-gray-800 rounded-lg p-4 space-y-4">
-        <h3 className="font-medium text-yellow-300">Create New Fixed Deposit</h3>
+      {/* Create New FD Section */}
+      <div className="bg-white/5 border-2 border-white/20 p-6 animate-slide-in-left" style={{ imageRendering: 'pixelated' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-dhani-gold font-vcr font-bold text-lg tracking-wider">
+            CREATE NEW FIXED DEPOSIT
+          </h3>
+          <StatusIndicator type="info" size="md" />
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="fd-amount" className="block text-gray-300">Deposit Amount</label>
-            <input
-              id="fd-amount"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Amount Input */}
+          <div>
+            <AccessibleInput
+              label="Deposit Amount"
               type="number"
-              min="1000"
               value={amount}
               onChange={handleAmountChange}
-              className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              placeholder="Minimum ₹1,000"
+              required
+              error={validationError}
+              helpText={`Available: ₹${bankBalance.toLocaleString()}`}
             />
           </div>
           
+          {/* Duration Selection */}
           <div className="space-y-2">
-            <label htmlFor="fd-duration" className="block text-gray-300">Duration</label>
-            <select
-              id="fd-duration"
-              value={duration}
-              onChange={handleDurationChange}
-              className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            >
+            <div className="text-white font-vcr font-bold text-sm tracking-wider">
+              DURATION & INTEREST RATE
+            </div>
+            <div className="space-y-2">
               {durations.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <button
+                  key={option.value}
+                  onClick={() => handleDurationChange(option.value)}
+                  className={`
+                    w-full p-3 text-left border-2 font-vcr text-sm transition-all duration-200
+                    ${duration === option.value 
+                      ? 'bg-dhani-gold text-black border-dhani-gold animate-pixel-glow' 
+                      : 'bg-transparent text-white border-white/20 hover:border-dhani-gold hover:text-dhani-gold'
+                    }
+                  `}
+                  style={{ imageRendering: 'pixelated' }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold tracking-wider">
+                      {option.label.split('(')[0].trim().toUpperCase()}
+                    </span>
+                    <span className={duration === option.value ? 'text-black' : 'text-dhani-gold'}>
+                      {option.label.match(/\((.*?)\)/)?.[1]}
+                    </span>
+                  </div>
+                </button>
               ))}
-            </select>
-          </div>
-        </div>
-        
-        <div className="bg-gray-700 p-3 rounded-md">
-          <div className="text-gray-300">Summary:</div>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <div className="text-gray-400">Principal Amount:</div>
-            <div className="text-yellow-300">₹{amount.toLocaleString()}</div>
-            
-            <div className="text-gray-400">Interest Rate:</div>
-            <div className="text-yellow-300">{getInterestRate(duration)}% per annum</div>
-            
-            <div className="text-gray-400">Duration:</div>
-            <div className="text-yellow-300">{Math.round(duration / 30.44)} months</div>
-            
-            <div className="text-gray-400">Maturity Date:</div>
-            <div className="text-yellow-300">{formatDate(Date.now() + duration * 24 * 60 * 60 * 1000)}</div>
-            
-            <div className="text-gray-400">Maturity Amount:</div>
-            <div className="text-yellow-300 font-semibold">
-              ₹{getMaturityAmount(amount, getInterestRate(duration), duration).toLocaleString()}
             </div>
           </div>
         </div>
-          <button
-          onClick={handleCreateFD}
-          disabled={amount > bankBalance || isCreatingFD}
-          className={`w-full py-2 rounded-md transition-colors duration-200 ${
-            amount > bankBalance || isCreatingFD
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-          }`}
-        >
-          {isCreatingFD ? 'Creating...' : 'Create Fixed Deposit'}
-        </button>
         
-        {amount > bankBalance && (
-          <div className="text-red-400 text-sm">
-            Insufficient balance in your bank account.
+        {/* Investment Summary */}
+        {amount && !validationError && (
+          <div className="mt-6 bg-dhani-gold/10 border-2 border-dhani-gold p-4 animate-bounce-in" style={{ imageRendering: 'pixelated' }}>
+            <div className="text-dhani-gold font-vcr font-bold text-sm tracking-wider mb-3">
+              INVESTMENT SUMMARY
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm font-vcr">
+              <div>
+                <div className="text-gray-400 tracking-wider">PRINCIPAL</div>
+                <div className="text-white font-bold">₹{parseInt(amount).toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 tracking-wider">INTEREST RATE</div>
+                <div className="text-dhani-gold font-bold">{getInterestRate(duration)}% P.A.</div>
+              </div>
+              <div>
+                <div className="text-gray-400 tracking-wider">DURATION</div>
+                <div className="text-white font-bold">{Math.round(duration / 30.44)} MONTHS</div>
+              </div>
+              <div>
+                <div className="text-gray-400 tracking-wider">MATURITY DATE</div>
+                <div className="text-white font-bold">{formatDate(Date.now() + duration * 24 * 60 * 60 * 1000)}</div>
+              </div>
+              <div>
+                <div className="text-gray-400 tracking-wider">INTEREST EARNED</div>
+                <div className="text-dhani-green font-bold">
+                  ₹{(getMaturityAmount(parseInt(amount), getInterestRate(duration), duration) - parseInt(amount)).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-400 tracking-wider">MATURITY AMOUNT</div>
+                <div className="text-dhani-gold font-bold text-lg">
+                  ₹{getMaturityAmount(parseInt(amount), getInterestRate(duration), duration).toLocaleString()}
+                </div>
+              </div>
+            </div>
+            
+            {/* ROI Progress Bar */}
+            <div className="mt-4">
+              <ProgressBar
+                progress={(getInterestRate(duration) / 10) * 100}
+                label="Interest Rate"
+                color="gold"
+                showPercentage={false}
+              />
+            </div>
           </div>
         )}
+        
+        {/* Create FD Button */}
+        <div className="mt-6">
+          {isCreatingFD ? (
+            <LoadingState message="Creating Fixed Deposit..." className="py-4" />
+          ) : (
+            <AccessibleButton
+              onClick={handleCreateFD}
+              variant="primary"
+              size="lg"
+              disabled={!!validationError || !amount || parseInt(amount) < 1000}
+              ariaLabel={`Create fixed deposit of ₹${amount || '0'} for ${Math.round(duration / 30.44)} months`}
+              className="w-full animate-pixel-glow"
+            >
+              <span className="mr-2">📈</span>
+              CREATE FIXED DEPOSIT
+              {amount && !validationError && (
+                <span className="ml-2 text-black/70">
+                  (₹{parseInt(amount).toLocaleString()})
+                </span>
+              )}
+            </AccessibleButton>
+          )}
+        </div>
       </div>
       
-      {/* Existing FDs section */}
-      <div className="space-y-4">
-        <h3 className="font-medium text-yellow-300">Your Fixed Deposits</h3>
+      {/* Existing FDs Section */}
+      <div className="space-y-4 animate-slide-in-right">
+        <div className="flex items-center justify-between">
+          <h3 className="text-dhani-gold font-vcr font-bold text-lg tracking-wider">
+            YOUR FIXED DEPOSITS
+          </h3>
+          {fixedDeposits.length > 0 && (
+            <div className="text-white font-vcr text-sm">
+              Total Value: ₹{fixedDeposits.reduce((sum, fd) => 
+                sum + getMaturityAmount(fd.amount, fd.interestRate, fd.duration), 0
+              ).toLocaleString()}
+            </div>
+          )}
+        </div>
         
         {fixedDeposits.length > 0 ? (
-          <div className="space-y-4">            {fixedDeposits.map(fd => {
+          <div className="space-y-4">
+            {fixedDeposits.map(fd => {
               const fdId = fd.id || fd._id || '';
               const isClaimingThis = claimingFDs.has(fdId);
+              const daysRemaining = getDaysRemaining(fd.maturityDate);
+              const maturityAmount = getMaturityAmount(fd.amount, fd.interestRate, fd.duration);
+              const progressPercentage = fd.matured ? 100 : Math.max(0, 100 - (daysRemaining / (fd.duration)) * 100);
               
               return (
-              <div 
-                key={fdId} 
-                className={`p-4 rounded-md border ${
-                  fd.matured 
-                    ? 'bg-green-900/30 border-green-700' 
-                    : 'bg-gray-800 border-gray-700'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-yellow-300">
-                      ₹{fd.amount.toLocaleString()} at {fd.interestRate}%
-                    </h4>
-                    <div className="text-sm text-gray-400 mt-1">
-                      Created on {formatDate(fd.startDate)}
+                <div 
+                  key={fdId} 
+                  className={`
+                    p-4 border-2 transition-all duration-300 hover:scale-105
+                    ${fd.matured 
+                      ? 'bg-dhani-green/20 border-dhani-green animate-pixel-glow' 
+                      : 'bg-white/5 border-white/20 hover:border-dhani-gold'
+                    }
+                  `}
+                  style={{ imageRendering: 'pixelated' }}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="text-dhani-gold font-vcr font-bold text-lg">
+                        ₹{fd.amount.toLocaleString()}
+                      </h4>
+                      <div className="text-white font-vcr text-sm">
+                        {fd.interestRate}% P.A. • {Math.round(fd.duration / 30.44)} MONTHS
+                      </div>
+                      <div className="text-gray-400 font-vcr text-xs mt-1">
+                        CREATED: {formatDate(fd.startDate)}
+                      </div>
+                    </div>
+                    
+                    <StatusBadge
+                      type={fd.matured ? 'success' : 'info'}
+                      text={fd.matured ? 'Matured' : `${daysRemaining} Days Left`}
+                      size="sm"
+                    />
+                  </div>
+                  
+                  {/* Progress Bar for Maturity */}
+                  <div className="mb-4">
+                    <ProgressBar
+                      progress={progressPercentage}
+                      label="Maturity Progress"
+                      color={fd.matured ? 'green' : progressPercentage > 75 ? 'gold' : 'blue'}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-vcr mb-4">
+                    <div>
+                      <div className="text-gray-400 tracking-wider">MATURITY DATE</div>
+                      <div className="text-white font-bold">{formatDate(fd.maturityDate)}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400 tracking-wider">INTEREST EARNED</div>
+                      <div className="text-dhani-green font-bold">
+                        ₹{(maturityAmount - fd.amount).toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400 tracking-wider">MATURITY AMOUNT</div>
+                      <div className="text-dhani-gold font-bold text-lg">
+                        ₹{maturityAmount.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-400 tracking-wider">STATUS</div>
+                      <div className={`font-bold ${fd.matured ? 'text-dhani-green' : 'text-blue-400'}`}>
+                        {fd.matured ? 'READY TO CLAIM' : 'ACTIVE'}
+                      </div>
                     </div>
                   </div>
                   
-                  {fd.matured ? (
-                    <span className="px-2 py-1 text-xs bg-green-800 text-green-300 rounded-full">
-                      Matured
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 text-xs bg-blue-800 text-blue-300 rounded-full">
-                      {getDaysRemaining(fd.maturityDate)} days left
-                    </span>
+                  {fd.matured && (
+                    <div className="mt-4">
+                      {isClaimingThis ? (
+                        <LoadingState message="Claiming FD..." className="py-2" />
+                      ) : (
+                        <AccessibleButton
+                          onClick={() => handleClaimFD(fdId)}
+                          variant="primary"
+                          size="md"
+                          ariaLabel={`Claim fixed deposit of ₹${maturityAmount.toLocaleString()}`}
+                          className="w-full animate-pixel-glow"
+                        >
+                          <span className="mr-2">💰</span>
+                          CLAIM WITH INTEREST
+                          <span className="ml-2 text-black/70">
+                            (₹{maturityAmount.toLocaleString()})
+                          </span>
+                        </AccessibleButton>
+                      )}
+                    </div>
                   )}
                 </div>
-                
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-sm">
-                  <div className="text-gray-400">Maturity Date:</div>
-                  <div className="text-white">{formatDate(fd.maturityDate)}</div>
-                  
-                  <div className="text-gray-400">Duration:</div>
-                  <div className="text-white">{Math.round(fd.duration / 30.44)} months</div>
-                  
-                  <div className="text-gray-400">Maturity Amount:</div>
-                  <div className="text-white font-semibold">
-                    ₹{getMaturityAmount(fd.amount, fd.interestRate, fd.duration).toLocaleString()}
-                  </div>
-                </div>
-                
-                {fd.matured && (
-                  <button
-                    onClick={() => handleClaimFD(fdId)}
-                    disabled={isClaimingThis}
-                    className={`mt-3 w-full py-2 rounded-md transition-colors duration-200 ${
-                      isClaimingThis
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-700 text-white'
-                    }`}
-                  >
-                    {isClaimingThis ? 'Claiming...' : 'Claim with Interest'}
-                  </button>
-                )}
-              </div>
               );
             })}
           </div>
         ) : (
-          <div className="p-4 bg-gray-800 rounded-md text-gray-400 text-center">
-            You don't have any fixed deposits yet. Create one to start earning interest!
+          <div className="bg-white/5 border-2 border-white/20 p-8 text-center animate-fade-in-up" style={{ imageRendering: 'pixelated' }}>
+            <div className="text-6xl mb-4">📈</div>
+            <div className="text-white font-vcr font-bold text-lg tracking-wider mb-2">
+              NO FIXED DEPOSITS YET
+            </div>
+            <div className="text-gray-400 font-vcr text-sm tracking-wider">
+              CREATE YOUR FIRST FIXED DEPOSIT TO START EARNING GUARANTEED RETURNS
+            </div>
           </div>
         )}
       </div>
       
-      {/* Message */}
+      {/* Enhanced Message Display */}
       {message && (
-        <div className={`p-3 rounded-md ${
-          messageType === 'success' ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
-        }`}>
-          {message}
+        <div className={`
+          p-4 border-2 font-vcr animate-bounce-in
+          ${messageType === 'success' 
+            ? 'bg-dhani-green/20 border-dhani-green text-dhani-green' 
+            : 'bg-red-500/20 border-red-500 text-red-400'
+          }
+        `} style={{ imageRendering: 'pixelated' }}>
+          <div className="flex items-center space-x-3">
+            <StatusIndicator 
+              type={messageType === 'success' ? 'success' : 'error'} 
+              size="md" 
+            />
+            <div>
+              <div className="font-bold tracking-wider text-sm">
+                {messageType === 'success' ? 'FIXED DEPOSIT SUCCESS' : 'FIXED DEPOSIT ERROR'}
+              </div>
+              <div className="text-sm opacity-90">
+                {message}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

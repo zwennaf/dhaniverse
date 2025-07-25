@@ -425,7 +425,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 font-vcr">
             <div
-                className="bg-black border-4 border-white w-full max-w-6xl max-h-[95vh] overflow-hidden"
+                className="bg-black border-4 border-white w-full max-w-6xl max-h-[95vh]"
                 style={{
                     imageRendering: "pixelated",
                     backgroundImage: `url("data:image/svg+xml;base64,${btoa(`<svg width="100%" height="100%" viewBox="0 0 1201 602" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -437,41 +437,62 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     backgroundSize: "100% 100%",
                 }}
             >
-                {/* Retro Header */}
+                {/* Header */}
                 <div className="bg-dhani-gold text-black p-6 border-b-4 border-white">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                            <div className="text-3xl">🏦</div>
+                            {/* Pixelated Bank Icon */}
+                            <div className="w-12 h-12 bg-black flex items-center justify-center border-2 border-black">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
+                                    <rect x="2" y="10" width="20" height="2" fill="#F1CD36" />
+                                    <rect x="4" y="12" width="2" height="8" fill="#F1CD36" />
+                                    <rect x="8" y="12" width="2" height="8" fill="#F1CD36" />
+                                    <rect x="12" y="12" width="2" height="8" fill="#F1CD36" />
+                                    <rect x="16" y="12" width="2" height="8" fill="#F1CD36" />
+                                    <rect x="2" y="20" width="20" height="2" fill="#F1CD36" />
+                                    <rect x="10" y="6" width="4" height="4" fill="#F1CD36" />
+                                    <rect x="8" y="8" width="2" height="2" fill="#F1CD36" />
+                                    <rect x="14" y="8" width="2" height="2" fill="#F1CD36" />
+                                    <rect x="6" y="4" width="12" height="2" fill="#F1CD36" />
+                                </svg>
+                            </div>
                             <div>
-                                <h1 className="text-2xl font-bold tracking-wider">
+                                <h1 className="text-2xl font-bold tracking-wider font-vcr">
                                     DHANIVERSE BANKING
                                 </h1>
-                                <p className="text-sm tracking-widest opacity-80">
+                                <p className="text-sm tracking-widest opacity-80 font-vcr">
                                     YOUR FINANCIAL COMMAND CENTER
                                 </p>
                             </div>
                         </div>
 
-                        {/* Status Indicators */}
+                        {/* Enhanced Status Indicators */}
                         <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2 bg-black text-white px-3 py-2 border-2 border-white">
+                            <div className="flex items-center space-x-2 bg-black text-white px-4 py-2 border-2 border-white font-vcr">
                                 <div
-                                    className={`w-2 h-2 ${
+                                    className={`w-3 h-3 ${
                                         walletStatus.connected
                                             ? "bg-dhani-green"
                                             : "bg-red-500"
                                     }`}
                                 ></div>
-                                <span className="text-xs font-bold tracking-wider">
-                                    {walletStatus.connected
-                                        ? `${walletStatus.walletType?.toUpperCase()} CONNECTED`
-                                        : "LOCAL MODE"}
-                                </span>
+                                <div>
+                                    <div className="text-xs font-bold tracking-wider">
+                                        {walletStatus.connected
+                                            ? `${walletStatus.walletType?.toUpperCase()} CONNECTED`
+                                            : "LOCAL MODE"}
+                                    </div>
+                                    {walletStatus.connected && walletStatus.address && (
+                                        <div className="text-xs text-dhani-gold">
+                                            {walletStatus.address.slice(0, 8)}...{walletStatus.address.slice(-6)}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <button
                                 onClick={handleClose}
-                                className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold text-lg"
+                                className="w-12 h-12 bg-red-600 hover:bg-red-700 text-white border-2 border-white font-bold text-xl font-vcr"
                             >
                                 ×
                             </button>
@@ -479,59 +500,107 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     </div>
                 </div>
 
-                {/* Balance Overview - Retro Style */}
+                {/* Balance Overview */}
                 <div className="bg-black text-white p-6 border-b-2 border-white/20">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-dhani-green/20 border-2 border-dhani-green p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-dhani-green text-sm font-bold tracking-wider">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-dhani-green text-sm font-bold tracking-wider font-vcr">
                                     WALLET BALANCE
                                 </span>
-                                <span className="text-2xl">💰</span>
+                                {/* Pixelated Wallet Icon */}
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
+                                    <rect x="2" y="6" width="20" height="12" fill="none" stroke="#4CA64C" strokeWidth="2" />
+                                    <rect x="4" y="8" width="16" height="8" fill="none" stroke="#4CA64C" strokeWidth="1" />
+                                    <rect x="16" y="10" width="4" height="4" fill="#4CA64C" />
+                                    <rect x="18" y="11" width="2" height="2" fill="none" stroke="white" strokeWidth="1" />
+                                    <rect x="4" y="4" width="14" height="2" fill="#4CA64C" />
+                                </svg>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold">
-                                ₹
-                                {(
-                                    playerRupees + totalRupeesChange
-                                ).toLocaleString()}
+                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
+                                ₹{(playerRupees + totalRupeesChange).toLocaleString()}
                             </div>
-                            <div className="text-dhani-green text-xs tracking-wider">
+                            <div className="text-dhani-green text-xs tracking-wider font-vcr">
                                 AVAILABLE FOR TRANSACTIONS
+                            </div>
+                            {/* Progress bar */}
+                            <div className="mt-3 w-full bg-gray-700 h-2">
+                                <div 
+                                    className="bg-dhani-green h-2 transition-all duration-500"
+                                    style={{ 
+                                        width: `${Math.min((playerRupees + totalRupeesChange) / 100000 * 100, 100)}%`,
+                                        imageRendering: 'pixelated'
+                                    }}
+                                />
                             </div>
                         </div>
 
                         <div className="bg-blue-500/20 border-2 border-blue-400 p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-blue-400 text-sm font-bold tracking-wider">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-blue-400 text-sm font-bold tracking-wider font-vcr">
                                     BANK BALANCE
                                 </span>
-                                <span className="text-2xl">🏦</span>
+                                {/* Pixelated Bank Icon */}
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
+                                    <rect x="2" y="10" width="20" height="2" fill="#60A5FA" />
+                                    <rect x="4" y="12" width="2" height="8" fill="#60A5FA" />
+                                    <rect x="8" y="12" width="2" height="8" fill="#60A5FA" />
+                                    <rect x="12" y="12" width="2" height="8" fill="#60A5FA" />
+                                    <rect x="16" y="12" width="2" height="8" fill="#60A5FA" />
+                                    <rect x="2" y="20" width="20" height="2" fill="#60A5FA" />
+                                    <rect x="10" y="6" width="4" height="4" fill="#60A5FA" />
+                                    <rect x="8" y="8" width="2" height="2" fill="#60A5FA" />
+                                    <rect x="14" y="8" width="2" height="2" fill="#60A5FA" />
+                                    <rect x="6" y="4" width="12" height="2" fill="#60A5FA" />
+                                </svg>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold">
+                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
                                 ₹{bankBalance.toLocaleString()}
                             </div>
-                            <div className="text-blue-400 text-xs tracking-wider">
+                            <div className="text-blue-400 text-xs tracking-wider font-vcr">
                                 SECURED IN BANK
+                            </div>
+                            {/* Progress bar */}
+                            <div className="mt-3 w-full bg-gray-700 h-2">
+                                <div 
+                                    className="bg-blue-400 h-2 transition-all duration-500"
+                                    style={{ 
+                                        width: `${Math.min(bankBalance / 100000 * 100, 100)}%`,
+                                        imageRendering: 'pixelated'
+                                    }}
+                                />
                             </div>
                         </div>
 
                         <div className="bg-purple-500/20 border-2 border-purple-400 p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-purple-400 text-sm font-bold tracking-wider">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-purple-400 text-sm font-bold tracking-wider font-vcr">
                                     TOTAL PORTFOLIO
                                 </span>
-                                <span className="text-2xl">📈</span>
+                                {/* Pixelated Chart Icon */}
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ imageRendering: 'pixelated' }}>
+                                    <rect x="2" y="2" width="20" height="20" fill="none" stroke="#A78BFA" strokeWidth="2" />
+                                    <rect x="6" y="16" width="2" height="4" fill="#A78BFA" />
+                                    <rect x="10" y="12" width="2" height="8" fill="#A78BFA" />
+                                    <rect x="14" y="8" width="2" height="12" fill="#A78BFA" />
+                                    <rect x="18" y="6" width="2" height="14" fill="#A78BFA" />
+                                </svg>
                             </div>
-                            <div className="text-2xl font-bold text-dhani-gold">
-                                ₹
-                                {(
-                                    playerRupees +
-                                    totalRupeesChange +
-                                    bankBalance
-                                ).toLocaleString()}
+                            <div className="text-2xl font-bold text-dhani-gold font-vcr mb-2">
+                                ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
                             </div>
-                            <div className="text-purple-400 text-xs tracking-wider">
+                            <div className="text-purple-400 text-xs tracking-wider font-vcr">
                                 COMBINED VALUE
+                            </div>
+                            {/* Progress bar */}
+                            <div className="mt-3 w-full bg-gray-700 h-2">
+                                <div 
+                                    className="bg-purple-400 h-2 transition-all duration-500"
+                                    style={{ 
+                                        width: `${Math.min((playerRupees + totalRupeesChange + bankBalance) / 200000 * 100, 100)}%`,
+                                        imageRendering: 'pixelated'
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>
