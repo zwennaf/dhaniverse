@@ -207,10 +207,10 @@ export class MainScene extends Scene implements MainGameScene {
 
         this.load.spritesheet(
             "character",
-            "/characters/orange_browncap_guy.png",
+            "/characters/C2.png",
             {
-                frameWidth: 64,
-                frameHeight: 64,
+                frameWidth: 1000.25, // 4001 / 4 = 1000.25
+                frameHeight: 1000.25, // 4001 / 4 = 1000.25
             }
         );
 
