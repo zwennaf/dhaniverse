@@ -36,7 +36,8 @@ const GamePage: React.FC = () => {
     // Start game with a slight delay
     const gameStartTimeout = setTimeout(() => {
       console.log("GamePage: Calling startGame");
-      startGame(gameUsername as string);
+      const selectedCharacter = user?.selectedCharacter || 'C2';
+      startGame(gameUsername as string, selectedCharacter);
     }, 100);
 
     return () => {
@@ -64,7 +65,7 @@ const GamePage: React.FC = () => {
       
       document.body.classList.remove('game-active');
     };
-  }, [isLoaded, isSignedIn, user?.gameUsername, navigate]); // More specific dependency
+  }, [isLoaded, isSignedIn, user?.gameUsername, user?.selectedCharacter, navigate]); // More specific dependency
    
   if (isLoading || !isLoaded) {
     return (
