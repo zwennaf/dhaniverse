@@ -6,6 +6,7 @@ export interface UserDocument extends Document {
   email: string;
   passwordHash: string;
   gameUsername: string;
+  selectedCharacter?: string; // C1, C2, C3, or C4
   createdAt: Date;
   googleId?: string;
   // Game-specific data

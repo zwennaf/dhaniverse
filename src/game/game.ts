@@ -13,9 +13,9 @@ let gameContainer: HTMLElement | null = null;
 let loadingText: HTMLElement | null = null;
 
 /**
- * Start game with the provided username
+ * Start game with the provided username and selected character
  */
-export function startGame(username: string): void {
+export function startGame(username: string, selectedCharacter: string = 'C2'): void {
     // Check if game is already initialized to avoid duplicate instances
     if (game) {
         console.log("Game is already running");
@@ -115,9 +115,10 @@ export function startGame(username: string): void {
         try {
             game = new Phaser.Game(config);
 
-            // Register the username and room code for the game
+            // Register the username, room code, and selected character for the game
             game.registry.set("username", username);
             game.registry.set("roomCode", roomCode);
+            game.registry.set("selectedCharacter", selectedCharacter);
 
             // Initialize the React HUD when game is ready
             game.events.once("ready", () => {

@@ -8,6 +8,7 @@ const Profile: React.FC = () => {
   const { user, isLoaded } = useUser();
   const { signOut, updateProfile } = useAuth();
   const navigate = useNavigate();  const [username, setUsername] = useState('');
+  const [selectedCharacter, setSelectedCharacter] = useState(''); // No default selection
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -20,6 +21,7 @@ const Profile: React.FC = () => {
     console.log('Profile: gameUsername type:', typeof user.gameUsername); // Debug log
     // Prefill the input with existing game username, ensure it's a string
     setUsername(user.gameUsername || '');
+    setSelectedCharacter(user.selectedCharacter || '');
   }, [isLoaded, user, hasUserTyped]);
 
   // Clear error on username change
@@ -52,10 +54,15 @@ const Profile: React.FC = () => {
       return;
     }
     
+    if (!selectedCharacter) {
+      setError('Please select a character before saving');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');
-      const result = await updateProfile(username.trim());
+      const result = await updateProfile(username.trim(), selectedCharacter);
       if (result.success) {
         setSaved(true);
         setHasUserTyped(false); // Reset the flag after successful save
@@ -79,14 +86,20 @@ const Profile: React.FC = () => {
       setSaved(false);
       return;
     }
-      // Username is valid, check if it needs saving
-    if (!saved && username.trim() !== (user.gameUsername || '')) {
-      // Try to save the username first, then navigate in the handleSave success path
+    
+    // Check if username or character needs saving
+    const needsSaving = !saved && (
+      username.trim() !== (user.gameUsername || '') || 
+      selectedCharacter !== (user.selectedCharacter || 'C2')
+    );
+    
+    if (needsSaving) {
+      // Try to save the profile first, then navigate
       handleSave().then(() => {
         navigate('/game');
       });
     } else {
-      // Username is already saved, navigate directly
+      // Profile is already saved, navigate directly
       navigate('/game');
     }
   };
@@ -140,6 +153,60 @@ const Profile: React.FC = () => {
           disabled={loading}
           className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!username || username.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
+
+        {/* Character Selection */}
+        <div className="space-y-3">
+          <label className="block text-dhani-text font-robert text-sm">Choose Character</label>
+          <div className="grid grid-cols-2 gap-3">
+            {['C1', 'C2', 'C3', 'C4'].map((character) => (
+              <div
+                key={character}
+                onClick={() => {
+                  setSelectedCharacter(character);
+                  setSaved(false);
+                }}
+                className={`relative cursor-pointer rounded-lg border-2 transition-all duration-200 ${
+                  selectedCharacter === character
+                    ? 'border-dhani-gold shadow-lg shadow-dhani-gold/30'
+                    : 'border-dhani-gold/30 hover:border-dhani-gold/60'
+                } ${loading ? 'pointer-events-none opacity-50' : ''}`}
+              >
+                <div className="w-14 h-14 bg-dhani-dark/50 rounded overflow-hidden relative">
+                  <img
+                    src={`/characters/${character}cover.png`}
+                    alt={`Character ${character}`}
+                    className="w-full h-full object-cover"
+                    style={{
+                      imageRendering: 'pixelated'
+                    }}
+                    onError={(e) => {
+                      console.error(`Failed to load character cover image: ${character}cover.png`);
+                      // Try lowercase version as fallback
+                      const fallbackSrc = `/characters/${character.toLowerCase()}cover.png`;
+                      if (e.currentTarget.src !== fallbackSrc) {
+                        e.currentTarget.src = fallbackSrc;
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                      }
+                    }}
+                    onLoad={() => {
+                      console.log(`Successfully loaded character cover image: ${character}cover.png`);
+                    }}
+                  />
+                </div>
+                {selectedCharacter === character && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-dhani-gold rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-dhani-dark rounded-full"></div>
+                  </div>
+                )}
+                <div className="text-center text-xs text-dhani-text/70 font-tickerbit mt-1">
+                  {character}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3">
           <PixelButton 
             variant='outline' 

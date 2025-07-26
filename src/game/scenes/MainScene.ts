@@ -73,6 +73,24 @@ export class MainScene extends Scene implements MainGameScene {
     }
 
     /**
+     * Get the selected character from registry or default to C2
+     */
+    private getSelectedCharacter(): string {
+        try {
+            // Get selectedCharacter from game registry (set by startGame)
+            const selectedCharacter = this.registry.get('selectedCharacter');
+            if (selectedCharacter && ['C1', 'C2', 'C3', 'C4'].includes(selectedCharacter)) {
+                return selectedCharacter;
+            }
+        } catch (error) {
+            console.warn('Failed to get selected character:', error);
+        }
+        
+        // Default to C2
+        return 'C2';
+    }
+
+    /**
      * Load Tickerbit font and ensure it's ready before creating text objects
      */
     private async loadTickerbitFont(): Promise<void> {
@@ -205,12 +223,14 @@ export class MainScene extends Scene implements MainGameScene {
         this.load.image("interior", "/maps/bank.png");
         this.load.image("stockmarket", "/maps/stockmarket.png");
 
+        // Load character based on user selection (default to C2)
+        const selectedCharacter = this.getSelectedCharacter();
         this.load.spritesheet(
             "character",
-            "/characters/orange_browncap_guy.png",
+            `/characters/${selectedCharacter}.png`,
             {
-                frameWidth: 64,
-                frameHeight: 64,
+                frameWidth: 1000.25, // 4001 / 4 = 1000.25
+                frameHeight: 1000.25, // 4001 / 4 = 1000.25
             }
         );
 

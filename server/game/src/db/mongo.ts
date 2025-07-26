@@ -12,6 +12,7 @@ export interface User {
     email: string;
     passwordHash: string;
     gameUsername: string;
+    selectedCharacter?: string;
     createdAt: Date;
     googleId?: string;
 }
@@ -149,6 +150,7 @@ class MongoDatabase {
                 email: userData.email,
                 passwordHash: userData.passwordHash,
                 gameUsername: userData.gameUsername,
+                selectedCharacter: userData.selectedCharacter || "C2",
                 createdAt: userData.createdAt,
                 googleId: userData.googleId,
                 gameData: {
@@ -176,6 +178,7 @@ class MongoDatabase {
                 email: userDoc.email,
                 passwordHash: userDoc.passwordHash,
                 gameUsername: userDoc.gameUsername,
+                selectedCharacter: userDoc.selectedCharacter,
                 createdAt: userDoc.createdAt,
                 googleId: userDoc.googleId,
             };
@@ -198,6 +201,7 @@ class MongoDatabase {
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
+            selectedCharacter: userDoc.selectedCharacter,
             createdAt: userDoc.createdAt,
             googleId: userDoc.googleId,
         };
@@ -212,6 +216,7 @@ class MongoDatabase {
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
+            selectedCharacter: userDoc.selectedCharacter,
             createdAt: userDoc.createdAt,
             googleId: userDoc.googleId,
         };
@@ -226,6 +231,7 @@ class MongoDatabase {
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
+            selectedCharacter: userDoc.selectedCharacter,
             createdAt: userDoc.createdAt,
             googleId: userDoc.googleId,
         };

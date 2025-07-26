@@ -133,6 +133,7 @@ authRouter.post("/auth/register", async (ctx: Context) => {
                 id: user.id,
                 email: user.email,
                 gameUsername: user.gameUsername,
+                selectedCharacter: "C2", // Default for new users
             },
         };
     } catch (error) {
@@ -239,6 +240,7 @@ authRouter.post("/auth/login", async (ctx: Context) => {
                 id: user.id,
                 email: user.email,
                 gameUsername: user.gameUsername,
+                selectedCharacter: user.selectedCharacter || "C2",
             },
             isNewUser: false,
         };
@@ -284,6 +286,7 @@ authRouter.get("/auth/me", async (ctx: Context) => {
                 id: userDoc._id?.toString() || "",
                 email: userDoc.email,
                 gameUsername: userDoc.gameUsername,
+                selectedCharacter: userDoc.selectedCharacter || "C2", // Default to C2
             },
         };
     } catch (error) {
@@ -377,7 +380,7 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
         }
 
         const body = await ctx.request.body.json();
-        const { gameUsername } = body;
+        const { gameUsername, selectedCharacter } = body;
 
         if (gameUsername && gameUsername.length < 3) {
             ctx.response.status = 400;
@@ -399,13 +402,29 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
             }
         }
 
+        // Validate selectedCharacter if provided
+        if (selectedCharacter && !['C1', 'C2', 'C3', 'C4'].includes(selectedCharacter)) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                error: "Invalid character selection. Must be C1, C2, C3, or C4",
+            };
+            return;
+        }
+
         // Update user
+        const updateFields: any = { lastUpdated: new Date() };
         if (gameUsername) {
-            const usersCollection =
-                mongodb.getCollection<UserDocument>("users");
+            updateFields.gameUsername = gameUsername;
+        }
+        if (selectedCharacter) {
+            updateFields.selectedCharacter = selectedCharacter;
+        }
+
+        if (Object.keys(updateFields).length > 1) { // More than just lastUpdated
+            const usersCollection = mongodb.getCollection<UserDocument>("users");
             await usersCollection.updateOne(
                 { _id: new ObjectId(verified.userId) },
-                { $set: { gameUsername, lastUpdated: new Date() } }
+                { $set: updateFields }
             );
         }
 
@@ -420,6 +439,7 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
                 id: updatedUser?._id?.toString() || "",
                 email: updatedUser?.email || "",
                 gameUsername: updatedUser?.gameUsername || "",
+                selectedCharacter: updatedUser?.selectedCharacter || "C2", // Default to C2
             },
         };
     } catch (error) {
@@ -468,6 +488,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                     id: user.id,
                     email: user.email,
                     gameUsername: user.gameUsername,
+                    selectedCharacter: user.selectedCharacter || "C2",
                 },
                 isNewUser: false,
             };
@@ -490,6 +511,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                     id: newUser.id,
                     email: newUser.email,
                     gameUsername: newUser.gameUsername,
+                    selectedCharacter: "C2", // Default for new users
                 },
                 isNewUser: true,
             };

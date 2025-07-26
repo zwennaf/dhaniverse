@@ -4,6 +4,7 @@ interface User {
   id: string;
   email: string;
   gameUsername: string;
+  selectedCharacter?: string; // C1, C2, C3, or C4
 }
 
 interface AuthContextType {
@@ -14,7 +15,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, gameUsername: string) => Promise<{ success: boolean; error?: string }>;
   signInWithGoogle: (googleToken: string, gameUsername?: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean }>;
   signOut: () => Promise<void>;
-  updateProfile: (gameUsername: string) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (gameUsername: string, selectedCharacter?: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -169,18 +170,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
-  const updateProfile = async (gameUsername: string): Promise<{ success: boolean; error?: string }> => {
+  const updateProfile = async (gameUsername: string, selectedCharacter?: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const token = localStorage.getItem('dhaniverse_token');
       if (!token) {
         return { success: false, error: 'Not authenticated' };
-      }      const response = await fetch(`${API_BASE}/auth/profile`, {
+      }
+
+      const body: any = { gameUsername };
+      if (selectedCharacter) {
+        body.selectedCharacter = selectedCharacter;
+      }
+
+      const response = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ gameUsername }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
