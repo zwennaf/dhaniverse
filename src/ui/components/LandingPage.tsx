@@ -89,7 +89,7 @@ const LandingPage = () => {
           
           <VideoPlayer 
             thumbnailSrc={mapUrl} 
-            videoSrc="https://www.youtube.com/embed/dQw4w9WgXcQ" 
+            videoSrc="https://www.youtube.com/embed/pa0H39WmyAE" 
             className="mb-6"
           />
           
