@@ -2,13 +2,10 @@
   "version": 1,
   "canisters": {
     "dhaniverse_backend": {
-      "type": "azle",
-      "main": "packages/icp-canister/src/index.ts",
-      "build": [
-        "cd packages/icp-canister && npm install",
-        "npx azle dhaniverse_backend"
-      ],
-      "wasm": ".azle/dhaniverse_backend/dhaniverse_backend.wasm",
+      "type": "rust",
+      "package": "rust-icp-canister",
+      "candid": "packages/icp-canister/rust_icp_canister.did",
+      "wasm": "target/wasm32-unknown-unknown/release/rust_icp_canister.wasm",
       "gzip": true,
       "metadata": [
         {
