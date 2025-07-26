@@ -73,7 +73,7 @@ export class BankNPCManager {
     const bankerX = 800;
     const bankerY = 500;
     this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
-    this.banker.setScale(5);
+    this.banker.setScale(0.3);
     this.banker.anims.play('idle-down');
       // Add banker name text
     const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Teller", {

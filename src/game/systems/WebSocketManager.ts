@@ -553,7 +553,7 @@ export class WebSocketManager {
             playerData.y,
             "character"
         );
-        otherPlayer.setScale(5);
+        otherPlayer.setScale(0.3);
 
         const nameText = this.scene.add
             .text(playerData.x, playerData.y - 50, playerData.username, {

@@ -128,7 +128,7 @@ export class StockMarketManager {
     const brokerX = 800;
     const brokerY = 600;
     this.broker = scene.add.sprite(brokerX, brokerY, 'character') as NPCSprite;
-    this.broker.setScale(5);
+    this.broker.setScale(0.3);
     this.broker.anims.play('idle-down');
       // Add broker name text
     const brokerNameText = scene.add.text(this.broker.x, this.broker.y - 50, "Stock Broker", {
