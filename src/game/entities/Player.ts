@@ -32,7 +32,7 @@ export class Player {
 
         // Create player sprite
         this.sprite = scene.add.sprite(x, y, "character");
-        this.sprite.setScale(0.08); // Scale down the large sprite to reasonable size
+        this.sprite.setScale(0.3); // Scale up the character to be more visible
 
         // Create animations
         this.createAnimations();
@@ -46,8 +46,8 @@ export class Player {
         if (this.sprite.body) {
             const body = this.sprite.body as Phaser.Physics.Arcade.Body;
             body.setCollideWorldBounds(true);
-            body.setSize(16, 16);
-            body.setOffset(24, 24);
+            body.setSize(240, 240);
+            body.setOffset(300, 480);
             body.setDamping(true);
             body.setDrag(0.85, 0.85);
         }

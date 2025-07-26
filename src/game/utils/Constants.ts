@@ -68,7 +68,7 @@ export const Constants = {
     DIALOG_INSTRUCTION_COLOR: "#aaaaaa",
 
     // Debug settings
-    SHOW_DEBUG_VISUALS: false,
+    SHOW_DEBUG_VISUALS: true,
     COLLISION_COLOR: 0xff0000,
     COLLISION_ALPHA: 0.3,
 };
