@@ -1,5 +1,18 @@
 # Blockchain Integration Documentation
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [ICP Integration](#icp-integration)
+- [Wallet Integration](#wallet-integration)
+- [Authentication System](#authentication-system)
+- [Storage Management](#storage-management)
+- [Error Handling](#error-handling)
+- [Security Considerations](#security-considerations)
+- [Development Guide](#development-guide)
+- [Testing and Debugging](#testing-and-debugging)
+
 ## Overview
 
 The Dhaniverse blockchain integration provides seamless Web3 functionality through Internet Computer Protocol (ICP) canisters and traditional Web3 wallet connections. The system enables secure financial transactions, decentralized data storage, and blockchain-based achievement tracking while maintaining compatibility with traditional web technologies.
@@ -503,4 +516,23 @@ const DEFAULT_CONFIG: Web3AuthConfig = {
 - **Multi-Signature Support**: Enhanced security for high-value transactions
 - **Hardware Wallet Support**: Integration with hardware wallets
 - **Advanced Encryption**: Enhanced data protection measures
-- **Audit Integration**: Automated security audit tools
+- **Audit Integration**: Automated security audit tools## Re
+lated Documentation
+
+- [ICP Canister API](../api/icp-canister.md) - Complete canister API reference
+- [Frontend APIs](../api/frontend-apis.md) - Frontend Web3 service APIs
+- [UI Components](./ui-components.md) - Web3 UI components and patterns
+- [Security Architecture](../architecture/security-architecture.md) - Security design and considerations
+- [Configuration Guide](../setup/configuration.md#web3-configuration) - Web3 setup and configuration
+
+## External Resources
+
+- [Internet Computer Documentation](https://internetcomputer.org/docs/current/developer-docs/)
+- [Web3.js Documentation](https://web3js.readthedocs.io/)
+- [MetaMask Developer Documentation](https://docs.metamask.io/)
+- [WalletConnect Documentation](https://docs.walletconnect.com/)
+- [Coinbase Wallet SDK](https://docs.cloud.coinbase.com/wallet-sdk/docs)
+
+---
+
+**Navigation**: [← Game Engine](./game-engine.md) | [Components Index](./index.md) | [UI Components →](./ui-components.md)

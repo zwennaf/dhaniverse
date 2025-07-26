@@ -1,10 +1,22 @@
 # Local Development Setup
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Project Setup](#project-setup)
+- [Environment Configuration](#environment-configuration)
+- [Database Setup](#database-setup)
+- [ICP Canister Setup](#icp-canister-setup)
+- [Server Setup](#server-setup)
+- [Frontend Setup](#frontend-setup)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
+
 This guide provides step-by-step instructions for setting up the Dhaniverse project in your local development environment.
 
 ## Prerequisites
 
-Before starting, ensure you have completed all requirements listed in [Prerequisites](prerequisites.md).
+Before starting, ensure you have completed all requirements listed in [Prerequisites](./prerequisites.md).
 
 ## Project Setup
 
@@ -390,4 +402,24 @@ If you encounter issues not covered in this guide:
 1. Check the [Troubleshooting Guide](troubleshooting.md)
 2. Review existing GitHub issues
 3. Create a new issue with detailed error information
-4. Join the community Discord for real-time help
+4. Join the community Discord for real-time help## Relate
+d Documentation
+
+- [Prerequisites](./prerequisites.md) - System requirements and dependencies
+- [Configuration](./configuration.md) - Environment variables and configuration files
+- [Troubleshooting](./troubleshooting.md) - Common setup issues and solutions
+- [Development Workflow](../development/development-workflow.md) - Development process and Git workflow
+- [Local Deployment](../deployment/local-deployment.md) - Local deployment procedures
+
+## Next Steps
+
+After completing the local setup:
+
+1. **Start Development** - Follow the [Development Workflow](../development/development-workflow.md)
+2. **Run Tests** - See [Testing Guide](../development/testing.md)
+3. **Deploy Locally** - Follow [Local Deployment](../deployment/local-deployment.md)
+4. **Explore APIs** - Check [API Documentation](../api/)
+
+---
+
+**Navigation**: [← Setup Index](./index.md) | [Prerequisites](./prerequisites.md) | [Configuration →](./configuration.md)

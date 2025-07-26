@@ -1,5 +1,18 @@
 # Game Engine Documentation
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Core Components](#core-components)
+- [Game Systems](#game-systems)
+- [Scene Management](#scene-management)
+- [Player System](#player-system)
+- [Multiplayer Integration](#multiplayer-integration)
+- [Performance Optimization](#performance-optimization)
+- [Development Guide](#development-guide)
+- [API Reference](#api-reference)
+
 ## Overview
 
 The Dhaniverse game engine is built on top of Phaser.js 3, providing a robust 2D game framework for the multiplayer web3 gaming experience. The engine manages scene lifecycle, player interactions, real-time multiplayer communication, and integration with various game systems including banking, stock market, and map management.
@@ -361,4 +374,22 @@ The engine implements comprehensive error handling:
 - **Server-side Validation**: Enhanced security for multiplayer interactions
 - **Load Balancing**: Distributed server architecture support
 - **Caching Optimization**: Advanced caching strategies for better performance
-- **Analytics Integration**: Comprehensive game analytics and metrics
+- **Analytics Integration**: Comprehensive game analytics and metrics## R
+elated Documentation
+
+- [Map Optimizer](./map-optimizer.md) - Map chunking and optimization system
+- [UI Components](./ui-components.md) - React UI integration with game
+- [WebSocket API](../api/websocket.md) - Real-time multiplayer communication
+- [Game Server API](../api/game-server.md) - Server integration patterns
+- [System Architecture](../architecture/system-architecture.md#frontend-architecture) - Game engine architecture
+
+## External Resources
+
+- [Phaser.js Documentation](https://phaser.io/phaser3/documentation)
+- [Phaser.js Examples](https://phaser.io/examples)
+- [TypeScript Game Development](https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes.html)
+- [2D Game Development Patterns](https://gameprogrammingpatterns.com/)
+
+---
+
+**Navigation**: [← Components Index](./index.md) | [Main Documentation](../README.md) | [Blockchain Integration →](./blockchain-integration.md)

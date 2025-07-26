@@ -1,5 +1,18 @@
 # UI Components Documentation
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Component Categories](#component-categories)
+- [Design System](#design-system)
+- [Accessibility Features](#accessibility-features)
+- [State Management](#state-management)
+- [Integration Patterns](#integration-patterns)
+- [Development Guide](#development-guide)
+- [Component API Reference](#component-api-reference)
+- [Testing Guidelines](#testing-guidelines)
+
 ## Overview
 
 The Dhaniverse UI component library is built with React and TypeScript, providing a comprehensive set of reusable components for the web3 gaming experience. The components follow modern design principles with pixel-perfect styling, accessibility compliance, and seamless integration with the game engine and blockchain services.
@@ -610,4 +623,23 @@ const handleWalletConnect = async () => {
 - **Bundle Optimization**: Advanced code splitting strategies
 - **Caching Strategies**: Improved component caching
 - **Server-Side Rendering**: SSR support for better performance
-- **Progressive Web App**: PWA features for mobile experience
+- **Progressive Web App**: PWA features for mobile experience##
+ Related Documentation
+
+- [Frontend APIs](../api/frontend-apis.md) - Frontend service integration
+- [Game Engine](./game-engine.md) - Game engine UI integration
+- [Blockchain Integration](./blockchain-integration.md) - Web3 UI patterns
+- [Development Workflow](../development/development-workflow.md) - Component development process
+- [Coding Standards](../development/coding-standards.md#react-standards) - React coding standards
+
+## External Resources
+
+- [React Documentation](https://react.dev/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [Framer Motion Documentation](https://www.framer.com/motion/)
+- [React Accessibility Guide](https://react.dev/learn/accessibility)
+- [TypeScript React Patterns](https://react-typescript-cheatsheet.netlify.app/)
+
+---
+
+**Navigation**: [← Blockchain Integration](./blockchain-integration.md) | [Components Index](./index.md) | [Map Optimizer →](./map-optimizer.md)

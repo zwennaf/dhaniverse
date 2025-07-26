@@ -4,7 +4,10 @@
   "description": "Tools for map optimization",
   "main": "chunk-map.js",
   "scripts": {
-    "chunk": "node chunk-map.js"
+    "chunk": "node chunk-map.js",
+    "check-docs-links": "node docs-link-checker.js",
+    "validate-docs-code": "node docs-code-validator.js",
+    "validate-docs": "node docs-link-checker.js && node docs-code-validator.js"
   },
   "dependencies": {
     "sharp": "^0.33.0",

@@ -21,6 +21,18 @@ Dhaniverse is a comprehensive web3 gaming platform that combines financial educa
 - **Real-time**: WebSocket servers for multiplayer and chat functionality
 - **Optimization**: Custom map optimization package for performance
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Key Features](#key-features)
+- [Architecture Components](#architecture-components)
+- [Documentation Structure](#documentation-structure)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [Support](#support)
+- [Version Information](#version-information)
+
 ## Documentation Structure
 
 This documentation is organized into the following sections:
@@ -120,6 +132,25 @@ For technical support or questions about the documentation:
 - **TypeScript**: 5.8+
 - **React**: 19.1+
 
+## Additional Resources
+
+### Development Resources
+- [Contributing Guidelines](./CONTRIBUTING.md) - How to contribute to the project
+- [Changelog](./CHANGELOG.md) - Version history and changes
+- [GitHub Repository](https://github.com/Gursimrxn/dhaniverse) - Source code and issues
+
+### External Documentation
+- [Internet Computer Documentation](https://internetcomputer.org/docs/current/developer-docs/)
+- [Phaser.js Documentation](https://phaser.io/phaser3/documentation)
+- [React Documentation](https://react.dev/)
+- [Deno Documentation](https://deno.land/manual)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+
+### Community and Support
+- [Discord Community](https://discord.gg/dhaniverse) - Join our community
+- [GitHub Discussions](https://github.com/Gursimrxn/dhaniverse/discussions) - Community discussions
+- [Issue Tracker](https://github.com/Gursimrxn/dhaniverse/issues) - Bug reports and feature requests
+
 ---
 
-*This documentation is maintained alongside the co
+*This documentation is maintained alongside the codebase and is updated with each release. For the most current information, always refer to the latest version in the main branch.*

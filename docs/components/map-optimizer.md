@@ -1,5 +1,18 @@
 # Map Optimizer Documentation
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Core Components](#core-components)
+- [Chunking System](#chunking-system)
+- [Cache Management](#cache-management)
+- [Performance Optimization](#performance-optimization)
+- [Integration Guide](#integration-guide)
+- [Configuration Options](#configuration-options)
+- [API Reference](#api-reference)
+- [Optimization Guide](#optimization-guide)
+
 ## Overview
 
 The Dhaniverse Map Optimizer is a specialized package designed to handle large-scale map images by breaking them into manageable chunks for efficient loading and rendering. The system provides dynamic loading, intelligent caching, and performance optimization for seamless gameplay experience with minimal memory footprint.
@@ -636,4 +649,22 @@ describe('ChunkManager Integration', () => {
 - **Delta Compression**: Efficient updates for changed chunks
 - **Collaborative Editing**: Multi-user chunk editing support
 - **Analytics Integration**: Detailed usage analytics and optimization
-- **Cloud Integration**: Cloud-based chunk storage and CDN support
+- **Cloud Integration**: Cloud-based chunk storage and CDN support## Related D
+ocumentation
+
+- [Game Engine](./game-engine.md) - Game engine integration with map system
+- [System Architecture](../architecture/system-architecture.md#performance-considerations) - Performance architecture
+- [Development Workflow](../development/development-workflow.md) - Package development process
+- [Local Setup](../setup/local-setup.md#map-optimizer-setup) - Map optimizer setup
+- [Performance Testing](../development/testing.md#performance-testing) - Performance testing guidelines
+
+## External Resources
+
+- [Canvas API Documentation](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
+- [Image Processing Techniques](https://developer.mozilla.org/en-US/docs/Web/API/ImageData)
+- [Performance Optimization Patterns](https://web.dev/performance/)
+- [TypeScript Package Development](https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html)
+
+---
+
+**Navigation**: [← UI Components](./ui-components.md) | [Components Index](./index.md) | [Main Documentation](../README.md)

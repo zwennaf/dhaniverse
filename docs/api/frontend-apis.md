@@ -1,5 +1,18 @@
 # Frontend APIs Reference
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Service Architecture](#service-architecture)
+- [ICP Actor Service](#icp-actor-service)
+- [Web3 Banking Service](#web3-banking-service)
+- [Wallet Manager](#wallet-manager)
+- [Web3 Wallet Service](#web3-wallet-service)
+- [React Components](#react-components)
+- [Hooks and Utilities](#hooks-and-utilities)
+- [Error Handling](#error-handling)
+- [Type Definitions](#type-definitions)
+
 ## Overview
 
 The Dhaniverse frontend provides a comprehensive set of service APIs and React components for Web3 gaming functionality. The frontend is built with React, TypeScript, and integrates with ICP canisters, Web3 wallets, and the game server.
@@ -853,4 +866,22 @@ export function BankingComponent() {
         </div>
     );
 }
-```
+```## Relat
+ed Documentation
+
+- [UI Components](../components/ui-components.md) - React component library
+- [Blockchain Integration](../components/blockchain-integration.md) - Web3 integration patterns
+- [ICP Canister API](./icp-canister.md) - Backend canister methods
+- [Game Engine](../components/game-engine.md) - Game engine integration
+- [Setup Configuration](../setup/configuration.md#frontend-configuration) - Frontend setup
+
+## External Resources
+
+- [React Documentation](https://react.dev/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Internet Computer Agent](https://www.npmjs.com/package/@dfinity/agent)
+- [Web3 Integration Patterns](https://web3js.readthedocs.io/)
+
+---
+
+**Navigation**: [← WebSocket API](./websocket.md) | [API Index](./index.md) | [Main Documentation](../README.md)
