@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
+import { balanceManager } from "../../../services/BalanceManager";
 
 interface GameHUDProps {
     rupees?: number;
@@ -78,21 +79,31 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
     }, [walletManager]);
 
-    // Listen for rupee updates
+    // Listen for balance updates from balance manager
     useEffect(() => {
-        setCurrentRupees(rupees);
+        // Set initial balance from balance manager
+        const currentBalance = balanceManager.getBalance();
+        setCurrentRupees(currentBalance.cash);
 
+        // Subscribe to balance changes
+        const unsubscribe = balanceManager.onBalanceChange((balance) => {
+            setCurrentRupees(balance.cash);
+        });
+
+        // Also listen for legacy rupee updates for backward compatibility
         const handleRupeeUpdate = (e: CustomEvent) => {
-            setCurrentRupees(e.detail.rupees);
+            if (e.detail?.rupees !== undefined) {
+                balanceManager.updateCash(e.detail.rupees);
+            }
         };
 
         window.addEventListener("rupee-update" as any, handleRupeeUpdate);
-        return () =>
-            window.removeEventListener(
-                "rupee-update" as any,
-                handleRupeeUpdate
-            );
-    }, [rupees]);
+        
+        return () => {
+            unsubscribe();
+            window.removeEventListener("rupee-update" as any, handleRupeeUpdate);
+        };
+    }, []);
 
     // Listen for player connection events
     useEffect(() => {

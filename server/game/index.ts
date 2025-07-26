@@ -23,15 +23,22 @@ import gameRouter from "./src/routes/gameRouter.ts";
 // Initialize database connection
 async function initializeDatabase() {
     try {
+        console.log("🔄 Initializing database connection...");
         await mongodb.connect();
+        
+        // Verify connection is working
+        if (!mongodb.isHealthy()) {
+            throw new Error("Database connection is not healthy after connect()");
+        }
+        
+        console.log("✅ Database connection verified and ready");
     } catch (error) {
         console.error("❌ Failed to initialize database:", error);
-        if (!config.isDev) {
-            // In production, exit if database connection fails
-            Deno.exit(1);
-        } else {
-            console.warn("⚠️  Continuing without database in development mode");
-        }
+        console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
+        
+        // Always exit if database connection fails - this is critical
+        console.error("❌ Database connection is required. Exiting...");
+        Deno.exit(1);
     }
 }
 

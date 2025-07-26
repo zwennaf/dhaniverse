@@ -172,6 +172,23 @@ export const bankingApi = {
         });
         return handleApiResponse(response);
     },
+
+    // Get bank transactions
+    getTransactions: async () => {
+        try {
+            const response = await fetch(`${API_BASE}/game/bank-account/transactions`, {
+                headers: getAuthHeaders(),
+            });
+            return handleApiResponse(response);
+        } catch (error) {
+            console.warn("Bank transactions API not available:", error);
+            // Return empty transactions if API endpoint doesn't exist
+            return {
+                success: true,
+                data: []
+            };
+        }
+    },
 };
 
 // ======================
@@ -246,7 +263,26 @@ export const stockApi = {
         });
         return handleApiResponse(response);
     },
+
+    // Get stock transactions
+    getTransactions: async () => {
+        try {
+            const response = await fetch(`${API_BASE}/game/stock-portfolio/transactions`, {
+                headers: getAuthHeaders(),
+            });
+            return handleApiResponse(response);
+        } catch (error) {
+            console.warn("Stock transactions API not available:", error);
+            // Return empty transactions if API endpoint doesn't exist
+            return {
+                success: true,
+                data: []
+            };
+        }
+    },
 };
+
+
 
 // ======================
 // SYNC API

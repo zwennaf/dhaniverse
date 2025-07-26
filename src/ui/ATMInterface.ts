@@ -3,6 +3,7 @@ import { BankAccount } from '../types/BankAccount';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ATMDashboard from './components/atm/ATMDashboard';
+import { balanceManager } from '../services/BalanceManager';
 
 export class ATMInterface {
   private container: HTMLElement | null = null;
@@ -132,25 +133,25 @@ export class ATMInterface {
   }
 
   private getPlayerRupees(): number {
-    // Try to get player rupees from various sources
+    // Get player rupees from balance manager (most reliable source)
     try {
-      // Check if there's a global game state
-      const gameState = (window as any).gameState;
-      if (gameState && typeof gameState.playerRupees === 'number') {
-        return gameState.playerRupees;
-      }
-      
-      // Check localStorage as fallback
-      const savedRupees = localStorage.getItem('dhaniverse_player_rupees');
-      if (savedRupees) {
-        return parseInt(savedRupees, 10) || 0;
-      }
-      
-      // Default fallback
-      return 1000;
+      const balance = balanceManager.getBalance();
+      return balance.cash;
     } catch (error) {
-      console.warn('Could not get player rupees, using default:', error);
-      return 1000;
+      console.warn('Could not get player rupees from balance manager:', error);
+      
+      // Fallback to game state
+      try {
+        const gameState = (window as any).gameState;
+        if (gameState && typeof gameState.playerRupees === 'number') {
+          return gameState.playerRupees;
+        }
+      } catch (gameStateError) {
+        console.warn('Could not get player rupees from game state:', gameStateError);
+      }
+      
+      // Last resort fallback
+      return 0;
     }
   }
 

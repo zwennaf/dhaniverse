@@ -290,104 +290,167 @@ export class ATMManager {
 
     private async loadBankAccount(): Promise<void> {
         try {
-            // Create a mock bank account for now to avoid API errors
-            // TODO: Replace with actual API call when backend is ready
-            this.playerBankAccount = {
-                _id: 'mock-account',
-                userId: 'current-user',
-                balance: 5000, // Mock balance
-                transactions: [
-                    {
-                        id: 'mock-1',
-                        type: 'deposit' as const,
-                        amount: 1000,
-                        timestamp: new Date(),
-                        description: 'Initial deposit'
-                    }
-                ],
-                createdAt: new Date(),
-                lastUpdated: new Date()
-            };
-            console.log('Using mock bank account data for ATM');
+            // Import banking API
+            const { bankingApi } = await import('../../utils/api');
+            
+            // Load real bank account data from backend
+            const response = await bankingApi.getAccount();
+            if (response.success && response.data) {
+                this.playerBankAccount = {
+                    _id: response.data._id || response.data.id || 'bank-account',
+                    userId: response.data.userId || 'current-user',
+                    balance: response.data.balance || 0,
+                    transactions: response.data.transactions || [],
+                    createdAt: new Date(response.data.createdAt || Date.now()),
+                    lastUpdated: new Date(response.data.lastUpdated || Date.now())
+                };
+                console.log('Loaded real bank account data for ATM:', this.playerBankAccount);
+            } else {
+                throw new Error('Failed to load bank account from backend');
+            }
         } catch (error) {
-            console.error("Error loading bank account:", error);
-            // Fallback to empty account
-            this.playerBankAccount = {
-                _id: 'fallback-account',
-                userId: 'current-user',
-                balance: 0,
-                transactions: [],
-                createdAt: new Date(),
-                lastUpdated: new Date()
-            };
+            console.error("Error loading bank account from backend:", error);
+            
+            // Try to get balance from balance manager as fallback
+            try {
+                const { balanceManager } = await import('../../services/BalanceManager');
+                const balance = balanceManager.getBalance();
+                
+                this.playerBankAccount = {
+                    _id: 'balance-manager-account',
+                    userId: 'current-user',
+                    balance: balance.bankBalance,
+                    transactions: [],
+                    createdAt: new Date(),
+                    lastUpdated: new Date()
+                };
+                console.log('Using balance manager data for ATM fallback:', this.playerBankAccount);
+            } catch (balanceError) {
+                console.error("Error loading from balance manager:", balanceError);
+                
+                // Final fallback to empty account
+                this.playerBankAccount = {
+                    _id: 'fallback-account',
+                    userId: 'current-user',
+                    balance: 0,
+                    transactions: [],
+                    createdAt: new Date(),
+                    lastUpdated: new Date()
+                };
+            }
         }
     }
 
     private async handleDeposit(amount: number): Promise<boolean> {
         try {
-            // Mock deposit operation for now
-            // TODO: Replace with actual API call when backend is ready
-            if (this.playerBankAccount && amount > 0) {
-                this.playerBankAccount.balance += amount;
-                this.playerBankAccount.transactions.push({
-                    id: `deposit-${Date.now()}`,
-                    type: 'deposit' as const,
-                    amount: amount,
-                    timestamp: new Date(),
-                    description: `ATM Deposit - ₹${amount}`
-                });
-                this.playerBankAccount.lastUpdated = new Date();
-                
-                EventBus.emit(
-                    "show-atm-success",
-                    `Successfully deposited ₹${amount}`
-                );
-                console.log(`Mock deposit: ₹${amount}, new balance: ₹${this.playerBankAccount.balance}`);
-                return true;
-            } else {
+            // Import balance manager and banking API
+            const { balanceManager } = await import('../../services/BalanceManager');
+            const { bankingApi } = await import('../../utils/api');
+            
+            if (amount <= 0) {
                 EventBus.emit("show-atm-error", "Invalid deposit amount");
                 return false;
             }
+            
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processDeposit(amount, this.nearestATM?.name || 'ATM');
+            
+            // Try to sync with backend
+            try {
+                const response = await bankingApi.deposit(amount);
+                if (!response.success) {
+                    console.warn("Backend ATM deposit failed, but local transaction completed");
+                }
+            } catch (apiError) {
+                console.warn("Backend API error during ATM deposit:", apiError);
+                // Continue with local transaction
+            }
+            
+            // Update local bank account data
+            if (this.playerBankAccount) {
+                this.playerBankAccount.balance += amount;
+                this.playerBankAccount.transactions.push({
+                    id: `atm-deposit-${Date.now()}`,
+                    type: 'deposit' as const,
+                    amount: amount,
+                    timestamp: new Date(),
+                    description: `ATM Deposit at ${this.nearestATM?.name || 'ATM'} - ₹${amount}`
+                });
+                this.playerBankAccount.lastUpdated = new Date();
+            }
+            
+            // Refresh bank account data from backend to ensure sync
+            await this.loadBankAccount();
+            
+            EventBus.emit(
+                "show-atm-success",
+                `Successfully deposited ₹${amount.toLocaleString()}`
+            );
+            console.log(`ATM deposit: ₹${amount}, new balance: ₹${this.playerBankAccount?.balance}`);
+            return true;
         } catch (error) {
-            console.error("Deposit error:", error);
-            EventBus.emit("show-atm-error", "Error during deposit");
+            console.error("ATM Deposit error:", error);
+            EventBus.emit("show-atm-error", `Deposit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }
 
     private async handleWithdraw(amount: number): Promise<boolean> {
         try {
-            // Mock withdrawal operation for now
-            // TODO: Replace with actual API call when backend is ready
-            if (this.playerBankAccount && amount > 0) {
-                if (this.playerBankAccount.balance >= amount) {
-                    this.playerBankAccount.balance -= amount;
-                    this.playerBankAccount.transactions.push({
-                        id: `withdraw-${Date.now()}`,
-                        type: 'withdrawal' as const,
-                        amount: amount,
-                        timestamp: new Date(),
-                        description: `ATM Withdrawal - ₹${amount}`
-                    });
-                    this.playerBankAccount.lastUpdated = new Date();
-                    
-                    EventBus.emit(
-                        "show-atm-success",
-                        `Successfully withdrew ₹${amount}`
-                    );
-                    console.log(`Mock withdrawal: ₹${amount}, new balance: ₹${this.playerBankAccount.balance}`);
-                    return true;
-                } else {
-                    EventBus.emit("show-atm-error", "Insufficient balance");
-                    return false;
-                }
-            } else {
+            // Import balance manager and banking API
+            const { balanceManager } = await import('../../services/BalanceManager');
+            const { bankingApi } = await import('../../utils/api');
+            
+            if (amount <= 0) {
                 EventBus.emit("show-atm-error", "Invalid withdrawal amount");
                 return false;
             }
+            
+            // Check if sufficient balance exists
+            if (!this.playerBankAccount || this.playerBankAccount.balance < amount) {
+                EventBus.emit("show-atm-error", "Insufficient balance");
+                return false;
+            }
+            
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processWithdrawal(amount, this.nearestATM?.name || 'ATM');
+            
+            // Try to sync with backend
+            try {
+                const response = await bankingApi.withdraw(amount);
+                if (!response.success) {
+                    console.warn("Backend ATM withdrawal failed, but local transaction completed");
+                }
+            } catch (apiError) {
+                console.warn("Backend API error during ATM withdrawal:", apiError);
+                // Continue with local transaction
+            }
+            
+            // Update local bank account data
+            if (this.playerBankAccount) {
+                this.playerBankAccount.balance -= amount;
+                this.playerBankAccount.transactions.push({
+                    id: `atm-withdraw-${Date.now()}`,
+                    type: 'withdrawal' as const,
+                    amount: amount,
+                    timestamp: new Date(),
+                    description: `ATM Withdrawal at ${this.nearestATM?.name || 'ATM'} - ₹${amount}`
+                });
+                this.playerBankAccount.lastUpdated = new Date();
+            }
+            
+            // Refresh bank account data from backend to ensure sync
+            await this.loadBankAccount();
+            
+            EventBus.emit(
+                "show-atm-success",
+                `Successfully withdrew ₹${amount.toLocaleString()}`
+            );
+            console.log(`ATM withdrawal: ₹${amount}, new balance: ₹${this.playerBankAccount?.balance}`);
+            return true;
         } catch (error) {
-            console.error("Withdrawal error:", error);
-            EventBus.emit("show-atm-error", "Error during withdrawal");
+            console.error("ATM Withdrawal error:", error);
+            EventBus.emit("show-atm-error", `Withdrawal failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }
@@ -397,66 +460,48 @@ export class ATMManager {
         duration: number
     ): Promise<boolean> {
         try {
-            // Mock fixed deposit operation for now
-            // TODO: Replace with actual API call when backend is ready
-            if (this.playerBankAccount && amount >= 100) {
-                if (this.playerBankAccount.balance >= amount) {
-                    // Deduct amount from balance
-                    this.playerBankAccount.balance -= amount;
-                    
-                    // Add transaction record
-                    this.playerBankAccount.transactions.push({
-                        id: `fd-${Date.now()}`,
-                        type: 'withdrawal' as const,
-                        amount: amount,
-                        timestamp: new Date(),
-                        description: `Fixed Deposit Creation - ₹${amount} for ${duration} months`
-                    });
-                    
-                    // Calculate interest rate based on duration
-                    let interestRate = 5.0; // Base rate
-                    if (duration >= 24) interestRate = 7.0;
-                    else if (duration >= 12) interestRate = 6.0;
-                    else if (duration >= 6) interestRate = 5.5;
-                    
-                    // Add fixed deposit to account (if fixedDeposits array exists)
-                    if (!this.playerBankAccount.fixedDeposits) {
-                        this.playerBankAccount.fixedDeposits = [];
-                    }
-                    
-                    const maturityDate = new Date();
-                    maturityDate.setMonth(maturityDate.getMonth() + duration);
-                    
-                    this.playerBankAccount.fixedDeposits.push({
-                        id: `fd-${Date.now()}`,
-                        amount: amount,
-                        interestRate: interestRate,
-                        startDate: new Date(),
-                        duration: duration * 30, // Convert months to days
-                        maturityDate: maturityDate,
-                        matured: false,
-                        status: 'active' as const
-                    });
-                    
-                    this.playerBankAccount.lastUpdated = new Date();
-                    
-                    EventBus.emit(
-                        "show-atm-success",
-                        `Fixed deposit of ₹${amount} created successfully (${interestRate}% APR for ${duration} months)`
-                    );
-                    console.log(`Mock fixed deposit: ₹${amount} for ${duration} months at ${interestRate}% APR`);
-                    return true;
-                } else {
-                    EventBus.emit("show-atm-error", "Insufficient balance for fixed deposit");
-                    return false;
-                }
-            } else {
+            // Import fixed deposit API
+            const { fixedDepositApi } = await import('../../utils/api');
+            
+            if (amount < 100) {
                 EventBus.emit("show-atm-error", "Minimum fixed deposit amount is ₹100");
                 return false;
             }
+            
+            if (!this.playerBankAccount || this.playerBankAccount.balance < amount) {
+                EventBus.emit("show-atm-error", "Insufficient balance for fixed deposit");
+                return false;
+            }
+            
+            // Use real backend API for fixed deposit creation
+            const response = await fixedDepositApi.create(amount, duration);
+            if (response.success) {
+                // Update local bank account data
+                if (this.playerBankAccount) {
+                    this.playerBankAccount.balance -= amount;
+                    this.playerBankAccount.transactions.push({
+                        id: `atm-fd-${Date.now()}`,
+                        type: 'withdrawal' as const,
+                        amount: amount,
+                        timestamp: new Date(),
+                        description: `Fixed Deposit Creation at ${this.nearestATM?.name || 'ATM'} - ₹${amount} for ${duration} months`
+                    });
+                    this.playerBankAccount.lastUpdated = new Date();
+                }
+                
+                const interestRate = response.data.interestRate || 5.0;
+                EventBus.emit(
+                    "show-atm-success",
+                    `Fixed deposit of ₹${amount.toLocaleString()} created successfully (${interestRate}% APR for ${duration} months)`
+                );
+                console.log(`ATM fixed deposit: ₹${amount} for ${duration} months at ${interestRate}% APR`);
+                return true;
+            } else {
+                throw new Error(response.error || "Fixed deposit creation failed");
+            }
         } catch (error) {
-            console.error("Fixed deposit error:", error);
-            EventBus.emit("show-atm-error", "Error during fixed deposit creation");
+            console.error("ATM Fixed deposit error:", error);
+            EventBus.emit("show-atm-error", `Fixed deposit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
             return false;
         }
     }

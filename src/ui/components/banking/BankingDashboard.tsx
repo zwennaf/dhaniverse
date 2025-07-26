@@ -10,10 +10,9 @@ import {
 import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import { WalletType } from "../../../services/Web3WalletService";
 import { ICPActorService } from "../../../services/ICPActorService";
-import {
-    DualStorageManager,
-} from "../../../services/DualStorageManager";
+import { DualStorageManager } from "../../../services/DualStorageManager";
 import { BankingPolish } from "../polish/FinalPolish";
+import { balanceManager } from "../../../services/BalanceManager";
 
 interface FixedDeposit {
     _id?: string;
@@ -38,6 +37,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState("overview");
     const [bankBalance, setBankBalance] = useState(0);
+    const [currentCash, setCurrentCash] = useState(playerRupees);
     const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([]);
     const [totalRupeesChange, setTotalRupeesChange] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -166,8 +166,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         }
     };
 
-
-
     const handleSyncToBlockchain = async () => {
         if (syncInProgress) return;
 
@@ -219,12 +217,12 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
             // Animate in
             requestAnimationFrame(() => {
-                notification.style.transform = 'translateX(0)';
+                notification.style.transform = "translateX(0)";
             });
 
             // Animate out and remove
             setTimeout(() => {
-                notification.style.transform = 'translateX(full)';
+                notification.style.transform = "translateX(full)";
                 setTimeout(() => {
                     if (document.body.contains(notification)) {
                         document.body.removeChild(notification);
@@ -236,6 +234,24 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         }
     };
 
+    // Subscribe to balance manager updates
+    useEffect(() => {
+        // Get initial balance from balance manager
+        const currentBalance = balanceManager.getBalance();
+        setCurrentCash(currentBalance.cash);
+        setBankBalance(currentBalance.bankBalance);
+
+        // Subscribe to balance changes
+        const unsubscribe = balanceManager.onBalanceChange((balance) => {
+            setCurrentCash(balance.cash);
+            setBankBalance(balance.bankBalance);
+        });
+
+        return () => {
+            unsubscribe();
+        };
+    }, []);
+
     // Load data from backend
     useEffect(() => {
         const loadBankingData = async () => {
@@ -245,7 +261,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                 const bankData = await bankingApi.getAccount();
                 if (bankData.success) {
-                    setBankBalance(bankData.data.balance || 0);
+                    const newBankBalance = bankData.data.balance || 0;
+                    setBankBalance(newBankBalance);
+                    balanceManager.updateBankBalance(newBankBalance);
                 }
 
                 const fdData = await fixedDepositApi.getAll();
@@ -270,7 +288,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     );
                     if (bankData) {
                         const parsedData = JSON.parse(bankData);
-                        setBankBalance(parsedData.balance || 0);
+                        const fallbackBalance = parsedData.balance || 0;
+                        setBankBalance(fallbackBalance);
+                        balanceManager.updateBankBalance(fallbackBalance);
                     }
 
                     const fdData = localStorage.getItem(
@@ -301,62 +321,79 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         loadBankingData();
     }, []);
 
-    // Banking operations (keeping existing logic)
+    // Banking operations using balance manager
     const handleDeposit = async (amount: number): Promise<boolean> => {
         try {
-            const result = await bankingApi.deposit(amount);
-            if (result.success) {
-                if (result.data && typeof result.data.balance === "number") {
-                    setBankBalance(result.data.balance);
-                } else {
-                    setBankBalance((prevBalance) => prevBalance + amount);
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processDeposit(
+                amount,
+                "Banking System"
+            );
+
+            // Try to sync with backend
+            try {
+                const result = await bankingApi.deposit(amount);
+                if (!result.success) {
+                    console.warn(
+                        "Backend deposit failed, but local transaction completed"
+                    );
                 }
-
-                setTotalRupeesChange((prev) => prev - amount);
-                await playerStateApi.updateRupees(playerRupees - amount);
-
-                window.dispatchEvent(
-                    new CustomEvent("rupee-update", {
-                        detail: { rupees: playerRupees - amount },
-                    })
-                );
-
-                return true;
-            } else {
-                throw new Error(result.error || "Deposit failed");
+            } catch (apiError) {
+                console.warn("Backend API error during deposit:", apiError);
+                // Continue with local transaction
             }
+
+            showSuccessNotification(
+                "💰 Deposit Successful",
+                `₹${amount.toLocaleString()} deposited to your bank account`
+            );
+
+            return true;
         } catch (error) {
             console.error("Deposit error:", error);
-            // Fallback logic...
-            return true;
+            setError(
+                `Deposit failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            );
+            return false;
         }
     };
 
     const handleWithdraw = async (amount: number): Promise<boolean> => {
         try {
-            const result = await bankingApi.withdraw(amount);
-            if (result.success) {
-                if (result.data && typeof result.data.balance === "number") {
-                    setBankBalance(result.data.balance);
-                } else {
-                    setBankBalance((prevBalance) => prevBalance - amount);
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processWithdrawal(
+                amount,
+                "Banking System"
+            );
+
+            // Try to sync with backend
+            try {
+                const result = await bankingApi.withdraw(amount);
+                if (!result.success) {
+                    console.warn(
+                        "Backend withdrawal failed, but local transaction completed"
+                    );
                 }
-
-                setTotalRupeesChange((prev) => prev + amount);
-                await playerStateApi.updateRupees(playerRupees + amount);
-
-                window.dispatchEvent(
-                    new CustomEvent("rupee-update", {
-                        detail: { rupees: playerRupees + amount },
-                    })
-                );
-
-                return true;
-            } else {
-                throw new Error(result.error || "Withdrawal failed");
+            } catch (apiError) {
+                console.warn("Backend API error during withdrawal:", apiError);
+                // Continue with local transaction
             }
+
+            showSuccessNotification(
+                "💸 Withdrawal Successful",
+                `₹${amount.toLocaleString()} withdrawn from your bank account`
+            );
+
+            return true;
         } catch (error) {
             console.error("Withdrawal error:", error);
+            setError(
+                `Withdrawal failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`
+            );
             return false;
         }
     };
@@ -418,19 +455,92 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     };
 
     const tabs = [
-{ id: "overview", name: "Overview", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-        { id: "account", name: "Banking", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-        { id: "fd", name: "Fixed Deposits", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+        {
+            id: "overview",
+            name: "Overview",
+            icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M3 3v18h18"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                    <path
+                        d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+        },
+        {
+            id: "account",
+            name: "Banking",
+            icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+        },
+        {
+            id: "fd",
+            name: "Fixed Deposits",
+            icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            ),
+        },
         ...(walletStatus.connected
-            ? [{ id: "web3", name: "Web3 Features", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> }]
+            ? [
+                  {
+                      id: "web3",
+                      name: "Web3 Features",
+                      icon: (
+                          <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                          >
+                              <path
+                                  d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                              />
+                          </svg>
+                      ),
+                  },
+              ]
             : []),
     ];
 
     return (
         <div className="fixed inset-0 flex bg-black items-center justify-center z-50 p-4">
             {/* Backdrop blur overlay */}
-            <div className="absolute inset-0 backdrop-blur-md" onClick={handleClose} />
-            
+            <div
+                className="absolute inset-0 backdrop-blur-md"
+                onClick={handleClose}
+            />
+
             {/* Main container - Modern minimal design */}
             <BankingPolish className="relative w-full max-w-6xl h-full max-h-[95vh] bg-black/95 backdrop-blur-modern border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden modern-scale-in">
                 {/* Subtle gradient overlay */}
@@ -440,8 +550,20 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     <div className="flex items-center space-x-4">
                         {/* Minimal Bank Icon */}
                         <div className="w-10 h-10 bg-gradient-to-br from-dhani-gold to-dhani-gold/80 rounded-lg flex items-center justify-center">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black"/>
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                            >
+                                <path
+                                    d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="text-black"
+                                />
                             </svg>
                         </div>
                         <div>
@@ -458,9 +580,17 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     <div className="flex items-center space-x-4">
                         {/* Connection Status - Minimal */}
                         <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/10">
-                            <div className={`w-2 h-2 rounded-full ${walletStatus.connected ? 'bg-green-400' : 'bg-gray-400'}`} />
+                            <div
+                                className={`w-2 h-2 rounded-full ${
+                                    walletStatus.connected
+                                        ? "bg-green-400"
+                                        : "bg-gray-400"
+                                }`}
+                            />
                             <span className="text-xs text-gray-300">
-                                {walletStatus.connected ? 'Web3 Connected' : 'Local Mode'}
+                                {walletStatus.connected
+                                    ? "Web3 Connected"
+                                    : "Local Mode"}
                             </span>
                         </div>
 
@@ -468,9 +598,19 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         <button
                             onClick={handleClose}
                             className="w-8 h-8 flex  justify-center text-red-400 hover:text-red-300 font-tickerbit  items-center hover:bg-red-500/10 rounded-lg transition-all duration-200 border border-red-600 hover:border-red-400"
-                        >x
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 6L6 18M6 6l12 12"/>
+                        >
+                            x
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M18 6L6 18M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
@@ -484,19 +624,49 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center space-x-2">
                                     <div className="w-8 h-8 bg-dhani-gold/20 rounded-lg flex items-center justify-center">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
-                                            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
-                                            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M21 12V7H5a2 2 0 0 1 0-4h14v4"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-dhani-gold"
+                                            />
+                                            <path
+                                                d="M3 5v14a2 2 0 0 0 2 2h16v-5"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-dhani-gold"
+                                            />
+                                            <path
+                                                d="M18 12a2 2 0 0 0 0 4h4v-4Z"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-dhani-gold"
+                                            />
                                         </svg>
                                     </div>
-                                    <span className="text-sm text-gray-300">Wallet</span>
+                                    <span className="text-sm text-gray-300">
+                                        Wallet
+                                    </span>
                                 </div>
                             </div>
                             <div className="text-2xl font-bold text-dhani-gold mb-1">
-                                ₹{(playerRupees + totalRupeesChange).toLocaleString()}
+                                ₹{currentCash.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-400">Available for transactions</div>
+                            <div className="text-xs text-gray-400">
+                                Available for transactions
+                            </div>
                         </div>
 
                         {/* Bank Balance */}
@@ -504,17 +674,33 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center space-x-2">
                                     <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"/>
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M3 21h18M5 21V10l7-7 7 7v11M9 21v-6h6v6"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-white"
+                                            />
                                         </svg>
                                     </div>
-                                    <span className="text-sm text-gray-300">Bank</span>
+                                    <span className="text-sm text-gray-300">
+                                        Bank
+                                    </span>
                                 </div>
                             </div>
                             <div className="text-2xl font-bold text-white mb-1">
                                 ₹{bankBalance.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-400">Secured deposits</div>
+                            <div className="text-xs text-gray-400">
+                                Secured deposits
+                            </div>
                         </div>
 
                         {/* Total Portfolio */}
@@ -522,18 +708,41 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center space-x-2">
                                     <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"/>
-                                            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"/>
+                                        <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M3 3v18h18"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-green-400"
+                                            />
+                                            <path
+                                                d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                className="text-green-400"
+                                            />
                                         </svg>
                                     </div>
-                                    <span className="text-sm text-gray-300">Total</span>
+                                    <span className="text-sm text-gray-300">
+                                        Total
+                                    </span>
                                 </div>
                             </div>
                             <div className="text-2xl font-bold text-green-400 mb-1">
-                                ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
+                                ₹{(currentCash + bankBalance).toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-400">Combined portfolio</div>
+                            <div className="text-xs text-gray-400">
+                                Combined portfolio
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -544,8 +753,20 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         <div className="bg-gradient-to-r from-dhani-gold/10 via-dhani-gold/5 to-transparent rounded-xl p-4 border border-dhani-gold/20">
                             <div className="flex items-start space-x-4">
                                 <div className="w-10 h-10 bg-dhani-gold/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                    <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                    >
+                                        <path
+                                            d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className="text-dhani-gold"
+                                        />
                                     </svg>
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -553,30 +774,39 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                         Unlock Web3 Features
                                     </h3>
                                     <p className="text-sm text-gray-400 mb-4">
-                                        Connect your wallet for blockchain features, token staking, and dual-currency support.
+                                        Connect your wallet for blockchain
+                                        features, token staking, and
+                                        dual-currency support.
                                     </p>
                                     <div className="flex flex-wrap gap-2">
-                                        {walletManager.getAvailableWallets().map((wallet) => (
-                                            <button
-                                                key={wallet.type}
-                                                onClick={() => {
-                                                    if (wallet.available) {
-                                                        handleConnectWallet(wallet.type);
-                                                    } else {
-                                                        setError(`${wallet.name} is not installed. Please install it first.`);
-                                                    }
-                                                }}
-                                                disabled={!wallet.available}
-                                                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                                                    wallet.available
-                                                        ? 'bg-dhani-gold text-black hover:bg-dhani-gold/90'
-                                                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                                                }`}
-                                            >
-                                                {wallet.name}
-                                                {!wallet.available && ' (Install)'}
-                                            </button>
-                                        ))}
+                                        {walletManager
+                                            .getAvailableWallets()
+                                            .map((wallet) => (
+                                                <button
+                                                    key={wallet.type}
+                                                    onClick={() => {
+                                                        if (wallet.available) {
+                                                            handleConnectWallet(
+                                                                wallet.type
+                                                            );
+                                                        } else {
+                                                            setError(
+                                                                `${wallet.name} is not installed. Please install it first.`
+                                                            );
+                                                        }
+                                                    }}
+                                                    disabled={!wallet.available}
+                                                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                                                        wallet.available
+                                                            ? "bg-dhani-gold text-black hover:bg-dhani-gold/90"
+                                                            : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                                                    }`}
+                                                >
+                                                    {wallet.name}
+                                                    {!wallet.available &&
+                                                        " (Install)"}
+                                                </button>
+                                            ))}
                                     </div>
                                 </div>
                             </div>
@@ -598,7 +828,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                 }`}
                             >
                                 <span className="text-base">{tab.icon}</span>
-                                <span className="hidden sm:inline">{tab.name}</span>
+                                <span className="hidden sm:inline">
+                                    {tab.name}
+                                </span>
                             </button>
                         ))}
                     </div>
@@ -609,20 +841,40 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 modern-fade-in">
                             <div className="modern-spinner mb-4" />
-                            <div className="text-gray-400 text-sm">Loading banking data...</div>
-                            <div className="text-xs text-gray-500 mt-2">Please wait while we secure your connection</div>
+                            <div className="text-gray-400 text-sm">
+                                Loading banking data...
+                            </div>
+                            <div className="text-xs text-gray-500 mt-2">
+                                Please wait while we secure your connection
+                            </div>
                         </div>
                     ) : error ? (
                         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
                             <div className="flex items-start space-x-3">
                                 <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                        <path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"/>
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                    >
+                                        <path
+                                            d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            className="text-red-400"
+                                        />
                                     </svg>
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-red-400 font-semibold mb-1">Error Loading Data</h3>
-                                    <p className="text-red-300 text-sm mb-4">{error}</p>
+                                    <h3 className="text-red-400 font-semibold mb-1">
+                                        Error Loading Data
+                                    </h3>
+                                    <p className="text-red-300 text-sm mb-4">
+                                        {error}
+                                    </p>
                                     <button
                                         onClick={() => window.location.reload()}
                                         className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors duration-200"
@@ -640,36 +892,75 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                         {/* Account Summary */}
                                         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
                                             <h3 className="text-white font-semibold text-lg mb-4 flex items-center">
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mr-3">
-                                                    <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
-                                                    <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                                <svg
+                                                    width="20"
+                                                    height="20"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    className="mr-3"
+                                                >
+                                                    <path
+                                                        d="M3 3v18h18"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        className="text-dhani-gold"
+                                                    />
+                                                    <path
+                                                        d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        className="text-dhani-gold"
+                                                    />
                                                 </svg>
                                                 Account Summary
                                             </h3>
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 text-sm">Available Cash</span>
+                                                    <span className="text-gray-400 text-sm">
+                                                        Available Cash
+                                                    </span>
                                                     <span className="text-white font-semibold">
-                                                        ₹{(playerRupees + totalRupeesChange).toLocaleString()}
+                                                        ₹
+                                                        {(
+                                                            playerRupees +
+                                                            totalRupeesChange
+                                                        ).toLocaleString()}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 text-sm">Bank Savings</span>
+                                                    <span className="text-gray-400 text-sm">
+                                                        Bank Savings
+                                                    </span>
                                                     <span className="text-white font-semibold">
-                                                        ₹{bankBalance.toLocaleString()}
+                                                        ₹
+                                                        {bankBalance.toLocaleString()}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400 text-sm">Fixed Deposits</span>
+                                                    <span className="text-gray-400 text-sm">
+                                                        Fixed Deposits
+                                                    </span>
                                                     <span className="text-white font-semibold">
-                                                        {fixedDeposits.length} Active
+                                                        {fixedDeposits.length}{" "}
+                                                        Active
                                                     </span>
                                                 </div>
                                                 <div className="border-t border-white/10 pt-4">
                                                     <div className="flex justify-between items-center">
-                                                        <span className="text-dhani-gold font-semibold">Total Worth</span>
+                                                        <span className="text-dhani-gold font-semibold">
+                                                            Total Worth
+                                                        </span>
                                                         <span className="text-dhani-gold font-bold text-lg">
-                                                            ₹{(playerRupees + totalRupeesChange + bankBalance).toLocaleString()}
+                                                            ₹
+                                                            {(
+                                                                playerRupees +
+                                                                totalRupeesChange +
+                                                                bankBalance
+                                                            ).toLocaleString()}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -679,42 +970,114 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                         {/* Quick Actions */}
                                         <div className="bg-gradient-to-br from-dhani-gold/10 to-dhani-gold/5 rounded-xl p-6 border border-dhani-gold/20">
                                             <h3 className="text-dhani-gold font-semibold text-lg mb-4 flex items-center">
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="mr-3">
-                                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-dhani-gold"/>
+                                                <svg
+                                                    width="20"
+                                                    height="20"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    className="mr-3"
+                                                >
+                                                    <path
+                                                        d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        className="text-dhani-gold"
+                                                    />
                                                 </svg>
                                                 Quick Actions
                                             </h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <button
-                                                    onClick={() => setActiveTab("account")}
+                                                    onClick={() =>
+                                                        setActiveTab("account")
+                                                    }
                                                     className="flex items-center justify-center space-x-2 p-3 bg-dhani-gold text-black font-medium rounded-lg hover:bg-dhani-gold/90 transition-colors duration-200"
                                                 >
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                    >
+                                                        <path
+                                                            d="M21 12V7H5a2 2 0 0 1 0-4h14v4"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                        <path
+                                                            d="M3 5v14a2 2 0 0 0 2 2h16v-5"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                        <path
+                                                            d="M18 12a2 2 0 0 0 0 4h4v-4Z"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
                                                     </svg>
                                                     <span>Banking</span>
                                                 </button>
                                                 <button
-                                                    onClick={() => setActiveTab("fd")}
+                                                    onClick={() =>
+                                                        setActiveTab("fd")
+                                                    }
                                                     className="flex items-center justify-center space-x-2 p-3 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors duration-200"
                                                 >
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M3 3v18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    <svg
+                                                        width="16"
+                                                        height="16"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                    >
+                                                        <path
+                                                            d="M3 3v18h18"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
+                                                        <path
+                                                            d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                        />
                                                     </svg>
                                                     <span>Fixed Deposits</span>
                                                 </button>
                                                 {walletStatus.connected && (
                                                     <button
-                                                        onClick={() => setActiveTab("web3")}
+                                                        onClick={() =>
+                                                            setActiveTab("web3")
+                                                        }
                                                         className="sm:col-span-2 flex items-center justify-center space-x-2 p-3 bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-white font-medium rounded-lg hover:from-purple-500/30 hover:to-blue-500/30 transition-all duration-200"
                                                     >
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                        <svg
+                                                            width="16"
+                                                            height="16"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                        >
+                                                            <path
+                                                                d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                            />
                                                         </svg>
-                                                        <span>Web3 Features</span>
+                                                        <span>
+                                                            Web3 Features
+                                                        </span>
                                                     </button>
                                                 )}
                                             </div>
@@ -725,7 +1088,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                             {activeTab === "account" && (
                                 <DepositWithdrawPanel
-                                    playerRupees={playerRupees + totalRupeesChange}
+                                    playerRupees={
+                                        playerRupees + totalRupeesChange
+                                    }
                                     bankBalance={bankBalance}
                                     onDeposit={handleDeposit}
                                     onWithdraw={handleWithdraw}

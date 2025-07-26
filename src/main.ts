@@ -5,8 +5,10 @@ import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
+
 import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
+import { balanceManager } from './services/BalanceManager.ts';
 
 let hudRootRef: ReactDOM.Root | null = null;
 
@@ -34,6 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize the stock market UI separately
   initializeStockMarketUI();
+  
+
   
   // Initialize the ATM interface
   initializeATMInterface();
@@ -75,6 +79,9 @@ function initializeStockMarketUI() {
   }
 }
 
+// Function to initialize post office UI
+
+
 // Function to initialize ATM interface
 function initializeATMInterface() {
   // Initialize the ATM interface (it doesn't need a container like React components)
@@ -91,6 +98,9 @@ export function initializeHUD(initialRupees = 25000) {
   const hudContainer = document.getElementById('hud-container');
   
   if (hudContainer) {
+    // Initialize balance manager with game state
+    balanceManager.initializeFromGameState(initialRupees);
+    
     // Make HUD visible
     hudContainer.style.display = 'block';
     

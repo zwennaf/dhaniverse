@@ -20,85 +20,111 @@ class MongoDatabase {
     private client: MongoClient | null = null;
     private db: Db | null = null;
     private isConnected = false;
+    private reconnectAttempts = 0;
+    private maxReconnectAttempts = 5;
+    
     async connect(): Promise<void> {
-        try {
-            console.log("🔌 Connecting to MongoDB Atlas...");
-            console.log(
-                "📍 Connection URL format check:",
-                config.mongodb.url.startsWith("mongodb+srv://")
-                    ? "✅ Atlas format"
-                    : "❌ Invalid format"
-            );
-
-            // Create client with better connection options
-            this.client = new MongoClient(config.mongodb.url, {
-                serverSelectionTimeoutMS: 10000, // 10 seconds
-                connectTimeoutMS: 10000, // 10 seconds
-                socketTimeoutMS: 45000, // 45 seconds
-                maxPoolSize: 10,
-                minPoolSize: 1,
-                maxIdleTimeMS: 30000,
-                retryWrites: true,
-                retryReads: true,
-                compressors: ['zlib'],
-            });
-
-            // Connect to MongoDB with timeout
-            console.log("⏳ Attempting connection...");
-            await Promise.race([
-                this.client.connect(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000)
-                )
-            ]);
-
-            // Set database instance
-            this.db = this.client.db(config.mongodb.dbName);
-
-            this.isConnected = true;
-            console.log(
-                `✅ MongoDB Atlas connected - Database: ${config.mongodb.dbName}`
-            );
-
-            // List collections (optional)
+        while (this.reconnectAttempts < this.maxReconnectAttempts) {
             try {
-                const collections = await this.db.listCollections().toArray();
+                this.reconnectAttempts++;
+                console.log(`🔌 Connecting to MongoDB Atlas... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
                 console.log(
-                    `📊 Collections: ${
-                        collections.length > 0
-                            ? collections.map((c) => c.name).join(", ")
-                            : "None (new database)"
-                    }`
+                    "📍 Connection URL format check:",
+                    config.mongodb.url.startsWith("mongodb+srv://")
+                        ? "✅ Atlas format"
+                        : "❌ Invalid format"
                 );
-            } catch (_listError) {
-                console.log(
-                    "📊 Collections: Unable to list (permissions may be limited)"
-                );
-            }
-        } catch (error) {
-            console.error("❌ MongoDB Atlas connection failed:", error);
-            this.isConnected = false;
 
-            // Provide more specific error messages
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            if (errorMessage.includes("authentication")) {
-                console.log(
-                    "💡 Authentication failed - check username/password in connection string"
-                );
-            } else if (
-                errorMessage.includes("network") ||
-                errorMessage.includes("timeout")
-            ) {
-                console.log(
-                    "💡 Network error - check internet connection and IP whitelist"
-                );
-            } else if (errorMessage.includes("parse")) {
-                console.log(
-                    "💡 Connection string format error - verify the MongoDB URI format"
-                );
-            }
+                // Close existing connection if any
+                if (this.client) {
+                    await this.client.close();
+                }
 
-            throw error;
+                // Create client with better connection options
+                this.client = new MongoClient(config.mongodb.url, {
+                    serverSelectionTimeoutMS: 15000, // 15 seconds
+                    connectTimeoutMS: 15000, // 15 seconds
+                    socketTimeoutMS: 45000, // 45 seconds
+                    maxPoolSize: 10,
+                    minPoolSize: 1,
+                    maxIdleTimeMS: 30000,
+                    retryWrites: true,
+                    retryReads: true,
+                    compressors: ['zlib'],
+                });
+
+                // Connect to MongoDB with timeout
+                console.log("⏳ Attempting connection...");
+                await Promise.race([
+                    this.client.connect(),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Connection timeout after 20 seconds')), 20000)
+                    )
+                ]);
+
+                // Set database instance
+                this.db = this.client.db(config.mongodb.dbName);
+
+                // Test the connection by performing a simple operation
+                await this.db.admin().ping();
+
+                this.isConnected = true;
+                this.reconnectAttempts = 0; // Reset on successful connection
+                console.log(
+                    `✅ MongoDB Atlas connected - Database: ${config.mongodb.dbName}`
+                );
+
+                // List collections (optional)
+                try {
+                    const collections = await this.db.listCollections().toArray();
+                    console.log(
+                        `📊 Collections: ${
+                            collections.length > 0
+                                ? collections.map((c) => c.name).join(", ")
+                                : "None (new database)"
+                        }`
+                    );
+                } catch (_listError) {
+                    console.log(
+                        "📊 Collections: Unable to list (permissions may be limited)"
+                    );
+                }
+
+                return; // Success, exit the retry loop
+            } catch (error) {
+                console.error(`❌ MongoDB Atlas connection failed (Attempt ${this.reconnectAttempts}):`, error);
+                this.isConnected = false;
+
+                // Provide more specific error messages
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (errorMessage.includes("authentication")) {
+                    console.log(
+                        "💡 Authentication failed - check username/password in connection string"
+                    );
+                } else if (
+                    errorMessage.includes("network") ||
+                    errorMessage.includes("timeout")
+                ) {
+                    console.log(
+                        "💡 Network error - check internet connection and IP whitelist"
+                    );
+                } else if (errorMessage.includes("parse")) {
+                    console.log(
+                        "💡 Connection string format error - verify the MongoDB URI format"
+                    );
+                }
+
+                // If this is not the last attempt, wait before retrying
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    const waitTime = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000); // Exponential backoff, max 10s
+                    console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                } else {
+                    // All attempts failed
+                    console.error(`❌ All ${this.maxReconnectAttempts} connection attempts failed`);
+                    throw error;
+                }
+            }
         }
     }
     async disconnect(): Promise<void> {
@@ -283,9 +309,19 @@ class MongoDatabase {
         await bankAccounts.insertOne(bankAccount);
     }
 
-    // Health check
+    // Health check with automatic reconnection attempt
     isHealthy(): boolean {
         return this.isConnected && this.client !== null && this.db !== null;
+    }
+
+    // Attempt to reconnect if connection is lost
+    async ensureConnection(): Promise<void> {
+        if (!this.isHealthy()) {
+            console.log("🔄 Connection lost, attempting to reconnect...");
+            this.isConnected = false;
+            this.reconnectAttempts = 0; // Reset attempts for reconnection
+            await this.connect();
+        }
     }
 }
 

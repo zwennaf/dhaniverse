@@ -6,6 +6,28 @@ import { COLLECTIONS } from "../db/schemas.ts";
 
 const apiRouter = new Router();
 
+// Database connection middleware
+apiRouter.use(async (ctx, next) => {
+  // Skip database check for health endpoint
+  if (ctx.request.url.pathname === "/api/health") {
+    await next();
+    return;
+  }
+  
+  // Check database connection for all other requests
+  if (!mongodb.isHealthy()) {
+    console.error("❌ Database not connected when processing API request:", ctx.request.url.pathname);
+    ctx.response.status = 503;
+    ctx.response.body = { 
+      error: "Database service unavailable",
+      message: "The database connection is not available. Please try again later."
+    };
+    return;
+  }
+  
+  await next();
+});
+
 // Add CORS middleware with more permissive settings for development
 apiRouter.use(oakCors({
   origin: (origin) => {

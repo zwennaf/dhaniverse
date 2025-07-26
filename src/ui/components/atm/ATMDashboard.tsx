@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BankingPolish } from "../polish/FinalPolish";
+import { bankingApi, playerStateApi, stockApi } from "../../../utils/api";
+import { balanceManager } from "../../../services/BalanceManager";
 
 interface Transaction {
     id: string;
@@ -8,7 +10,6 @@ interface Transaction {
         | "withdrawal"
         | "stock_buy"
         | "stock_sell"
-        | "post_office"
         | "bank_transfer";
     amount: number;
     timestamp: Date;
@@ -39,6 +40,7 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState("overview");
     const [bankBalance, setBankBalance] = useState(bankAccount?.balance || 0);
+    const [currentCash, setCurrentCash] = useState(playerRupees);
     const [totalRupeesChange, setTotalRupeesChange] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,130 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
     const [showTransactionsDropdown, setShowTransactionsDropdown] =
         useState(false);
     const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+    const [portfolioData, setPortfolioData] = useState({
+        stockValue: 0,
+        totalPortfolioValue: 0,
+    });
+
+    // Subscribe to balance manager updates
+    useEffect(() => {
+        // Get initial balance from balance manager
+        const currentBalance = balanceManager.getBalance();
+        setCurrentCash(currentBalance.cash);
+        setBankBalance(currentBalance.bankBalance);
+
+        // Subscribe to balance changes
+        const unsubscribe = balanceManager.onBalanceChange((balance) => {
+            setCurrentCash(balance.cash);
+            setBankBalance(balance.bankBalance);
+        });
+
+        return () => {
+            unsubscribe();
+        };
+    }, []);
+
+    // Real-time event listeners for transaction updates
+    useEffect(() => {
+        // Load initial transactions
+        loadAllTransactions();
+
+        // Listen for real-time transaction updates from different sources
+        const handleBankTransaction = (event: CustomEvent) => {
+            const { type, amount, description } = event.detail;
+            addNewTransaction({
+                id: `bank_${Date.now()}_${Math.random()}`,
+                type: type === "deposit" ? "deposit" : "withdrawal",
+                amount: amount,
+                timestamp: new Date(),
+                description: description || `Bank ${type}`,
+                location: "Bank",
+            });
+        };
+
+        const handleStockTransaction = (event: CustomEvent) => {
+            const { type, amount, symbol, quantity, price } = event.detail;
+            addNewTransaction({
+                id: `stock_${Date.now()}_${Math.random()}`,
+                type: type === "buy" ? "stock_buy" : "stock_sell",
+                amount: amount || quantity * price,
+                timestamp: new Date(),
+                description: `${
+                    type === "buy" ? "Bought" : "Sold"
+                } ${quantity} ${symbol} shares at ₹${price}`,
+                location: "Stock Market",
+            });
+        };
+
+        const handleATMTransaction = (event: CustomEvent) => {
+            const { type, amount, atmName } = event.detail;
+            addNewTransaction({
+                id: `atm_${Date.now()}_${Math.random()}`,
+                type: type,
+                amount: amount,
+                timestamp: new Date(),
+                description: `ATM ${
+                    type === "deposit" ? "Deposit" : "Withdrawal"
+                } at ${atmName}`,
+                location: atmName,
+            });
+        };
+
+        // Add event listeners
+        window.addEventListener(
+            "bank-transaction",
+            handleBankTransaction as EventListener
+        );
+        window.addEventListener(
+            "stock-transaction",
+            handleStockTransaction as EventListener
+        );
+
+        window.addEventListener(
+            "atm-transaction",
+            handleATMTransaction as EventListener
+        );
+
+        // Cleanup event listeners
+        return () => {
+            window.removeEventListener(
+                "bank-transaction",
+                handleBankTransaction as EventListener
+            );
+            window.removeEventListener(
+                "stock-transaction",
+                handleStockTransaction as EventListener
+            );
+
+            window.removeEventListener(
+                "atm-transaction",
+                handleATMTransaction as EventListener
+            );
+        };
+    }, []);
+
+    // Add new transaction to the list and update localStorage
+    const addNewTransaction = (transaction: Transaction) => {
+        setAllTransactions((prev) => {
+            const updated = [transaction, ...prev].sort(
+                (a, b) =>
+                    new Date(b.timestamp).getTime() -
+                    new Date(a.timestamp).getTime()
+            );
+
+            // Save to localStorage for persistence
+            const atmTransactions = JSON.parse(
+                localStorage.getItem("atm_transactions") || "[]"
+            );
+            atmTransactions.unshift(transaction);
+            localStorage.setItem(
+                "atm_transactions",
+                JSON.stringify(atmTransactions.slice(0, 100))
+            ); // Keep last 100
+
+            return updated;
+        });
+    };
 
     // Enhanced close handler
     const handleClose = () => {
@@ -66,27 +192,30 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
         onClose();
     };
 
-    // ATM operations
+    // ATM operations using balance manager
     const handleATMDeposit = async (amount: number): Promise<boolean> => {
         try {
-            const success = await onDeposit(amount);
-            if (success) {
-                setBankBalance((prev: number) => prev + amount);
-                setTotalRupeesChange((prev: number) => prev - amount);
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processDeposit(amount, atmName);
 
-                window.dispatchEvent(
-                    new CustomEvent("rupee-update", {
-                        detail: { rupees: playerRupees - amount },
-                    })
-                );
-
-                showSuccessNotification(
-                    "💰 Deposit Successful",
-                    `₹${amount.toLocaleString()} deposited to your account`
-                );
-                return true;
+            // Try to sync with backend
+            try {
+                const success = await onDeposit(amount);
+                if (!success) {
+                    console.warn(
+                        "Backend ATM deposit failed, but local transaction completed"
+                    );
+                }
+            } catch (apiError) {
+                console.warn("Backend API error during ATM deposit:", apiError);
+                // Continue with local transaction
             }
-            return false;
+
+            showSuccessNotification(
+                "💰 Deposit Successful",
+                `₹${amount.toLocaleString()} deposited to your account`
+            );
+            return true;
         } catch (error) {
             console.error("ATM Deposit error:", error);
             setError(
@@ -100,29 +229,33 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
 
     const handleATMWithdraw = async (amount: number): Promise<boolean> => {
         try {
-            if (amount > bankBalance) {
-                setError("Insufficient balance in your account");
-                return false;
+            // Use balance manager for transaction processing
+            const transaction = balanceManager.processWithdrawal(
+                amount,
+                atmName
+            );
+
+            // Try to sync with backend
+            try {
+                const success = await onWithdraw(amount);
+                if (!success) {
+                    console.warn(
+                        "Backend ATM withdrawal failed, but local transaction completed"
+                    );
+                }
+            } catch (apiError) {
+                console.warn(
+                    "Backend API error during ATM withdrawal:",
+                    apiError
+                );
+                // Continue with local transaction
             }
 
-            const success = await onWithdraw(amount);
-            if (success) {
-                setBankBalance((prev: number) => prev - amount);
-                setTotalRupeesChange((prev: number) => prev + amount);
-
-                window.dispatchEvent(
-                    new CustomEvent("rupee-update", {
-                        detail: { rupees: playerRupees + amount },
-                    })
-                );
-
-                showSuccessNotification(
-                    "💸 Withdrawal Successful",
-                    `₹${amount.toLocaleString()} withdrawn from your account`
-                );
-                return true;
-            }
-            return false;
+            showSuccessNotification(
+                "💸 Withdrawal Successful",
+                `₹${amount.toLocaleString()} withdrawn from your account`
+            );
+            return true;
         } catch (error) {
             console.error("ATM Withdrawal error:", error);
             setError(
@@ -134,47 +267,168 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
         }
     };
 
-    // Load all user transactions from different sources
+    // Load all user transactions from balance manager and APIs
     const loadAllTransactions = async () => {
         try {
-            // Mock data - replace with actual API calls to get all user transactions
-            const mockTransactions: Transaction[] = [
-                {
-                    id: "1",
-                    type: "deposit",
-                    amount: 5000,
-                    timestamp: new Date(Date.now() - 86400000),
-                    description: "ATM Deposit at ATM 1",
-                    location: "ATM 1",
-                },
-                {
-                    id: "2",
-                    type: "stock_buy",
-                    amount: 2500,
-                    timestamp: new Date(Date.now() - 172800000),
-                    description: "Bought RELIANCE shares",
-                    location: "Stock Market",
-                },
-                {
-                    id: "3",
-                    type: "withdrawal",
-                    amount: 1000,
-                    timestamp: new Date(Date.now() - 259200000),
-                    description: "ATM Withdrawal at ATM 3",
-                    location: "ATM 3",
-                },
-                {
-                    id: "4",
-                    type: "post_office",
-                    amount: 3000,
-                    timestamp: new Date(Date.now() - 345600000),
-                    description: "Post Office Savings Deposit",
-                    location: "Post Office",
-                },
-            ];
-            setAllTransactions(mockTransactions);
+            setLoading(true);
+            setError(null); // Clear any previous errors
+
+            // Get transactions from balance manager first (most up-to-date)
+            const balanceManagerTransactions = balanceManager.getTransactions();
+            const allTransactions: Transaction[] =
+                balanceManagerTransactions.map((tx) => ({
+                    id: tx.id,
+                    type: tx.type as any,
+                    amount: tx.amount,
+                    timestamp: tx.timestamp,
+                    description: tx.description,
+                    location: tx.location,
+                }));
+
+            // 1. Load Banking Transactions
+            try {
+                const bankingResponse = await bankingApi.getTransactions();
+                if (
+                    bankingResponse.success &&
+                    bankingResponse.data &&
+                    Array.isArray(bankingResponse.data)
+                ) {
+                    const bankingTransactions = bankingResponse.data.map(
+                        (tx: any) => ({
+                            id:
+                                tx._id ||
+                                tx.id ||
+                                `bank_${Date.now()}_${Math.random()}`,
+                            type:
+                                tx.type === "credit" || tx.type === "deposit"
+                                    ? "deposit"
+                                    : "withdrawal",
+                            amount: tx.amount || 0,
+                            timestamp: new Date(
+                                tx.timestamp || tx.createdAt || Date.now()
+                            ),
+                            description:
+                                tx.description ||
+                                `Bank ${tx.type || "transaction"}`,
+                            location: tx.location || "Bank",
+                        })
+                    );
+                    allTransactions.push(...bankingTransactions);
+                    console.log(
+                        `Loaded ${bankingTransactions.length} banking transactions`
+                    );
+                }
+            } catch (error) {
+                console.warn("Failed to load banking transactions:", error);
+                // Don't let banking API errors break the whole function
+            }
+
+            // 2. Load Stock Market Transactions
+            try {
+                const stockResponse = await stockApi.getTransactions();
+                if (
+                    stockResponse.success &&
+                    stockResponse.data &&
+                    Array.isArray(stockResponse.data)
+                ) {
+                    const stockTransactions = stockResponse.data.map(
+                        (tx: any) => ({
+                            id:
+                                tx._id ||
+                                tx.id ||
+                                `stock_${Date.now()}_${Math.random()}`,
+                            type:
+                                tx.type === "buy" ? "stock_buy" : "stock_sell",
+                            amount: tx.amount || tx.quantity * tx.price || 0,
+                            timestamp: new Date(
+                                tx.timestamp || tx.createdAt || Date.now()
+                            ),
+                            description: `${
+                                tx.type === "buy" ? "Bought" : "Sold"
+                            } ${tx.quantity || 0} ${
+                                tx.symbol || "shares"
+                            } shares`,
+                            location: "Stock Market",
+                        })
+                    );
+                    allTransactions.push(...stockTransactions);
+                    console.log(
+                        `Loaded ${stockTransactions.length} stock transactions`
+                    );
+                }
+            } catch (error) {
+                console.warn("Failed to load stock transactions:", error);
+                // Don't let stock API errors break the whole function
+            }
+
+            // 4. Load ATM Transactions (current session)
+            try {
+                const atmTransactions = JSON.parse(
+                    localStorage.getItem("atm_transactions") || "[]"
+                );
+                if (Array.isArray(atmTransactions)) {
+                    // Convert stored transactions to proper format
+                    const formattedATMTransactions = atmTransactions.map(
+                        (tx: any) => ({
+                            ...tx,
+                            timestamp: new Date(tx.timestamp),
+                        })
+                    );
+                    allTransactions.push(...formattedATMTransactions);
+                    console.log(
+                        `Loaded ${formattedATMTransactions.length} ATM transactions from localStorage`
+                    );
+                }
+            } catch (error) {
+                console.warn(
+                    "Failed to load ATM transactions from localStorage:",
+                    error
+                );
+            }
+
+            // Sort all transactions by timestamp (newest first)
+            allTransactions.sort(
+                (a, b) =>
+                    new Date(b.timestamp).getTime() -
+                    new Date(a.timestamp).getTime()
+            );
+
+            setAllTransactions(allTransactions);
+            console.log(
+                `Loaded ${allTransactions.length} transactions from all sources`
+            );
         } catch (error) {
-            console.error("Error loading transactions:", error);
+            console.error("Critical error loading transactions:", error);
+            // Don't set error state that might close the ATM, just log it
+            console.warn(
+                "Transaction loading failed, but ATM will remain open"
+            );
+
+            // Load fallback transactions from localStorage only
+            try {
+                const fallbackTransactions = JSON.parse(
+                    localStorage.getItem("atm_transactions") || "[]"
+                );
+                if (Array.isArray(fallbackTransactions)) {
+                    const formattedTransactions = fallbackTransactions.map(
+                        (tx: any) => ({
+                            ...tx,
+                            timestamp: new Date(tx.timestamp),
+                        })
+                    );
+                    setAllTransactions(formattedTransactions);
+                } else {
+                    setAllTransactions([]);
+                }
+            } catch (fallbackError) {
+                console.warn(
+                    "Fallback transaction loading also failed:",
+                    fallbackError
+                );
+                setAllTransactions([]);
+            }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -478,10 +732,7 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
                                 </div>
                             </div>
                             <div className="text-2xl font-bold text-dhani-gold mb-1">
-                                ₹
-                                {(
-                                    playerRupees + totalRupeesChange
-                                ).toLocaleString()}
+                                ₹{currentCash.toLocaleString()}
                             </div>
                             <div className="text-xs text-gray-400">
                                 Available cash
@@ -637,9 +888,7 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
                         <>
                             {activeTab === "overview" && (
                                 <OverviewTab
-                                    playerRupees={
-                                        playerRupees + totalRupeesChange
-                                    }
+                                    playerRupees={currentCash}
                                     bankBalance={bankBalance}
                                     bankAccount={bankAccount}
                                     setActiveTab={setActiveTab}
@@ -648,9 +897,7 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
 
                             {activeTab === "deposit" && (
                                 <DepositTab
-                                    playerRupees={
-                                        playerRupees + totalRupeesChange
-                                    }
+                                    playerRupees={currentCash}
                                     onDeposit={handleATMDeposit}
                                 />
                             )}
@@ -664,9 +911,7 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
 
                             {activeTab === "balance" && (
                                 <BalanceTab
-                                    playerRupees={
-                                        playerRupees + totalRupeesChange
-                                    }
+                                    playerRupees={currentCash}
                                     bankBalance={bankBalance}
                                     bankAccount={bankAccount}
                                 />
@@ -1409,27 +1654,7 @@ const TransactionsTab: React.FC<{
                         />
                     </svg>
                 );
-            case "post_office":
-                return (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path
-                            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-purple-400"
-                        />
-                        <polyline
-                            points="22,6 12,13 2,6"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="text-purple-400"
-                        />
-                    </svg>
-                );
+
             default:
                 return (
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -1456,8 +1681,7 @@ const TransactionsTab: React.FC<{
                 return "text-blue-400";
             case "stock_sell":
                 return "text-orange-400";
-            case "post_office":
-                return "text-purple-400";
+
             default:
                 return "text-gray-400";
         }
@@ -1473,8 +1697,7 @@ const TransactionsTab: React.FC<{
                 return "Stock Purchase";
             case "stock_sell":
                 return "Stock Sale";
-            case "post_office":
-                return "Post Office";
+
             case "bank_transfer":
                 return "Bank Transfer";
             default:
