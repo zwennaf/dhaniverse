@@ -8,6 +8,8 @@ This section covers development workflows, testing strategies, coding standards,
 - [Testing](./testing.md) - Testing strategies and procedures
 - [Coding Standards](./coding-standards.md) - Code style and best practices
 - [Debugging](./debugging.md) - Debugging guides and tools
+- [Documentation Review Checklist](./documentation-review-checklist.md) - Quality standards for documentation
+- [Documentation Update Procedures](./documentation-update-procedures.md) - Keeping docs synchronized with code
 
 ## Development Overview
 
