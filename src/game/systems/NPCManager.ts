@@ -27,7 +27,7 @@ export class NPCManager {
     
     // Create NPC at predefined position
     this.npc = scene.add.sprite(737, 3753, 'character') as NPCSprite;
-    this.npc.setScale(5);
+    this.npc.setScale(0.32); // Adjusted scale for C2.png to match original NPC size
     this.npc.anims.play('idle-right');
       // Add NPC name text
     const npcNameText = scene.add.text(this.npc.x, this.npc.y - 50, "Village Elder", {

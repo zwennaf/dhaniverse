@@ -61,10 +61,13 @@ export class Player {
                 backgroundColor: Constants.PLAYER_NAME_BACKGROUND,
                 padding: Constants.PLAYER_NAME_PADDING,
             })
-            .setOrigin(0.5,3);
-            
+            .setOrigin(0.5, 3);
+
         // Ensure font is loaded and refresh the text if needed
-        FontUtils.ensureFontLoaded('Tickerbit', Constants.PLAYER_NAME_SIZE).then(() => {
+        FontUtils.ensureFontLoaded(
+            "Tickerbit",
+            Constants.PLAYER_NAME_SIZE
+        ).then(() => {
             this.nameText.setStyle({
                 fontFamily: FontUtils.getPlayerNameFont(),
                 fontSize: Constants.PLAYER_NAME_SIZE,
@@ -186,7 +189,7 @@ export class Player {
         // Columns 1-2: Idle positions
         // Columns 3-4: Running positions
 
-        // Down animations (Row 1: frames 0-3)
+        // Down animations (Row 1: frames 0-3) - All use idle frames
         anims.create({
             key: "idle-down",
             frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
@@ -196,17 +199,17 @@ export class Player {
         anims.create({
             key: "walk-down",
             frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
-            frameRate: 4,
+            frameRate: 2,
             repeat: -1,
         });
         anims.create({
             key: "run-down",
-            frames: anims.generateFrameNumbers("character", { frames: [2, 3] }),
-            frameRate: 8,
+            frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
+            frameRate: 2,
             repeat: -1,
         });
 
-        // Left animations (Row 2: frames 4-7)
+        // Left animations (Row 2: frames 4-7) - All use idle frames
         anims.create({
             key: "idle-left",
             frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
@@ -216,17 +219,17 @@ export class Player {
         anims.create({
             key: "walk-left",
             frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
-            frameRate: 4,
+            frameRate: 2,
             repeat: -1,
         });
         anims.create({
             key: "run-left",
-            frames: anims.generateFrameNumbers("character", { frames: [6, 7] }),
-            frameRate: 8,
+            frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
+            frameRate: 2,
             repeat: -1,
         });
 
-        // Right animations (Row 3: frames 8-11)
+        // Right animations (Row 3: frames 8-11) - All use idle frames
         anims.create({
             key: "idle-right",
             frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
@@ -236,33 +239,39 @@ export class Player {
         anims.create({
             key: "walk-right",
             frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
-            frameRate: 4,
+            frameRate: 2,
             repeat: -1,
         });
         anims.create({
             key: "run-right",
-            frames: anims.generateFrameNumbers("character", { frames: [10, 11] }),
-            frameRate: 8,
+            frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
+            frameRate: 2,
             repeat: -1,
         });
 
-        // Up animations (Row 4: frames 12-15)
+        // Up animations (Row 4: frames 12-15) - All use idle frames
         anims.create({
             key: "idle-up",
-            frames: anims.generateFrameNumbers("character", { frames: [12, 13] }),
+            frames: anims.generateFrameNumbers("character", {
+                frames: [12, 13],
+            }),
             frameRate: 2,
             repeat: -1,
         });
         anims.create({
             key: "walk-up",
-            frames: anims.generateFrameNumbers("character", { frames: [12, 13] }),
-            frameRate: 4,
+            frames: anims.generateFrameNumbers("character", {
+                frames: [12, 13],
+            }),
+            frameRate: 2,
             repeat: -1,
         });
         anims.create({
             key: "run-up",
-            frames: anims.generateFrameNumbers("character", { frames: [14, 15] }),
-            frameRate: 8,
+            frames: anims.generateFrameNumbers("character", {
+                frames: [12, 13],
+            }),
+            frameRate: 2,
             repeat: -1,
         });
     }
