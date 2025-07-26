@@ -1,5 +1,18 @@
 # WebSocket API Reference
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Connection Information](#connection-information)
+- [Connection Flow](#connection-flow)
+- [Message Types](#message-types)
+- [Client-to-Server Messages](#client-to-server-messages)
+- [Server-to-Client Messages](#server-to-client-messages)
+- [Error Handling](#error-handling)
+- [Connection Management](#connection-management)
+- [Rate Limiting](#rate-limiting)
+- [Security Considerations](#security-considerations)
+
 ## Overview
 
 The Dhaniverse WebSocket server provides real-time multiplayer functionality, enabling players to see each other's movements, chat, and receive live game updates. The server is built with Deno and handles authentication, position updates, and chat messaging.
@@ -624,4 +637,20 @@ FASTMCP_LOG_LEVEL=DEBUG
 Monitor server health using the HTTP endpoints:
 - `/health` - Basic health check
 - `/online` - Current user count
-- `/info` - Server information
+- `/info` - Server information## 
+Related Documentation
+
+- [Game Server API](./game-server.md) - REST API endpoints and authentication
+- [Frontend APIs](./frontend-apis.md) - Frontend WebSocket integration
+- [Game Engine](../components/game-engine.md) - Real-time game systems
+- [System Architecture](../architecture/system-architecture.md#real-time-communication-flow) - WebSocket architecture
+
+## External Resources
+
+- [WebSocket API Documentation](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
+- [Deno WebSocket](https://deno.land/manual/runtime/web_platform_apis#websockets)
+- [Real-time Communication Patterns](https://web.dev/websockets-basics/)
+
+---
+
+**Navigation**: [← Game Server API](./game-server.md) | [API Index](./index.md) | [Frontend APIs →](./frontend-apis.md)

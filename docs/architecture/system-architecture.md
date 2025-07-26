@@ -1,5 +1,27 @@
 # System Architecture
 
+## Table of Contents
+
+- [Overview](#overview)
+- [High-Level Architecture](#high-level-architecture)
+- [Component Architecture](#component-architecture)
+  - [Frontend Architecture](#frontend-architecture)
+  - [Backend Architecture](#backend-architecture)
+- [Data Flow Architecture](#data-flow-architecture)
+  - [Primary Data Flow](#primary-data-flow)
+  - [Real-time Communication Flow](#real-time-communication-flow)
+- [Security Architecture](#security-architecture)
+  - [Authentication Flow](#authentication-flow)
+  - [Security Layers](#security-layers)
+- [Deployment Architecture](#deployment-architecture)
+  - [Development Environment](#development-environment)
+  - [Production Environment](#production-environment)
+- [Performance Considerations](#performance-considerations)
+  - [Scalability Design](#scalability-design)
+  - [Optimization Strategies](#optimization-strategies)
+- [Technology Stack Summary](#technology-stack-summary)
+- [Integration Points](#integration-points)
+
 ## Overview
 
 Dhaniverse is a comprehensive Web3 gaming platform that combines traditional gaming mechanics with blockchain technology. The system is built on a distributed architecture that includes an Internet Computer Protocol (ICP) canister backend, multiple game servers, a React-based frontend, and various supporting services.
@@ -396,3 +418,16 @@ graph TB
 ```
 
 This architecture provides a robust, scalable foundation for the Dhaniverse Web3 gaming platform, ensuring security, performance, and maintainability across all system components.
+
+## Related Documentation
+
+- [Data Flow Architecture](./data-flow.md) - Detailed data flow patterns and communication
+- [Security Architecture](./security-architecture.md) - Security measures and authentication
+- [Technology Stack](./technology-stack.md) - Technology choices and rationale
+- [ICP Canister API](../api/icp-canister.md) - Blockchain backend API reference
+- [Game Server API](../api/game-server.md) - Game server endpoints and integration
+- [Component Documentation](../components/) - Individual component details
+
+---
+
+**Navigation**: [← Architecture Index](./index.md) | [Main Documentation](../README.md) | [Data Flow →](./data-flow.md)

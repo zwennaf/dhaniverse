@@ -1,5 +1,19 @@
 # Game Server API Reference
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Base Configuration](#base-configuration)
+- [Authentication](#authentication)
+- [Authentication Endpoints](#authentication-endpoints)
+- [Player Management Endpoints](#player-management-endpoints)
+- [Banking Endpoints](#banking-endpoints)
+- [Stock Trading Endpoints](#stock-trading-endpoints)
+- [Game State Endpoints](#game-state-endpoints)
+- [Error Handling](#error-handling)
+- [Rate Limiting](#rate-limiting)
+- [WebSocket Integration](#websocket-integration)
+
 ## Overview
 
 The Dhaniverse game server is built with Deno and Oak framework, providing REST API endpoints for authentication, player state management, banking operations, and stock trading functionality. The server uses MongoDB for data persistence and JWT for authentication.
@@ -50,6 +64,106 @@ Registers a new user account.
 **Error Responses**:
 - `400`: Validation errors (missing fields, weak password, username taken)
 - `500`: Internal server error
+
+**Complete Registration Example**:
+```javascript
+// Registration with validation and error handling
+async function registerUser(userData) {
+    try {
+        // Client-side validation
+        const validation = validateRegistrationData(userData);
+        if (!validation.isValid) {
+            throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+        }
+
+        const response = await fetch('/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            // Handle specific error cases
+            if (response.status === 400) {
+                if (result.error.includes('email_taken')) {
+                    throw new Error('Email address is already registered');
+                } else if (result.error.includes('username_taken')) {
+                    throw new Error('Username is already taken');
+                } else if (result.error.includes('weak_password')) {
+                    throw new Error('Password must be at least 8 characters with uppercase, lowercase, and numbers');
+                }
+            }
+            throw new Error(result.error || 'Registration failed');
+        }
+
+        // Store token and user data
+        localStorage.setItem('auth_token', result.token);
+        localStorage.setItem('user_data', JSON.stringify(result.user));
+
+        console.log('Registration successful:', result.user);
+        return result;
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        throw error;
+    }
+}
+
+// Client-side validation function
+function validateRegistrationData(data) {
+    const errors = [];
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!data.email || !emailRegex.test(data.email)) {
+        errors.push('Valid email address is required');
+    }
+    
+    // Password validation
+    if (!data.password || data.password.length < 8) {
+        errors.push('Password must be at least 8 characters long');
+    }
+    
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (data.password && !passwordRegex.test(data.password)) {
+        errors.push('Password must contain uppercase, lowercase, and numbers');
+    }
+    
+    // Username validation
+    if (!data.gameUsername || data.gameUsername.length < 3) {
+        errors.push('Username must be at least 3 characters long');
+    }
+    
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (data.gameUsername && !usernameRegex.test(data.gameUsername)) {
+        errors.push('Username can only contain letters, numbers, and underscores');
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
+}
+
+// Usage example
+try {
+    const result = await registerUser({
+        email: 'player@example.com',
+        password: 'SecurePass123',
+        gameUsername: 'CryptoTrader'
+    });
+    
+    // Redirect to game or show success message
+    window.location.href = '/game';
+} catch (error) {
+    // Show error to user
+    showErrorMessage(error.message);
+}
+```
 
 ### POST /auth/login
 
@@ -752,4 +866,22 @@ try {
 } catch (error) {
     console.error('Deposit failed:', error.message);
 }
-```
+```#
+# Related Documentation
+
+- [WebSocket API](./websocket.md) - Real-time communication protocols
+- [ICP Canister API](./icp-canister.md) - Blockchain backend integration
+- [Frontend APIs](./frontend-apis.md) - Frontend service integration
+- [Game Engine](../components/game-engine.md) - Game engine integration patterns
+- [Authentication Setup](../setup/configuration.md#authentication) - JWT configuration
+
+## External Resources
+
+- [Deno Documentation](https://deno.land/manual)
+- [Oak Framework](https://deno.land/x/oak)
+- [MongoDB Node.js Driver](https://docs.mongodb.com/drivers/node/)
+- [JWT.io](https://jwt.io/) - JWT token debugging
+
+---
+
+**Navigation**: [← ICP Canister API](./icp-canister.md) | [API Index](./index.md) | [WebSocket API →](./websocket.md)
