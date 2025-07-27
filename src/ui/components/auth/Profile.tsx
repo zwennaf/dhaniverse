@@ -185,19 +185,8 @@ const Profile: React.FC = () => {
                     style={{
                       imageRendering: 'pixelated'
                     }}
-                    onError={(e) => {
-                      console.error(`Failed to load character cover image: ${character}cover.png`);
-                      // Try lowercase version as fallback
-                      const fallbackSrc = `/characters/${character.toLowerCase()}cover.png`;
-                      if (e.currentTarget.src !== fallbackSrc) {
-                        e.currentTarget.src = fallbackSrc;
-                      } else {
-                        e.currentTarget.style.display = 'none';
-                      }
-                    }}
-                    onLoad={() => {
-                      console.log(`Successfully loaded character cover image: ${character}cover.png`);
-                    }}
+                    
+                    
                   />
                 </div>
                 {selectedCharacter === character && (
