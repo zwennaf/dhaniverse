@@ -160,7 +160,7 @@ const Profile: React.FC = () => {
         <div className="space-y-3">
           <label className="block text-dhani-text font-robert text-sm">Choose Character</label>
           <div className="grid grid-cols-2 gap-3">
-            {['c1', 'C2', 'c3', 'C4'].map((character) => (
+            {['C1', 'C2', 'C3', 'C4'].map((character) => (
               <div
                 key={character}
                 onClick={() => {
