@@ -8,8 +8,8 @@ import { BuildingManager } from "../systems/BuildingManager.ts";
 import { BankNPCManager } from "../systems/BankNPCManager.ts";
 import { StockMarketManager } from "../systems/StockMarketManager.ts";
 import { ATMManager } from "../managers/ATMManager.ts";
-import { MapDragHandler } from "../systems/MapDragHandler.ts";
-import { ExtendedCamera } from "../systems/ChunkedMapManager.ts";
+
+
 
 // Custom event interfaces
 interface RupeeUpdateEvent extends CustomEvent {
@@ -58,7 +58,7 @@ export class MainScene extends Scene implements MainGameScene {
     bankNPCManager!: BankNPCManager;
     stockMarketManager!: StockMarketManager;
     atmManager!: ATMManager;
-    private mapDragHandler!: MapDragHandler;
+    
     private gameContainer!: GameObjects.Container;
     private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
     private loadingProgress: number = 0;
@@ -341,34 +341,14 @@ export class MainScene extends Scene implements MainGameScene {
         this.cameras.main.startFollow(this.player.getSprite(), true, 0.1, 0.1);
 
         // Set initial zoom and constraints
-        const camera = this.cameras.main as ExtendedCamera;
-        camera.setZoom(0.7);
-        camera.minZoom = 0.25;
-        camera.maxZoom = 2.0;
+        const camera = this.cameras.main;
+        
+        
 
         // Enable round pixels to reduce flickering
         this.cameras.main.setRoundPixels(true);
 
-        // Setup mouse wheel zoom
-        this.input.on(
-            "wheel",
-            (
-                _pointer: Phaser.Input.Pointer,
-                _gameObjects: unknown,
-                _deltaX: number,
-                deltaY: number
-            ) => {
-                const camera = this.cameras.main as ExtendedCamera;
-                const newZoom = camera.zoom + (deltaY > 0 ? -0.1 : 0.1);
-                camera.setZoom(
-                    Phaser.Math.Clamp(newZoom, camera.minZoom!, camera.maxZoom!)
-                );
-            }
-        );
-
-        // Initialize map drag handler after camera setup
-        this.mapDragHandler = new MapDragHandler(this);
-        this.mapDragHandler.initialize();
+        
 
         // Add event listener for updatePlayerRupees events (from banking and stock market)
         window.addEventListener(
@@ -423,9 +403,7 @@ export class MainScene extends Scene implements MainGameScene {
                 this.atmManager.destroy();
             }
 
-            if (this.mapDragHandler) {
-                this.mapDragHandler.destroy();
-            }
+            
 
             window.removeEventListener(
                 "updatePlayerRupees",
@@ -463,10 +441,7 @@ export class MainScene extends Scene implements MainGameScene {
         this.stockMarketManager.update();
         this.atmManager.update();
 
-        // Update map drag handler to handle building state changes
-        if (this.mapDragHandler) {
-            this.mapDragHandler.update();
-        }
+        
 
         // Update map chunks based on player position
         this.mapManager.update();
