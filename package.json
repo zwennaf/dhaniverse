@@ -8,16 +8,25 @@
         "host": "vite --host",
         "build": "tsc && vite build",
         "preview": "vite preview",
+        "test": "vitest",
+        "test:run": "vitest run",
         "server:game": "deno run -A --unstable-detect-cjs --env-file=server/game/.env --watch server/game/index.ts",
         "server:ws": "deno run -A --env-file=server/ws/.env --watch server/ws/ws.ts",
         "server": "start-servers.bat"
     },
     "devDependencies": {
+        "@changesets/cli": "^2.29.5",
         "@tailwindcss/postcss": "^4.1.11",
+        "@testing-library/jest-dom": "^6.6.4",
+        "@testing-library/react": "^16.3.0",
+        "@testing-library/user-event": "^14.6.1",
+        "@types/jest": "^30.0.0",
         "@vitejs/plugin-react": "4.7.0",
         "concurrently": "9.2.0",
+        "jsdom": "^26.1.0",
         "typescript": "5.8.3",
-        "vite": "^6.2.0"
+        "vite": "^6.2.0",
+        "vitest": "^3.2.4"
     },
     "dependencies": {
         "@coinbase/wallet-sdk": "4.3.7",

@@ -1,0 +1,53 @@
+name: Release Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v1.3.0)'
+        required: true
+        type: string
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Changesets version and changelog
+        run: |
+          npx changeset version
+          npx changeset changelog
+
+      - name: Extract latest changelog section
+        id: changelog
+        run: |
+          # Extract latest version section from CHANGELOG.md
+          awk '/^## /{i++} i==2{exit} i==1' CHANGELOG.md > temp_changelog.md
+          echo "CHANGELOG_BODY<<EOF" >> $GITHUB_ENV
+          cat temp_changelog.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Create PR from main to prod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base prod \
+            --head main \
+            --title "Release: ${{ github.event.inputs.version }}" \
+            --body "${{ env.CHANGELOG_BODY }}" \
+            --label "release"
