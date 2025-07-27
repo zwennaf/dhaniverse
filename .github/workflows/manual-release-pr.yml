@@ -27,7 +27,6 @@ jobs:
       - name: Run Changesets version and changelog
         run: |
           npx changeset version
-          npx changeset changelog
 
       - name: Extract latest changelog section
         id: changelog
