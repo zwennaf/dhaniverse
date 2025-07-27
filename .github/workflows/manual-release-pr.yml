@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 23
 
       - name: Install dependencies
         run: npm ci
@@ -32,19 +32,16 @@ jobs:
       - name: Extract latest changelog section
         id: changelog
         run: |
-          # Extract latest version section from CHANGELOG.md
           awk '/^## /{i++} i==2{exit} i==1' CHANGELOG.md > temp_changelog.md
           echo "CHANGELOG_BODY<<EOF" >> $GITHUB_ENV
           cat temp_changelog.md >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Set up GitHub CLI
-        uses: cli/cli-action@v2
-
       - name: Create PR from main to prod
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "Creating release PR for ${{ github.event.inputs.version }}"
           gh pr create \
             --base prod \
             --head main \
