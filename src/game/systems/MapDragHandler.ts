@@ -473,6 +473,9 @@ export class MapDragHandler {
         this.dragState.isAtBoundary = false;
         this.dragState.boundaryDirection = '';
 
+        // Disable camera follow when dragging starts
+        this.scene.setCameraFollow(false);
+
         // Provide immediate visual feedback
         this.provideImmediateVisualFeedback();
 
@@ -579,6 +582,9 @@ export class MapDragHandler {
         // Hide boundary feedback
         this.hideBoundaryFeedback();
         
+        // Re-enable camera follow when dragging ends
+        this.scene.setCameraFollow(true);
+
         // Restore cursor with smooth transition
         this.restoreCursorWithTransition();
     }
@@ -761,7 +767,7 @@ export class MapDragHandler {
             const clampedZoom = Phaser.Math.Clamp(currentZoom, minZoom, maxZoom);
 
             // Base sensitivity - how much the camera moves per pixel of mouse movement
-            const baseSensitivity = 1.0;
+            const baseSensitivity = 2.0;
 
             // Calculate zoom-adjusted sensitivity
             // At higher zoom levels (zoomed in), we want less camera movement per pixel
@@ -1226,14 +1232,17 @@ export class MapDragHandler {
             return false;
         }
 
-        // Check if click is within player bounds (considering sprite size and scale)
-        const playerBounds = playerSprite.getBounds();
-        const clickBuffer = 50; // Add some buffer for easier clicking
+        // Get the player's position in world coordinates
+        const playerX = playerSprite.x;
+        const playerY = playerSprite.y;
+
+        // Calculate the distance between the pointer and the player
+        const distance = Phaser.Math.Distance.Between(worldX, worldY, playerX, playerY);
+
+        // Check if the distance is within a certain threshold (e.g., half the player's width)
+        const threshold = playerSprite.width / 2;
         
-        return worldX >= playerBounds.x - clickBuffer &&
-               worldX <= playerBounds.x + playerBounds.width + clickBuffer &&
-               worldY >= playerBounds.y - clickBuffer &&
-               worldY <= playerBounds.y + playerBounds.height + clickBuffer;
+        return distance <= threshold;
     }
 
     /**

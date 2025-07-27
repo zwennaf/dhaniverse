@@ -45,6 +45,7 @@ export interface MainGameScene extends Scene {
 
 export class MainScene extends Scene implements MainGameScene {
     private isTyping: boolean = false;
+    private isCameraFollowingPlayer: boolean = true;
     private handleTypingStartBound = () => this.handleTypingStart();
     private handleTypingEndBound = () => this.handleTypingEnd();
     private player!: Player;
@@ -794,6 +795,20 @@ export class MainScene extends Scene implements MainGameScene {
         const mapWidth = this.mapManager.getMapWidth();
         const mapHeight = this.mapManager.getMapHeight();
         this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+    }
+
+    public setCameraFollow(follow: boolean): void {
+        if (follow) {
+            if (!this.isCameraFollowingPlayer) {
+                this.cameras.main.startFollow(this.player.getSprite(), true, 0.1, 0.1);
+                this.isCameraFollowingPlayer = true;
+            }
+        } else {
+            if (this.isCameraFollowingPlayer) {
+                this.cameras.main.stopFollow();
+                this.isCameraFollowingPlayer = false;
+            }
+        }
     } // Bound handler to update rupees
     private handleRupeeUpdate(event: Event): void {
         const customEvent = event as RupeeUpdateEvent;
@@ -886,6 +901,9 @@ export class MainScene extends Scene implements MainGameScene {
             if (eKey) {
                 eKey.enabled = true;
             }
+
+            // Re-enable camera follow after typing ends
+            this.setCameraFollow(true);
         }
     }
     // Cleanup method called when scene is destroyed
