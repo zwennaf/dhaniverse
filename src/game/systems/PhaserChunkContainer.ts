@@ -1,28 +1,28 @@
-import { GameObjects, Scene, Tweens } from 'phaser';
+import Phaser from 'phaser';
 
 interface ChunkTransition {
   chunkId: string;
-  image: GameObjects.Image;
-  tween?: Tweens.Tween;
+  image: Phaser.GameObjects.Image;
+  tween?: Phaser.Tweens.Tween;
 }
 
-export class PhaserChunkContainer extends GameObjects.Container {
+export class PhaserChunkContainer extends Phaser.GameObjects.Container {
   private chunkTransitions: Map<string, ChunkTransition> = new Map();
   private transitionDuration: number = 300; // ms
   private fadeInAlpha: number = 0.8; // Start slightly transparent for smooth loading
 
-  constructor(scene: Scene, x?: number, y?: number) {
+  constructor(scene: Phaser.Scene, x?: number, y?: number) {
     super(scene, x, y);
     scene.add.existing(this);
   }
 
-  public addChunkWithTransition(chunkId: string, image: GameObjects.Image): void {
+  public addChunkWithTransition(chunkId: string, image: Phaser.GameObjects.Image): void {
     // Set initial alpha for fade-in effect
     image.setAlpha(0);
-    
+
     // Add to container
     this.add(image);
-    
+
     // Create fade-in tween
     const tween = this.scene.tweens.add({
       targets: image,
@@ -104,7 +104,7 @@ export class PhaserChunkContainer extends GameObjects.Container {
     return this.chunkTransitions.has(chunkId);
   }
 
-  public getChunkImage(chunkId: string): GameObjects.Image | null {
+  public getChunkImage(chunkId: string): Phaser.GameObjects.Image | null {
     const transition = this.chunkTransitions.get(chunkId);
     return transition ? transition.image : null;
   }
@@ -112,7 +112,7 @@ export class PhaserChunkContainer extends GameObjects.Container {
   public updateChunkDepth(): void {
     // Ensure all chunks are behind other game objects
     this.list.forEach((child) => {
-      if (child instanceof GameObjects.Image) {
+      if (child instanceof Phaser.GameObjects.Image) {
         child.setDepth(-10);
       }
     });
@@ -140,7 +140,7 @@ export class PhaserChunkContainer extends GameObjects.Container {
         console.warn(`Error destroying chunk image during clearAll:`, error);
       }
     });
-    
+
     this.chunkTransitions.clear();
     this.removeAll(true);
   }
