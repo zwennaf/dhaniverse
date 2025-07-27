@@ -21,7 +21,7 @@ const Profile: React.FC = () => {
     console.log('Profile: gameUsername type:', typeof user.gameUsername); // Debug log
     // Prefill the input with existing game username, ensure it's a string
     setUsername(user.gameUsername || '');
-    setSelectedCharacter(user.selectedCharacter || '');
+    setSelectedCharacter(user.selectedCharacter || 'C1');
   }, [isLoaded, user, hasUserTyped]);
 
   // Clear error on username change
