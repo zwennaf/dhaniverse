@@ -8,6 +8,7 @@ import { BuildingManager } from "../systems/BuildingManager.ts";
 import { BankNPCManager } from "../systems/BankNPCManager.ts";
 import { StockMarketManager } from "../systems/StockMarketManager.ts";
 import { ATMManager } from "../managers/ATMManager.ts";
+import { MapDragHandler } from "../systems/MapDragHandler.ts";
 import { ExtendedCamera } from "../systems/ChunkedMapManager.ts";
 
 // Custom event interfaces
@@ -35,6 +36,8 @@ export interface MainGameScene extends Scene {
     bankNPCManager: BankNPCManager;
     stockMarketManager: StockMarketManager;
     atmManager: ATMManager;
+    npcManager: NPCManager;
+    buildingManager: BuildingManager;
     openBankingUI(bankAccount: any): void;
     openStockMarketUI(stocks: any[]): void;
     playerRupees: number;
@@ -49,11 +52,12 @@ export class MainScene extends Scene implements MainGameScene {
     private collisionManager!: CollisionManager;
     mapManager!: ChunkedMapManager;
     private webSocketManager!: WebSocketManager;
-    private npcManager!: NPCManager;
-    private buildingManager!: BuildingManager;
+    npcManager!: NPCManager;
+    buildingManager!: BuildingManager;
     bankNPCManager!: BankNPCManager;
     stockMarketManager!: StockMarketManager;
     atmManager!: ATMManager;
+    private mapDragHandler!: MapDragHandler;
     private gameContainer!: GameObjects.Container;
     private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
     private loadingProgress: number = 0;
@@ -361,6 +365,10 @@ export class MainScene extends Scene implements MainGameScene {
             }
         );
 
+        // Initialize map drag handler after camera setup
+        this.mapDragHandler = new MapDragHandler(this);
+        this.mapDragHandler.initialize();
+
         // Add event listener for updatePlayerRupees events (from banking and stock market)
         window.addEventListener(
             "updatePlayerRupees",
@@ -414,6 +422,10 @@ export class MainScene extends Scene implements MainGameScene {
                 this.atmManager.destroy();
             }
 
+            if (this.mapDragHandler) {
+                this.mapDragHandler.destroy();
+            }
+
             window.removeEventListener(
                 "updatePlayerRupees",
                 this.handleUpdatePlayerRupeesBound
@@ -449,6 +461,11 @@ export class MainScene extends Scene implements MainGameScene {
         this.bankNPCManager.update();
         this.stockMarketManager.update();
         this.atmManager.update();
+
+        // Update map drag handler to handle building state changes
+        if (this.mapDragHandler) {
+            this.mapDragHandler.update();
+        }
 
         // Update map chunks based on player position
         this.mapManager.update();

@@ -48,13 +48,15 @@ const Profile: React.FC = () => {
         <div className="text-dhani-text font-tickerbit z-10">Loading...</div>
       </div>
     );
-  }  const handleSave = async () => {
+  }  const handleSave = async (characterOverride?: string) => {
     if (username.trim().length < 3) {
       setError('Username must be at least 3 characters');
       return;
     }
     
-    if (!selectedCharacter) {
+    const finalCharacter = characterOverride || selectedCharacter;
+
+    if (!finalCharacter) {
       setError('Please select a character before saving');
       return;
     }
@@ -62,15 +64,15 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      const result = await updateProfile(username.trim(), selectedCharacter);
+      const result = await updateProfile(username.trim(), finalCharacter);
       if (result.success) {
         setSaved(true);
         setHasUserTyped(false); // Reset the flag after successful save
       } else {
-        setError(result.error || 'Failed to save username');
+        setError(result.error || 'Failed to save profile');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to save username');
+      setError(err.message || 'Failed to save profile');
     } finally {
       setLoading(false);
     }
@@ -95,7 +97,7 @@ const Profile: React.FC = () => {
     
     if (needsSaving) {
       // Try to save the profile first, then navigate
-      handleSave().then(() => {
+      handleSave(selectedCharacter).then(() => {
         navigate('/game');
       });
     } else {
@@ -162,8 +164,12 @@ const Profile: React.FC = () => {
               <div
                 key={character}
                 onClick={() => {
-                  setSelectedCharacter(character);
+                  const characterToSelect = character;
+                  setSelectedCharacter(characterToSelect);
                   setSaved(false);
+                  if (username.trim().length >= 3) {
+                      handleSave(characterToSelect);
+                  }
                 }}
                 className={`relative cursor-pointer rounded-lg border-2 transition-all duration-200 ${
                   selectedCharacter === character
@@ -217,7 +223,7 @@ const Profile: React.FC = () => {
           >
             Play Now
           </PixelButton>
-          <PixelButton variant='outline' size='lg' onClick={handleSave} disabled={loading} className="sm:w-1/3 bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
+          <PixelButton variant='outline' size='lg' onClick={() => handleSave()} disabled={loading} className="sm:w-1/3 bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
             {loading ? 'Saving...' : 'Save'}
           </PixelButton>
           <PixelButton variant="signout" onClick={() => signOut().then(() => navigate('/sign-in'))} disabled={loading} className="sm:w-1/3 bg-red-600 hover:bg-red-900">
