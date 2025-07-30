@@ -876,7 +876,7 @@ export class ChunkedMapManager {
             camera.maxZoom = camera._origMaxZoom;
 
             // Reset zoom to a comfortable default value
-            camera.setZoom(0.7);
+            camera.setZoom(0.8);
         }
 
         // Reset physics world bounds to outdoor map dimensions
@@ -907,7 +907,7 @@ export class ChunkedMapManager {
     // Fallback method for setting camera bounds
     private setDefaultCameraBounds(): void {
         const camera = this.scene.cameras.main as ExtendedCamera;
-        const zoom = camera.zoom || 0.7;
+        const zoom = camera.zoom || 0.8;
 
         // Calculate the visible area based on zoom level
         const visibleWidth = camera.width / zoom;

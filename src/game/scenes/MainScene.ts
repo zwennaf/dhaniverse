@@ -342,7 +342,7 @@ export class MainScene extends Scene implements MainGameScene {
 
         // Set initial zoom and constraints
         const camera = this.cameras.main;
-        camera.setZoom(0.5);
+        camera.setZoom(0.8);
         
         
 
