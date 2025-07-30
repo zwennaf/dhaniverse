@@ -822,9 +822,14 @@ export class ChunkedMapManager {
             // Simple, fixed maxZoom for interior areas
             const maxZoom = 0.7;
 
-            // Get camera and set zoom
+            // Get camera and set zoom using dynamic zoom manager
             const camera = this.scene.cameras.main as ExtendedCamera;
-            camera.setZoom(maxZoom);
+            const scene = this.scene as any;
+            if (scene.dynamicZoomManager) {
+                scene.dynamicZoomManager.setZoom(maxZoom, true);
+            } else {
+                camera.setZoom(maxZoom);
+            }
 
             // Store camera settings for restoration later
             camera._origMinZoom = camera.minZoom || 0.25;
@@ -875,8 +880,13 @@ export class ChunkedMapManager {
             camera.minZoom = camera._origMinZoom;
             camera.maxZoom = camera._origMaxZoom;
 
-            // Reset zoom to a comfortable default value
-            camera.setZoom(0.8);
+            // Reset zoom to a comfortable default value using dynamic zoom manager
+            const scene = this.scene as any;
+            if (scene.dynamicZoomManager) {
+                scene.dynamicZoomManager.resetToDefault(true);
+            } else {
+                camera.setZoom(0.8);
+            }
         }
 
         // Reset physics world bounds to outdoor map dimensions

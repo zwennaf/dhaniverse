@@ -8,6 +8,7 @@ import { BuildingManager } from "../systems/BuildingManager.ts";
 import { BankNPCManager } from "../systems/BankNPCManager.ts";
 import { StockMarketManager } from "../systems/StockMarketManager.ts";
 import { ATMManager } from "../managers/ATMManager.ts";
+import { DynamicZoomManager } from "../systems/DynamicZoomManager.ts";
 
 
 
@@ -58,6 +59,7 @@ export class MainScene extends Scene implements MainGameScene {
     bankNPCManager!: BankNPCManager;
     stockMarketManager!: StockMarketManager;
     atmManager!: ATMManager;
+    private dynamicZoomManager!: DynamicZoomManager;
     
     private gameContainer!: GameObjects.Container;
     private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
@@ -340,11 +342,8 @@ export class MainScene extends Scene implements MainGameScene {
         // Setup camera to follow player with smooth follow
         this.cameras.main.startFollow(this.player.getSprite(), true, 0.1, 0.1);
 
-        // Set initial zoom and constraints
-        const camera = this.cameras.main;
-        camera.setZoom(0.8);
-        
-        
+        // Initialize dynamic zoom manager after player is created
+        this.dynamicZoomManager = new DynamicZoomManager(this, this.player);
 
         // Enable round pixels to reduce flickering
         this.cameras.main.setRoundPixels(true);
@@ -404,6 +403,10 @@ export class MainScene extends Scene implements MainGameScene {
                 this.atmManager.destroy();
             }
 
+            if (this.dynamicZoomManager) {
+                this.dynamicZoomManager.destroy();
+            }
+
             
 
             window.removeEventListener(
@@ -443,6 +446,9 @@ export class MainScene extends Scene implements MainGameScene {
         this.atmManager.update();
 
         
+
+        // Update dynamic zoom based on player movement
+        this.dynamicZoomManager.update();
 
         // Update map chunks based on player position
         this.mapManager.update();
