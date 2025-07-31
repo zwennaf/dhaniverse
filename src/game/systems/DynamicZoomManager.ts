@@ -8,11 +8,13 @@ export class DynamicZoomManager {
     
     // Zoom levels
     private readonly DEFAULT_ZOOM = 0.8;
-    private readonly RUNNING_ZOOM = 0.65; // Slightly zoomed out when running
+    private readonly RUNNING_ZOOM = 0.72; // Less zoom out when running
     
     // Animation settings
-    private readonly ZOOM_TRANSITION_DURATION = 300; // milliseconds
-    private readonly ZOOM_EASE = 'Power2.easeOut';
+    private readonly ZOOM_OUT_DURATION = 800; // Slow zoom out when starting to run
+    private readonly ZOOM_IN_DURATION = 200; // Quick return to default when stopping
+    private readonly ZOOM_OUT_EASE = 'Power2.easeOut';
+    private readonly ZOOM_IN_EASE = 'Power2.easeOut';
     
     // State tracking
     private currentZoomTarget: number = this.DEFAULT_ZOOM;
@@ -62,12 +64,16 @@ export class DynamicZoomManager {
             this.zoomTween.stop();
         }
         
+        // Use different durations and easing based on zoom direction
+        const duration = this.isRunning ? this.ZOOM_OUT_DURATION : this.ZOOM_IN_DURATION;
+        const ease = this.isRunning ? this.ZOOM_OUT_EASE : this.ZOOM_IN_EASE;
+        
         // Create smooth zoom transition
         this.zoomTween = this.scene.tweens.add({
             targets: this.camera,
             zoom: targetZoom,
-            duration: this.ZOOM_TRANSITION_DURATION,
-            ease: this.ZOOM_EASE,
+            duration: duration,
+            ease: ease,
             onComplete: () => {
                 this.zoomTween = undefined;
             }
@@ -89,8 +95,8 @@ export class DynamicZoomManager {
             this.zoomTween = this.scene.tweens.add({
                 targets: this.camera,
                 zoom: zoom,
-                duration: this.ZOOM_TRANSITION_DURATION,
-                ease: this.ZOOM_EASE,
+                duration: this.ZOOM_IN_DURATION, // Use quick transition for building entry/exit
+                ease: this.ZOOM_IN_EASE,
                 onComplete: () => {
                     this.zoomTween = undefined;
                 }
