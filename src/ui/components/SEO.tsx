@@ -55,16 +55,22 @@ const updateCanonical = (url: string) => {
 };
 
 const updateStructuredData = (data: object, id: string) => {
-    // Remove all existing SEO structured data to prevent conflicts
-    const existingScripts = document.querySelectorAll("script[data-seo-id]");
-    existingScripts.forEach((script) => script.remove());
+    try {
+        // Remove all existing SEO structured data to prevent conflicts
+        const existingScripts = document.querySelectorAll("script[data-seo-id]");
+        existingScripts.forEach((script) => script.remove());
 
-    // Add new structured data
-    const script = document.createElement("script");
-    script.type = "application/ld+json";
-    script.setAttribute("data-seo-id", id);
-    script.textContent = JSON.stringify(data);
-    document.head.appendChild(script);
+        // Add new structured data
+        const script = document.createElement("script");
+        script.type = "application/ld+json";
+        script.setAttribute("data-seo-id", id);
+        
+        // Use innerHTML instead of textContent to avoid CSP issues
+        script.innerHTML = JSON.stringify(data);
+        document.head.appendChild(script);
+    } catch (error) {
+        console.warn("Failed to update structured data:", error);
+    }
 };
 
 const SEO: React.FC<SEOProps> = ({
@@ -77,13 +83,14 @@ const SEO: React.FC<SEOProps> = ({
     noIndex = false,
 }) => {
     useEffect(() => {
-        // Debug logging in development
-        if (process.env.NODE_ENV === "development") {
-            console.log("SEO Update:", { title, url, type });
-        }
+        try {
+            // Debug logging in development
+            if (process.env.NODE_ENV === "development") {
+                console.log("SEO Update:", { title, url, type });
+            }
 
-        // Update title
-        document.title = title;
+            // Update title
+            document.title = title;
 
         // Update meta tags
         updateMetaTag("description", description);
@@ -226,14 +233,21 @@ const SEO: React.FC<SEOProps> = ({
                 "game"
             );
         }
+        } catch (error) {
+            console.warn("SEO update failed:", error);
+        }
     }, [title, description, keywords, image, url, type, noIndex]);
 
     // Cleanup effect
     useEffect(() => {
         return () => {
-            // Clean up structured data when component unmounts
-            const seoScripts = document.querySelectorAll("script[data-seo-id]");
-            seoScripts.forEach((script) => script.remove());
+            try {
+                // Clean up structured data when component unmounts
+                const seoScripts = document.querySelectorAll("script[data-seo-id]");
+                seoScripts.forEach((script) => script.remove());
+            } catch (error) {
+                console.warn("SEO cleanup failed:", error);
+            }
         };
     }, []);
 

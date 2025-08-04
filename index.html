@@ -55,7 +55,7 @@
     <link rel="dns-prefetch" href="https://accounts.google.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     
-    <!-- Updated CSP to handle Google Auth scripts -->    
+    <!-- Updated CSP to handle Google Auth scripts and SEO -->    
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: https://accounts.google.com https://cdn.jsdelivr.net https://*.googleusercontent.com;
@@ -67,12 +67,11 @@
         style-src 'self' 'unsafe-inline' https:;
         font-src 'self' data: https:;
         object-src 'none';
-        require-trusted-types-for 'script';
     "/>
     
     <!-- Default Structured Data - will be updated dynamically by SEO component -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="/performance.js" async></script>
+    <!-- <script src="/performance.js" async></script> -->
     <link rel="stylesheet" href="/src/style.css">
     <style>
         body { 

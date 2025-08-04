@@ -35,11 +35,11 @@
   }
   
   // Service Worker registration for caching
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then(registration => console.log('SW registered'))
-        .catch(error => console.log('SW registration failed'));
+        .catch(error => console.log('SW registration failed:', error));
     });
   }
 })();
