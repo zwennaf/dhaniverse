@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
 import PixelButton from './atoms/PixelButton';
+import SEO from './SEO';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -81,6 +82,14 @@ const GamePage: React.FC = () => {
   // The game will be rendered by Phaser in the game-container div
   return (
     <div className="game-page">
+      <SEO 
+        title="Play Dhaniverse Game - Financial RPG | Learn Money Management Online"
+        description="Play Dhaniverse, the immersive 2D RPG that teaches real financial skills. Explore buildings, trade stocks, manage budgets, and level up your money knowledge through interactive gameplay."
+        keywords="play dhaniverse, dhaniverse game online, dhaniverse RPG, financial RPG game, money management game online, stock trading game, budgeting game online, financial education RPG, investing game online, personal finance simulator, financial literacy game online, money RPG online, financial simulation game, stock market simulator, budget management game, financial planning game online, investment trading game, money skills RPG, financial learning game, gamified finance online, interactive finance game, financial education simulator, money management RPG, financial game play online"
+        url="https://dhaniverse.in/game"
+        type="game"
+        image="https://dhaniverse.in/og-image.jpg"
+      />
       <div className="fixed top-4 left-4 z-50">
         <PixelButton 
           variant="outline" 

@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 import GoogleSignInButton from './GoogleSignInButton';
+import SEO from '../SEO';
 
 // Simplified device detection function
 const isMobileDevice = () => {
@@ -127,6 +128,12 @@ const CustomSignUp: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <SEO 
+        title="Join Dhaniverse - Free Financial Education Through Gaming"
+        description="Create your free Dhaniverse account and start learning financial literacy through gaming. Join thousands of users mastering money management skills through our interactive RPG platform."
+        keywords="join dhaniverse, dhaniverse signup, dhaniverse sign up, dhaniverse registration, financial education signup, money management game registration, financial literacy platform signup, free financial education, dhaniverse account, create dhaniverse account, financial game signup, money RPG registration, financial learning platform signup"
+        url="https://dhaniverse.in/sign-up"
+      />
       <div 
         className="absolute inset-0 z-0" 
         style={{

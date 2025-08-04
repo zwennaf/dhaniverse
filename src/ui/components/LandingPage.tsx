@@ -6,6 +6,7 @@ import PixelButton from './atoms/PixelButton';
 import FeatureCard from './atoms/FeatureCard';
 import GameBuildings from './atoms/GameBuildings';
 import MarqueeTestimonials from './atoms/MarqueeTestimonials';
+import SEO from './SEO';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import LeafIcon from './icons/LeafIcon';
 import CoinIcon from './icons/CoinIcon';
@@ -68,6 +69,13 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen relative flex flex-col text-white bg-black">
+      <SEO 
+        title="Dhaniverse - Gamified Financial Literacy Platform | Learn Money Management Through Gaming"
+        description="Transform your financial future with Dhaniverse - India's first gamified financial literacy platform. Learn investing, budgeting, and money management through an immersive 2D RPG game. Perfect for Gen Z and millennials."
+        keywords="dhaniverse, dhaniverse game, dhaniverse.in, financial literacy game, money management game, financial education game, investing game, budgeting game, financial RPG, money RPG, financial simulation, stock market game, personal finance game, financial learning platform, gamified finance, finance education India, money skills game, financial planning game, investment simulator, budget simulator, financial literacy platform, money management app, financial education app, learn finance through gaming, financial game online, money management simulator, financial literacy India, Gen Z finance, millennial finance, financial education for students, interactive finance learning"
+        url="https://dhaniverse.in/"
+        type="website"
+      />
       
       
       <Header className="sticky top-6 w-[90%] m-auto z-10" />

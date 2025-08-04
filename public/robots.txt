@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://dhaniverse.in/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Block access to sensitive areas
+Disallow: /api/
+Disallow: /.env
+Disallow: /server/
+Disallow: /node_modules/
+Disallow: /dist/
+Disallow: /.git/
+
+# Allow important pages
+Allow: /
+Allow: /game
+Allow: /sign-up
+Allow: /sign-in
+
+# Block auth-protected pages from indexing
+Disallow: /profile
