@@ -2,14 +2,14 @@
 import { load } from "std/dotenv/mod.ts";
 
 // Load the .env file with more flexible options
-await load({ 
-  export: true,
-  allowEmptyValues: true
+await load({
+    export: true,
+    allowEmptyValues: true,
 });
 
 // Set default NODE_ENV if not provided
 if (!Deno.env.get("NODE_ENV")) {
-  Deno.env.set("NODE_ENV", Deno.env.get("DENO_ENV") || "development");
+    Deno.env.set("NODE_ENV", Deno.env.get("DENO_ENV") || "development");
 }
 
 import { Application } from "oak";
@@ -25,17 +25,22 @@ async function initializeDatabase() {
     try {
         console.log("🔄 Initializing database connection...");
         await mongodb.connect();
-        
+
         // Verify connection is working
         if (!mongodb.isHealthy()) {
-            throw new Error("Database connection is not healthy after connect()");
+            throw new Error(
+                "Database connection is not healthy after connect()"
+            );
         }
-        
+
         console.log("✅ Database connection verified and ready");
     } catch (error) {
         console.error("❌ Failed to initialize database:", error);
-        console.error("❌ Error details:", error instanceof Error ? error.message : String(error));
-        
+        console.error(
+            "❌ Error details:",
+            error instanceof Error ? error.message : String(error)
+        );
+
         // Always exit if database connection fails - this is critical
         console.error("❌ Database connection is required. Exiting...");
         Deno.exit(1);
@@ -119,21 +124,25 @@ app.use(authRouter.allowedMethods());
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
 
-// WebSocket functionality has been moved to a dedicated server in server/ws
-
 // Start the server with database initialization
 async function startServer() {
     await initializeDatabase();
 
-    const port = config.port;
+    // Use PORT from environment (Deno Deploy sets this) or fallback to 8000 for local dev
+    const port = parseInt(Deno.env.get("PORT") || "8000");
 
     try {
         console.log(`🚀 Starting server on port ${port}`);
-        await app.listen({ port });
-        console.log(`✅ Server running on http://localhost:${port}`);
         console.log(
-            `� WebSockent server available at ws://localhost:${port}/ws`
+            `Environment: ${
+                Deno.env.get("DENO_DEPLOYMENT_ID")
+                    ? "Deno Deploy"
+                    : "Local Development"
+            }`
         );
+
+        await app.listen({ port });
+        console.log(`✅ Server running on port ${port}`);
     } catch (error) {
         console.error("❌ Failed to start server:", error);
         Deno.exit(1);
