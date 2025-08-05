@@ -1,5 +1,8 @@
 // API utility functions for backend communication
-const API_BASE = "https://dhaniverseapi.deno.dev"
+const API_BASE =
+  (typeof window !== "undefined" && window.location.hostname === "localhost")
+    ? "http://localhost:8000"
+    : "https://dhaniverseapi.deno.dev";
    
 
 // Helper function to get auth headers

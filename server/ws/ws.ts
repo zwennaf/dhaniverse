@@ -88,8 +88,7 @@ async function handleAuthentication(
         // Get the auth server URL based on environment
         const authServerUrl =
             Deno.env.get("DENO_ENV") === "production"
-                ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") ||
-                  "https://dhaniverseapi.deno.dev"
+                ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") || "https://dhaniverseapi.deno.dev"
                 : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
 
         console.log(`Validating token with auth server: ${authServerUrl}`);

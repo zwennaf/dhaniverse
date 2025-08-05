@@ -92,7 +92,7 @@ const Profile: React.FC = () => {
     // Check if username or character needs saving
     const needsSaving = !saved && (
       username.trim() !== (user.gameUsername || '') || 
-      selectedCharacter !== (user.selectedCharacter || 'C2')
+      selectedCharacter !== (user.selectedCharacter || 'C1')
     );
     
     if (needsSaving) {
@@ -156,48 +156,56 @@ const Profile: React.FC = () => {
           className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!username || username.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
         />
 
-        {/* Character Selection */}
+        {/* Character Selection - Minimal & Modern */}
         <div className="space-y-3">
-          <label className="block text-dhani-text font-robert text-sm">Choose Character</label>
-          <div className="grid grid-cols-2 gap-3">
-            {['C1', 'C2', 'C3', 'C4'].map((character) => (
-              <div
-                key={character}
+          <label className="block text-dhani-text font-robert text-sm mb-3">Choose Your Financial Avatar</label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 justify-items-center">
+            {[ 
+              { id: 'C1', label: 'Trader' },
+              { id: 'C2', label: 'Investor' },
+              { id: 'C3', label: 'Saver' },
+              { id: 'C4', label: 'Planner' }
+            ].map(({ id, label }) => (
+              <button
+                type="button"
+                key={id}
                 onClick={() => {
-                  const characterToSelect = character;
-                  setSelectedCharacter(characterToSelect);
+                  setSelectedCharacter(id);
                   setSaved(false);
                   if (username.trim().length >= 3) {
-                      handleSave(characterToSelect);
+                    handleSave(id);
                   }
                 }}
-                className={`relative cursor-pointer rounded-lg border-2 transition-all duration-200 ${
-                  selectedCharacter === character
-                    ? 'border-dhani-gold shadow-lg shadow-dhani-gold/30'
-                    : 'border-dhani-gold/30 hover:border-dhani-gold/60'
-                } ${loading ? 'pointer-events-none opacity-50' : ''}`}
+                disabled={loading}
+                className={`group relative flex flex-col items-center justify-center w-16 h-20 sm:w-14 sm:h-16 bg-dhani-darkgray rounded-xl border transition-all duration-200 shadow-sm focus:outline-none hover:scale-105
+                  ${selectedCharacter === id
+                    ? 'border-dhani-gold shadow-dhani-gold/40 scale-105'
+                    : 'border-dhani-gold/20 hover:border-dhani-gold/60'}
+                  ${loading ? 'pointer-events-none opacity-50' : ''}`}
+                style={{
+                  boxShadow: selectedCharacter === id ? '0 0 0 2px #F1CD36, 0 4px 16px #F1CD3633' : undefined,
+                  transition: 'box-shadow 0.2s',
+                  padding: '4px',
+                }}
               >
-                <div className="w-14 h-14 bg-dhani-dark/50 rounded overflow-hidden relative">
-                  <img
-                    src={`/characters/${character}cover.png`}
-                    alt={`Character ${character}`}
-                    className="w-full h-full object-cover"
-                    style={{
-                      imageRendering: 'pixelated'
-                    }}
-                    
-                    
-                  />
-                </div>
-                {selectedCharacter === character && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-dhani-gold rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-dhani-dark rounded-full"></div>
-                  </div>
+                <img
+                  src={`/characters/${id}-Preview.png`}
+                  alt={`Character ${label}`}
+                  className="w-10 h-10 sm:w-8 sm:h-8 object-cover rounded-lg mb-1"
+                  style={{ imageRendering: 'pixelated' }}
+                  onError={e => { e.currentTarget.style.opacity = '0.3'; e.currentTarget.alt = 'Image not found'; }}
+                />
+                <span className="text-xs font-tickerbit text-dhani-text/80 tracking-wide w-full text-center whitespace-normal">
+                  {label}
+                </span>
+                {selectedCharacter === id && (
+                  <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center">
+                    <span className="w-3 h-3 bg-dhani-gold rounded-full border-2 border-dhani-dark flex items-center justify-center">
+                      <span className="w-1.5 h-1.5 bg-dhani-dark rounded-full"></span>
+                    </span>
+                  </span>
                 )}
-                <div className="text-center text-xs text-dhani-text/70 font-tickerbit mt-1">
-                  {character}
-                </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>

@@ -37,7 +37,7 @@ const GamePage: React.FC = () => {
     // Start game with a slight delay
     const gameStartTimeout = setTimeout(() => {
       console.log("GamePage: Calling startGame");
-      const selectedCharacter = user?.selectedCharacter || 'C2';
+      const selectedCharacter = user?.selectedCharacter || 'C1';
       startGame(gameUsername as string, selectedCharacter);
     }, 100);
 
