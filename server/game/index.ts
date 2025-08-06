@@ -122,9 +122,10 @@ async function startServer() {
             "🚀 Starting server using Deno.serve (Deno Deploy compatible)"
         );
 
-        // Use Deno.serve - the modern way for Deno Deploy
-        Deno.serve((_req) => {
-            return new Response("✅ Running with Deno.serve on Deploy!");
+        // Use Deno.serve with Oak app integration
+        Deno.serve(async (req) => {
+            const response = await app.handle(req);
+            return response || new Response("Not Found", { status: 404 });
         });
 
         console.log("✅ Server started successfully");
