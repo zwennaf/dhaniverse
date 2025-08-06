@@ -132,16 +132,9 @@ async function startServer() {
             "🚀 Starting server using Deno.serve (Deno Deploy compatible)"
         );
 
-        // Use Deno.serve - works on both Deno Deploy and locally
-        // Deno Deploy handles port automatically, locally it uses a random available port
-        Deno.serve(async (req) => {
-            try {
-                const response = await app.handle(req);
-                return response || new Response("Not Found", { status: 404 });
-            } catch (handleError) {
-                console.error("Error handling request:", handleError);
-                return new Response("Internal Server Error", { status: 500 });
-            }
+        // Use Deno.serve - the modern way for Deno Deploy
+        Deno.serve((req) => {
+            return new Response("✅ Running with Deno.serve on Deploy!");
         });
 
         console.log("✅ Server started successfully");

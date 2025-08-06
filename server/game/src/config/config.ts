@@ -1,6 +1,6 @@
 // Configuration for the Deno server
-// Check both NODE_ENV and DENO_ENV for compatibility
-const isDev = (Deno.env.get("DENO_ENV") || Deno.env.get("NODE_ENV") || "development") !== "production";
+// Simple environment detection - assume production if no NODE_ENV set
+const isDev = Deno.env.get("NODE_ENV") !== "production";
 
 // Parse allowed origins from environment variable
 const parseAllowedOrigins = (): string[] => {
@@ -10,12 +10,10 @@ const parseAllowedOrigins = (): string[] => {
   }
   return isDev 
     ? ["http://localhost:5173", "http://localhost:3000", "http://localhost:4173"]
-    : ["https://dhaniverse.vercel.app"];
+    : ["*"]; // Allow all origins in production - configure ALLOWED_ORIGINS env var for restrictions
 };
 
 export const config = {
-  port: parseInt(Deno.env.get("PORT") || "3001"),
-  serverDomain: Deno.env.get("SERVER_DOMAIN") || "localhost",
   jwtSecret: Deno.env.get("JWT_SECRET") || "your-jwt-secret-key-change-this-in-production",
   
   // MongoDB Configuration
@@ -28,7 +26,7 @@ export const config = {
         const match = mongoUri.match(/\/([^/?]+)(\?|$)/);
         return match ? match[1] : "dhaniverse";
       }
-      return Deno.env.get("DB_NAME") || "dhaniverse";
+      return "dhaniverse";
     })()
   },
   
@@ -59,7 +57,6 @@ if (!config.jwtSecret || config.jwtSecret === "your-jwt-secret-key-change-this-i
 // Log configuration (without sensitive data)
 console.log("🔧 Server Configuration:");
 console.log(`   Environment: ${isDev ? 'Development' : 'Production'}`);
-console.log(`   Port: ${config.port} (HTTP + WebSocket)`);
 console.log(`   Database: ${config.mongodb.dbName}`);
 console.log(`   MongoDB URL: ${config.mongodb.url ? '✅ Configured' : '⚠️  Using local default'}`);
 console.log(`   JWT Secret: ${config.jwtSecret !== 'your-jwt-secret-key-change-this-in-production' ? '✅ Configured' : '⚠️  Using generated secret'}`);
