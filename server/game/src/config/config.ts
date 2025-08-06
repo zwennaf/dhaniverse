@@ -14,7 +14,7 @@ const parseAllowedOrigins = (): string[] => {
 };
 
 export const config = {
-  port: parseInt(Deno.env.get("PORT") || "8000"),
+  port: parseInt(Deno.env.get("PORT") || "3001"),
   serverDomain: Deno.env.get("SERVER_DOMAIN") || "localhost",
   jwtSecret: Deno.env.get("JWT_SECRET") || "your-jwt-secret-key-change-this-in-production",
   

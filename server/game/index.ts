@@ -128,45 +128,23 @@ async function startServer() {
     await initializeDatabase();
 
     try {
-        // Try Deno.serve first (works on Deno Deploy), fallback to Oak's listen
-        console.log("🚀 Attempting to start server...");
+        console.log(
+            "🚀 Starting server using Deno.serve (Deno Deploy compatible)"
+        );
 
-        // Check if we're in a Deno Deploy environment (including DeployEA)
-        const isDeployEnvironment =
-            Deno.env.get("DENO_DEPLOYMENT_ID") ||
-            Deno.env.get("DENO_REGION") ||
-            globalThis.Deno?.serve;
+        // Use Deno.serve - works on both Deno Deploy and locally
+        // Deno Deploy handles port automatically, locally it uses a random available port
+        Deno.serve(async (req) => {
+            try {
+                const response = await app.handle(req);
+                return response || new Response("Not Found", { status: 404 });
+            } catch (handleError) {
+                console.error("Error handling request:", handleError);
+                return new Response("Internal Server Error", { status: 500 });
+            }
+        });
 
-        if (isDeployEnvironment) {
-            console.log(
-                "🚀 Starting server for Deno Deploy/DeployEA environment"
-            );
-
-            // Use Deno.serve for Deploy/DeployEA - no port needed, platform handles it
-            Deno.serve(async (req) => {
-                try {
-                    const response = await app.handle(req);
-                    return (
-                        response || new Response("Not Found", { status: 404 })
-                    );
-                } catch (handleError) {
-                    console.error("Error handling request:", handleError);
-                    return new Response("Internal Server Error", {
-                        status: 500,
-                    });
-                }
-            });
-            console.log("✅ Server started using Deno.serve (Deploy/DeployEA)");
-        } else {
-            console.log("🚀 Starting server for local development");
-
-            // Local development - use Oak's listen with specified port
-            const port = parseInt(Deno.env.get("PORT") || "8000");
-            console.log(`🚀 Starting server on port ${port}`);
-
-            await app.listen({ port });
-            console.log(`✅ Server running on http://localhost:${port}`);
-        }
+        console.log("✅ Server started successfully");
     } catch (error) {
         console.error("❌ Failed to start server:", error);
         Deno.exit(1);
