@@ -1,15 +1,5 @@
-// Load environment variables first
-import { load } from "std/dotenv/mod.ts";
-
-// Load the .env file with more flexible options
-await load({
-    export: true,
-    allowEmptyValues: true,
-});
-
-// Set default NODE_ENV if not provided
 if (!Deno.env.get("NODE_ENV")) {
-    Deno.env.set("NODE_ENV", Deno.env.get("DENO_ENV") || "development");
+    Deno.env.set("NODE_ENV", "production");
 }
 
 import { Application } from "oak";
@@ -133,7 +123,7 @@ async function startServer() {
         );
 
         // Use Deno.serve - the modern way for Deno Deploy
-        Deno.serve((req) => {
+        Deno.serve((_req) => {
             return new Response("✅ Running with Deno.serve on Deploy!");
         });
 
