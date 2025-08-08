@@ -1,0 +1,61 @@
+name: Bug report
+description: Create a report to help us improve
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Players are welcome to file issues. Pull requests are limited to the core team.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: This is not a security vulnerability (if it is, please report privately per LICENSE contact)
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Game version/build (if visible)
+      placeholder: e.g., web prod on date/time
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Browser and version, OS, device
+      placeholder: Chrome 126 on Windows 11; 1920x1080
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Be precise and include a minimal sequence
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots/recording
+      description: Drag-and-drop images or videos here
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Logs, error messages, network info, etc.
