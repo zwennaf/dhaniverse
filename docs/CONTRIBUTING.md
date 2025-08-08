@@ -1,6 +1,14 @@
 # Contributing to Dhaniverse
 
-Thank you for your interest in contributing to Dhaniverse! This document provides guidelines and information for contributors to help maintain code quality and project consistency.
+At this time, Dhaniverse does not accept external pull requests. Players and external users are welcome to open issues.
+
+This repository is publicly visible for transparency and evaluation purposes, but the codebase is proprietary (see [LICENSE](../LICENSE)).
+
+Important:
+- Players/external users: issues are welcome for bug reports and feedback. Please do not submit pull requests—PRs are limited to the core team and will be closed.
+- For partnerships/licensing conversations, contact the maintainer.
+
+If you’re interested in collaboration, partnerships, or discussing licensing, please reach out to the maintainer directly.
 
 ## Table of Contents
 
@@ -33,7 +41,7 @@ We are committed to providing a welcoming and inclusive environment for all cont
 - Publishing private information without permission
 - Any conduct that would be inappropriate in a professional setting
 
-## Getting Started
+## Getting Started (Core Team Only)
 
 ### Prerequisites
 
@@ -46,10 +54,9 @@ Before contributing, ensure you have the required development environment set up
 
 ### Initial Setup
 
-1. Fork the repository on GitHub
-2. Clone your fork locally:
+1. Clone the repository locally (core team access):
    ```bash
-   git clone https://github.com/your-username/dhaniverse.git
+   git clone https://github.com/Gursimrxn/dhaniverse.git
    cd dhaniverse
    ```
 3. Install dependencies:
@@ -66,7 +73,7 @@ Before contributing, ensure you have the required development environment set up
    npm run dev
    ```
 
-## Development Workflow
+## Development Workflow (Core Team Only)
 
 ### Branch Strategy
 
@@ -96,7 +103,7 @@ Before contributing, ensure you have the required development environment set up
    git commit -m "feat: add user authentication system"
    ```
 
-6. Push your branch and create a pull request
+6. Push your branch and create a pull request to the private internal review process
 
 ### Commit Message Format
 
@@ -126,7 +133,7 @@ fix(websocket): resolve connection timeout issues
 docs(api): update ICP canister documentation
 ```
 
-## Coding Standards
+## Coding Standards (Core Team Only)
 
 ### TypeScript Guidelines
 
@@ -160,7 +167,7 @@ docs(api): update ICP canister documentation
 - End files with a newline
 - Use meaningful comments for complex logic
 
-## Testing Requirements
+## Testing Requirements (Core Team Only)
 
 ### Frontend Testing
 
@@ -217,7 +224,7 @@ cd packages/icp-canister && cargo test
 - Provide example requests and responses
 - Document error codes and handling
 
-## Pull Request Process
+## Pull Request Process (Core Team Only)
 
 ### Before Submitting
 
@@ -260,7 +267,11 @@ Brief description of changes
 
 ## Issue Reporting
 
-### Bug Reports
+Players/external users: issues are welcome. Please provide clear reproduction steps, your browser/OS, and screenshots or screen recordings when possible. For security concerns, contact via GitHub (see LICENSE contact) and avoid public issue threads.
+
+Core team: follow the internal triage workflow and labels.
+
+### Bug Reports (Core Team)
 
 Include the following information:
 
@@ -271,7 +282,7 @@ Include the following information:
 - **Screenshots**: If applicable
 - **Additional Context**: Any relevant information
 
-### Feature Requests
+### Feature Requests (Core Team)
 
 Include the following information:
 
@@ -280,7 +291,7 @@ Include the following information:
 - **Alternatives Considered**: Other approaches considered
 - **Additional Context**: Use cases, examples
 
-## Component-Specific Guidelines
+## Component-Specific Guidelines (Core Team Only)
 
 ### Game Engine (Phaser.js)
 
@@ -310,21 +321,16 @@ Include the following information:
 - Use consistent styling patterns
 - Test across different browsers and devices
 
-## Getting Help
+## Getting Help (Core Team & Internal)
 
 If you need help with contributing:
 
 1. Check the [documentation](./README.md)
-2. Search existing issues and discussions
-3. Ask questions in issue comments
-4. Contact maintainers for complex questions
+2. Use internal channels for questions and reviews
+3. Contact maintainers directly for complex questions
 
-## Recognition
+## Recognition (Internal)
 
-Contributors will be recognized in:
-
-- Project README contributors section
-- Release notes for significant contributions
-- Special recognition for outstanding contributions
+Core team contributions are recognized internally (release notes, docs acknowledgements, and internal announcements).
 
 Thank you for contributing to Dhaniverse and helping make financial education more accessible and engaging!

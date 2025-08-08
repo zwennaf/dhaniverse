@@ -2,145 +2,117 @@
 
 ![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)
 
+An immersive 2D RPG that teaches real-world money skills through play.
+
 > "We're not just making financial education fun — we're making it relevant to young India's unique challenges."
 
-**Dhaniverse** is a 2D open-world RPG game that transforms the way Gen Z and Millennials learn about personal finance. It combines interactive gameplay with real-world financial education to create an immersive learning experience.
+## License & Usage (Important)
 
-## About the Project
+This codebase is proprietary. All rights reserved. See the LICENSE file for full terms.
 
-Dhaniverse is an immersive financial literacy platform designed to teach real-world money skills through interactive gameplay. The platform enables users to learn saving, investing, budgeting, and entrepreneurship in a low-risk, high-reward virtual environment.
+- No permission is granted to use, copy, modify, merge, publish, distribute, sublicense, or sell any part of this software without prior written permission.
+- All game assets (including but not limited to maps, characters, sprites, UI, audio) are copyrighted by the Dhaniverse team and may not be used outside this project.
+- For licensing or partnership inquiries, contact: @Gursimrxn (GitHub)
 
-**Key Benefits:**
-- Perfect for students and young professionals
-- Built with behavioral economics and gamification principles
-- Real-life financial simulations and decision-making scenarios
+## Quick Links
 
-## Documentation
+- Live Demo: https://dhaniverse.in
+- Documentation: [./docs/README.md](./docs/README.md)
+- Architecture: [./docs/architecture/index.md](./docs/architecture/index.md)
+- APIs: [./docs/api/index.md](./docs/api/index.md)
 
-For comprehensive information about the project, please refer to our detailed documentation:
 
-- **[Getting Started](docs/setup/index.md)** - Setup and installation guide
-- **[Architecture Overview](docs/architecture/index.md)** - System design and technical architecture
-- **[API Documentation](docs/api/index.md)** - Complete API reference
-- **[Development Guide](docs/development/index.md)** - Development workflow and standards
-- **[Deployment Guide](docs/deployment/index.md)** - Production deployment instructions
-- **[Component Documentation](docs/components/index.md)** - Detailed component specifications
 
-## Technology Stack
+## Tech Snapshot
 
-### Frontend
-- **React.js** with TypeScript for UI components
-- **Phaser 3** for WebGL 2D game rendering
-- **Vite** build system for fast development
-- **Modular ESModules** architecture
+- Frontend: React + TypeScript, Phaser 3, Vite
+- Backend: Deno (Oak), MongoDB, WebSocket, JWT
+- Blockchain: Internet Computer (ICP) optional integration
+- Docs: see ./docs
 
-### Backend
-- **Deno** runtime with MongoDB database
-- **WebSocket** for real-time multiplayer functionality
-- **JWT** authentication with token management
-- **Oak** framework for REST APIs
+## Highlights
 
-### Blockchain Integration (ICP)
-- **Internet Computer Protocol** for decentralized features
-- **Azle Framework** for TypeScript canisters
-- **Principal-based Authentication** for secure identity management
-- **Dual Storage Strategy** for hybrid local/blockchain data
-
-### Design & Assets
-- **Figma** for UI/UX design
-- **Tiled Map Editor** for game world creation
-- **Custom packages** for map optimization and chunking
-
-## Core Features
-
-### Gameplay Elements
-- **RPG-style map exploration** with chunked loading and dynamic optimization
-- **Habit-building missions** for practicing budgeting, saving, and investing
-- **Real-world finance simulations** including stock trading and tax planning
-- **Real-time multiplayer** with WebSocket connections and chat system
-- **Advanced error handling** with graceful degradation and retry mechanisms
-
-### Technical Features
-- **High-performance map optimization** with binary chunking and encryption
-- **Smart loading system** with predictive caching and memory management
-- **Real-time multiplayer infrastructure** with room-based gameplay
-- **Comprehensive error handling** chain for robust user experience
-- **WebGL optimization** with automatic fallback and recovery systems
-- **Modular architecture** with separate packages for specialized functionality
-- **Blockchain integration** with ICP for tamper-proof financial education
-- **Decentralized leaderboards** with verifiable trading achievements
-- **On-chain banking** with optional wallet connection for enhanced features
-
-### Use Cases
-- Curriculum add-on for schools and colleges
-- Fintech onboarding for Gen Z users
-- Self-paced learning tool for individuals
-
-## Business Model
-
-| Model | Description |
-|-------|-------------|
-| **Freemium** | Basic access free, advanced levels behind subscription |
-| **In-Game Purchases** | Cosmetic upgrades, power-ups, financial tools |
-| **Premium Zones** | Unlock deeper simulations like Startup Street & Investor Island |
-| **Ethical In-Game Ads** | Contextual, skippable ads from relevant brands |
-
-**Target Demographics:** 18–35 years | **Global Scale:** Localized content for different currencies and regions
+- Open-world RPG for financial literacy (budgeting, saving, investing)
+- Real-time multiplayer with smooth sync
+- Map optimization and chunked loading for performance
 
 ## Project Structure
 
-### Architecture Overview
+### Architecture Overview (Summary)
 
 ```
 dhaniverse/
-├── packages/                   # Modular packages
-│   ├── map-optimizer/          # High-performance map optimization
+├── packages/                        # Modular packages
+│   ├── map-optimizer/               # Map optimization utilities
 │   │   ├── src/
-│   │   │   ├── chunker/        # Map chunking algorithms
-│   │   │   ├── manager/        # Chunk management system
-│   │   │   ├── parser/         # Binary map parsing
-│   │   │   └── types/          # TypeScript definitions
-│   │   └── package.json
-│   └── icp-canister/           # ICP blockchain integration
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── icp-canister/                # ICP (Internet Computer) canister (Rust)
 │       ├── src/
-│       │   ├── index.ts        # Main canister implementation
-│       │   └── types.ts        # Blockchain data models
-│       └── dfx.json            # ICP deployment configuration
-├── src/                        # Game client source
+│       ├── Cargo.toml
+│       ├── rust_icp_canister.did
+│       └── README.md
+├── server/                          # Backend services (Deno)
+│   ├── game/                        # REST APIs, DB, business logic
+│   │   ├── src/
+│   │   │   ├── auth/
+│   │   │   ├── db/
+│   │   │   ├── routes/              # authRouter.ts, gameRouter.ts, apiRouter.ts
+│   │   │   └── config/
+│   │   ├── index.ts                 # Entry (see package scripts)
+│   │   └── .env.example
+│   └── ws/                          # WebSocket server (real-time multiplayer)
+│       ├── ws.ts
+│       ├── deno.json
+│       └── .env.example
+├── src/                             # Frontend (React + Phaser)
 │   ├── game/
-│   │   ├── entities/           # Player, NPCs, interactive objects
-│   │   ├── scenes/             # Game scenes (Main, UI, etc.)
-│   │   ├── systems/            # Core game systems
-│   │   │   ├── error-handling/ # Advanced error management
-│   │   │   ├── ChunkedMapManager.ts
-│   │   │   ├── StockMarketManager.ts
-│   │   │   ├── BuildingManager.ts
-│   │   │   └── WebSocketManager.ts
-│   │   └── utils/              # Game utilities & constants
-│   └── ui/                     # React UI components
-├── server/                     # Deno backend
-│   ├── src/
-│   │   ├── auth/               # Authentication systems
-│   │   ├── db/                 # Database schemas & operations
-│   │   ├── routes/             # API endpoints
-│   │   ├── services/           # WebSocket & business logic
-│   │   └── websocket-server.ts # Real-time multiplayer
-│   └── deno.json
-├── docs/                       # Comprehensive documentation
-│   ├── setup/                  # Installation and configuration
-│   ├── architecture/           # System design documentation
-│   ├── api/                    # API reference
-│   ├── development/            # Development guidelines
-│   ├── deployment/             # Deployment instructions
-│   └── components/             # Component specifications
-├── public/                     # Static assets
-│   ├── maps/chunks/            # Optimized map chunks
-│   ├── characters/             # Character sprites
-│   └── UI/                     # Interface assets
-└── tools/                      # Build & optimization tools
+│   │   ├── entities/
+│   │   ├── scenes/
+│   │   ├── systems/
+│   │   ├── managers/                # e.g., ATMManager.ts
+│   │   └── utils/                   # e.g., CharacterAnimations.ts
+│   ├── ui/
+│   │   ├── components/
+│   │   └── contexts/
+│   ├── services/
+│   ├── types/
+│   ├── utils/
+│   ├── main.ts
+│   └── style.css
+├── public/                          # Static assets
+│   ├── characters/
+│   ├── collisions/
+│   ├── fonts/
+│   ├── maps/
+│   ├── UI/
+│   ├── humans.txt
+│   ├── site.webmanifest
+│   ├── sw.js
+│   └── favicon.ico
+├── deps/                            # External declarations & candid
+│   ├── init.json
+│   ├── pulled.json
+│   └── candid/
+├── docs/                            # Comprehensive documentation
+│   ├── setup/
+│   ├── architecture/
+│   ├── api/
+│   ├── development/
+│   ├── deployment/
+│   └── components/
+├── tools/                           # Build & documentation tools
+│   ├── chunk-map.js
+│   ├── docs-code-validator.js
+│   ├── docs-link-checker.js
+│   └── package.json
+├── index.html
+├── LICENSE
+├── README.md
+└── package.json
 ```
 
-### Key Systems
+### Key Systems (Summary)
 
 #### Map Optimization Package
 - **Binary chunking** for faster loading
@@ -170,19 +142,15 @@ dhaniverse/
 - **Dual Storage Strategy** - Seamless fallback between blockchain and traditional storage
 - **Principal-based Security** - Secure user authentication via ICP identity system
 
-## Future Scope & Expansion
+## Status
 
-- Mobile App and Wearables Integration
-- AI-powered Personal Finance Advisors
-- School and College Partnerships
-- Real-world banking and investing integrations
-- B2B solutions for Banks, Fintechs, Edtechs, and Governments
+Roadmap and future scope are tracked in docs.
 
-**Market Potential:** ₹15,000 Cr Indian Financial Literacy Market  
-**Global Reach:** 1.8 Billion+ Gen Zs entering financial independence  
-**App Market Growth:** $1.5B by 2025, 24% YoY growth
+## Contributions
 
-## WCHL25 Hackathon Integration
+We are not accepting external contributions at this time.
+
+## WCHL25 Hackathon Integration (Overview)
 
 ### Blockchain Utility Demonstration
 
@@ -210,54 +178,11 @@ Dhaniverse showcases practical blockchain integration that enhances rather than 
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+ and npm
-- Deno runtime for backend services
-- MongoDB for database
-- Git for version control
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/Gursimrxn/dhaniverse.git
-cd dhaniverse
-
-# Install dependencies
-npm install
-
-# Setup server environment
-cd server
-cp .env.example .env  # Configure your environment variables
-
-# Development commands
-npm run dev          # Start client development server
-npm run server       # Start Deno backend server
-npm run build        # Build for production
-
-# Package development
-cd packages/map-optimizer
-npm run build        # Build map optimization package
-npm run dev          # Watch mode for package development
-
-# ICP Canister development
-cd packages/icp-canister
-npm run start        # Start local ICP replica
-npm run deploy       # Deploy canister to local network
-npm run build        # Build canister for deployment
-```
-
-### Building & Deployment
-
-- **Frontend**: Built with Vite, deployed on Vercel
-- **Backend**: Deno runtime, deployed on Deno Deploy
-- **Database**: MongoDB with connection pooling
-- **WebSocket**: Separate service for real-time features
+For setup and deployment, see docs/setup and docs/deployment.
 
 ## Live Demo
 
-Experience Dhaniverse in action: **https://dhaniverse.vercel.app**
+Experience Dhaniverse in action: **https://dhaniverse.in**
 
 ### Quick Start Guide
 
@@ -268,21 +193,12 @@ Experience Dhaniverse in action: **https://dhaniverse.vercel.app**
 5. **Chat with other players** using the `/` key
 6. **Track your progress** through the financial challenges
 
-## Contributing
-
-We welcome open-source collaboration! Interested in contributing? Help us expand quests, optimize performance, or integrate global financial systems.
-
-For detailed contribution guidelines, please see our [Development Guide](docs/development/index.md).
+<!-- External contributions are not accepted. Internal guidelines are in docs/development. -->
 
 ## Awards & Recognition
 
-- Featured in GitHub's trending repositories
-- Gamification Excellence in EdTech category
-- Innovation in Financial Literacy award finalist
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Won 1st Place at HACKMOL 6.0
+- WCHL 25 NATIONAL ROUND QUALIFIER
 
 ---
 

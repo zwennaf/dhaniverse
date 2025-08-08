@@ -1,0 +1,20 @@
+/* TEAM */
+Founder & CEO: Gursimran Singh
+COO: Jashanjot Singh
+CPO: Aagam Jain
+CTO: Ekaspreet Singh
+Engineer: Jagjeevan Kashid
+
+/* CONTACT */
+Site: https://dhaniverse.in/
+Contact: @Gursimrxn (GitHub)
+
+/* SITE */
+Standards: HTML5, CSS3, TypeScript
+Components: React, Phaser 3, Tailwind CSS, Vite
+Backend: Deno (Oak), MongoDB, WebSocket
+CDN: jsDelivr
+Hosting: Vercel
+
+/* META */
+Last updated: 2025-08-08
