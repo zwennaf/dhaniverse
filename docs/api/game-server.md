@@ -255,13 +255,19 @@ Updates user profile information.
 
 ### POST /auth/google
 
-Google OAuth authentication.
+Google OAuth authentication. If an Authorization Bearer token is provided and the Google email matches the existing account, the server links Google to that user and preserves their profile and balances instead of creating a new account.
 
 **Request Body**:
 ```json
 {
     "googleToken": "google_id_token"
 }
+```
+
+Optional headers:
+
+```
+Authorization: Bearer <existing-session-token>
 ```
 
 **Response**:

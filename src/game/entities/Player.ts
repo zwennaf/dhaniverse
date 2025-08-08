@@ -1,5 +1,6 @@
 import { Scene, GameObjects, Types } from "phaser";
 import { Constants } from "../utils/Constants.ts";
+import { ensureCharacterAnimations } from "../utils/CharacterAnimations.ts";
 import { FontUtils } from "../utils/FontUtils.ts";
 
 export class Player {
@@ -20,7 +21,8 @@ export class Player {
         x: number,
         y: number,
         cursors: Types.Input.Keyboard.CursorKeys,
-        wasd: Record<string, Phaser.Input.Keyboard.Key>
+        wasd: Record<string, Phaser.Input.Keyboard.Key>,
+        _skin?: string // optional, reserved for future per-player skin handling if needed
     ) {
         this.scene = scene;
         this.cursors = cursors;
@@ -34,8 +36,8 @@ export class Player {
         this.sprite = scene.add.sprite(x, y, "character");
         this.sprite.setScale(0.3); // Scale up the character to be more visible
 
-        // Create animations
-        this.createAnimations();
+    // Ensure animations exist for the 'character' texture (local player)
+    ensureCharacterAnimations(this.scene, "character");
 
         // Set initial animation
         this.sprite.anims.play("idle-down");
@@ -176,104 +178,8 @@ export class Player {
     }
 
     private createAnimations(): void {
-        const { anims } = this.scene;
-
-        // Only create animations if they don't exist already
-        if (anims.exists("idle-down")) return;
-
-        // C2.png has 4x4 grid (16 frames total)
-        // Row 1 (frames 0-3): Down-facing characters (S key)
-        // Row 2 (frames 4-7): Left-facing characters (A key)
-        // Row 3 (frames 8-11): Right-facing characters (D key)
-        // Row 4 (frames 12-15): Up-facing characters (W key)
-        // Columns 1-2: Idle positions
-        // Columns 3-4: Running positions
-
-        // Down animations (Row 1: frames 0-3) - All use idle frames
-        anims.create({
-            key: "idle-down",
-            frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "walk-down",
-            frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "run-down",
-            frames: anims.generateFrameNumbers("character", { frames: [0, 1] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-
-        // Left animations (Row 2: frames 4-7) - All use idle frames
-        anims.create({
-            key: "idle-left",
-            frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "walk-left",
-            frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "run-left",
-            frames: anims.generateFrameNumbers("character", { frames: [4, 5] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-
-        // Right animations (Row 3: frames 8-11) - All use idle frames
-        anims.create({
-            key: "idle-right",
-            frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "walk-right",
-            frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "run-right",
-            frames: anims.generateFrameNumbers("character", { frames: [8, 9] }),
-            frameRate: 2,
-            repeat: -1,
-        });
-
-        // Up animations (Row 4: frames 12-15) - All use idle frames
-        anims.create({
-            key: "idle-up",
-            frames: anims.generateFrameNumbers("character", {
-                frames: [12, 13],
-            }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "walk-up",
-            frames: anims.generateFrameNumbers("character", {
-                frames: [12, 13],
-            }),
-            frameRate: 2,
-            repeat: -1,
-        });
-        anims.create({
-            key: "run-up",
-            frames: anims.generateFrameNumbers("character", {
-                frames: [12, 13],
-            }),
-            frameRate: 2,
-            repeat: -1,
-        });
+        // Kept for backward compatibility; ensure animations for 'character'
+        ensureCharacterAnimations(this.scene, "character");
     }
 
     private updateNamePosition(): void {

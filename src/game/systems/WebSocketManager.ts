@@ -3,6 +3,7 @@ import { Player } from "../entities/Player.ts";
 import { Constants } from "../utils/Constants.ts";
 import { FontUtils } from "../utils/FontUtils.ts";
 import { MainGameScene } from "../scenes/MainScene.ts";
+import { ensureCharacterAnimations } from "../utils/CharacterAnimations.ts";
 
 interface PlayerData {
     id: string;
@@ -10,6 +11,7 @@ interface PlayerData {
     x: number;
     y: number;
     animation?: string;
+    skin?: string; // character skin id (C1..C4)
 }
 
 interface OtherPlayer {
@@ -243,9 +245,12 @@ export class WebSocketManager {
 
                 const token = localStorage.getItem("dhaniverse_token");
                 if (token) {
+                    // Include selected character skin only once during authentication
+                    const skin = this.scene.registry.get("selectedCharacter") || "C2";
                     this.sendMessage("authenticate", {
                         token,
                         gameUsername: username,
+                        skin,
                     });
                 }
 
@@ -387,23 +392,35 @@ export class WebSocketManager {
     update(): void {
         const time = this.scene.time.now;
 
-        // Update other players with interpolation
+        // Update other players with interpolation (time-based for smoothness)
+        const dt = this.scene.game.loop.delta || 16.67;
+        const smoothing = 0.18; // base smoothing factor (0..1)
+        const factor = 1 - Math.pow(1 - smoothing, dt / 16.67);
         this.otherPlayers.forEach((otherPlayer) => {
             if (
                 otherPlayer.targetX !== undefined &&
                 otherPlayer.targetY !== undefined
             ) {
-                const factor = 0.3;
-                otherPlayer.sprite.x = Phaser.Math.Linear(
-                    otherPlayer.sprite.x,
-                    otherPlayer.targetX,
-                    factor
-                );
-                otherPlayer.sprite.y = Phaser.Math.Linear(
-                    otherPlayer.sprite.y,
-                    otherPlayer.targetY,
-                    factor
-                );
+                // Snap if teleport/large correction to avoid long lerp
+                const dx = otherPlayer.targetX - otherPlayer.sprite.x;
+                const dy = otherPlayer.targetY - otherPlayer.sprite.y;
+                const dist2 = dx * dx + dy * dy;
+                const snapThreshold2 = 400; // 20px squared
+                if (dist2 > snapThreshold2) {
+                    otherPlayer.sprite.x = otherPlayer.targetX;
+                    otherPlayer.sprite.y = otherPlayer.targetY;
+                } else {
+                    otherPlayer.sprite.x = Phaser.Math.Linear(
+                        otherPlayer.sprite.x,
+                        otherPlayer.targetX,
+                        factor
+                    );
+                    otherPlayer.sprite.y = Phaser.Math.Linear(
+                        otherPlayer.sprite.y,
+                        otherPlayer.targetY,
+                        factor
+                    );
+                }
                 otherPlayer.nameText.x = otherPlayer.sprite.x;
                 otherPlayer.nameText.y = otherPlayer.sprite.y - 50;
             }
@@ -548,10 +565,29 @@ export class WebSocketManager {
             return;
         }
 
+        // Use the player's skin if provided; fallback to currently loaded "character" texture
+        let skinTextureKey: string = "character";
+        if (playerData.skin && this.scene.textures.exists(playerData.skin)) {
+            skinTextureKey = playerData.skin;
+        } else if (playerData.skin && !this.scene.textures.exists(playerData.skin)) {
+            // If skin texture not loaded (edge case), load it and then create the sprite
+            const frameCfg = { frameWidth: 1000.25, frameHeight: 1000.25 } as any;
+            this.scene.load.spritesheet(playerData.skin, `/characters/${playerData.skin}.png`, frameCfg);
+            this.scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+                ensureCharacterAnimations(this.scene, playerData.skin!);
+                this.createOtherPlayer({ ...playerData, skin: playerData.skin });
+            });
+            this.scene.load.start();
+            return;
+        }
+
+        // Ensure animations exist for that texture key
+        ensureCharacterAnimations(this.scene, skinTextureKey);
+
         const otherPlayer = this.scene.add.sprite(
             playerData.x,
             playerData.y,
-            "character"
+            skinTextureKey
         );
         otherPlayer.setScale(0.3);
 
@@ -593,9 +629,20 @@ export class WebSocketManager {
         }
 
         if (playerData.animation) {
-            otherPlayer.anims.play(playerData.animation);
+            // Try playing skin-prefixed animation; fallback to legacy name
+            const prefixed = `${skinTextureKey}-${playerData.animation}`;
+            if (this.scene.anims.exists(prefixed)) {
+                otherPlayer.anims.play(prefixed);
+            } else {
+                otherPlayer.anims.play(playerData.animation);
+            }
         } else {
-            otherPlayer.anims.play("idle-down");
+            const idle = `${skinTextureKey}-idle-down`;
+            if (this.scene.anims.exists(idle)) {
+                otherPlayer.anims.play(idle);
+            } else {
+                otherPlayer.anims.play("idle-down");
+            }
         }
     }
 
@@ -607,7 +654,13 @@ export class WebSocketManager {
             otherPlayer.lastUpdate = this.scene.time.now;
 
             if (playerData.animation) {
-                otherPlayer.sprite.anims.play(playerData.animation, true);
+                const textureKey = otherPlayer.sprite.texture.key;
+                const prefixed = `${textureKey}-${playerData.animation}`;
+                if (this.scene.anims.exists(prefixed)) {
+                    otherPlayer.sprite.anims.play(prefixed, true);
+                } else {
+                    otherPlayer.sprite.anims.play(playerData.animation, true);
+                }
             }
         } else {
             this.createOtherPlayer(playerData);

@@ -5,31 +5,42 @@ interface GoogleSignInButtonProps {
   onError: (error: string) => void;
   text?: string;
   disabled?: boolean;
+  gameUsernameHint?: string; // optional username to pass during first-time Google account creation
 }
 
 const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   onSuccess,
   onError,
   text = "Sign in with Google",
-  disabled = false
+  disabled = false,
+  gameUsernameHint,
 }) => {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     if (disabled || loading) return;
-    
+
     setLoading(true);
-    
+
     try {
       // Initialize Google Sign-In
       const { google } = window as any;
-      
-      if (!google) {
+
+      // Ensure script is loaded (handles slow/cached load, Firefox quirks)
+      if (!google || !google.accounts?.id) {
+        // Try to wait briefly for the script to be ready
+        await new Promise((r) => setTimeout(r, 300));
+      }
+
+      if (!google || !google.accounts?.id) {
         throw new Error('Google Sign-In not loaded');
       }
 
       // Configure the client
-      await google.accounts.id.initialize({
+      // Avoid re-initializing if already done by previous clicks
+      try {
+        // Wrap in try in case multiple calls cause benign errors
+        await google.accounts.id.initialize({
         client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id',
         callback: async (response: any) => {
           try {
@@ -39,6 +50,10 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
             console.log('Google token received:', token ? 'Token present' : 'No token');
             if (!token) {
               throw new Error('No credential received from Google');
+            }
+            // Persist a hint for signup flow if available
+            if (gameUsernameHint) {
+              try { localStorage.setItem('dhaniverse_google_username_hint', gameUsernameHint); } catch {}
             }
             onSuccess(token);
           } catch (error) {
@@ -50,11 +65,25 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
         },
         ux_mode: 'popup',
         auto_select: false,
-      });
+        });
+      } catch (e) {
+        // If initialize throws because it's already initialized, continue
+        console.warn('Google accounts id initialize warning:', e);
+      }
 
       // Prompt the user to sign in
-      google.accounts.id.prompt();
-      
+      const promptResult = await google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed()) {
+          console.warn('Google prompt not displayed:', notification.getNotDisplayedReason?.());
+        }
+        if (notification.isSkippedMoment()) {
+          console.warn('Google prompt skipped:', notification.getSkippedReason?.());
+        }
+        if (notification.isDismissedMoment()) {
+          console.warn('Google prompt dismissed:', notification.getDismissedReason?.());
+        }
+      });
+
     } catch (error) {
       console.error('Google sign-in error:', error);
       onError('Failed to initialize Google sign-in');
@@ -67,16 +96,10 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       type="button"
       onClick={handleGoogleSignIn}
       disabled={disabled || loading}
-      className={`
-        w-full flex justify-center items-center px-4 py-3 border border-gray-600
-        rounded-lg shadow-sm bg-white text-gray-900 text-sm font-medium
-        hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 
-        focus:ring-dhani-gold transition-colors duration-200
-        ${(disabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}
-      `}
+      className={`w-full flex justify-center items-center px-4 py-3 border border-gray-700 rounded-lg shadow-sm bg-black/70 text-gray-100 text-sm font-medium hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-dhani-gold focus:ring-offset-black transition-colors duration-200 ${(disabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       {loading ? (
-        <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mr-2"></div>
+        <div className="w-5 h-5 border-2 border-gray-600 border-t-gray-200 rounded-full animate-spin mr-2"></div>
       ) : (
         <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

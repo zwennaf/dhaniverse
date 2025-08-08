@@ -133,17 +133,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('API Base URL:', API_BASE);
       
       const body: any = { googleToken };
-      if (gameUsername) {
-        body.gameUsername = gameUsername;
+      // Prefer explicit param; otherwise look for a local hint saved by the button
+      const usernameHint = gameUsername || localStorage.getItem('dhaniverse_google_username_hint') || undefined;
+      if (usernameHint) {
+        body.gameUsername = usernameHint;
       }
 
       console.log('Making POST request to:', `${API_BASE}/auth/google`);
       console.log('Request body:', { ...body, googleToken: googleToken ? '[REDACTED]' : 'MISSING' });
 
-      const response = await fetch(`${API_BASE}/auth/google`, {
+    const token = localStorage.getItem('dhaniverse_token');
+    const response = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),
       });

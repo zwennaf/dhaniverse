@@ -17,6 +17,7 @@ interface PlayerData {
     x: number;
     y: number;
     animation?: string;
+    skin?: string;
 }
 
 // Connection tracking
@@ -33,6 +34,7 @@ interface Connection {
     animation?: string;
     userId?: string;
     pendingUpdate?: { x: number; y: number; animation?: string };
+    skin?: string;
 }
 
 // Message types
@@ -40,6 +42,7 @@ interface AuthMessage {
     type: "authenticate";
     token: string;
     gameUsername: string;
+    skin?: string;
 }
 
 interface UpdateMessage {
@@ -152,6 +155,10 @@ async function handleAuthentication(
         connection.authenticated = true;
         connection.username = gameUsername;
         connection.userId = userId;
+        // Persist selected skin (default to C2 if not provided)
+        connection.skin = message.skin && ["C1","C2","C3","C4"].includes(message.skin)
+            ? message.skin
+            : (connection.skin || "C2");
 
         // Track this connection for the user
         userConnections.set(userId, connection.id);
@@ -177,7 +184,7 @@ async function handleAuthentication(
         );
 
         // Send list of existing players
-        const players: PlayerData[] = [];
+    const players: PlayerData[] = [];
         connections.forEach((conn) => {
             if (conn.id !== connection.id && conn.authenticated) {
                 players.push({
@@ -185,7 +192,8 @@ async function handleAuthentication(
                     username: conn.username,
                     x: conn.position.x,
                     y: conn.position.y,
-                    animation: conn.animation,
+            animation: conn.animation,
+            skin: conn.skin || "C2",
                 });
             }
         });
@@ -205,6 +213,7 @@ async function handleAuthentication(
                 username: connection.username,
                 x: connection.position.x,
                 y: connection.position.y,
+                skin: connection.skin || "C2",
             },
         });
 

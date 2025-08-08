@@ -412,7 +412,7 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
         }
 
         // Update user
-        const updateFields: any = { lastUpdated: new Date() };
+    const updateFields: (Partial<Pick<UserDocument, 'gameUsername' | 'selectedCharacter'>> & { lastUpdated: Date }) = { lastUpdated: new Date() };
         if (gameUsername) {
             updateFields.gameUsername = gameUsername;
         }
@@ -462,7 +462,7 @@ authRouter.get("/auth/google", (ctx: Context) => {
 authRouter.post("/auth/google", async (ctx: Context) => {
     try {
         const body = await ctx.request.body.json();
-        const { googleToken } = body;
+        const { googleToken, gameUsername } = body;
 
         // Verify Google token
         const googleUserInfo = await verifyGoogleToken(googleToken);
@@ -475,11 +475,56 @@ authRouter.post("/auth/google", async (ctx: Context) => {
 
         const { email, sub: googleId } = googleUserInfo;
 
-        // Check if user exists by email
-        const user = await mongodb.findUserByEmail(email);
+        // Collections
+        const usersCol = mongodb.getCollection<UserDocument>("users");
+
+        // 1) Prefer existing link by googleId
+    let user = await mongodb.findUserByGoogleId(googleId);
+
+        // 2) Otherwise find by email
+        if (!user) {
+            user = await mongodb.findUserByEmail(email);
+            // If found by email but no googleId, link it for future
+            if (user && !user.googleId) {
+                await usersCol.updateOne(
+                    { _id: new ObjectId(user.id) },
+                    { $set: { googleId, lastLoginAt: new Date() } }
+                );
+            }
+        }
+
+        // 3) If still not found, but client sent an Authorization token, try to link
+        if (!user) {
+            const authHeader = ctx.request.headers.get("Authorization");
+            if (authHeader?.startsWith("Bearer ")) {
+                const existingToken = authHeader.substring(7);
+                const verified = await verifyToken(existingToken);
+                if (verified && typeof verified.userId === "string") {
+                    const existingDoc = await usersCol.findOne({ _id: new ObjectId(verified.userId) });
+                    if (existingDoc) {
+                        // Link only if emails match to avoid account takeover
+                        if (existingDoc.email?.toLowerCase() === email.toLowerCase()) {
+                            await usersCol.updateOne(
+                                { _id: existingDoc._id! },
+                                { $set: { googleId, lastLoginAt: new Date() } }
+                            );
+                            user = {
+                                id: existingDoc._id!.toString(),
+                                email: existingDoc.email,
+                                passwordHash: existingDoc.passwordHash,
+                                gameUsername: existingDoc.gameUsername,
+                                selectedCharacter: existingDoc.selectedCharacter,
+                                createdAt: existingDoc.createdAt,
+                                googleId: googleId,
+                            };
+                        }
+                    }
+                }
+            }
+        }
 
         if (user) {
-            // User exists, sign them in
+            // User exists, sign them in (preserves balances and profile)
             const token = await createToken(user.id);
             ctx.response.body = {
                 success: true,
@@ -492,30 +537,38 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                 },
                 isNewUser: false,
             };
-        } else {
-            // Auto-create new user with Google - no username required initially
-            const newUser = await mongodb.createUser({
-                email: email,
-                passwordHash: "", // No password for Google users
-                gameUsername: "", // Empty initially - user will set it in profile
-                createdAt: new Date(),
-                googleId: googleId,
-            });
-
-            const token = await createToken(newUser.id);
-            ctx.response.status = 201;
-            ctx.response.body = {
-                success: true,
-                token,
-                user: {
-                    id: newUser.id,
-                    email: newUser.email,
-                    gameUsername: newUser.gameUsername,
-                    selectedCharacter: "C2", // Default for new users
-                },
-                isNewUser: true,
-            };
+            return;
         }
+
+        // 4) Create a new user (first Google sign-in on this email)
+        // Allow optional initial gameUsername if provided and available
+        let initialUsername = "";
+        if (typeof gameUsername === "string" && gameUsername.trim().length >= 3) {
+            const exists = await mongodb.findUserByGameUsername(gameUsername.trim());
+            if (!exists) initialUsername = gameUsername.trim();
+        }
+
+        const newUser = await mongodb.createUser({
+            email: email,
+            passwordHash: "", // No password for Google users
+            gameUsername: initialUsername, // Empty or provided if unique
+            createdAt: new Date(),
+            googleId: googleId,
+        });
+
+        const token = await createToken(newUser.id);
+        ctx.response.status = 201;
+        ctx.response.body = {
+            success: true,
+            token,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                gameUsername: newUser.gameUsername,
+                selectedCharacter: "C2", // Default for new users
+            },
+            isNewUser: true,
+        };
     } catch (error) {
         ctx.response.status = 500;
         ctx.response.body = { error: "Internal server error" };

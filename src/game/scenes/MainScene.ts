@@ -9,6 +9,7 @@ import { BankNPCManager } from "../systems/BankNPCManager.ts";
 import { StockMarketManager } from "../systems/StockMarketManager.ts";
 import { ATMManager } from "../managers/ATMManager.ts";
 import { DynamicZoomManager } from "../systems/DynamicZoomManager.ts";
+import { ensureCharacterAnimations } from "../utils/CharacterAnimations.ts";
 
 
 
@@ -230,16 +231,14 @@ export class MainScene extends Scene implements MainGameScene {
         this.load.image("interior", "/maps/bank.png");
         this.load.image("stockmarket", "/maps/stockmarket.png");
 
-        // Load character based on user selection (default to C2)
+        // Load all character skins so we can show others with different skins
+        const frameCfg = { frameWidth: 1000.25, frameHeight: 1000.25 };
+        ["C1", "C2", "C3", "C4"].forEach((skin) => {
+            this.load.spritesheet(skin, `/characters/${skin}.png`, frameCfg);
+        });
+        // Maintain legacy key 'character' for the local player using selected skin
         const selectedCharacter = this.getSelectedCharacter();
-        this.load.spritesheet(
-            "character",
-            `/characters/${selectedCharacter}.png`,
-            {
-                frameWidth: 1000.25, // 4001 / 4 = 1000.25
-                frameHeight: 1000.25, // 4001 / 4 = 1000.25
-            }
-        );
+    this.load.spritesheet("character", `/characters/${selectedCharacter}.png`, frameCfg);
 
         this.load.json("collisionData", "/collisions/collisions.json");
 
@@ -283,6 +282,7 @@ export class MainScene extends Scene implements MainGameScene {
     }
 
     private createGameElements(): void {
+    const selectedSkin = this.getSelectedCharacter();
         // Create game container - all game elements should be added to this container
         this.gameContainer = this.add.container(0, 0);
 
@@ -310,7 +310,11 @@ export class MainScene extends Scene implements MainGameScene {
         // Create player after map and collisions are set up
         const username = this.registry.get("username") || "Player";
         // Set fixed starting position for better gameplay experience
-        this.player = new Player(this, 800, 800, this.cursors, this.wasd);
+    // Ensure animations exist for local and other skins
+    ensureCharacterAnimations(this, "character");
+    ["C1", "C2", "C3", "C4"].forEach((skin) => ensureCharacterAnimations(this, skin));
+
+    this.player = new Player(this, 800, 800, this.cursors, this.wasd, selectedSkin);
         this.gameContainer.add(this.player.getSprite());
         this.gameContainer.add(this.player.getNameText());
 
@@ -321,7 +325,7 @@ export class MainScene extends Scene implements MainGameScene {
 
         // Add player-dependent managers
         this.buildingManager = new BuildingManager(this);
-        this.npcManager = new NPCManager(this);
+    this.npcManager = new NPCManager(this);
         this.webSocketManager = new WebSocketManager(this, this.player);
 
         // Initialize the bank NPC manager (will be invisible until player enters the bank)
