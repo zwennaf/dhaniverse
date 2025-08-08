@@ -88,8 +88,7 @@ async function handleAuthentication(
         // Get the auth server URL based on environment
         const authServerUrl =
             Deno.env.get("DENO_ENV") === "production"
-                ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") ||
-                  "https://dhaniverseapi.deno.dev"
+                ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") || "https://dhaniverseapi.deno.dev"
                 : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
 
         console.log(`Validating token with auth server: ${authServerUrl}`);
@@ -248,8 +247,7 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
         connection.lastUpdateTime = 0;
     }
 
-    if (now - connection.lastUpdateTime < 200) {
-        // 200ms = 5 updates per second max
+    if (now - connection.lastUpdateTime < 200) { // 200ms = 5 updates per second max
         // Store the update but don't broadcast immediately to prevent spam
         connection.pendingUpdate = {
             x: message.x,
@@ -267,14 +265,13 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
         y: message.y,
         animation: message.animation,
     };
-
+    
     // Clear pending update
     connection.pendingUpdate = undefined;
 
     // Only update if position actually changed significantly
-    const positionChanged =
-        Math.abs(connection.position.x - updateData.x) > 2 ||
-        Math.abs(connection.position.y - updateData.y) > 2;
+    const positionChanged = Math.abs(connection.position.x - updateData.x) > 2 || 
+                           Math.abs(connection.position.y - updateData.y) > 2;
     const animationChanged = connection.animation !== updateData.animation;
 
     if (!positionChanged && !animationChanged) {
@@ -541,12 +538,9 @@ setInterval(() => {
     });
 
     // Log connection stats (less frequently)
-    if (Math.random() < 0.1) {
-        // Only log 10% of the time
+    if (Math.random() < 0.1) { // Only log 10% of the time
         console.log(
-            `Connection stats: Total=${
-                connections.size
-            }, Authenticated=${getOnlineUsersCount()}`
+            `Connection stats: Total=${connections.size}, Authenticated=${getOnlineUsersCount()}`
         );
     }
 }, 30 * 1000); // Check every 30 seconds instead of 60
