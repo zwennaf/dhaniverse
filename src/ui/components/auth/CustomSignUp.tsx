@@ -143,8 +143,8 @@ const CustomSignUp: React.FC = () => {
           filter: 'blur(8px)'
         }}
       />
-      <form onSubmit={handleSubmit} className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10">
-        <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">Sign Up for <span className='text-dhani-gold pixel-glow'> Dhaniverse </span></h1>
+      <form onSubmit={handleSubmit} className="bg-black/70 p-6 rounded-lg w-full max-w-lg space-y-4 z-10">
+        <h1 className="text-3xl font-tickerbit tracking-widest text-dhani-text text-center mb-4">Sign Up for <span className='text-dhani-gold pixel-glow'>Dhaniverse</span></h1>
         
         {/* Enhanced error styling to match Profile.tsx */}
         {error && (
@@ -159,7 +159,7 @@ const CustomSignUp: React.FC = () => {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email"
           required
-          className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
+          className="w-full bg-dhani-dark border border-dhani-text/30 rounded-2xl py-3 px-4 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-text/50"
         />
         <input
           type="password"
@@ -167,7 +167,7 @@ const CustomSignUp: React.FC = () => {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
           required
-          className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
+          className="w-full bg-dhani-dark border border-dhani-text/30 rounded-2xl py-3 px-4 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-text/50"
         />
         <input
           type="text"
@@ -175,14 +175,14 @@ const CustomSignUp: React.FC = () => {
           onChange={(e) => setGameUsername(e.target.value)}
           placeholder="In-Game Username"
           required
-          className={`w-full bg-dhani-dark border rounded-2xl py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold ${!gameUsername || gameUsername.trim().length < 3 ? 'border-red-400' : 'border-dhani-gold/30'}`}
+          className={`w-full bg-dhani-dark border rounded-2xl py-3 px-4 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-text/50 ${!gameUsername || gameUsername.trim().length < 3 ? 'border-red-400' : 'border-dhani-text/30'}`}
         />        <PixelButton type="submit" disabled={loading} className="w-full">
           {loading ? 'Signing Up...' : 'Sign Up'}
         </PixelButton>
         <div className="relative my-4 flex items-center justify-center">
-          <div className="border-t border-dhani-gold/20 w-full"></div>
-          <span className="bg-dhani-darkgray px-3 text-sm text-dhani-text/60">or</span>
-          <div className="border-t border-dhani-gold/20 w-full"></div>
+          <div className="border-t border-dhani-gold/30 w-full"></div>
+          <span className="bg-black/70 px-3 text-sm text-dhani-text/60">or</span>
+          <div className="border-t border-dhani-gold/30 w-full"></div>
         </div>
         
         <GoogleSignInButton

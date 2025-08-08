@@ -181,14 +181,10 @@ const CustomSignIn = () => {
             />
             <form
                 onSubmit={handleSubmit}
-                className="bg-dhani-darkgray p-6 rounded-2xl shadow-lg shadow-dhani-gold/20 w-full max-w-md space-y-4 z-10"
+                className="bg-black/70 p-6 rounded-lg w-full max-w-lg space-y-4 z-10"
             >
-                <h1 className="text-3xl font-tickerbit tracking-widest uppercase text-dhani-text text-center">
-                    Sign In to{" "}
-                    <span className="text-dhani-gold pixel-glow">
-                        {" "}
-                        Dhaniverse{" "}
-                    </span>
+                <h1 className="text-3xl font-tickerbit tracking-widest text-dhani-text text-center mb-8">
+                    Sign In to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
                 </h1>
                 {/* Enhanced error styling */}
                 {error && (
@@ -208,7 +204,7 @@ const CustomSignIn = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email"
                     required
-                    className="w-full bg-dhani-dark border pixel-corners border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
+                    className="w-full bg-dhani-dark border border-dhani-text/30 rounded-2xl py-3 px-4 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-text/50"
                 />
                 <input
                     type="password"
@@ -216,8 +212,8 @@ const CustomSignIn = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
                     required
-                    className="w-full bg-dhani-dark border rounded-2xl border-dhani-gold/30 py-2 px-3 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-gold"
-                />{" "}
+                    className="w-full bg-dhani-dark border border-dhani-text/30 rounded-2xl py-3 px-4 text-dhani-text font-robert focus:outline-none focus:ring-1 focus:ring-dhani-text/50"
+                />
                 <PixelButton
                     type="submit"
                     disabled={loading}
@@ -226,17 +222,15 @@ const CustomSignIn = () => {
                     {loading ? "Signing In..." : "Sign In / Create Account"}
                 </PixelButton>
                 <div className="flex items-center justify-center my-4">
-                    <div className="border-t border-dhani-gold/30 flex-grow"></div>
-                    <span className="px-3 text-dhani-text/70 text-sm font-robert">
-                        or
-                    </span>
-                    <div className="border-t border-dhani-gold/30 flex-grow"></div>
+                    <div className="border-t border-dhani-gold/30 flex-grow" />
+                    <span className="px-3 text-dhani-text/70 text-sm font-robert">or</span>
+                    <div className="border-t border-dhani-gold/30 flex-grow" />
                 </div>
                 <GoogleSignInButton
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}
                     disabled={loading}
-                />{" "}
+                />
                 <div className="text-center space-y-2">
                     <p className="text-dhani-text/60 text-xs font-robert">
                         New to Dhaniverse? Just enter your email and password
