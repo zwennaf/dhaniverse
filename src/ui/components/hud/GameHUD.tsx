@@ -3,12 +3,15 @@ import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
+import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
+import ChatVoiceControls from "../voice/ChatVoiceControls";
 
 interface GameHUDProps {
     rupees?: number;
     username?: string;
     walletManager?: WalletManager;
     icpService?: ICPActorService;
+    voiceEnabled?: boolean;
 }
 
 interface ConnectedPlayer {
@@ -19,8 +22,10 @@ interface ConnectedPlayer {
 
 const GameHUD: React.FC<GameHUDProps> = ({
     rupees = 25000,
+    username = "Player",
     walletManager,
     icpService,
+    voiceEnabled = true,
 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
@@ -42,6 +47,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
     });
     const [networkHealthy, setNetworkHealthy] = useState(true);
 
+    const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
+
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -50,7 +57,24 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         // Make sure typing is disabled initially
         window.dispatchEvent(new Event("typing-end"));
+        
+        const onSelfConnected = (e: any) => {
+            const { id } = e.detail || {};
+            if (id) setSelfPlayerId(id);
+        };
+        window.addEventListener("playerSelfConnected" as any, onSelfConnected);
+        
+        return () => {
+            window.removeEventListener("playerSelfConnected" as any, onSelfConnected);
+        };
     }, []);
+
+    // Initialize voice command handler if voice is enabled
+    useEffect(() => {
+        if (voiceEnabled && selfPlayerId) {
+            voiceCommandHandler.initialize("dhaniverse-main", selfPlayerId).catch(console.error);
+        }
+    }, [voiceEnabled, selfPlayerId]);
 
     // Initialize blockchain status monitoring
     useEffect(() => {
@@ -102,6 +126,11 @@ const GameHUD: React.FC<GameHUDProps> = ({
         return () => {
             unsubscribe();
             window.removeEventListener("rupee-update" as any, handleRupeeUpdate);
+            
+            // Cleanup voice command handler if voice was enabled
+            if (voiceEnabled) {
+                voiceCommandHandler.destroy();
+            }
         };
     }, []);
 
@@ -399,10 +428,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
         if (e.key === "Enter" && chatInput.trim()) {
             e.preventDefault();
 
-            // Send message
+            const message = chatInput.trim();
+            
+            // Always send as a regular chat message (slash commands removed)
             window.dispatchEvent(
                 new CustomEvent("send-chat", {
-                    detail: { message: chatInput.trim() },
+                    detail: { message },
                 })
             );
 
@@ -410,6 +441,23 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setChatInput("");
             setTimeout(() => chatInputRef.current?.focus(), 0);
         }
+    };
+
+    // Add system message to chat
+    const addSystemMessage = (message: string) => {
+        setChatMessages((prev) => {
+            const systemMessage = {
+                id: `system-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substring(2, 9)}`,
+            username: "System",
+            message,
+            };
+            const newMessages = [...prev, systemMessage];
+            return newMessages.length > 50
+                ? newMessages.slice(-50)
+                : newMessages;
+        });
     };
 
     return (
@@ -495,8 +543,13 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     ref={messagesRef}
                 >
                     {chatMessages.length === 0 ? (
-                        <div className="text-white/50 italic text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider p-2">
-                            No messages yet. Press / to chat.
+                        <div className="text-white/50 italic text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider p-2 space-y-1">
+                            <div>No messages yet. Press / to chat.</div>
+                            {voiceEnabled && (
+                                <div className="text-xs text-white/40">
+                                    Voice controls are below.
+                                </div>
+                            )}
                         </div>
                     ) : (
                         chatMessages.map((msg, idx) => (
@@ -530,6 +583,16 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         ))
                     )}
                 </div>
+
+                {/* Voice controls over the chat input */}
+                {voiceEnabled && selfPlayerId && (
+                    <div className="mb-2">
+                        <ChatVoiceControls
+                            roomName="dhaniverse-main"
+                            participantName={selfPlayerId}
+                        />
+                    </div>
+                )}
 
                 {/* Chat input */}
                 <div className="relative">

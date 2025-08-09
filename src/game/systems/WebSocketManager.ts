@@ -471,6 +471,17 @@ export class WebSocketManager {
         switch (data.type) {
             case "connect":
                 this.playerId = data.id;
+                // Dispatch event with self player id so UI (e.g., voice) can use it
+                try {
+                    const selfUsername = this.scene.registry.get("username");
+                    window.dispatchEvent(
+                        new CustomEvent("playerSelfConnected", {
+                            detail: { id: data.id, username: selfUsername },
+                        })
+                    );
+                } catch (e) {
+                    // non-fatal
+                }
                 break;
 
             case "players":
