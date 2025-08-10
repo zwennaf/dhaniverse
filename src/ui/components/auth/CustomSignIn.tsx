@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import PixelButton from "../atoms/PixelButton";
 import GoogleSignInButton from "./GoogleSignInButton";
 import SEO from "../SEO";
+import analytics from "../../../utils/analytics";
 
 // Simplified device detection function
 const isMobileDevice = () => {
@@ -126,6 +127,9 @@ const CustomSignIn = () => {
         const result = await signIn(email, password);
 
         if (result.success) {
+            // Track successful sign in
+            analytics.trackSignInSuccess('email', result.isNewUser);
+            
             if (result.isNewUser && result.message) {
                 setSuccess(result.message);
                 // Give user a moment to see the success message before navigating
@@ -148,6 +152,9 @@ const CustomSignIn = () => {
         const result = await signInWithGoogle(googleToken);
 
         if (result.success) {
+            // Track successful Google sign in
+            analytics.trackSignInSuccess('google', result.isNewUser);
+            
             // Navigate to profile - new users will be prompted to set username there
             navigate("/profile");
         } else {

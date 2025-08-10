@@ -12,6 +12,7 @@ import EarthIcon from './icons/EarthIcon';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { CoinIcon2 } from './icons/CoinIcon2';
+import analytics from '../../utils/analytics';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -20,6 +21,9 @@ const LandingPage = () => {
   // Check if the user is signed in but doesn't have a username set
   // If so, redirect them to the profile page to set one up
   useEffect(() => {
+    // Track landing page view
+    analytics.trackLandingPageView();
+    
     if (isLoaded && isSignedIn && user) {
       const gameUsername = user.gameUsername;
       if (!gameUsername || (typeof gameUsername === 'string' && gameUsername.trim() === '')) {
@@ -94,7 +98,10 @@ const LandingPage = () => {
             <div className='flex gap-5'>
               {isSignedIn ? (
                 <>
-                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>
+                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => {
+                    analytics.trackGameStart(user?.gameUsername);
+                    navigate('/game');
+                  }}>
                     Play Financial RPG Game
                   </PixelButton>
                   <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
@@ -103,10 +110,16 @@ const LandingPage = () => {
                 </>
               ) : (
                 <>
-                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/sign-in')}>
+                  <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => {
+                    analytics.trackSignInIntent();
+                    navigate('/sign-in');
+                  }}>
                     Start Learning Finance
                   </PixelButton>
-                  <PixelButton variant='cta' onClick={() => navigate('/sign-up')}>
+                  <PixelButton variant='cta' onClick={() => {
+                    analytics.trackSignUpIntent();
+                    navigate('/sign-up');
+                  }}>
                     Create Free Account
                   </PixelButton>
                 </>

@@ -144,10 +144,10 @@
             http-equiv="Content-Security-Policy"
             content="
         default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: https://accounts.google.com https://cdn.jsdelivr.net https://*.googleusercontent.com;
-        script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https: blob: https://accounts.google.com https://cdn.jsdelivr.net https://*.googleusercontent.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: https://accounts.google.com https://cdn.jsdelivr.net https://*.googleusercontent.com https://www.googletagmanager.com https://www.google-analytics.com;
+        script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https: blob: https://accounts.google.com https://cdn.jsdelivr.net https://*.googleusercontent.com https://www.googletagmanager.com https://www.google-analytics.com;
         worker-src 'self' blob:;
-        connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:* https: wss: https://accounts.google.com https://oauth2.googleapis.com https://play.google.com https://www.googleapis.com;
+        connect-src 'self' http://localhost:* https://localhost:* ws://localhost:* wss://localhost:* https: wss: https://accounts.google.com https://oauth2.googleapis.com https://play.google.com https://www.googleapis.com https://www.google-analytics.com https://analytics.google.com;
         frame-src 'self' https://accounts.google.com https://*.googleusercontent.com https://vercel.live https://www.youtube.com;
         img-src 'self' data: blob: https: https://lh3.googleusercontent.com;
         style-src 'self' 'unsafe-inline' https:;
@@ -226,6 +226,24 @@
                 "datePublished": "2024-01-01",
                 "dateModified": "2025-01-10"
             }
+        </script>
+
+        <!-- Google tag (gtag.js) -->
+        <script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-SLRCXDGCLG"
+        ></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
+            gtag("config", "G-SLRCXDGCLG", {
+                page_title: "Dhaniverse - Financial Literacy Game",
+                page_location: window.location.href,
+                send_page_view: true,
+            });
         </script>
 
         <!-- Default Structured Data - will be updated dynamically by SEO component -->
