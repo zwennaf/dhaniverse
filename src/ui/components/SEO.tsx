@@ -11,11 +11,11 @@ interface SEOProps {
 }
 
 const defaultSEO = {
-    title: "Dhaniverse - Gamified Financial Literacy Platform | Learn Money Management Through Gaming",
+    title: "Dhaniverse - Learn Finance Through Gaming | Financial Literacy Game",
     description:
-        "Transform your financial future with Dhaniverse - India's first gamified financial literacy platform. Learn investing, budgeting, and money management through an immersive 2D RPG game. Perfect for Gen Z and millennials.",
+        "Master money management through India's first financial literacy RPG game. Learn investing, budgeting & personal finance skills. Free to play, built for Gen Z & millennials.",
     keywords:
-        "dhaniverse, dhaniverse game, dhaniverse.in, financial literacy game, money management game, financial education game, investing game, budgeting game, financial RPG, money RPG, financial simulation, stock market game, personal finance game, financial learning platform, gamified finance, finance education India, money skills game, financial planning game, investment simulator, budget simulator, financial literacy platform, money management app, financial education app, learn finance through gaming, financial game online, money management simulator, financial literacy India, Gen Z finance, millennial finance, financial education for students, interactive finance learning",
+        "dhaniverse, financial literacy game, money management game, investing game, budgeting game, personal finance education, financial RPG, stock market simulator, Gen Z finance, millennial finance, gamified learning, financial education India, learn finance through gaming, money skills game, investment simulator, budget simulator, financial planning game, wealth building game, banking simulation, financial wisdom, money management skills, personal finance app, financial learning platform, interactive finance education",
     image: "https://dhaniverse.in/og-image.jpg",
     url: "https://dhaniverse.in/",
     type: "website",

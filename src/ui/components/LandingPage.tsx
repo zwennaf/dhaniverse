@@ -4,21 +4,18 @@ import Footer from './atoms/Footer';
 import VideoPlayer from './atoms/VideoPlayer';
 import PixelButton from './atoms/PixelButton';
 import FeatureCard from './atoms/FeatureCard';
-import GameBuildings from './atoms/GameBuildings';
 import MarqueeTestimonials from './atoms/MarqueeTestimonials';
 import SEO from './SEO';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import LeafIcon from './icons/LeafIcon';
-import CoinIcon from './icons/CoinIcon';
 import EarthIcon from './icons/EarthIcon';
 import { useNavigate } from 'react-router-dom';
-import { useUser, useAuth } from '../contexts/AuthContext';
+import { useUser } from '../contexts/AuthContext';
 import { CoinIcon2 } from './icons/CoinIcon2';
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useAuth();
   
   // Check if the user is signed in but doesn't have a username set
   // If so, redirect them to the profile page to set one up
@@ -30,11 +27,6 @@ const LandingPage = () => {
       }
     }
   }, [isLoaded, isSignedIn, user, navigate]);
-    const handleSignOut = async () => {
-    await signOut();
-    // Reload page after sign out
-    window.location.reload();
-  };
 
   const handleProfile = () => {
     if (!isLoaded) return;
@@ -60,19 +52,12 @@ const LandingPage = () => {
     { quote: "When I HODL my cash in the bank, I opened a fake FD. Then I understood interest. My bank gives better than Mu Sigma!", author: "Dr, 33" }
   ];
 
-  // Sample buildings data
-  const buildings = Array.from({ length: 8 }, (_, i) => ({
-    id: i + 1,
-    name: `Building ${i + 1}`,
-    imageSrc: mapUrl
-  }));
-
   return (
     <div className="min-h-screen relative flex flex-col text-white bg-black">
       <SEO 
-        title="Dhaniverse - Gamified Financial Literacy Platform | Learn Money Management Through Gaming"
-        description="Transform your financial future with Dhaniverse - India's first gamified financial literacy platform. Learn investing, budgeting, and money management through an immersive 2D RPG game. Perfect for Gen Z and millennials."
-        keywords="dhaniverse, dhaniverse game, dhaniverse.in, financial literacy game, money management game, financial education game, investing game, budgeting game, financial RPG, money RPG, financial simulation, stock market game, personal finance game, financial learning platform, gamified finance, finance education India, money skills game, financial planning game, investment simulator, budget simulator, financial literacy platform, money management app, financial education app, learn finance through gaming, financial game online, money management simulator, financial literacy India, Gen Z finance, millennial finance, financial education for students, interactive finance learning"
+        title="Dhaniverse - Learn Finance Through Gaming | Financial Literacy Game"
+        description="Master money management through India's first financial literacy RPG game. Learn investing, budgeting & personal finance skills. Free to play, built for Gen Z & millennials."
+        keywords="dhaniverse, financial literacy game, money management game, investing game, budgeting game, personal finance education, financial RPG, stock market simulator, Gen Z finance, millennial finance, gamified learning, financial education India, learn finance through gaming, money skills game, investment simulator, budget simulator, financial planning game, wealth building game, banking simulation, financial wisdom, money management skills, personal finance app, financial learning platform, interactive finance education"
         url="https://dhaniverse.in/"
         type="website"
       />
@@ -110,25 +95,41 @@ const LandingPage = () => {
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>
-                    Play Now
+                    Play Financial RPG Game
                   </PixelButton>
-                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">Profile</PixelButton>                </>
+                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
+                    My Profile
+                  </PixelButton>
+                </>
               ) : (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/sign-in')}>
-                    Play Now
+                    Start Learning Finance
                   </PixelButton>
                   <PixelButton variant='cta' onClick={() => navigate('/sign-up')}>
-                    Sign Up
+                    Create Free Account
                   </PixelButton>
                 </>
               )}
+            </div>
+            
+            {/* Internal Navigation Links */}
+            <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+              <a href="/game" className="text-dhani-gold hover:text-dhani-gold/80 underline">Financial RPG Game</a>
+              <span className="text-white/40">•</span>
+              <a href="/sign-up" className="text-white/70 hover:text-white underline">Create Account</a>
+              <span className="text-white/40">•</span>
+              <a href="/sign-in" className="text-white/70 hover:text-white underline">Sign In</a>
+              <span className="text-white/40">•</span>
+              <a href="#features" className="text-white/70 hover:text-white underline">Features</a>
+              <span className="text-white/40">•</span>
+              <a href="#testimonials" className="text-white/70 hover:text-white underline">Reviews</a>
             </div>
           </div>
         </div>
       </section>
         {/* Features section */} 
-      <section className="w-full px-4 py-8 md:py-16 flex flex-col items-center">
+      <section id="features" className="w-full px-4 py-8 md:py-16 flex flex-col items-center">
         <div className="max-w-6xl mx-auto w-full text-center mb-8 md:mb-12">
           <div className="inline-block px-3 border-[2px] mt-10 md:mt-20 mb-10 md:mb-20 border-white/50">
             <p className="text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
@@ -188,7 +189,7 @@ const LandingPage = () => {
       </section>
       
       {/* Testimonials section with marquee */}
-      <section className="w-full relative m-auto py-16 ">
+      <section id="testimonials" className="w-full relative m-auto py-16 ">
         <div className="w-[150px] h-[150px] lg:w-[350px] lg:h-[350px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
         <div className=" mx-auto px-4 mb-8">
           <h2 className="text-3xl md:text-5xl font-vcr mb-8 text-center">What Players Say?</h2>
