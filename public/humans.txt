@@ -1,20 +1,40 @@
 /* TEAM */
 Founder & CEO: Gursimran Singh
-COO: Jashanjot Singh
-CPO: Aagam Jain
+Co-Founder & COO: Jashanjot Singh  
+Co-Founder & CPO: Aagam Jain
 CTO: Ekaspreet Singh
-Engineer: Jagjeevan Kashid
+Founding Engineer: Jagjeevan Kashid
+
+/* ABOUT DHANIVERSE */
+Mission: Making financial literacy accessible through gamified learning
+Vision: Empowering Gen Z and millennials with practical money management skills
+Founded: 2025
+Location: India
 
 /* CONTACT */
-Site: https://dhaniverse.in/
-Contact: @Gursimrxn (GitHub)
+Website: https://dhaniverse.in/
+GitHub: @Gursimrxn
+Twitter: @dhaniverse
+Email: hello@dhaniverse.in
 
-/* SITE */
-Standards: HTML5, CSS3, TypeScript
-Components: React, Phaser 3, Tailwind CSS, Vite
+/* TECHNOLOGY */
+Frontend: React, TypeScript, Tailwind CSS, Vite
+Game Engine: Phaser 3
 Backend: Deno (Oak), MongoDB, WebSocket
+Blockchain: Internet Computer Protocol (ICP)
 CDN: jsDelivr
 Hosting: Vercel
+Analytics: Privacy-focused analytics
+
+/* FEATURES */
+- Financial literacy RPG game
+- Stock market simulation
+- Banking and investment education
+- Budgeting and money management
+- Multiplayer financial challenges
+- Progress tracking and achievements
 
 /* META */
-Last updated: 2025-08-08
+Last updated: 2025-01-10
+Version: 2.0
+Language: English (India)
