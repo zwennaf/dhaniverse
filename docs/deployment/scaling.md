@@ -151,7 +151,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           phaser: ['phaser'],
           web3: ['ethers', '@dfinity/agent'],
-          ui: ['framer-motion', 'lucide-react']
+          ui: ['motion/react', 'lucide-react']
         }
       }
     },

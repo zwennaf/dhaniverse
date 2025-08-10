@@ -220,7 +220,7 @@ const PixelButton: React.FC<ButtonProps> = ({ children, variant = 'primary' }) =
 
 ```typescript
 // Framer Motion animation example
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 const AnimatedCard: React.FC = ({ children }) => (
   <motion.div

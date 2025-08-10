@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import GameCard from './GameCard';
 import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../lib/utils';
