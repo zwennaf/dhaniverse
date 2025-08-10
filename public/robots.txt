@@ -23,11 +23,9 @@ Disallow: /dist/
 Disallow: /.git/
 Disallow: /tools/
 Disallow: /deps/
-Disallow: /UI/
 Disallow: /maps/
 Disallow: /characters/
 Disallow: /collisions/
-Disallow: /fonts/
 
 # Allow important pages
 Allow: /
