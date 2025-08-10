@@ -164,11 +164,11 @@ const CustomSignIn = () => {
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
             <SEO
-                title="Sign In to Dhaniverse - Start Your Financial Learning Journey"
-                description="Sign in to Dhaniverse and continue your financial education journey. Access your progress, play the financial RPG game, and level up your money management skills."
-                keywords="sign in dhaniverse, dhaniverse login, dhaniverse sign in, financial education login, money management game login, financial literacy platform login, dhaniverse account login, financial game login, money RPG login"
+                title="Sign In to Dhaniverse - Access Your Financial Learning Account"
+                description="Sign in to your Dhaniverse account to continue learning finance through gaming. Access your progress in India's first financial literacy RPG game and improve your money management skills."
+                keywords="dhaniverse sign in, dhaniverse login, financial education login, money management game login, financial literacy platform login, dhaniverse account access, financial game login, money RPG login, personal finance game login, investment game login"
                 url="https://dhaniverse.in/sign-in"
-                noIndex={true}
+                noIndex={false}
             />
             <div
                 className="absolute inset-0 z-0"
@@ -183,9 +183,17 @@ const CustomSignIn = () => {
                 onSubmit={handleSubmit}
                 className="bg-black/70 p-6 rounded-lg w-full max-w-lg space-y-4 z-10"
             >
-                <h1 className="text-3xl font-tickerbit tracking-widest text-dhani-text text-center mb-8">
-                    Sign In to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
+                <h1 className="text-3xl font-tickerbit tracking-widest text-dhani-text text-center mb-4">
+                    Sign In to{" "}
+                    <span className="text-dhani-gold pixel-glow">
+                        Dhaniverse
+                    </span>
                 </h1>
+
+                <p className="text-center text-dhani-text/80 text-sm font-robert mb-6">
+                    Continue your financial education journey. Access your
+                    progress in India's first financial literacy RPG game.
+                </p>
                 {/* Enhanced error styling */}
                 {error && (
                     <div className="text-red-400 text-sm font-tickerbit p-2 mb-2 border border-red-400 rounded bg-red-900/20">
@@ -223,7 +231,9 @@ const CustomSignIn = () => {
                 </PixelButton>
                 <div className="flex items-center justify-center my-4">
                     <div className="border-t border-dhani-gold/30 flex-grow" />
-                    <span className="px-3 text-dhani-text/70 text-sm font-robert">or</span>
+                    <span className="px-3 text-dhani-text/70 text-sm font-robert">
+                        or
+                    </span>
                     <div className="border-t border-dhani-gold/30 flex-grow" />
                 </div>
                 <GoogleSignInButton
