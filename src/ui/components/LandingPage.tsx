@@ -4,7 +4,7 @@ import Footer from './atoms/Footer';
 import VideoPlayer from './atoms/VideoPlayer';
 import PixelButton from './atoms/PixelButton';
 import FeatureCard from './atoms/FeatureCard';
-import MarqueeTestimonials from './atoms/MarqueeTestimonials';
+import ScrollVelocityTestimonials from './atoms/ScrollVelocityTestimonials';
 import SEO from './SEO';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import LeafIcon from './icons/LeafIcon';
@@ -95,16 +95,16 @@ const LandingPage = () => {
               Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" /><ChevronRight className="w-4 h-4 -ml-2" />
             </p>
           
-            <div className='flex gap-5'>
+            <div className='flex flex-col sm:flex-row gap-3 sm:gap-5'>
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => {
                     analytics.trackGameStart(user?.gameUsername);
                     navigate('/game');
                   }}>
-                    Play Financial RPG Game
+                    Play Game
                   </PixelButton>
-                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">
+                  <PixelButton variant='outline' size='lg' className="bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text" onClick={handleProfile}>
                     My Profile
                   </PixelButton>
                 </>
@@ -114,7 +114,7 @@ const LandingPage = () => {
                     analytics.trackSignInIntent();
                     navigate('/sign-in');
                   }}>
-                    Start Learning Finance
+                    Play Now
                   </PixelButton>
                   <PixelButton variant='cta' onClick={() => {
                     analytics.trackSignUpIntent();
@@ -209,11 +209,25 @@ const LandingPage = () => {
         </div>
         
         <div className="mb-4">
-          <MarqueeTestimonials testimonials={testimonials1} direction="left" speed={40} />
+          <ScrollVelocityTestimonials 
+            testimonials={testimonials1} 
+            baseVelocity={-50}
+            damping={50}
+            stiffness={400}
+            numCopies={4}
+            velocityMapping={{ input: [0, 1000], output: [0, 3] }}
+          />
         </div>
         
         <div className="mb-16">
-          <MarqueeTestimonials testimonials={testimonials2} direction="right" speed={30} />
+          <ScrollVelocityTestimonials 
+            testimonials={testimonials2} 
+            baseVelocity={50}
+            damping={60}
+            stiffness={350}
+            numCopies={4}
+            velocityMapping={{ input: [0, 1000], output: [0, 4] }}
+          />
         </div>
       </section>      <section className='w-full relative md:mb-32 mb-16'>
         <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
@@ -238,11 +252,11 @@ const LandingPage = () => {
             
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-vcr mb-4 sm:mb-6 px-2">Just Start Playing already!</h2>
             <p className="text-sm sm:text-lg font-robert mb-6 sm:mb-8 tracking-widest text-white/80 px-2">No lectures. Just quests, coins, maps, and clarity.</p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-5">
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => navigate('/game')}>Play Now</PixelButton>
-                  <PixelButton variant='outline' size='lg' onClick={handleProfile} className=" bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text">Profile</PixelButton>
+                  <PixelButton variant='outline' size='lg' className="bg-dhani-green/80 hover:bg-dhani-green/50 text-dhani-text" onClick={handleProfile}>Profile</PixelButton>
                 </>
               ) : (
                 <>
