@@ -3,8 +3,34 @@ import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
 import { createToken, verifyToken } from "../auth/jwt.ts";
 import type { UserDocument } from "../db/schemas.ts";
+import { EmailService } from "../services/EmailService.ts";
+import { OTPService } from "../services/OTPService.ts";
 
 const authRouter = new Router();
+
+// Initialize services
+const emailService = new EmailService();
+const otpService = new OTPService(mongodb);
+
+// Rate limiting helper
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMs: number = 15 * 60 * 1000): boolean {
+    const now = Date.now();
+    const record = rateLimitMap.get(identifier);
+    
+    if (!record || now > record.resetTime) {
+        rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs });
+        return true;
+    }
+    
+    if (record.count >= maxAttempts) {
+        return false;
+    }
+    
+    record.count++;
+    return true;
+}
 
 // Helper function to hash passwords (basic implementation)
 async function hashPassword(password: string): Promise<string> {
@@ -601,5 +627,415 @@ async function verifyGoogleToken(
         return null;
     }
 }
+
+// ==========================================
+// OTP ROUTES FOR EMAIL VERIFICATION
+// ==========================================
+
+// Send OTP for email verification
+authRouter.post("/auth/send-otp", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { email, purpose = 'email_verification' } = body;
+
+        if (!email) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "Email is required"
+            };
+            return;
+        }
+
+        // Rate limiting
+        if (!checkRateLimit(`otp:${email}`, 3, 5 * 60 * 1000)) {
+            ctx.response.status = 429;
+            ctx.response.body = {
+                success: false,
+                message: "Too many OTP requests. Please wait 5 minutes."
+            };
+            return;
+        }
+
+        // Check if user has a valid OTP already
+        const hasValidOTP = await otpService.hasValidOTP(email, purpose);
+        if (hasValidOTP) {
+            const expiryTime = await otpService.getOTPExpiryTime(email, purpose);
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "A valid OTP already exists. Please check your email or wait for it to expire.",
+                expiresAt: expiryTime?.toISOString()
+            };
+            return;
+        }
+
+        // Generate and send OTP
+        const { otp, expiresAt } = await otpService.generateOTP(email, {
+            purpose: purpose as 'email_verification' | 'password_reset',
+            expiresInMinutes: 10
+        });
+
+        const emailSent = await emailService.sendOTPEmail({
+            to: email,
+            otp,
+            expiresIn: 10
+        });
+
+        if (!emailSent) {
+            ctx.response.status = 500;
+            ctx.response.body = {
+                success: false,
+                message: "Failed to send verification email. Please try again."
+            };
+            return;
+        }
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            message: "Verification code sent to your email.",
+            expiresAt: expiresAt.toISOString()
+        };
+
+    } catch (error) {
+        console.error("Send OTP error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Internal server error"
+        };
+    }
+});
+
+// Verify OTP
+authRouter.post("/auth/verify-otp", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { email, otp, purpose = 'email_verification' } = body;
+
+        if (!email || !otp) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "Email and OTP are required"
+            };
+            return;
+        }
+
+        // Rate limiting
+        if (!checkRateLimit(`verify:${email}`, 5, 15 * 60 * 1000)) {
+            ctx.response.status = 429;
+            ctx.response.body = {
+                success: false,
+                message: "Too many verification attempts. Please try again in 15 minutes."
+            };
+            return;
+        }
+
+        // Verify OTP
+        const verification = await otpService.verifyOTP(email, otp, purpose);
+        
+        if (!verification.valid) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: verification.message
+            };
+            return;
+        }
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            message: "OTP verified successfully"
+        };
+
+    } catch (error) {
+        console.error("Verify OTP error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Internal server error"
+        };
+    }
+});
+
+// Enhanced registration with email verification
+authRouter.post("/auth/register-with-otp", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { email, password, gameUsername, otp, selectedCharacter } = body;
+
+        // Validation
+        if (!email || !password || !gameUsername || !otp) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "Email, password, game username, and OTP are required"
+            };
+            return;
+        }
+
+        // Rate limiting
+        if (!checkRateLimit(`register:${email}`, 3, 15 * 60 * 1000)) {
+            ctx.response.status = 429;
+            ctx.response.body = {
+                success: false,
+                message: "Too many registration attempts. Please try again in 15 minutes."
+            };
+            return;
+        }
+
+        // Verify OTP first
+        const verification = await otpService.verifyOTP(email, otp, 'email_verification');
+        if (!verification.valid) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: verification.message
+            };
+            return;
+        }
+
+        // Check if user already exists
+        const existingUser = await mongodb.findUserByEmail(email);
+        if (existingUser) {
+            ctx.response.status = 409;
+            ctx.response.body = {
+                success: false,
+                message: "User with this email already exists"
+            };
+            return;
+        }
+
+        // Check if username is taken
+        const existingUsername = await mongodb.findUserByGameUsername(gameUsername);
+        if (existingUsername) {
+            ctx.response.status = 409;
+            ctx.response.body = {
+                success: false,
+                message: "Username is already taken"
+            };
+            return;
+        }
+
+        // Create user
+        const passwordHash = await hashPassword(password);
+        const user = await mongodb.createUser({
+            email,
+            passwordHash,
+            gameUsername,
+            selectedCharacter: selectedCharacter || 'C1',
+            createdAt: new Date()
+        });
+
+        // Create initial player state
+        await mongodb.createInitialPlayerState(user.id);
+
+        // Send welcome email
+        await emailService.sendWelcomeEmail(email, gameUsername);
+
+        // Generate JWT token
+        const token = await createToken(user.id, gameUsername);
+
+        ctx.response.status = 201;
+        ctx.response.body = {
+            success: true,
+            message: "Registration completed successfully!",
+            user: {
+                id: user.id,
+                email: user.email,
+                gameUsername: user.gameUsername,
+                selectedCharacter: user.selectedCharacter
+            },
+            token
+        };
+
+    } catch (error) {
+        console.error("Registration with OTP error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Internal server error"
+        };
+    }
+});
+
+// Password reset request
+authRouter.post("/auth/forgot-password", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { email } = body;
+
+        if (!email) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "Email is required"
+            };
+            return;
+        }
+
+        // Rate limiting
+        if (!checkRateLimit(`forgot:${email}`, 3, 15 * 60 * 1000)) {
+            ctx.response.status = 429;
+            ctx.response.body = {
+                success: false,
+                message: "Too many password reset attempts. Please try again in 15 minutes."
+            };
+            return;
+        }
+
+        // Check if user exists (but don't reveal if they don't)
+        const user = await mongodb.findUserByEmail(email);
+        
+        if (user) {
+            // Generate and send OTP
+            const { otp, expiresAt } = await otpService.generateOTP(email, {
+                purpose: 'password_reset',
+                expiresInMinutes: 15
+            });
+
+            await emailService.sendOTPEmail({
+                to: email,
+                otp,
+                username: user.gameUsername,
+                expiresIn: 15
+            });
+        }
+
+        // Always return success to prevent email enumeration
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            message: "If an account with this email exists, you will receive a password reset code."
+        };
+
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Internal server error"
+        };
+    }
+});
+
+// Reset password with OTP
+authRouter.post("/auth/reset-password", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { email, otp, newPassword } = body;
+
+        if (!email || !otp || !newPassword) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: "Email, OTP, and new password are required"
+            };
+            return;
+        }
+
+        // Rate limiting
+        if (!checkRateLimit(`reset:${email}`, 5, 15 * 60 * 1000)) {
+            ctx.response.status = 429;
+            ctx.response.body = {
+                success: false,
+                message: "Too many reset attempts. Please try again in 15 minutes."
+            };
+            return;
+        }
+
+        // Verify OTP
+        const verification = await otpService.verifyOTP(email, otp, 'password_reset');
+        
+        if (!verification.valid) {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                success: false,
+                message: verification.message
+            };
+            return;
+        }
+
+        // Find user
+        const user = await mongodb.findUserByEmail(email);
+        if (!user) {
+            ctx.response.status = 404;
+            ctx.response.body = {
+                success: false,
+                message: "User not found"
+            };
+            return;
+        }
+
+        // Update password
+        const hashedPassword = await hashPassword(newPassword);
+        const collection = mongodb.getCollection('users');
+        await collection.updateOne(
+            { _id: user._id },
+            { 
+                $set: { 
+                    passwordHash: hashedPassword,
+                    updatedAt: new Date()
+                } 
+            }
+        );
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            message: "Password reset successfully. You can now login with your new password."
+        };
+
+    } catch (error) {
+        console.error("Reset password error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Internal server error"
+        };
+    }
+});
+
+// Health check for email service
+authRouter.get("/auth/email-health", async (ctx: Context) => {
+    try {
+        const isHealthy = await emailService.testConnection();
+        const otpStats = await otpService.getOTPStats();
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            emailService: isHealthy ? 'healthy' : 'unhealthy',
+            otpStats
+        };
+    } catch (error) {
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Health check failed"
+        };
+    }
+});
+
+// Cleanup expired OTPs (call this periodically)
+authRouter.post("/auth/cleanup-otps", async (ctx: Context) => {
+    try {
+        const cleaned = await otpService.cleanupExpiredOTPs();
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            message: `Cleaned up ${cleaned} expired OTPs`
+        };
+    } catch (error) {
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            message: "Cleanup failed"
+        };
+    }
+});
 
 export default authRouter;
