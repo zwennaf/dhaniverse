@@ -16,7 +16,11 @@ async function testEmailService() {
         console.log(`   SMTP_PORT: ${Deno.env.get("SMTP_PORT")}`);
         console.log(`   SMTP_SECURE: ${Deno.env.get("SMTP_SECURE")}`);
         console.log(`   SMTP_USER: ${Deno.env.get("SMTP_USER")}`);
-        console.log(`   SMTP_PASS: ${Deno.env.get("SMTP_PASS") ? "***SET***" : "NOT SET"}`);
+        console.log(
+            `   SMTP_PASS: ${
+                Deno.env.get("SMTP_PASS") ? "***SET***" : "NOT SET"
+            }`
+        );
         console.log(`   SMTP_FROM_EMAIL: ${Deno.env.get("SMTP_FROM_EMAIL")}`);
 
         // Test email service connection
@@ -40,7 +44,7 @@ async function testEmailService() {
                 const emailSent = await emailService.sendOTPEmail({
                     to: testEmail,
                     otp: testOTP,
-                    username: "TestUser",
+                    username: "gursimranji",
                     expiresIn: 10,
                 });
 
@@ -52,7 +56,18 @@ async function testEmailService() {
                 } else {
                     console.log("❌ Failed to send test email");
                 }
-            } else {
+                const welcomeEmailSent = await emailService.sendWelcomeEmail(
+                    testEmail,
+                    "gursimranji"
+                );
+                if (welcomeEmailSent) {
+                    console.log("✅ Welcome email sent successfully!");
+                    console.log(
+                        `📧 Check your email at ${testEmail} for the welcome email`
+                    );
+                }
+                    
+                } else {
                 console.log(
                     "\n💡 To test actual email sending, set TEST_EMAIL_ADDRESS=your@email.com in your .env file"
                 );

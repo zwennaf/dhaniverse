@@ -86,7 +86,7 @@ export class EmailService {
                     address: this.fromEmail,
                 },
                 to: to,
-                subject: "Welcome to Dhaniverse! 🎮",
+                subject: "Welcome to Dhaniverse",
                 html: this.generateWelcomeEmailHTML(username),
                 text: this.generateWelcomeEmailText(username),
             };
@@ -119,7 +119,7 @@ export class EmailService {
                     address: this.fromEmail,
                 },
                 to: to,
-                subject: "Reset Your Dhaniverse Password",
+                subject: "Dhaniverse Password Reset",
                 html: this.generatePasswordResetEmailHTML(resetUrl, username),
                 text: this.generatePasswordResetEmailText(resetUrl, username),
             };
@@ -145,61 +145,512 @@ export class EmailService {
         expiresIn: number = 10
     ): string {
         return `
-    <!DOCTYPE html>
+        <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dhaniverse Verification Code</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .otp-box { background: white; border: 2px solid #667eea; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0; }
-            .otp-code { font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; margin: 10px 0; }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0; }
+            /* Email-safe styles without CSS variables */
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+                line-height: 1.6;
+                color: #1a1a1a !important;
+                background: #ffffff !important;
+                margin: 0;
+                padding: 20px;
+            }
+
+            /* Reset link colors */
+            a {
+                color: #d4af37 !important;
+                text-decoration: none;
+            }
+
+            a:hover {
+                color: #b8860b !important;
+            }
+
+            /* Reset text colors */
+            p, div, span, h1, h2, h3, h4, h5, h6 {
+                color: inherit !important;
+            }
+
+            .container {
+                max-width: 680px;
+                width: 100%;
+                margin: 0 auto;
+                background: #f8f9fa;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+                border: 1px solid #e9ecef;
+            }
+
+            .header {
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                padding: 48px 40px;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+                border-bottom: 1px solid #e9ecef;
+            }
+
+            .header::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #d4af37, #f5d167, #d4af37);
+                box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+            }
+
+            .header-badge {
+                display: inline-block;
+                padding: 8px 16px;
+                border: 2px solid rgba(212, 175, 55, 0.3);
+                border-radius: 4px;
+                margin-bottom: 24px;
+                background: rgba(212, 175, 55, 0.05);
+            }
+
+            .header-badge-text {
+                font-size: 12px;
+                color: #4a4a4a !important;
+                font-weight: 500;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                margin: 0;
+            }
+
+            .logo {
+                width: 80px;
+                height: 80px;
+                margin: 0 auto 20px auto;
+                display: block;
+                border-radius: 12px;
+            }
+
+            .brand {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 36px;
+                color: #d4af37 !important;
+                margin: 0 0 16px 0;
+                font-weight: bold;
+                letter-spacing: 2px;
+                position: relative;
+                z-index: 1;
+                text-transform: uppercase;
+            }
+
+            .tagline {
+                font-size: 16px;
+                color: #4a4a4a !important;
+                margin: 0;
+                font-weight: 400;
+                letter-spacing: 1px;
+                line-height: 1.5;
+            }
+
+            .content {
+                background: #ffffff;
+                padding: 40px;
+                position: relative;
+            }
+
+            .greeting {
+                font-size: 24px;
+                font-family: 'Courier New', Courier, monospace;
+                color: #1a1a1a !important;
+                margin-bottom: 25px;
+                letter-spacing: 1px;
+                position: relative;
+                display: inline-block;
+                font-weight: bold;
+            }
+
+            .greeting::after {
+                content: "";
+                position: absolute;
+                bottom: -8px;
+                left: 0;
+                width: 60px;
+                height: 3px;
+                background: #d4af37;
+                border-radius: 2px;
+            }
+
+            .intro-text {
+                color: #4a4a4a !important;
+                margin-bottom: 30px;
+                font-size: 17px;
+                line-height: 1.7;
+            }
+
+            .otp-container {
+                background: rgba(248, 249, 250, 0.8);
+                border: 1px solid rgba(212, 175, 55, 0.2);
+                border-radius: 12px;
+                padding: 35px 20px;
+                text-align: center;
+                margin: 35px 0;
+                position: relative;
+                overflow: hidden;
+                box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
+            }
+
+            @media (prefers-color-scheme: dark) {
+                .otp-container {
+                    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+                }
+                
+                .otp-container::before {
+                    content: "";
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(
+                        135deg,
+                        rgba(212, 175, 55, 0.05) 0%,
+                        transparent 50%,
+                        rgba(212, 175, 55, 0.05) 100%
+                    );
+                    pointer-events: none;
+                }
+            }
+
+            .otp-label {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 12px;
+                color: #d4af37 !important;
+                margin-bottom: 15px;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                font-weight: bold;
+            }
+
+            .otp-code {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 48px;
+                font-weight: bold;
+                color: #d4af37 !important;
+                letter-spacing: 8px;
+                margin: 20px 0;
+                background: rgba(212, 175, 55, 0.1);
+                padding: 15px 25px;
+                display: inline-block;
+                border-radius: 8px;
+                border: 2px solid #d4af37;
+            }
+
+            .otp-expiry {
+                font-size: 15px;
+                color: #666666 !important;
+                margin-top: 15px;
+                font-weight: 500;
+            }
+
+            .security-notice {
+                background: #fff8e1;
+                border: 1px solid rgba(212, 175, 55, 0.3);
+                border-radius: 8px;
+                padding: 25px;
+                margin: 35px 0;
+                border-left: 4px solid #d4af37;
+            }
+
+            .security-title {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 14px;
+                color: #d4af37 !important;
+                margin-bottom: 15px;
+                letter-spacing: 1px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .security-list {
+                color: #4a4a4a !important;
+                margin: 0;
+                padding-left: 28px;
+                font-size: 15px;
+            }
+
+            .security-list li {
+                margin-bottom: 10px;
+                line-height: 1.6;
+                position: relative;
+                color: #4a4a4a !important;
+            }
+
+            .security-list li::before {
+                content: "•";
+                color: #d4af37 !important;
+                position: absolute;
+                left: -15px;
+                font-size: 18px;
+            }
+
+            .features-section {
+                margin: 35px 0;
+            }
+
+            .features-title {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 16px;
+                color: #d4af37 !important;
+                margin-bottom: 20px;
+                letter-spacing: 1px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .features-list {
+                color: #4a4a4a !important;
+                margin: 0;
+                padding-left: 28px;
+                font-size: 16px;
+            }
+
+            .features-list li {
+                margin-bottom: 12px;
+                position: relative;
+                padding-left: 10px;
+                color: #4a4a4a !important;
+            }
+
+            .features-list li::before {
+                content: "▹";
+                color: #f5d167 !important;
+                position: absolute;
+                left: -15px;
+            }
+
+            .highlight {
+                color: #d4af37 !important;
+                font-weight: 500;
+            }
+
+            .cta-text {
+                color: #4a4a4a !important;
+                font-size: 17px;
+                margin-top: 35px;
+                text-align: center;
+                font-style: italic;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border: 1px solid #e9ecef;
+            }
+
+            .footer {
+                text-align: center;
+                margin-top: 40px;
+                color: var(--text-tertiary);
+                font-size: 13px;
+                padding: 40px 30px;
+                border-top: 1px solid var(--border-primary);
+                background: var(--footer-bg);
+                line-height: 1.8;
+                position: relative;
+            }
+
+            .footer::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 60px;
+                height: 3px;
+                background: var(--gold-primary);
+                border-radius: 2px;
+            }
+
+            .footer-brand {
+                font-family: 'Courier New', Courier, monospace;
+                color: var(--gold-primary);
+                font-size: 16px;
+                margin-bottom: 12px;
+                letter-spacing: 1px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .footer-links {
+                text-align: center;
+                margin: 16px 0;
+                line-height: 1.8;
+            }
+
+            .footer-links a {
+                display: inline-block;
+                margin: 0 8px;
+            }
+
+            .footer-link {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 12px;
+                transition: color 0.3s ease;
+            }
+
+            .footer-link:hover {
+                color: var(--gold-primary);
+            }
+
+            .footer-copyright {
+                margin-top: 20px;
+                padding-top: 16px;
+                border-top: 1px solid var(--border-primary);
+                font-size: 11px;
+                opacity: 0.8;
+            }
+
+            @media (max-width: 600px) {
+                .header,
+                .content {
+                    padding: 30px 20px;
+                }
+
+                .brand {
+                    font-size: 28px;
+                }
+
+                .otp-code {
+                    font-size: 36px;
+                    letter-spacing: 6px;
+                    padding: 12px 15px;
+                }
+
+                .features-list,
+                .security-list {
+                    padding-left: 24px;
+                }
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎮 Dhaniverse</h1>
-                <p>Your Financial Gaming Adventure Awaits!</p>
+                <div class="header-badge">
+                    <p class="header-badge-text">Learn Personal Finance with Fun</p>
+                </div>
+                <img src="https://dhaniverse.in/android-chrome-192x192.png" alt="Dhaniverse Logo" class="logo" width="80" height="80" />
+                <h1 class="brand">Dhaniverse</h1>
+                <p class="tagline">No lectures. Just quests, coins, maps, and clarity.</p>
             </div>
+
             <div class="content">
-                <h2>Hello${username ? ` ${username}` : ""}! 👋</h2>
-                <p>Welcome to Dhaniverse! To complete your registration and start your financial learning journey, please use the verification code below:</p>
-                
-                <div class="otp-box">
-                    <p>Your Verification Code:</p>
+                <h2 class="greeting">
+                    Hello${username ? ` ${username}` : " Player"}
+                </h2>
+
+                <p class="intro-text">
+                    Welcome to Dhaniverse! Your journey to financial mastery
+                    begins now. To complete your registration and unlock the
+                    full experience, please use the verification code below.
+                </p>
+
+                <div class="otp-container">
+                    <div class="otp-label">Your Verification Code</div>
                     <div class="otp-code">${otp}</div>
-                    <p><small>This code expires in ${expiresIn} minutes</small></p>
+                    <div class="otp-expiry">
+                        Expires in ${expiresIn} minutes
+                    </div>
                 </div>
 
-                <div class="warning">
-                    <strong>⚠️ Security Notice:</strong>
-                    <ul>
-                        <li>Never share this code with anyone</li>
-                        <li>Dhaniverse will never ask for this code via phone or email</li>
-                        <li>If you didn't request this code, please ignore this email</li>
+                <div class="security-notice">
+                    <div class="security-title">Security Notice</div>
+                    <ul class="security-list">
+                        <li>
+                            Never share this code with anyone, including
+                            Dhaniverse staff
+                        </li>
+                        <li>
+                            This code provides access to your account - treat it
+                            like a password
+                        </li>
+                        <li>
+                            Dhaniverse will never ask for this code via phone or
+                            email
+                        </li>
+                        <li>
+                            If you didn't request this, please contact support
+                            immediately
+                        </li>
                     </ul>
                 </div>
 
-                <p>Once verified, you'll be able to:</p>
-                <ul>
-                    <li>🏦 Learn banking and investment concepts through gameplay</li>
-                    <li>📈 Practice stock trading in a safe environment</li>
-                    <li>🔗 Explore Web3 and blockchain technology</li>
-                    <li>👥 Connect with friends and compete on leaderboards</li>
-                </ul>
+                <div class="features-section">
+                    <div class="features-title">
+                        What Awaits You in Dhaniverse
+                    </div>
+                    <ul class="features-list">
+                        <li>
+                            <span class="highlight">No lectures</span> - Learn
+                            through engaging gameplay and real-world scenarios
+                        </li>
+                        <li>
+                            <span class="highlight"
+                                >Dummy currency, real skills</span
+                            >
+                            - Earn coins while mastering financial concepts
+                        </li>
+                        <li>
+                            <span class="highlight">Ethical gaming</span> -
+                            Ad-free experience focused on genuine learning
+                        </li>
+                        <li>
+                            <span class="highlight">Social finance</span> -
+                            Connect with friends and climb the leaderboards
+                        </li>
+                        <li>
+                            <span class="highlight"
+                                >Real-world application</span
+                            >
+                            - Practical skills you can use immediately
+                        </li>
+                    </ul>
+                </div>
 
-                <p>Ready to start your financial education adventure? Enter the code above and let's begin!</p>
+                <p class="cta-text">
+                    "No lectures. Just quests, coins, maps, and clarity."<br />
+                    Your financial adventure begins now!
+                </p>
             </div>
+
             <div class="footer">
-                <p>© 2025 Dhaniverse. All rights reserved.</p>
-                <p>Building the future of financial education through gaming.</p>
+                <div class="footer-brand">DHANIVERSE</div>
+                <p>Building the future of financial education through gaming</p>
+                
+                <div class="footer-links">
+                    <a href="https://dhaniverse.in/game" class="footer-link">Financial RPG Game</a> • 
+                    <a href="https://dhaniverse.in/sign-up" class="footer-link">Create Account</a> • 
+                    <a href="https://dhaniverse.in/sign-in" class="footer-link">Sign In</a> • 
+                    <a href="https://dhaniverse.in/#features" class="footer-link">Features</a> • 
+                    <a href="https://dhaniverse.in/#testimonials" class="footer-link">Reviews</a>
+                </div>
+                
+                <div class="footer-copyright">
+                    <p>© 2025 Dhaniverse. All rights reserved.</p>
+                    <p>This email was sent as part of your Dhaniverse registration.</p>
+                    <p style="margin-top: 12px;">
+                        Questions? Contact us at <a href="mailto:support@dhaniverse.in" class="footer-link">support@dhaniverse.in</a>
+                    </p>
+                </div>
             </div>
         </div>
     </body>
@@ -216,29 +667,23 @@ export class EmailService {
         expiresIn: number = 10
     ): string {
         return `
-Hello${username ? ` ${username}` : ""}!
+DHANIVERSE - VERIFICATION CODE
 
-Welcome to Dhaniverse! To complete your registration and start your financial learning journey, please use the verification code below:
+Hello${username ? ` ${username}` : ""}
 
-Your Verification Code: ${otp}
+Complete your account verification using the code below:
+
+VERIFICATION CODE: ${otp}
 
 This code expires in ${expiresIn} minutes.
 
-SECURITY NOTICE:
+SECURITY INFORMATION:
 - Never share this code with anyone
-- Dhaniverse will never ask for this code via phone or email
+- We will never ask for this code via phone or email
 - If you didn't request this code, please ignore this email
 
-Once verified, you'll be able to:
-- Learn banking and investment concepts through gameplay
-- Practice stock trading in a safe environment
-- Explore Web3 and blockchain technology
-- Connect with friends and compete on leaderboards
-
-Ready to start your financial education adventure? Enter the code above and let's begin!
-
 © 2025 Dhaniverse. All rights reserved.
-Building the future of financial education through gaming.
+Financial education platform.
     `;
     }
 
@@ -252,61 +697,384 @@ Building the future of financial education through gaming.
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to Dhaniverse!</title>
+        <title>Welcome to Dhaniverse</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .cta-button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .feature-box { background: white; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+            /* Fallback fonts for email clients that block external fonts */
+            
+            :root {
+                --gold-primary: #d4af37;
+                --gold-secondary: #f5d167;
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8f9fa;
+                --bg-card: #ffffff;
+                --border-primary: #e9ecef;
+                --border-secondary: rgba(212, 175, 55, 0.2);
+                --text-primary: #1a1a1a;
+                --text-secondary: #4a4a4a;
+                --text-tertiary: #666666;
+                --header-bg: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                --footer-bg: #f8f9fa;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                line-height: 1.6;
+                color: var(--text-primary);
+                background: var(--bg-primary);
+                margin: 0;
+                padding: 20px;
+            }
+
+            .container {
+                max-width: 680px;
+                width: 100%;
+                margin: 0 auto;
+                background: var(--bg-secondary);
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+                border: 1px solid var(--border-primary);
+            }
+
+            .header {
+                background: var(--header-bg);
+                padding: 48px 40px;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+                border-bottom: 1px solid var(--border-primary);
+            }
+
+            .header::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(
+                    90deg,
+                    var(--gold-primary),
+                    var(--gold-secondary),
+                    var(--gold-primary)
+                );
+                box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+            }
+
+            .header-badge {
+                display: inline-block;
+                padding: 8px 16px;
+                border: 2px solid rgba(212, 175, 55, 0.3);
+                border-radius: 4px;
+                margin-bottom: 24px;
+                background: rgba(212, 175, 55, 0.05);
+            }
+
+            .header-badge-text {
+                font-size: 12px;
+                color: var(--text-secondary);
+                font-weight: 500;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                margin: 0;
+            }
+
+            .logo {
+                width: 80px;
+                height: 80px;
+                margin: 0 auto 20px auto;
+                display: block;
+                border-radius: 12px;
+            }
+
+            .brand {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 36px;
+                color: var(--gold-primary);
+                margin: 0 0 16px 0;
+                font-weight: bold;
+                letter-spacing: 2px;
+                position: relative;
+                z-index: 1;
+                text-transform: uppercase;
+            }
+
+            .tagline {
+                font-size: 16px;
+                color: var(--text-secondary);
+                margin: 0;
+                font-weight: 400;
+                letter-spacing: 1px;
+                line-height: 1.5;
+            }
+
+            .content {
+                background: var(--bg-card);
+                padding: 40px;
+                position: relative;
+            }
+
+            .greeting {
+                font-size: 24px;
+                font-family: 'Courier New', Courier, monospace;
+                color: var(--text-primary);
+                margin-bottom: 25px;
+                letter-spacing: 1px;
+                position: relative;
+                display: inline-block;
+                font-weight: bold;
+            }
+
+            .greeting::after {
+                content: "";
+                position: absolute;
+                bottom: -8px;
+                left: 0;
+                width: 60px;
+                height: 3px;
+                background: var(--gold-primary);
+                border-radius: 2px;
+            }
+
+            .intro-text {
+                color: var(--text-secondary);
+                margin-bottom: 30px;
+                font-size: 17px;
+                line-height: 1.7;
+            }
+
+            .feature-card {
+                background: var(--bg-secondary);
+                border-radius: 8px;
+                padding: 20px;
+                margin: 16px 0;
+                border-left: 3px solid var(--gold-primary);
+            }
+
+            .feature-title {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 16px;
+                color: var(--gold-primary);
+                margin: 0 0 8px 0;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .feature-desc {
+                color: var(--text-secondary);
+                font-size: 14px;
+                line-height: 1.5;
+                margin: 0;
+            }
+
+            .cta-section {
+                text-align: center;
+                margin: 40px 0;
+                padding: 32px 24px;
+                background: var(--bg-secondary);
+                border-radius: 12px;
+                border: 1px solid var(--border-primary);
+            }
+
+            .cta-button {
+                display: inline-block;
+                background: var(--gold-primary);
+                color: #ffffff;
+                padding: 14px 28px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 14px;
+                border-radius: 8px;
+                margin: 0 0 16px 0;
+                transition: all 0.2s ease;
+            }
+
+            .cta-button:hover {
+                background: #b8941f;
+            }
+
+            .cta-subtitle {
+                color: var(--text-tertiary);
+                margin: 0;
+                font-size: 13px;
+            }
+
+            .tips-section {
+                margin: 40px 0 0 0;
+            }
+
+            .tips-title {
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 16px;
+                color: var(--gold-primary);
+                margin: 0 0 16px 0;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .tips-list {
+                color: var(--text-secondary);
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+
+            .tips-list li {
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                position: relative;
+                padding-left: 16px;
+            }
+
+            .tips-list li:before {
+                content: "•";
+                color: var(--gold-primary);
+                position: absolute;
+                left: 0;
+            }
+
+            .tips-list li:last-child {
+                margin-bottom: 0;
+            }
+
+            .footer {
+                text-align: center;
+                margin-top: 40px;
+                color: var(--text-tertiary);
+                font-size: 13px;
+                padding: 40px 30px;
+                border-top: 1px solid var(--border-primary);
+                background: var(--footer-bg);
+                line-height: 1.8;
+                position: relative;
+            }
+
+            .footer::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 60px;
+                height: 3px;
+                background: var(--gold-primary);
+                border-radius: 2px;
+            }
+
+            .footer-brand {
+                font-family: 'Courier New', Courier, monospace;
+                color: var(--gold-primary);
+                font-size: 14px;
+                margin-bottom: 12px;
+                letter-spacing: 1px;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+
+            .footer-links {
+                text-align: center;
+                margin: 16px 0;
+                line-height: 1.8;
+            }
+
+            .footer-links a {
+                display: inline-block;
+                margin: 0 8px;
+            }
+
+            .footer-link {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 12px;
+                transition: color 0.3s ease;
+            }
+
+            .footer-link:hover {
+                color: var(--gold-primary);
+            }
+
+            .footer-copyright {
+                margin-top: 20px;
+                padding-top: 16px;
+                border-top: 1px solid var(--border-primary);
+                font-size: 11px;
+                opacity: 0.8;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎉 Welcome to Dhaniverse, ${username}!</h1>
-                <p>Your Financial Gaming Adventure Starts Now!</p>
+                <div class="header-badge">
+                    <p class="header-badge-text">Learn Personal Finance with Fun</p>
+                </div>
+                <img src="https://dhaniverse.in/android-chrome-192x192.png" alt="Dhaniverse Logo" class="logo" width="80" height="80" />
+                <h1 class="brand">Dhaniverse</h1>
+                <p class="tagline">Welcome to your financial adventure, ${username}!</p>
             </div>
+
             <div class="content">
-                <h2>Congratulations! 🎮</h2>
-                <p>You've successfully joined Dhaniverse, where learning finance is as fun as playing your favorite game!</p>
+                <h2 class="greeting">Your glow-up starts here</h2>
+                <p class="intro-text">You've successfully joined Dhaniverse, where learning finance is as fun as your favorite game! Your financial adventure begins now.</p>
 
-                <div class="feature-box">
-                    <h3>🏦 Master Banking & Investing</h3>
-                    <p>Learn real-world financial concepts through interactive gameplay. From savings accounts to stock trading, we've got you covered!</p>
+                <div class="feature-card">
+                    <div class="feature-title">No mental stress — just clarity</div>
+                    <div class="feature-desc">Learn through gameplay, not lectures. No trauma. No pressure. Just understanding.</div>
                 </div>
 
-                <div class="feature-box">
-                    <h3>🔗 Explore Web3 & Blockchain</h3>
-                    <p>Ready for the future? Discover cryptocurrency, DeFi, and blockchain technology in a beginner-friendly way.</p>
+                <div class="feature-card">
+                    <div class="feature-title">Dummy currency, real skills</div>
+                    <div class="feature-desc">Earn in-game coins & level up while learning real-world money skills.</div>
                 </div>
 
-                <div class="feature-box">
-                    <h3>👥 Connect & Compete</h3>
-                    <p>Join a community of learners! Challenge friends, climb leaderboards, and share your financial journey.</p>
+                <div class="feature-card">
+                    <div class="feature-title">Ethical, real-world adventure</div>
+                    <div class="feature-desc">No ads. Just fun quests that teach real financial wisdom.</div>
                 </div>
 
-                <div style="text-align: center;">
+                <div class="cta-section">
                     <a href="${
                         Deno.env.get("FRONTEND_URL") || "https://dhaniverse.in"
-                    }" class="cta-button">Start Playing Now! 🚀</a>
+                    }" class="cta-button">Access Platform</a>
+                    <p class="cta-subtitle">Begin your financial education journey</p>
                 </div>
 
-                <p><strong>Pro Tips for New Players:</strong></p>
-                <ul>
-                    <li>Start with the tutorial to learn the basics</li>
-                    <li>Visit the bank to understand savings and interest</li>
-                    <li>Try the stock market when you're ready to invest</li>
-                    <li>Connect with friends for a more fun experience</li>
-                </ul>
-
-                <p>Need help? Our community is here to support you every step of the way!</p>
+                <div class="tips-section">
+                    <div class="tips-title">Getting Started</div>
+                    <ul class="tips-list">
+                        <li>Complete the introductory tutorial</li>
+                        <li>Explore the banking simulation</li>
+                        <li>Practice investment strategies</li>
+                        <li>Track your learning progress</li>
+                    </ul>
+                </div>
             </div>
+
             <div class="footer">
-                <p>© 2025 Dhaniverse. All rights reserved.</p>
-                <p>Building the future of financial education through gaming.</p>
+                <div class="footer-brand">DHANIVERSE</div>
+                <p>Building the future of financial education through gaming</p>
+                
+                <div class="footer-links">
+                    <a href="https://dhaniverse.in/game" class="footer-link">Financial RPG Game</a> • 
+                    <a href="https://dhaniverse.in/sign-up" class="footer-link">Create Account</a> • 
+                    <a href="https://dhaniverse.in/sign-in" class="footer-link">Sign In</a> • 
+                    <a href="https://dhaniverse.in/#features" class="footer-link">Features</a> • 
+                    <a href="https://dhaniverse.in/#testimonials" class="footer-link">Reviews</a>
+                </div>
+                
+                <div class="footer-copyright">
+                    <p>© 2025 Dhaniverse. All rights reserved.</p>
+                    <p>This email was sent as part of your Dhaniverse registration.</p>
+                    <p style="margin-top: 12px;">
+                        Questions? Contact us at <a href="mailto:support@dhaniverse.in" class="footer-link">support@dhaniverse.in</a>
+                    </p>
+                </div>
             </div>
         </div>
     </body>
@@ -319,34 +1087,27 @@ Building the future of financial education through gaming.
      */
     private generateWelcomeEmailText(username: string): string {
         return `
-Welcome to Dhaniverse, ${username}!
+DHANIVERSE - WELCOME
 
-Congratulations! You've successfully joined Dhaniverse, where learning finance is as fun as playing your favorite game!
+Hello ${username}
 
-WHAT YOU CAN DO:
-🏦 Master Banking & Investing
-Learn real-world financial concepts through interactive gameplay. From savings accounts to stock trading, we've got you covered!
+Your Dhaniverse account is now active. Start your financial education journey through interactive gameplay and practical learning.
 
-🔗 Explore Web3 & Blockchain
-Ready for the future? Discover cryptocurrency, DeFi, and blockchain technology in a beginner-friendly way.
+PLATFORM FEATURES:
+- Interactive Learning: Master financial concepts through gameplay
+- Practical Skills: Develop real-world money management abilities
+- Progressive System: Advance through structured lessons
 
-👥 Connect & Compete
-Join a community of learners! Challenge friends, climb leaderboards, and share your financial journey.
+GETTING STARTED:
+- Complete the introductory tutorial
+- Explore the banking simulation
+- Practice investment strategies
+- Track your learning progress
 
-PRO TIPS FOR NEW PLAYERS:
-- Start with the tutorial to learn the basics
-- Visit the bank to understand savings and interest
-- Try the stock market when you're ready to invest
-- Connect with friends for a more fun experience
-
-Ready to start? Visit: ${
-            Deno.env.get("FRONTEND_URL") || "https://dhaniverse.in"
-        }
-
-Need help? Our community is here to support you every step of the way!
+Access Platform: ${Deno.env.get("FRONTEND_URL") || "https://dhaniverse.in"}
 
 © 2025 Dhaniverse. All rights reserved.
-Building the future of financial education through gaming.
+Financial education platform.
     `;
     }
 
@@ -363,48 +1124,276 @@ Building the future of financial education through gaming.
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Reset Your Dhaniverse Password</title>
+        <title>Dhaniverse Password Reset</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .cta-button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+            /* Fallback fonts for email clients that block external fonts */
+            
+            :root {
+                --gold-primary: #d4af37;
+                --gold-secondary: #f5d167;
+                --bg-primary: #ffffff;
+                --bg-secondary: #f8f9fa;
+                --bg-card: #ffffff;
+                --border-primary: #e9ecef;
+                --text-primary: #1a1a1a;
+                --text-secondary: #4a4a4a;
+                --text-tertiary: #666666;
+                --header-bg: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                --footer-bg: #f8f9fa;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                line-height: 1.6; 
+                color: var(--text-primary); 
+                background: var(--bg-primary);
+                margin: 0;
+                padding: 20px;
+            }
+            .container { 
+                max-width: 680px; 
+                width: 100%;
+                margin: 0 auto; 
+                background: var(--bg-secondary);
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+                border: 1px solid var(--border-primary);
+            }
+            .header { 
+                background: var(--header-bg);
+                padding: 48px 40px;
+                text-align: center; 
+                position: relative;
+                overflow: hidden;
+                border-bottom: 1px solid var(--border-primary);
+            }
+            .header::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(
+                    90deg,
+                    var(--gold-primary),
+                    var(--gold-secondary),
+                    var(--gold-primary)
+                );
+                box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+            }
+            .header-badge {
+                display: inline-block;
+                padding: 8px 16px;
+                border: 2px solid rgba(212, 175, 55, 0.3);
+                border-radius: 4px;
+                margin-bottom: 24px;
+                background: rgba(212, 175, 55, 0.05);
+            }
+            .header-badge-text {
+                font-size: 12px;
+                color: var(--text-secondary);
+                font-weight: 500;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                margin: 0;
+            }
+            .logo {
+                width: 80px;
+                height: 80px;
+                margin: 0 auto 16px auto;
+                display: block;
+                border-radius: 8px;
+            }
+            .brand { 
+                font-family: 'Courier New', Courier, monospace; 
+                font-size: 36px; 
+                color: var(--gold-primary); 
+                margin: 0 0 16px 0;
+                font-weight: bold;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+            }
+            .subtitle {
+                font-size: 16px;
+                color: var(--text-secondary);
+                margin: 0;
+                font-weight: 400;
+                letter-spacing: 1px;
+                line-height: 1.5;
+            }
+            .content { 
+                background: var(--bg-card);
+                padding: 40px;
+                position: relative;
+            }
+            .greeting {
+                font-size: 24px;
+                font-family: 'Courier New', Courier, monospace;
+                color: var(--text-primary);
+                margin: 0 0 25px 0;
+                font-weight: bold;
+                letter-spacing: 1px;
+                position: relative;
+                display: inline-block;
+            }
+            .greeting::after {
+                content: "";
+                position: absolute;
+                bottom: -8px;
+                left: 0;
+                width: 60px;
+                height: 3px;
+                background: var(--gold-primary);
+                border-radius: 2px;
+            }
+            .intro-text {
+                color: var(--text-secondary);
+                margin: 0 0 30px 0;
+                font-size: 17px;
+                line-height: 1.7;
+            }
+            .cta-section {
+                text-align: center;
+                margin: 40px 0;
+                padding: 32px 24px;
+                background: #f8f9fa;
+                border-radius: 12px;
+                border: 1px solid #e9ecef;
+            }
+            .cta-button { 
+                display: inline-block; 
+                background: #D4AF37; 
+                color: #ffffff; 
+                padding: 14px 28px; 
+                text-decoration: none; 
+                font-weight: 600;
+                font-size: 14px;
+                border-radius: 8px;
+                margin: 0;
+                transition: all 0.2s ease;
+            }
+            .cta-button:hover {
+                background: #b8941f;
+            }
+            .security-notice { 
+                background: #fff8e1; 
+                border-radius: 8px;
+                padding: 20px; 
+                margin: 40px 0;
+                border-left: 4px solid #D4AF37;
+            }
+            .security-title {
+                font-size: 14px;
+                color: #1a1a1a;
+                margin: 0 0 12px 0;
+                font-weight: 600;
+            }
+            .security-list {
+                color: #4a4a4a;
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+            .security-list li {
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                position: relative;
+                padding-left: 16px;
+            }
+            .security-list li:before {
+                content: "•";
+                color: #D4AF37;
+                position: absolute;
+                left: 0;
+            }
+            .security-list li:last-child {
+                margin-bottom: 0;
+            }
+            .url-section {
+                background: #f8f9fa;
+                border-radius: 8px;
+                padding: 16px;
+                margin: 24px 0;
+                border: 1px solid #e9ecef;
+            }
+            .url-label {
+                font-size: 12px;
+                color: #666666;
+                margin: 0 0 8px 0;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-weight: 500;
+            }
+            .url-text {
+                word-break: break-all;
+                color: #D4AF37;
+                font-size: 12px;
+                margin: 0;
+                font-family: monospace;
+            }
+            .footer { 
+                text-align: center; 
+                margin-top: 60px; 
+                padding-top: 40px;
+                color: #999999; 
+                font-size: 12px;
+                border-top: 1px solid #f0f0f0;
+            }
+            .footer-brand {
+                font-family: 'Press Start 2P', monospace;
+                color: #D4AF37;
+                font-size: 10px;
+                margin: 0 0 8px 0;
+            }
+            .footer p {
+                margin: 4px 0;
+                line-height: 1.4;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🔐 Password Reset</h1>
-                <p>Dhaniverse Account Security</p>
+                <img src="https://dhaniverse.in/android-chrome-192x192.png" alt="Dhaniverse" class="logo" width="48" height="48" />
+                <h1 class="brand">DHANIVERSE</h1>
+                <p class="subtitle">Account Security</p>
             </div>
             <div class="content">
-                <h2>Hello${username ? ` ${username}` : ""}!</h2>
-                <p>We received a request to reset your Dhaniverse password. If you made this request, click the button below to create a new password:</p>
+                <h2 class="greeting">Password Reset Request</h2>
+                <p class="intro-text">Hello${
+                    username ? ` ${username}` : ""
+                }. We received a request to reset your account password. Use the button below to create a new password.</p>
 
-                <div style="text-align: center;">
-                    <a href="${resetUrl}" class="cta-button">Reset My Password 🔑</a>
+                <div class="cta-section">
+                    <a href="${resetUrl}" class="cta-button">Reset Password</a>
                 </div>
 
-                <div class="warning">
-                    <strong>⚠️ Security Notice:</strong>
-                    <ul>
-                        <li>This link expires in 1 hour for security</li>
-                        <li>If you didn't request this reset, please ignore this email</li>
-                        <li>Your current password remains unchanged until you create a new one</li>
+                <div class="security-notice">
+                    <div class="security-title">Security Information</div>
+                    <ul class="security-list">
+                        <li>This link expires in 1 hour for security purposes</li>
+                        <li>If you didn't request this reset, ignore this email</li>
+                        <li>Your current password remains active until changed</li>
                     </ul>
                 </div>
 
-                <p>If the button doesn't work, copy and paste this link into your browser:</p>
-                <p style="word-break: break-all; background: #f0f0f0; padding: 10px; border-radius: 5px;">${resetUrl}</p>
-
-                <p>Having trouble? Contact our support team and we'll help you get back into your account.</p>
+                <div class="url-section">
+                    <div class="url-label">Alternative Access</div>
+                    <p class="url-text">${resetUrl}</p>
+                </div>
             </div>
             <div class="footer">
+                <div class="footer-brand">DHANIVERSE</div>
                 <p>© 2025 Dhaniverse. All rights reserved.</p>
-                <p>Building the future of financial education through gaming.</p>
+                <p>Financial education platform.</p>
             </div>
         </div>
     </body>
@@ -420,21 +1409,21 @@ Building the future of financial education through gaming.
         username?: string
     ): string {
         return `
-Hello${username ? ` ${username}` : ""}!
+DHANIVERSE - PASSWORD RESET
 
-We received a request to reset your Dhaniverse password. If you made this request, visit the link below to create a new password:
+Hello${username ? ` ${username}` : ""}
+
+We received a request to reset your account password. Use the link below to create a new password:
 
 ${resetUrl}
 
-SECURITY NOTICE:
-- This link expires in 1 hour for security
-- If you didn't request this reset, please ignore this email
-- Your current password remains unchanged until you create a new one
-
-Having trouble? Contact our support team and we'll help you get back into your account.
+SECURITY INFORMATION:
+- This link expires in 1 hour for security purposes
+- If you didn't request this reset, ignore this email
+- Your current password remains active until changed
 
 © 2025 Dhaniverse. All rights reserved.
-Building the future of financial education through gaming.
+Financial education platform.
     `;
     }
 
