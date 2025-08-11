@@ -17,9 +17,9 @@ This codebase is proprietary. All rights reserved. See the LICENSE file for full
 ## Quick Links
 
 - Live Demo: https://dhaniverse.in
-- Documentation: [./docs/README.md](./docs/README.md)
-- Architecture: [./docs/architecture/index.md](./docs/architecture/index.md)
-- APIs: [./docs/api/index.md](./docs/api/index.md)
+- 📚 **Documentation**: [dhaniverse-docs](https://github.com/dhaniverse/dhaniverse-docs)
+- Game Design & Strategy: [Onboarding & Retention](https://github.com/dhaniverse/dhaniverse-docs/blob/main/game-design/onboarding-retention-strategy.md)
+- Technical Architecture: [System Design](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/architecture.md)
 
 
 
@@ -28,7 +28,7 @@ This codebase is proprietary. All rights reserved. See the LICENSE file for full
 - Frontend: React + TypeScript, Phaser 3, Vite
 - Backend: Deno (Oak), MongoDB, WebSocket, JWT
 - Blockchain: Internet Computer (ICP) optional integration
-- Docs: see ./docs
+- Docs: [dhaniverse-docs repo](https://github.com/dhaniverse/dhaniverse-docs)
 
 ## Highlights
 
@@ -94,13 +94,7 @@ dhaniverse/
 │   ├── init.json
 │   ├── pulled.json
 │   └── candid/
-├── docs/                            # Comprehensive documentation
-│   ├── setup/
-│   ├── architecture/
-│   ├── api/
-│   ├── development/
-│   ├── deployment/
-│   └── components/
+├── docs/                            # → Moved to dhaniverse-docs repo
 ├── tools/                           # Build & documentation tools
 │   ├── chunk-map.js
 │   ├── docs-code-validator.js
@@ -178,7 +172,7 @@ Dhaniverse showcases practical blockchain integration that enhances rather than 
 
 ## Getting Started
 
-For setup and deployment, see docs/setup and docs/deployment.
+For setup and deployment, see [dhaniverse-docs](https://github.com/dhaniverse/dhaniverse-docs).
 
 ## Live Demo
 
