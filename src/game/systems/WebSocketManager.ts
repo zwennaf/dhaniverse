@@ -400,7 +400,7 @@ export class WebSocketManager {
             const dy = otherPlayer.targetY - otherPlayer.sprite.y;
             
             // Smooth easing factor - higher = faster, lower = smoother
-            const easeFactor = 0.15;
+            const easeFactor = 0.12;
             
             otherPlayer.sprite.x += dx * easeFactor;
             otherPlayer.sprite.y += dy * easeFactor;
