@@ -65,22 +65,27 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         // Make sure typing is disabled initially
         window.dispatchEvent(new Event("typing-end"));
-        
+
         const onSelfConnected = (e: any) => {
             const { id } = e.detail || {};
             if (id) setSelfPlayerId(id);
         };
         window.addEventListener("playerSelfConnected" as any, onSelfConnected);
-        
+
         return () => {
-            window.removeEventListener("playerSelfConnected" as any, onSelfConnected);
+            window.removeEventListener(
+                "playerSelfConnected" as any,
+                onSelfConnected
+            );
         };
     }, []);
 
     // Initialize voice command handler if voice is enabled
     useEffect(() => {
         if (voiceEnabled && selfPlayerId) {
-            voiceCommandHandler.initialize("dhaniverse-main", selfPlayerId).catch(console.error);
+            voiceCommandHandler
+                .initialize("dhaniverse-main", selfPlayerId)
+                .catch(console.error);
         }
     }, [voiceEnabled, selfPlayerId]);
 
@@ -130,11 +135,14 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
 
         window.addEventListener("rupee-update" as any, handleRupeeUpdate);
-        
+
         return () => {
             unsubscribe();
-            window.removeEventListener("rupee-update" as any, handleRupeeUpdate);
-            
+            window.removeEventListener(
+                "rupee-update" as any,
+                handleRupeeUpdate
+            );
+
             // Cleanup voice command handler if voice was enabled
             if (voiceEnabled) {
                 voiceCommandHandler.destroy();
@@ -475,7 +483,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             e.preventDefault();
 
             const message = chatInput.trim();
-            
+
             // Always send as a regular chat message (slash commands removed)
             window.dispatchEvent(
                 new CustomEvent("send-chat", {
@@ -496,8 +504,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 id: `system-${Date.now()}-${Math.random()
                     .toString(36)
                     .substring(2, 9)}`,
-            username: "System",
-            message,
+                username: "System",
+                message,
             };
             const newMessages = [...prev, systemMessage];
             return newMessages.length > 50

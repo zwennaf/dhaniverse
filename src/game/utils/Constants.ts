@@ -23,7 +23,8 @@ export const Constants = {
         return "ws://localhost:8001";
     },
     WS_RECONNECT_DELAY: 5000,
-    WS_POSITION_THRESHOLD: 5, // Only send updates when player moves more than this amount
+    WS_POSITION_THRESHOLD: 1, // Very low threshold for ultra-smooth updates
+    WS_UPDATE_RATE: 33, // Send updates every 33ms (30 FPS) for ultra-smooth movement
     // Font settings for consistent styling
     PLAYER_NAME_FONT: "Tickerbit",
     PLAYER_NAME_SIZE: "24px",
