@@ -17,9 +17,10 @@ interface PlayerData {
 interface OtherPlayer {
     sprite: GameObjects.Sprite;
     nameText: GameObjects.Text;
-    targetX?: number;
-    targetY?: number;
+    targetX: number;
+    targetY: number;
     lastUpdate: number;
+    currentAnimation?: string;
 }
 
 interface ConnectionResult {
@@ -88,7 +89,7 @@ export class WebSocketManager {
     private reconnectAttempts: number = 0;
     private maxReconnectAttempts: number = 5;
     private lastUpdateTime: number = 0;
-    private updateInterval: number = 200;
+    private updateInterval: number = Constants.WS_UPDATE_RATE;
     private connected: boolean = false;
     private connectionStatusText: GameObjects.Text | null = null;
     private intentionalDisconnect: boolean = false;
@@ -391,42 +392,25 @@ export class WebSocketManager {
 
     update(): void {
         const time = this.scene.time.now;
-
-        // Update other players with interpolation (time-based for smoothness)
         const dt = this.scene.game.loop.delta || 16.67;
-        const smoothing = 0.18; // base smoothing factor (0..1)
-        const factor = 1 - Math.pow(1 - smoothing, dt / 16.67);
+
+        // Simple smooth easing for other players
         this.otherPlayers.forEach((otherPlayer) => {
-            if (
-                otherPlayer.targetX !== undefined &&
-                otherPlayer.targetY !== undefined
-            ) {
-                // Snap if teleport/large correction to avoid long lerp
-                const dx = otherPlayer.targetX - otherPlayer.sprite.x;
-                const dy = otherPlayer.targetY - otherPlayer.sprite.y;
-                const dist2 = dx * dx + dy * dy;
-                const snapThreshold2 = 400; // 20px squared
-                if (dist2 > snapThreshold2) {
-                    otherPlayer.sprite.x = otherPlayer.targetX;
-                    otherPlayer.sprite.y = otherPlayer.targetY;
-                } else {
-                    otherPlayer.sprite.x = Phaser.Math.Linear(
-                        otherPlayer.sprite.x,
-                        otherPlayer.targetX,
-                        factor
-                    );
-                    otherPlayer.sprite.y = Phaser.Math.Linear(
-                        otherPlayer.sprite.y,
-                        otherPlayer.targetY,
-                        factor
-                    );
-                }
-                otherPlayer.nameText.x = otherPlayer.sprite.x;
-                otherPlayer.nameText.y = otherPlayer.sprite.y - 50;
-            }
+            const dx = otherPlayer.targetX - otherPlayer.sprite.x;
+            const dy = otherPlayer.targetY - otherPlayer.sprite.y;
+            
+            // Smooth easing factor - higher = faster, lower = smoother
+            const easeFactor = 0.15;
+            
+            otherPlayer.sprite.x += dx * easeFactor;
+            otherPlayer.sprite.y += dy * easeFactor;
+            
+            // Update name position
+            otherPlayer.nameText.x = otherPlayer.sprite.x;
+            otherPlayer.nameText.y = otherPlayer.sprite.y - 50;
         });
 
-        // Send position updates with rate limiting
+        // Send position updates
         const timeSinceLastUpdate = time - this.lastUpdateTime;
         if (timeSinceLastUpdate < this.updateInterval) return;
 
@@ -434,7 +418,6 @@ export class WebSocketManager {
         const currentAnimation = this.player.getCurrentAnimation();
         const lastSentAnimation = this.player.getLastSentAnimation();
 
-        // Check if significant change occurred
         const movementDistance = this.lastPositionSent
             ? Math.sqrt(
                   Math.pow(currentPosition.x - this.lastPositionSent.x, 2) +
@@ -466,6 +449,8 @@ export class WebSocketManager {
             }
         }
     }
+
+
 
     private handleServerMessage(data: ServerMessage): void {
         switch (data.type) {
@@ -631,6 +616,7 @@ export class WebSocketManager {
             targetX: playerData.x,
             targetY: playerData.y,
             lastUpdate: this.scene.time.now,
+            currentAnimation: playerData.animation,
         });
 
         const gameContainer = this.scene.getGameContainer();
@@ -660,11 +646,13 @@ export class WebSocketManager {
     private updateOtherPlayer(playerData: PlayerData): void {
         const otherPlayer = this.otherPlayers.get(playerData.id);
         if (otherPlayer) {
+            // Simply update target position - easing happens in update()
             otherPlayer.targetX = playerData.x;
             otherPlayer.targetY = playerData.y;
             otherPlayer.lastUpdate = this.scene.time.now;
 
-            if (playerData.animation) {
+            // Handle animation changes
+            if (playerData.animation && playerData.animation !== otherPlayer.currentAnimation) {
                 const textureKey = otherPlayer.sprite.texture.key;
                 const prefixed = `${textureKey}-${playerData.animation}`;
                 if (this.scene.anims.exists(prefixed)) {
@@ -672,6 +660,7 @@ export class WebSocketManager {
                 } else {
                     otherPlayer.sprite.anims.play(playerData.animation, true);
                 }
+                otherPlayer.currentAnimation = playerData.animation;
             }
         } else {
             this.createOtherPlayer(playerData);
