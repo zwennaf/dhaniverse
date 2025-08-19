@@ -5,6 +5,8 @@ import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
 import ChatVoiceControls from "../voice/ChatVoiceControls";
+import LocationTracker from "./LocationTracker";
+import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
 
 interface GameHUDProps {
     rupees?: number;
@@ -48,6 +50,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [networkHealthy, setNetworkHealthy] = useState(true);
 
     const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
+
+    // Location tracker state
+    const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>([]);
+    const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
+    const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
+    const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -304,6 +312,44 @@ const GameHUD: React.FC<GameHUDProps> = ({
         window.addEventListener("chat-message" as any, handleChat);
         return () =>
             window.removeEventListener("chat-message" as any, handleChat);
+    }, []);
+
+    // Listen for location tracker updates
+    useEffect(() => {
+        // Subscribe to tracking targets changes
+        const unsubscribe = locationTrackerManager.subscribe(() => {
+            setTrackingTargets(locationTrackerManager.getEnabledTargets());
+        });
+
+        // Set initial targets
+        setTrackingTargets(locationTrackerManager.getEnabledTargets());
+
+        // Listen for game position updates
+        const handlePlayerPositionUpdate = (e: any) => {
+            const { x, y } = e.detail;
+            setPlayerPosition({ x, y });
+        };
+
+        const handleCameraPositionUpdate = (e: any) => {
+            const { x, y } = e.detail;
+            setCameraPosition({ x, y });
+        };
+
+        // Listen for window resize
+        const handleResize = () => {
+            setScreenSize({ width: window.innerWidth, height: window.innerHeight });
+        };
+
+        window.addEventListener('player-position-update' as any, handlePlayerPositionUpdate);
+        window.addEventListener('camera-position-update' as any, handleCameraPositionUpdate);
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener('player-position-update' as any, handlePlayerPositionUpdate);
+            window.removeEventListener('camera-position-update' as any, handleCameraPositionUpdate);
+            window.removeEventListener('resize', handleResize);
+        };
     }, []);
 
     // Auto-scroll chat messages
@@ -622,6 +668,20 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Location Trackers */}
+            {trackingTargets.map((target) => (
+                <LocationTracker
+                    key={target.id}
+                    targetPosition={target.position}
+                    playerPosition={playerPosition}
+                    cameraPosition={cameraPosition}
+                    screenSize={screenSize}
+                    enabled={target.enabled}
+                    targetName={target.name}
+                    targetImage={target.image}
+                />
+            ))}
         </div>
     );
 };

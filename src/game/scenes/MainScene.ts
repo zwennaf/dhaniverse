@@ -4,12 +4,14 @@ import { CollisionManager } from "../systems/CollisionManager.ts";
 import { ChunkedMapManager } from "../systems/ChunkedMapManager.ts";
 import { WebSocketManager } from "../systems/WebSocketManager.ts";
 import { NPCManager } from "../systems/NPCManager.ts";
+import { MayaNPCManager } from "../systems/MayaNPCManager.ts";
 import { BuildingManager } from "../systems/BuildingManager.ts";
 import { BankNPCManager } from "../systems/BankNPCManager.ts";
 import { StockMarketManager } from "../systems/StockMarketManager.ts";
 import { ATMManager } from "../managers/ATMManager.ts";
 import { DynamicZoomManager } from "../systems/DynamicZoomManager.ts";
 import { ensureCharacterAnimations } from "../utils/CharacterAnimations.ts";
+import { locationTrackerManager } from "../../services/LocationTrackerManager.ts";
 
 
 
@@ -56,6 +58,7 @@ export class MainScene extends Scene implements MainGameScene {
     mapManager!: ChunkedMapManager;
     private webSocketManager!: WebSocketManager;
     npcManager!: NPCManager;
+    mayaNPCManager!: MayaNPCManager;
     buildingManager!: BuildingManager;
     bankNPCManager!: BankNPCManager;
     stockMarketManager!: StockMarketManager;
@@ -238,7 +241,13 @@ export class MainScene extends Scene implements MainGameScene {
         });
         // Maintain legacy key 'character' for the local player using selected skin
         const selectedCharacter = this.getSelectedCharacter();
-    this.load.spritesheet("character", `/characters/${selectedCharacter}.png`, frameCfg);
+        this.load.spritesheet("character", `/characters/${selectedCharacter}.png`, frameCfg);
+
+        // Load Maya's spritesheet with 5 columns x 8 rows (64x64 each tile)
+        this.load.spritesheet("maya", "/characters/maya.png", {
+            frameWidth: 64,
+            frameHeight: 64
+        });
 
         this.load.json("collisionData", "/collisions/collisions.json");
 
@@ -305,16 +314,26 @@ export class MainScene extends Scene implements MainGameScene {
             // Additional interaction keys
             this.input.keyboard.addKey("E");
             this.input.keyboard.addKey("ESC");
+            
+            // Add tracker toggle key (T for Tracker)
+            const trackerKey = this.input.keyboard.addKey("T");
+            trackerKey.on('down', () => {
+                const isTracked = locationTrackerManager.toggleTarget('maya');
+                console.log(`Maya tracker ${isTracked ? 'enabled' : 'disabled'} (Press T to toggle)`);
+            });
         }
 
         // Create player after map and collisions are set up
         const username = this.registry.get("username") || "Player";
         // Set fixed starting position for better gameplay experience
-    // Ensure animations exist for local and other skins
-    ensureCharacterAnimations(this, "character");
-    ["C1", "C2", "C3", "C4"].forEach((skin) => ensureCharacterAnimations(this, skin));
+        // Ensure animations exist for local and other skins
+        ensureCharacterAnimations(this, "character");
+        ["C1", "C2", "C3", "C4"].forEach((skin) => ensureCharacterAnimations(this, skin));
+        
+        // Ensure Maya animations exist (they're created in MayaNPCManager but we can also ensure here)
+        // Maya animations will be created by MayaNPCManager.createMayaAnimations()
 
-    this.player = new Player(this, 800, 800, this.cursors, this.wasd, selectedSkin);
+        this.player = new Player(this, 800, 800, this.cursors, this.wasd, selectedSkin);
         this.gameContainer.add(this.player.getSprite());
         this.gameContainer.add(this.player.getNameText());
 
@@ -325,8 +344,30 @@ export class MainScene extends Scene implements MainGameScene {
 
         // Add player-dependent managers
         this.buildingManager = new BuildingManager(this);
-    this.npcManager = new NPCManager(this);
+        this.npcManager = new NPCManager(this);
+        
+        // Initialize Maya NPC manager
+        this.mayaNPCManager = new MayaNPCManager(this);
+        
         this.webSocketManager = new WebSocketManager(this, this.player);
+
+        // Initialize the bank NPC manager (will be invisible until player enters the bank)
+        this.bankNPCManager = new BankNPCManager(this);
+
+        // Initialize the stock market manager (will be invisible until player enters the stock market)
+        this.stockMarketManager = new StockMarketManager(this);
+
+        // Initialize the ATM manager for outdoor ATM interactions
+        this.atmManager = new ATMManager(this);
+
+        // Add Maya to the location tracker manager
+        locationTrackerManager.addTarget({
+            id: 'maya',
+            name: 'Maya',
+            position: { x: 7768, y: 3521 },
+            image: '/characters/maya-preview.png',
+            enabled: true // Start disabled, can be toggled by player
+        });
 
         // Initialize the bank NPC manager (will be invisible until player enters the bank)
         this.bankNPCManager = new BankNPCManager(this);
@@ -407,9 +448,16 @@ export class MainScene extends Scene implements MainGameScene {
                 this.atmManager.destroy();
             }
 
+            if (this.mayaNPCManager) {
+                this.mayaNPCManager.destroy();
+            }
+
             if (this.dynamicZoomManager) {
                 this.dynamicZoomManager.destroy();
             }
+
+            // Clear location tracker targets
+            locationTrackerManager.clear();
 
             
 
@@ -444,10 +492,20 @@ export class MainScene extends Scene implements MainGameScene {
         this.collisionManager.update();
         this.webSocketManager.update();
         this.npcManager.update();
+        this.mayaNPCManager.update();
         this.buildingManager.update();
         this.bankNPCManager.update();
         this.stockMarketManager.update();
         this.atmManager.update();
+
+        // Emit position updates for location tracker
+        window.dispatchEvent(new CustomEvent('player-position-update', {
+            detail: { x: this.player.getSprite().x, y: this.player.getSprite().y }
+        }));
+        
+        window.dispatchEvent(new CustomEvent('camera-position-update', {
+            detail: { x: this.cameras.main.scrollX + this.cameras.main.width / 2, y: this.cameras.main.scrollY + this.cameras.main.height / 2 }
+        }));
 
         
 
@@ -654,6 +712,26 @@ export class MainScene extends Scene implements MainGameScene {
                 console.log(
                     `Stock market sync test: ${oldRupees} -> ${this.playerRupees}`
                 );
+            },
+
+            // Location tracker functions
+            toggleMayaTracker: () => {
+                const isTracked = locationTrackerManager.toggleTarget('maya');
+                console.log(`Maya tracker ${isTracked ? 'enabled' : 'disabled'}`);
+                return isTracked;
+            },
+
+            trackMaya: (enabled: boolean = true) => {
+                locationTrackerManager.setTargetEnabled('maya', enabled);
+                console.log(`Maya tracker ${enabled ? 'enabled' : 'disabled'}`);
+            },
+
+            getTrackerStatus: () => {
+                return {
+                    targets: locationTrackerManager.getTargets(),
+                    enabledTargets: locationTrackerManager.getEnabledTargets(),
+                    mayaTracked: locationTrackerManager.getTarget('maya')?.enabled || false
+                };
             },
         };
 
