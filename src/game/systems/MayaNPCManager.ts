@@ -15,6 +15,8 @@ export class MayaNPCManager {
     private isPlayerNearNPC: boolean = false;
     private activeDialog: boolean = false;
     private speechBubble: GameObjects.Sprite | null = null;
+    private dialogContainer: GameObjects.Container | null = null;
+    private dialogKeyListeners: { [key: string]: (event: KeyboardEvent) => void } = {};
 
     // Maya's position
     public readonly x: number = 7768;
@@ -40,15 +42,15 @@ export class MayaNPCManager {
         
         this.maya.anims.play("maya-idle-down");
 
-        // Add Maya's name text
+        // Add Maya's name text with special styling like LocationTracker
         const mayaNameText = scene.add
             .text(this.maya.x, this.maya.y - 50, "Maya", {
-                fontFamily: Constants.NPC_NAME_FONT,
-                fontSize: Constants.NPC_NAME_SIZE,
-                color: Constants.NPC_NAME_COLOR,
+                fontFamily: "Tickerbit", // Use same font as LocationTracker
+                fontSize: "18px", // Slightly larger for importance
+                color: "#ffffff",
                 align: "center",
-                backgroundColor: Constants.NPC_NAME_BACKGROUND,
-                padding: Constants.NPC_NAME_PADDING,
+                backgroundColor: "#000000b3", // Semi-transparent black like LocationTracker
+                padding: { x: 8, y: 4 }, // More padding for better appearance
             })
             .setOrigin(0.5)
             .setDepth(51) // Name text above Maya sprite
@@ -57,15 +59,19 @@ export class MayaNPCManager {
             .setFlipX(false) // Ensure text is not flipped horizontally
             .setFlipY(false); // Ensure text is not flipped vertically
 
-        // Add interaction text (initially hidden)
+        // Add a subtle border effect like LocationTracker
+        mayaNameText.setStroke("#333333", 1); // Dark border for better visibility
+        mayaNameText.setShadow(2, 2, "#000000", 3); // Drop shadow for depth
+
+        // Add interaction text (initially hidden) with enhanced styling
         this.interactionText = scene.add
             .text(this.maya.x, this.maya.y - 80, "Press E to interact", {
-                fontFamily: Constants.UI_TEXT_FONT,
-                fontSize: Constants.UI_TEXT_SIZE,
-                color: Constants.UI_TEXT_COLOR,
+                fontFamily: "Tickerbit", // Match Maya's name font
+                fontSize: "16px",
+                color: "#ffffff",
                 align: "center",
-                backgroundColor: Constants.UI_TEXT_BACKGROUND,
-                padding: Constants.UI_TEXT_PADDING,
+                backgroundColor: "#1a1a1ab3", // Slightly different background
+                padding: { x: 10, y: 5 }, // More padding
             })
             .setOrigin(0.5)
             .setAlpha(0)
@@ -74,6 +80,10 @@ export class MayaNPCManager {
             .setRotation(0) // Ensure text is not rotated
             .setFlipX(false) // Ensure text is not flipped horizontally
             .setFlipY(false); // Ensure text is not flipped vertically
+
+        // Add border and shadow effects like Maya's name
+        this.interactionText.setStroke("#444444", 1);
+        this.interactionText.setShadow(2, 2, "#000000", 2);
 
         // Add to game container
         const gameContainer = scene.getGameContainer();
@@ -193,12 +203,13 @@ export class MayaNPCManager {
         );
         dialogBox.setScrollFactor(0).setDepth(2000);
 
-        // Add dialog text with word wrap
+        // Add dialog text with word wrap and typing effect
+        const fullText = "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!";
         const dialogText = this.scene.add
             .text(
                 dialogBox.x,
                 dialogBox.y,
-                "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!",
+                "", // Start with empty text for typing effect
                 {
                     fontFamily: Constants.DIALOG_TEXT_FONT,
                     fontSize: Constants.DIALOG_TEXT_SIZE,
@@ -210,6 +221,9 @@ export class MayaNPCManager {
             .setOrigin(0.5)
             .setScrollFactor(0)
             .setDepth(2001);
+
+        // Add typing effect
+        this.addTypingEffect(dialogText, fullText);
 
         // Add close instruction
         const closeText = this.scene.add
@@ -229,8 +243,8 @@ export class MayaNPCManager {
             .setDepth(2001);
 
         // Create a container for dialog elements
-        const dialogContainer = this.scene.add.container(0, 0);
-        dialogContainer.add([dialogBox, dialogText, closeText]);
+        this.dialogContainer = this.scene.add.container(0, 0);
+        this.dialogContainer.add([dialogBox, dialogText, closeText]);
 
         // Create speech bubble above Maya
         this.speechBubble = this.scene.add.sprite(
@@ -247,19 +261,73 @@ export class MayaNPCManager {
             this.speechBubble.play("speech-bubble-open");
         }
 
-        // Setup keyboard listeners to close dialog
-        this.scene.input.keyboard?.once("keydown-E", () => this.closeDialog());
-        this.scene.input.keyboard?.once("keydown-SPACE", () => this.closeDialog());
-        this.scene.input.keyboard?.once("keydown-ENTER", () => this.closeDialog());
+        // Setup improved keyboard listeners to close dialog
+        this.setupDialogKeyListeners();
+    }
 
-        // Store dialog elements for cleanup
-        (this.speechBubble as any).dialogContainer = dialogContainer;
+    private setupDialogKeyListeners(): void {
+        // Clear any existing listeners
+        this.clearDialogKeyListeners();
+
+        // Create reusable event handlers
+        const closeDialogHandler = () => {
+            if (this.activeDialog) {
+                this.closeDialog();
+            }
+        };
+
+        // Store references to the handlers for cleanup
+        this.dialogKeyListeners = {
+            'E': closeDialogHandler,
+            'Space': closeDialogHandler,
+            'Enter': closeDialogHandler,
+            'Escape': closeDialogHandler, // Add escape key for better UX
+        };
+
+        // Add event listeners for multiple keys
+        if (this.scene.input.keyboard) {
+            this.scene.input.keyboard.on('keydown-E', this.dialogKeyListeners['E']);
+            this.scene.input.keyboard.on('keydown-SPACE', this.dialogKeyListeners['Space']);
+            this.scene.input.keyboard.on('keydown-ENTER', this.dialogKeyListeners['Enter']);
+            this.scene.input.keyboard.on('keydown-ESC', this.dialogKeyListeners['Escape']);
+        }
+    }
+
+    private clearDialogKeyListeners(): void {
+        if (this.scene.input.keyboard && Object.keys(this.dialogKeyListeners).length > 0) {
+            this.scene.input.keyboard.off('keydown-E', this.dialogKeyListeners['E']);
+            this.scene.input.keyboard.off('keydown-SPACE', this.dialogKeyListeners['Space']);
+            this.scene.input.keyboard.off('keydown-ENTER', this.dialogKeyListeners['Enter']);
+            this.scene.input.keyboard.off('keydown-ESC', this.dialogKeyListeners['Escape']);
+        }
+        this.dialogKeyListeners = {};
+    }
+
+    private addTypingEffect(textObject: GameObjects.Text, fullText: string): void {
+        let currentIndex = 0;
+        const typingSpeed = 50; // milliseconds per character
+
+        const typeNextCharacter = () => {
+            if (currentIndex < fullText.length && this.activeDialog) {
+                currentIndex++;
+                textObject.setText(fullText.substring(0, currentIndex));
+                
+                // Continue typing if dialog is still active
+                setTimeout(typeNextCharacter, typingSpeed);
+            }
+        };
+
+        // Start typing
+        setTimeout(typeNextCharacter, 200); // Small delay before starting
     }
 
     private closeDialog(): void {
         if (!this.activeDialog) return;
 
         this.activeDialog = false;
+
+        // Clear keyboard listeners
+        this.clearDialogKeyListeners();
 
         // Play the closing animation if speech bubble exists and animation exists
         if (this.speechBubble) {
@@ -278,21 +346,21 @@ export class MayaNPCManager {
                 this.speechBubble.destroy();
                 this.speechBubble = null;
             }
+        }
 
-            // Clean up dialog container with fade out animation
-            const dialogContainer = (this.speechBubble as any).dialogContainer;
-            if (dialogContainer) {
-                this.scene.tweens.add({
-                    targets: dialogContainer,
-                    alpha: 0,
-                    duration: 200,
-                    onComplete: () => {
-                        if (dialogContainer) {
-                            dialogContainer.destroy();
-                        }
-                    },
-                });
-            }
+        // Clean up dialog container with fade out animation
+        if (this.dialogContainer) {
+            this.scene.tweens.add({
+                targets: this.dialogContainer,
+                alpha: 0,
+                duration: 200,
+                onComplete: () => {
+                    if (this.dialogContainer) {
+                        this.dialogContainer.destroy();
+                        this.dialogContainer = null;
+                    }
+                },
+            });
         }
     }
 
@@ -410,6 +478,13 @@ export class MayaNPCManager {
     }
 
     public destroy(): void {
+        // Clean up dialog system
+        this.clearDialogKeyListeners();
+        
+        if (this.activeDialog) {
+            this.closeDialog();
+        }
+
         if (this.maya) {
             if (this.maya.nameText) {
                 this.maya.nameText.destroy();
@@ -422,7 +497,13 @@ export class MayaNPCManager {
         }
 
         if (this.speechBubble) {
-            this.closeDialog();
+            this.speechBubble.destroy();
+            this.speechBubble = null;
+        }
+
+        if (this.dialogContainer) {
+            this.dialogContainer.destroy();
+            this.dialogContainer = null;
         }
     }
 }
