@@ -35,9 +35,10 @@ export class Player {
         // Create player sprite
         this.sprite = scene.add.sprite(x, y, "character");
         this.sprite.setScale(0.3); // Scale up the character to be more visible
+        this.sprite.setDepth(1000); // Set highest depth so player appears above all NPCs and other players
 
-    // Ensure animations exist for the 'character' texture (local player)
-    ensureCharacterAnimations(this.scene, "character");
+        // Ensure animations exist for the 'character' texture (local player)
+        ensureCharacterAnimations(this.scene, "character");
 
         // Set initial animation
         this.sprite.anims.play("idle-down");
@@ -63,7 +64,8 @@ export class Player {
                 backgroundColor: Constants.PLAYER_NAME_BACKGROUND,
                 padding: Constants.PLAYER_NAME_PADDING,
             })
-            .setOrigin(0.5, 3);
+            .setOrigin(0.5, 3)
+            .setDepth(1001); // Player name should be above player sprite
 
         // Ensure font is loaded and refresh the text if needed
         FontUtils.ensureFontLoaded(

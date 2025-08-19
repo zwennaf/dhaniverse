@@ -74,6 +74,7 @@ export class BankNPCManager {
     const bankerY = 500;
     this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
     this.banker.setScale(0.3);
+    this.banker.setDepth(50); // Same depth as other NPCs
     this.banker.anims.play('idle-down');
       // Add banker name text
     const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Teller", {
@@ -83,7 +84,7 @@ export class BankNPCManager {
       align: 'center',
       backgroundColor: Constants.NPC_NAME_BACKGROUND,
       padding: Constants.NPC_NAME_PADDING
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(51);
     
     // Add interaction text (initially hidden)
     this.interactionText = scene.add.text(this.banker.x, this.banker.y - 80, "Press E to interact", {
@@ -93,7 +94,7 @@ export class BankNPCManager {
       align: 'center',
       backgroundColor: Constants.UI_TEXT_BACKGROUND,
       padding: Constants.UI_TEXT_PADDING
-    }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
+    }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(52);
     
     // Add to game container
     const gameContainer = scene.getGameContainer();

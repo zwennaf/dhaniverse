@@ -28,6 +28,7 @@ export class NPCManager {
         // Create NPC at predefined position
         this.npc = scene.add.sprite(737, 3753, "character") as NPCSprite;
         this.npc.setScale(0.32); // Adjusted scale for C2.png to match original NPC size
+        this.npc.setDepth(50); // Same depth as Maya, lower than players
         this.npc.anims.play("idle-right");
         // Add NPC name text
         const npcNameText = scene.add
@@ -39,7 +40,8 @@ export class NPCManager {
                 backgroundColor: Constants.NPC_NAME_BACKGROUND,
                 padding: Constants.NPC_NAME_PADDING,
             })
-            .setOrigin(0.5);
+            .setOrigin(0.5)
+            .setDepth(51); // Above NPC sprite
 
         // Add interaction text (initially hidden)
         this.interactionText = scene.add
@@ -52,7 +54,8 @@ export class NPCManager {
                 padding: Constants.UI_TEXT_PADDING,
             })
             .setOrigin(0.5)
-            .setAlpha(0);
+            .setAlpha(0)
+            .setDepth(52); // Above name text
 
         // Add to game container
         const gameContainer = scene.getGameContainer();

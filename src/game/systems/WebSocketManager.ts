@@ -601,6 +601,7 @@ export class WebSocketManager {
             skinTextureKey
         );
         otherPlayer.setScale(0.3);
+        otherPlayer.setDepth(100); // Other players have lower depth than main player (1000)
 
         const nameText = this.scene.add
             .text(playerData.x, playerData.y - 50, playerData.username, {
@@ -611,7 +612,8 @@ export class WebSocketManager {
                 padding: Constants.PLAYER_NAME_PADDING,
                 letterSpacing: 2,
             })
-            .setOrigin(0.5, 3);
+            .setOrigin(0.5, 3)
+            .setDepth(101); // Name text above other player sprite
 
         // Ensure font is loaded and refresh the text if needed
         FontUtils.ensureFontLoaded(
