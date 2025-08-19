@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, Document, ObjectId } from "mongodb";
+import { MongoClient, Db, Collection, ObjectId, Document } from "mongodb";
 import { config } from "../config/config.ts";
 import type {
     UserDocument,
@@ -23,12 +23,14 @@ class MongoDatabase {
     private isConnected = false;
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
-    
+
     async connect(): Promise<void> {
         while (this.reconnectAttempts < this.maxReconnectAttempts) {
             try {
                 this.reconnectAttempts++;
-                console.log(`🔌 Connecting to MongoDB Atlas... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                console.log(
+                    `🔌 Connecting to MongoDB Atlas... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+                );
                 console.log(
                     "📍 Connection URL format check:",
                     config.mongodb.url.startsWith("mongodb+srv://")
@@ -41,26 +43,23 @@ class MongoDatabase {
                     await this.client.close();
                 }
 
-                // Create client with better connection options
-                this.client = new MongoClient(config.mongodb.url, {
-                    serverSelectionTimeoutMS: 15000, // 15 seconds
-                    connectTimeoutMS: 15000, // 15 seconds
-                    socketTimeoutMS: 45000, // 45 seconds
-                    maxPoolSize: 10,
-                    minPoolSize: 1,
-                    maxIdleTimeMS: 30000,
-                    retryWrites: true,
-                    retryReads: true,
-                    compressors: ['zlib'],
-                });
+                // Create client with connection options
+                this.client = new MongoClient(config.mongodb.url);
 
-                // Connect to MongoDB with timeout
                 console.log("⏳ Attempting connection...");
                 await Promise.race([
                     this.client.connect(),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Connection timeout after 20 seconds')), 20000)
-                    )
+                    new Promise((_, reject) =>
+                        setTimeout(
+                            () =>
+                                reject(
+                                    new Error(
+                                        "Connection timeout after 20 seconds"
+                                    )
+                                ),
+                            20000
+                        )
+                    ),
                 ]);
 
                 // Set database instance
@@ -77,7 +76,9 @@ class MongoDatabase {
 
                 // List collections (optional)
                 try {
-                    const collections = await this.db.listCollections().toArray();
+                    const collections = await this.db
+                        .listCollections()
+                        .toArray();
                     console.log(
                         `📊 Collections: ${
                             collections.length > 0
@@ -93,11 +94,15 @@ class MongoDatabase {
 
                 return; // Success, exit the retry loop
             } catch (error) {
-                console.error(`❌ MongoDB Atlas connection failed (Attempt ${this.reconnectAttempts}):`, error);
+                console.error(
+                    `❌ MongoDB Atlas connection failed (Attempt ${this.reconnectAttempts}):`,
+                    error
+                );
                 this.isConnected = false;
 
                 // Provide more specific error messages
-                const errorMessage = error instanceof Error ? error.message : String(error);
+                const errorMessage =
+                    error instanceof Error ? error.message : String(error);
                 if (errorMessage.includes("authentication")) {
                     console.log(
                         "💡 Authentication failed - check username/password in connection string"
@@ -117,12 +122,19 @@ class MongoDatabase {
 
                 // If this is not the last attempt, wait before retrying
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    const waitTime = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000); // Exponential backoff, max 10s
+                    const waitTime = Math.min(
+                        1000 * Math.pow(2, this.reconnectAttempts - 1),
+                        10000
+                    ); // Exponential backoff, max 10s
                     console.log(`⏳ Waiting ${waitTime}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, waitTime)
+                    );
                 } else {
                     // All attempts failed
-                    console.error(`❌ All ${this.maxReconnectAttempts} connection attempts failed`);
+                    console.error(
+                        `❌ All ${this.maxReconnectAttempts} connection attempts failed`
+                    );
                     throw error;
                 }
             }
@@ -168,13 +180,13 @@ class MongoDatabase {
             };
             const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
             const result = await users.insertOne(userDoc);
-            userDoc._id = result.insertedId;
+            const insertedId = result.insertedId;
 
             // Create initial player state
-            await this.createInitialPlayerState(userDoc._id.toString());
+            await this.createInitialPlayerState(insertedId.toString());
 
             return {
-                id: userDoc._id.toString(),
+                id: insertedId.toString(),
                 email: userDoc.email,
                 passwordHash: userDoc.passwordHash,
                 gameUsername: userDoc.gameUsername,
@@ -197,7 +209,7 @@ class MongoDatabase {
         if (!userDoc) return null;
 
         return {
-            id: userDoc._id?.toString() || "",
+            id: userDoc._id?.toString() ?? "",
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
@@ -212,7 +224,7 @@ class MongoDatabase {
         if (!userDoc) return null;
 
         return {
-            id: userDoc._id?.toString() || "",
+            id: userDoc._id?.toString() ?? "",
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
@@ -227,7 +239,7 @@ class MongoDatabase {
         if (!userDoc) return null;
 
         return {
-            id: userDoc._id?.toString() || "",
+            id: userDoc._id?.toString() ?? "",
             email: userDoc.email,
             passwordHash: userDoc.passwordHash,
             gameUsername: userDoc.gameUsername,
