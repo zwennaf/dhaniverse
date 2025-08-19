@@ -21,6 +21,7 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
 }) => {
     const [arrowPosition, setArrowPosition] = useState({ x: 0, y: 0, angle: 0 });
     const [isTargetVisible, setIsTargetVisible] = useState(false);
+    const [animationState, setAnimationState] = useState<'hidden' | 'photo-appearing' | 'arrow-appearing' | 'visible' | 'fading'>('hidden');
     const arrowRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -38,7 +39,23 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
             targetPosition.y >= screenTop &&
             targetPosition.y <= screenBottom;
 
-        setIsTargetVisible(targetVisible);
+        // Handle visibility changes with staggered animation
+        if (targetVisible !== isTargetVisible) {
+            if (!targetVisible) {
+                // Target just became invisible - start appearing animation sequence
+                setAnimationState('photo-appearing');
+                setTimeout(() => setAnimationState('arrow-appearing'), 200); // Photo appears first
+                setTimeout(() => setAnimationState('visible'), 500); // Then arrow and text
+                setIsTargetVisible(false);
+            } else {
+                // Target just became visible - fade out
+                setAnimationState('fading');
+                setTimeout(() => {
+                    setIsTargetVisible(true);
+                    setAnimationState('hidden');
+                }, 300); // Match transition duration
+            }
+        }
 
         if (!targetVisible) {
             // Calculate direction from player to target
@@ -67,26 +84,67 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
             
             setArrowPosition({ x: arrowX, y: arrowY, angle: angleDegrees });
         }
-    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled]);
+    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled, isTargetVisible, animationState]);
 
     if (!enabled || isTargetVisible) {
         return null;
     }
 
+    // Get animation classes based on state
+    const getPhotoClasses = () => {
+        switch (animationState) {
+            case 'hidden': return 'opacity-0 scale-0';
+            case 'photo-appearing': return 'opacity-100 scale-110';
+            case 'arrow-appearing': return 'opacity-100 scale-100';
+            case 'visible': return 'opacity-100 scale-100';
+            case 'fading': return 'opacity-0 scale-95';
+            default: return 'opacity-0 scale-0';
+        }
+    };
+
+    const getArrowClasses = () => {
+        switch (animationState) {
+            case 'hidden': return 'opacity-0 translate-x-[-100%] scale-0';
+            case 'photo-appearing': return 'opacity-0 translate-x-[-100%] scale-0';
+            case 'arrow-appearing': return 'opacity-100 translate-x-0 scale-110';
+            case 'visible': return 'opacity-100 translate-x-0 scale-100';
+            case 'fading': return 'opacity-0 translate-x-[20px] scale-95';
+            default: return 'opacity-0 translate-x-[-100%] scale-0';
+        }
+    };
+
+    const getTextClasses = () => {
+        switch (animationState) {
+            case 'hidden': return 'opacity-0 translate-x-[-120%] scale-0';
+            case 'photo-appearing': return 'opacity-0 translate-x-[-120%] scale-0';
+            case 'arrow-appearing': return 'opacity-100 translate-x-0 scale-110';
+            case 'visible': return 'opacity-100 translate-x-0 scale-100';
+            case 'fading': return 'opacity-0 translate-x-[30px] scale-95';
+            default: return 'opacity-0 translate-x-[-120%] scale-0';
+        }
+    };
+
     return (
         <div
             ref={arrowRef}
-            className="fixed pointer-events-none z-[1001] transition-all duration-300 ease-out"
+            className="fixed pointer-events-none z-[1001]"
             style={{
                 left: `${arrowPosition.x}px`,
                 top: `${arrowPosition.y}px`,
                 transform: `translate(-50%, -50%) rotate(${arrowPosition.angle}deg)`,
+                transition: 'left 0.3s ease-out, top 0.3s ease-out',
             }}
         >
             {/* Arrow container */}
             <div className="relative flex items-center">
-                {/* Target image */}
-                <div className="relative">
+                {/* Target image - Counter-rotated to stay upright with bouncy appear animation */}
+                <div 
+                    className={`relative transition-all duration-300 ease-out ${getPhotoClasses()}`}
+                    style={{
+                        transform: `rotate(${-arrowPosition.angle}deg)`,
+                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // Bouncy effect
+                    }}
+                >
                     <img
                         src={targetImage}
                         alt={targetName}
@@ -100,8 +158,9 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
                     <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-white/60 animate-ping"></div>
                 </div>
                 
-                {/* Arrow SVG */}
-                <div className="ml-2">
+                {/* Arrow SVG - Slides out from image */}
+                <div className={`ml-2 transition-all duration-200 delay-150 ${getArrowClasses()}`}
+                     style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
                     <svg
                         width="40"
                         height="20"
@@ -142,8 +201,14 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
                     </svg>
                 </div>
                 
-                {/* Target name */}
-                <div className="ml-2 bg-black/70 text-white text-sm px-2 py-1 rounded border border-white/30 font-['Tickerbit',Arial,sans-serif] tracking-wider shadow-lg">
+                {/* Target name - Smart flipping and mirroring, slides out from image */}
+                <div 
+                    className={`ml-2 bg-black/70 text-white text-sm px-2 py-1 rounded border border-white/30 font-['Tickerbit',Arial,sans-serif] tracking-wider shadow-lg transition-all duration-200 delay-200 ${getTextClasses()}`}
+                    style={{
+                        transform: `${Math.abs(arrowPosition.angle) > 90 && Math.abs(arrowPosition.angle) < 270 ? 'scaleY(-1) scaleX(-1)' : 'none'}`,
+                        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)', // Bouncy effect
+                    }}
+                >
                     {targetName}
                 </div>
             </div>

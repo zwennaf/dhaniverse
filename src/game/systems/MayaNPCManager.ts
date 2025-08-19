@@ -51,7 +51,11 @@ export class MayaNPCManager {
                 padding: Constants.NPC_NAME_PADDING,
             })
             .setOrigin(0.5)
-            .setDepth(51); // Name text above Maya sprite
+            .setDepth(51) // Name text above Maya sprite
+            .setScale(1) // Ensure text scale is normal
+            .setRotation(0) // Ensure text is not rotated
+            .setFlipX(false) // Ensure text is not flipped horizontally
+            .setFlipY(false); // Ensure text is not flipped vertically
 
         // Add interaction text (initially hidden)
         this.interactionText = scene.add
@@ -65,7 +69,11 @@ export class MayaNPCManager {
             })
             .setOrigin(0.5)
             .setAlpha(0)
-            .setDepth(52); // Above name text
+            .setDepth(52) // Above name text
+            .setScale(1) // Ensure text scale is normal
+            .setRotation(0) // Ensure text is not rotated
+            .setFlipX(false) // Ensure text is not flipped horizontally
+            .setFlipY(false); // Ensure text is not flipped vertically
 
         // Add to game container
         const gameContainer = scene.getGameContainer();
@@ -378,6 +386,27 @@ export class MayaNPCManager {
         // Double-check: ensure sprite stays perfectly aligned after animation
         this.maya.setFlipX(false);
         this.maya.setRotation(0);
+        
+        // Also ensure name text stays aligned
+        this.ensureTextAlignment();
+    }
+
+    private ensureTextAlignment(): void {
+        // Ensure Maya's name text is never transformed
+        if (this.maya.nameText) {
+            this.maya.nameText.setScale(1);
+            this.maya.nameText.setRotation(0);
+            this.maya.nameText.setFlipX(false);
+            this.maya.nameText.setFlipY(false);
+        }
+        
+        // Ensure interaction text is never transformed
+        if (this.interactionText) {
+            this.interactionText.setScale(1);
+            this.interactionText.setRotation(0);
+            this.interactionText.setFlipX(false);
+            this.interactionText.setFlipY(false);
+        }
     }
 
     public destroy(): void {
