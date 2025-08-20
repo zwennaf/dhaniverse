@@ -31,5 +31,4 @@ public/maps/fullmap
 
 # Rust
 target/
-Cargo.lock
 *.pdb
