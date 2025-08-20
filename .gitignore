@@ -28,3 +28,8 @@ dist-ssr
 .kiro
 .temp-validation
 public/maps/fullmap
+
+# Rust
+target/
+Cargo.lock
+*.pdb

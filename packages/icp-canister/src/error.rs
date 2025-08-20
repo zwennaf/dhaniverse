@@ -142,7 +142,8 @@ impl CanisterError {
             CanisterError::InsufficientBalance |
             CanisterError::StakingPoolNotFound |
             CanisterError::StakingNotMatured |
-            CanisterError::TransactionNotFound => false,
+            CanisterError::TransactionNotFound |
+            CanisterError::SignatureVerificationFailed => false,
         }
     }
     

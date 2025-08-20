@@ -1,9 +1,11 @@
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
 use std::collections::HashMap;
+use ic_stable_structures::{Storable, storable::Bound};
+use std::borrow::Cow;
 
 // Wallet Types
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum WalletType {
     MetaMask,
     Phantom,
@@ -286,4 +288,50 @@ impl From<&str> for AchievementRarity {
             _ => AchievementRarity::Common,
         }
     }
+}
+
+// Storable implementations for stable structures
+impl Storable for WalletConnection {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 1024,
+        is_fixed_size: false,
+    };
+}
+
+impl Storable for UserData {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 8192,
+        is_fixed_size: false,
+    };
+}
+
+impl Storable for Web3Session {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 512,
+        is_fixed_size: false,
+    };
 }

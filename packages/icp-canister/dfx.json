@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "canisters": {
+    "dhaniverse_backend": {
+      "type": "rust",
+      "package": "rust-icp-canister",
+      "candid": "rust_icp_canister.did"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral"
+    },
+    "ic": {
+      "providers": ["https://ic0.app"],
+      "type": "persistent"
+    }
+  }
+}

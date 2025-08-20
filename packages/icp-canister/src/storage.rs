@@ -1,7 +1,7 @@
 use crate::types::*;
 use crate::error::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
+// Removed unused import
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 

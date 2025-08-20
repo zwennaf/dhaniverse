@@ -252,7 +252,7 @@ pub struct WalletStats {
 // Validate wallet signature for transactions (placeholder)
 pub fn validate_transaction_signature(
     address: &str,
-    transaction_data: &str,
+    _transaction_data: &str,
     signature: &str,
 ) -> CanisterResult<()> {
     // Validate wallet is connected

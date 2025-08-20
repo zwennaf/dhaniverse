@@ -12,9 +12,7 @@ mod monitoring;
 #[cfg(test)]
 mod tests;
 
-use types::*;
-use error::CanisterError;
-use storage::*;
+// Import modules for internal use
 
 // Re-export types for external use
 pub use types::*;

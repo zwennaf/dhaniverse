@@ -3,7 +3,7 @@ use crate::error::*;
 use crate::storage;
 use crate::utils;
 use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
-use k256::ecdsa::signature::Verifier;
+// Removed unused import
 use sha2::{Digest, Sha256};
 
 // Authenticate user with wallet signature
@@ -61,8 +61,8 @@ pub async fn create_session(wallet_connection: WalletConnection) -> CanisterResu
     let now = ic_cdk::api::time();
     let session = Web3Session {
         wallet_address: wallet_connection.address.clone(),
-        wallet_type: wallet_connection.wallet_type,
-        chain_id: wallet_connection.chain_id,
+        wallet_type: wallet_connection.wallet_type.clone(),
+        chain_id: wallet_connection.chain_id.clone(),
         connected_at: now,
         last_activity: now,
     };
@@ -208,7 +208,7 @@ fn generate_session_token(wallet_address: &str) -> String {
 }
 
 // Verify session token (simplified implementation)
-pub fn verify_session_token(wallet_address: &str, token: &str) -> CanisterResult<()> {
+pub fn verify_session_token(wallet_address: &str, _token: &str) -> CanisterResult<()> {
     // In a real implementation, you would store and validate tokens properly
     // For now, we just check if the session exists and is valid
     if !storage::is_session_valid(wallet_address) {

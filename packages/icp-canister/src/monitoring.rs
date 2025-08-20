@@ -1,4 +1,4 @@
-use crate::types::*;
+// Removed unused import
 use crate::storage;
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
@@ -184,12 +184,12 @@ pub fn get_user_activity_metrics() -> UserActivityMetrics {
 
 pub fn get_transaction_metrics() -> TransactionMetrics {
     // Calculate from all user transactions
-    let mut total_volume_rupees = 0.0;
-    let mut total_volume_tokens = 0.0;
-    let mut exchange_count = 0;
-    let mut staking_count = 0;
-    let mut total_transactions = 0;
-    let mut successful_transactions = 0;
+    let total_volume_rupees = 0.0;
+    let total_volume_tokens = 0.0;
+    let exchange_count = 0;
+    let staking_count = 0;
+    let total_transactions = 0;
+    let successful_transactions = 0;
     
     // This would iterate through all users in a real implementation
     // For now, return estimated metrics

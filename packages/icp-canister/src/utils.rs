@@ -112,13 +112,9 @@ pub fn generate_transaction_hash() -> String {
 // Get random bytes using IC's randomness
 fn get_random_bytes(len: usize) -> Vec<u8> {
     let mut bytes = vec![0u8; len];
-    let random_seed = ic_cdk::api::management_canister::main::raw_rand()
-        .0
-        .unwrap_or_else(|_| {
-            // Fallback to timestamp-based randomness if raw_rand fails
-            let timestamp = ic_cdk::api::time();
-            timestamp.to_be_bytes().to_vec()
-        });
+    // Use timestamp-based randomness since raw_rand is async
+    let timestamp = ic_cdk::api::time();
+    let random_seed = timestamp.to_be_bytes().to_vec();
     
     // Use SHA256 to generate more random bytes if needed
     let mut hasher = Sha256::new();
