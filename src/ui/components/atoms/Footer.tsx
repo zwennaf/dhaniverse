@@ -23,9 +23,9 @@ const Footer = ({ className }: FooterProps) => {
           <div className="flex justify-center items-center">
             <p className="font-vcr">© Dhaniverse</p>
           </div>          <div className="flex flex-wrap justify-center sm:justify-end gap-4 sm:gap-6 md:gap-8 lg:gap-10">
-            <Link to="https://gursimran.me" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Gursimran Singh</Link>
-            <a href="https://www.linkedin.com/in/jashanjotsingh01" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Jashanjot Singh</a>
-            <a href="https://www.linkedin.com/in/aagam-jain0" className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Aagam Jain</a>
+            <Link to="https://gursimran.me" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Gursimran Singh</Link>
+            <a href="https://www.linkedin.com/in/jashanjotsingh01" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Jashanjot Singh</a>
+            <a href="https://www.linkedin.com/in/aagam-jain0" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Aagam Jain</a>
           </div>
         </div>
         
