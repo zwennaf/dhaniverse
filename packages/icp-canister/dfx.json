@@ -4,7 +4,8 @@
     "dhaniverse_backend": {
       "type": "rust",
       "package": "rust-icp-canister",
-      "candid": "rust_icp_canister.did"
+      "candid": "rust_icp_canister.did",
+      "specified_id": "dzbzg-eqaaa-aaaap-an3rq-cai"
     }
   },
   "defaults": {
