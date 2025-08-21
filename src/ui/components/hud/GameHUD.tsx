@@ -7,6 +7,7 @@ import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
 import ChatVoiceControls from "../voice/ChatVoiceControls";
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
+import DialogueBox from '../common/DialogueBox';
 
 interface GameHUDProps {
     rupees?: number;
@@ -53,6 +54,16 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // Location tracker state
     const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>([]);
+    // First task dialog state
+    const [showFirstTaskDialog, setShowFirstTaskDialog] = useState(false);
+    const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
+    const [smallAlertText, setSmallAlertText] = useState('');
+    const [genericDialog, setGenericDialog] = useState<{
+        text: string;
+        characterName?: string;
+        isVisible: boolean;
+        allowAdvance?: boolean;
+    }>({ text: '', characterName: undefined, isVisible: false });
     const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
     const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
     const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -360,6 +371,82 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
     }, []);
 
+    // Assign first task when onboarding completes
+    useEffect(() => {
+        const assignFirstTaskHandler = () => {
+            // Show a top-center task dialog
+            setShowFirstTaskDialog(true);
+        };
+
+        const handlePlayerNearMaya = (e: any) => {
+            // hide small alerts when player reaches Maya
+            setShowSmallAlertDialog(false);
+        };
+
+    window.addEventListener('assign-first-task' as any, assignFirstTaskHandler);
+        window.addEventListener('player-near-maya' as any, handlePlayerNearMaya);
+
+        // Generic dialogue events (from game systems like Maya)
+        const showDialogueHandler = (e: any) => {
+            const d = e.detail || {};
+            console.debug('GameHUD: show-dialogue event received', d);
+            setGenericDialog({
+                text: d.text || '',
+                characterName: d.characterName || 'Maya',
+                isVisible: true,
+                allowAdvance: d.allowAdvance !== false,
+            });
+        };
+
+        const showTemporaryHandler = (e: any) => {
+            const d = e.detail || {};
+            const text = d.text || '';
+            const duration = d.durationMs || 1500;
+            setSmallAlertText(text);
+            setShowSmallAlertDialog(true);
+            window.setTimeout(() => setShowSmallAlertDialog(false), duration);
+        };
+
+        const closeDialogueHandler = () => {
+            setGenericDialog((g) => ({ ...g, isVisible: false }));
+        };
+
+        window.addEventListener('show-dialogue' as any, showDialogueHandler);
+        window.addEventListener('show-temporary-dialog' as any, showTemporaryHandler);
+        window.addEventListener('close-dialogue' as any, closeDialogueHandler);
+
+        return () => {
+            window.removeEventListener('assign-first-task' as any, assignFirstTaskHandler);
+            window.removeEventListener('player-near-maya' as any, handlePlayerNearMaya);
+            window.removeEventListener('show-dialogue' as any, showDialogueHandler);
+            window.removeEventListener('show-temporary-dialog' as any, showTemporaryHandler);
+            window.removeEventListener('close-dialogue' as any, closeDialogueHandler);
+        };
+    }, []);
+
+    // If GamePage set a pending flag before HUD mounted, show the dialog now
+    useEffect(() => {
+        if ((window as any).__assignFirstTaskPending) {
+            setShowFirstTaskDialog(true);
+            (window as any).__assignFirstTaskPending = false;
+        }
+    }, []);
+
+    // Consume a pending show-dialogue payload if it was set before HUD mounted
+    useEffect(() => {
+        const pending = (window as any).__pendingShowDialogue;
+        if (pending && pending.text) {
+            console.debug('GameHUD: consuming pending show-dialogue', pending);
+            setGenericDialog({
+                text: pending.text,
+                characterName: pending.characterName || 'Maya',
+                isVisible: true,
+                allowAdvance: pending.allowAdvance !== false,
+            });
+            (window as any).__pendingShowDialogue = null;
+        }
+    }, []);
+
     // Auto-scroll chat messages
     useEffect(() => {
         if (messagesRef.current) {
@@ -514,8 +601,64 @@ const GameHUD: React.FC<GameHUDProps> = ({
         });
     };
 
+    // When user clicks 'Got it' on the first task dialog
+    const handleFirstTaskGotIt = () => {
+        setShowFirstTaskDialog(false);
+        // Enable Maya tracker at player's initial position (tracker manager already has Maya target but enable it)
+        locationTrackerManager.setTargetEnabled('maya', true);
+        // Notify game scene to show tracker (MainScene listens to tracker state) - also ensure position known
+        const maya = locationTrackerManager.getTarget('maya');
+        if (maya) {
+            // keep current maya target position
+            locationTrackerManager.updateTargetPosition('maya', maya.position);
+        }
+
+        // Start watching player movement and show small alert if player strays too far without going to Maya
+        let strayTimer: number | null = null;
+
+        const onPlayerPosition = (e: any) => {
+            const { x, y } = e.detail || {};
+            // compute distance if maya exists
+            const mayaTarget = locationTrackerManager.getTarget('maya');
+            if (!mayaTarget) return;
+            const dx = (mayaTarget.position.x || 0) - (x || 0);
+            const dy = (mayaTarget.position.y || 0) - (y || 0);
+            const distSq = dx * dx + dy * dy;
+            // threshold squared (approx 300^2)
+            if (distSq > (300 * 300)) {
+                // user is exploring far away - show a small alert every 12s
+                setSmallAlertText('Go meet Maya to start your journey');
+                setShowSmallAlertDialog(true);
+                if (strayTimer) window.clearTimeout(strayTimer as any);
+                strayTimer = window.setTimeout(() => {
+                    setShowSmallAlertDialog(false);
+                }, 5000);
+            } else {
+                setShowSmallAlertDialog(false);
+            }
+        };
+
+        window.addEventListener('player-position-update' as any, onPlayerPosition);
+        // cleanup when no longer necessary (for simplicity remove after 10 minutes)
+        window.setTimeout(() => {
+            window.removeEventListener('player-position-update' as any, onPlayerPosition);
+            if (strayTimer) window.clearTimeout(strayTimer as any);
+        }, 10 * 60 * 1000);
+    };
+
+    // Handle player advancing/closing a generic dialogue from the HUD
+    const handleGenericAdvance = () => {
+        // Tell the game that the player advanced/closed the dialogue
+        window.dispatchEvent(new CustomEvent('dialogue-advance'));
+        setGenericDialog((g) => ({ ...g, isVisible: false }));
+    };
+
+    const handleGenericComplete = () => {
+        window.dispatchEvent(new CustomEvent('dialogue-complete'));
+    };
+
     return (
-        <div className="absolute top-2 left-2 w-full h-full pointer-events-none z-[1000] font-['Tickerbit',Arial,sans-serif]">
+        <div className="absolute top-2 left-2 w-full h-full z-[1000] font-['Tickerbit',Arial,sans-serif]">
             {/* Top right status area */}
             <div className="absolute top-5 right-5 flex flex-col items-end space-y-2">
                 {/* Blockchain status indicator */}
@@ -677,6 +820,28 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
+            {/* First Task Dialogue (top-center) */}
+            <DialogueBox
+                text={"GO AND MEET MAYA AT HER HOUSE\nFOLLOW THE TRACKER TO REACH HER HOUSE"}
+                title={"TASK 1:"}
+                isVisible={showFirstTaskDialog}
+                position={'top-center'}
+                showGotItButton={true}
+                onGotIt={handleFirstTaskGotIt}
+                showProgressIndicator={false}
+                small={false}
+            />
+
+            {/* Small alert/dialog for stray reminders (small, top-center) */}
+            <DialogueBox
+                text={smallAlertText}
+                isVisible={showSmallAlertDialog}
+                position={'top-center'}
+                small={true}
+                showProgressIndicator={false}
+                showContinueHint={false}
+            />
+
             {/* Location Trackers */}
             {trackingTargets.map((target) => (
                 <LocationTracker
@@ -690,6 +855,18 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     targetImage={target.image}
                 />
             ))}
+
+            {/* Generic HUD Dialogue (bottom) - used by Maya and other game systems */}
+            <DialogueBox
+                text={genericDialog.text}
+                characterName={genericDialog.characterName}
+                isVisible={genericDialog.isVisible}
+                onAdvance={handleGenericAdvance}
+                onComplete={handleGenericComplete}
+                showProgressIndicator={false}
+                showContinueHint={true}
+                allowSpaceAdvance={true}
+            />
         </div>
     );
 };

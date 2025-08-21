@@ -210,61 +210,16 @@ export class MayaNPCManager {
 
         this.activeDialog = true;
 
-        // Create a dialog box similar to NPCManager
-        const dialogBox = this.scene.add.rectangle(
-            this.scene.cameras.main.centerX,
-            this.scene.cameras.main.height - 150,
-            this.scene.cameras.main.width * 0.8,
-            150,
-            0x000000,
-            0.8
-        );
-        dialogBox.setScrollFactor(0).setDepth(2000);
+        // Emit a UI event so the HUD DialogueBox shows the same UI as onboarding
+        window.dispatchEvent(new CustomEvent('show-dialogue', {
+            detail: {
+                text: "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!",
+                characterName: 'M.A.Y.A',
+                allowAdvance: true
+            }
+        }));
 
-        // Add dialog text with word wrap and typing effect
-        const fullText = "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!";
-        const dialogText = this.scene.add
-            .text(
-                dialogBox.x,
-                dialogBox.y,
-                "", // Start with empty text for typing effect
-                {
-                    fontFamily: Constants.DIALOG_TEXT_FONT,
-                    fontSize: Constants.DIALOG_TEXT_SIZE,
-                    color: Constants.DIALOG_TEXT_COLOR,
-                    align: "center",
-                    wordWrap: { width: dialogBox.width - 40 },
-                }
-            )
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2001);
-
-        // Add typing effect
-        this.addTypingEffect(dialogText, fullText);
-
-        // Add close instruction
-        const closeText = this.scene.add
-            .text(
-                dialogBox.x,
-                dialogBox.y + 60,
-                "Press E, Space or Enter to close",
-                {
-                    fontFamily: Constants.DIALOG_INSTRUCTION_FONT,
-                    fontSize: Constants.DIALOG_INSTRUCTION_SIZE,
-                    color: Constants.DIALOG_INSTRUCTION_COLOR,
-                    align: "center",
-                }
-            )
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2001);
-
-        // Create a container for dialog elements
-        this.dialogContainer = this.scene.add.container(0, 0);
-        this.dialogContainer.add([dialogBox, dialogText, closeText]);
-
-        // Create speech bubble above Maya
+        // Create speech bubble above Maya for visual cue (keep existing visual behavior)
         this.speechBubble = this.scene.add.sprite(
             this.maya.x,
             this.maya.y - 120,
@@ -274,13 +229,17 @@ export class MayaNPCManager {
         this.speechBubble.setDepth(2002);
         this.speechBubble.setScrollFactor(1);
 
-        // Play the opening animation if it exists
         if (this.scene.anims.exists("speech-bubble-open")) {
             this.speechBubble.play("speech-bubble-open");
         }
 
-        // Setup improved keyboard listeners to close dialog
-        this.setupDialogKeyListeners();
+        // Listen for HUD advance/close events
+        const onAdvance = () => {
+            // Close local dialog state and cleanup visuals
+            this.closeDialog();
+            window.removeEventListener('dialogue-advance', onAdvance as any);
+        };
+        window.addEventListener('dialogue-advance' as any, onAdvance as any);
     }
 
     private setupDialogKeyListeners(): void {
@@ -589,26 +548,13 @@ export class MayaNPCManager {
     }
 
     private showTemporaryDialog(text: string, durationMs: number = 1500): void {
-        // Simple speech bubble above Maya with text for a short duration
-        const bubble = this.scene.add.rectangle(this.scene.cameras.main.centerX, this.scene.cameras.main.height - 140, this.scene.cameras.main.width * 0.7, 80, 0x000000, 0.8);
-        bubble.setScrollFactor(0).setDepth(2001);
-        const msg = this.scene.add
-            .text(bubble.x, bubble.y, text, {
-                fontFamily: Constants.DIALOG_TEXT_FONT,
-                fontSize: Constants.DIALOG_TEXT_SIZE,
-                color: Constants.DIALOG_TEXT_COLOR,
-                align: "center",
-                wordWrap: { width: bubble.width - 40 },
-            })
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2002);
-
-        // Auto-destroy after duration
-        this.scene.time.delayedCall(durationMs, () => {
-            msg.destroy();
-            bubble.destroy();
-        });
+        // Emit a temporary HUD dialogue (small) so the HUD can show consistent styling
+        window.dispatchEvent(new CustomEvent('show-temporary-dialog', {
+            detail: {
+                text,
+                durationMs: durationMs
+            }
+        }));
     }
 
     private moveToNextWaypoint(): void {
@@ -732,52 +678,31 @@ export class MayaNPCManager {
         const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
 
         if (distance > this.distanceThreshold) {
-            // Show alert immediately if not already showing
-            if (!this.alertText) {
-                this.alertText = this.scene.add
-                    .text(this.scene.cameras.main.centerX, 90, "⚠️ You are too far away! Follow Maya.", {
-                        fontFamily: Constants.DIALOG_TEXT_FONT,
-                        fontSize: "16px",
-                        color: "#ffcc00",
-                        align: "center",
-                        backgroundColor: "#000000b3",
-                        padding: { x: 10, y: 6 },
-                    })
-                    .setOrigin(0.5)
-                    .setScrollFactor(0)
-                    .setDepth(2000);
-            }
+            // Dispatch a temporary HUD dialog alert so it uses the DialogueBox UI
+            window.dispatchEvent(new CustomEvent('show-temporary-dialog', {
+                detail: {
+                    text: '⚠️ You are too far away! Follow Maya.',
+                    durationMs: 5000
+                }
+            }));
 
-            // If no timer scheduled, create a repeating timer to re-alert every 60s
+            // Ensure we keep re-alerting via a Phaser timer if not already scheduled
             if (!this.alertTimerEvent) {
                 this.alertTimerEvent = this.scene.time.addEvent({
                     delay: this.alertIntervalMs,
                     loop: true,
                     callback: () => {
-                        if (this.alertText && !this.alertText.scene) return;
-                        if (!this.alertText) {
-                            this.alertText = this.scene.add
-                                .text(this.scene.cameras.main.centerX, 90, "⚠️ You are too far away! Follow Maya.", {
-                                    fontFamily: Constants.DIALOG_TEXT_FONT,
-                                    fontSize: "16px",
-                                    color: "#ffcc00",
-                                    align: "center",
-                                    backgroundColor: "#000000b3",
-                                    padding: { x: 10, y: 6 },
-                                })
-                                .setOrigin(0.5)
-                                .setScrollFactor(0)
-                                .setDepth(2000);
-                        }
+                        window.dispatchEvent(new CustomEvent('show-temporary-dialog', {
+                            detail: {
+                                text: '⚠️ You are too far away! Follow Maya.',
+                                durationMs: 5000
+                            }
+                        }));
                     }
                 });
             }
         } else {
-            // Player is close enough: remove alert and timer
-            if (this.alertText) {
-                this.alertText.destroy();
-                this.alertText = null;
-            }
+            // Player is close enough: stop the repeating alert timer
             if (this.alertTimerEvent) {
                 this.alertTimerEvent.remove(false);
                 this.alertTimerEvent = null;
@@ -825,52 +750,23 @@ export class MayaNPCManager {
     }
 
     private showArrivalInteraction(): void {
-        // Prevent multiple activations
         if (this.activeDialog) return;
-
         this.activeDialog = true;
 
-        // Show final dialog box with the requested message
-        const dialogBox = this.scene.add.rectangle(
-            this.scene.cameras.main.centerX,
-            this.scene.cameras.main.height - 150,
-            this.scene.cameras.main.width * 0.8,
-            120,
-            0x000000,
-            0.85
-        );
-        dialogBox.setScrollFactor(0).setDepth(2000);
+        window.dispatchEvent(new CustomEvent('show-dialogue', {
+            detail: {
+                text: "This is our Central Bank!\nGo inside and meet the bank manager.",
+                characterName: 'M.A.Y.A',
+                allowAdvance: true
+            }
+        }));
 
-        const lines = "This is our Central Bank!\nGo inside and meet the bank manager.";
-        const dialogText = this.scene.add
-            .text(dialogBox.x, dialogBox.y, lines, {
-                fontFamily: Constants.DIALOG_TEXT_FONT,
-                fontSize: Constants.DIALOG_TEXT_SIZE,
-                color: Constants.DIALOG_TEXT_COLOR,
-                align: "center",
-                wordWrap: { width: dialogBox.width - 40 },
-            })
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2001);
-
-        // Close instruction
-        const closeText = this.scene.add
-            .text(dialogBox.x, dialogBox.y + 50, "Press E, Space or Enter to close", {
-                fontFamily: Constants.DIALOG_INSTRUCTION_FONT,
-                fontSize: Constants.DIALOG_INSTRUCTION_SIZE,
-                color: Constants.DIALOG_INSTRUCTION_COLOR,
-                align: "center",
-            })
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2001);
-
-        this.dialogContainer = this.scene.add.container(0, 0);
-        this.dialogContainer.add([dialogBox, dialogText, closeText]);
-
-        // Register key listeners to close
-        this.setupDialogKeyListeners();
+        // When HUD advances/closes, cleanup locally
+        const onAdvance = () => {
+            this.closeDialog();
+            window.removeEventListener('dialogue-advance' as any, onAdvance as any);
+        };
+        window.addEventListener('dialogue-advance' as any, onAdvance as any);
     }
 
     private ensureTextAlignment(): void {

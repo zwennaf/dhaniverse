@@ -115,6 +115,12 @@ const GamePage: React.FC = () => {
       if (user?.gameUsername) {
         startGameFlow(user.gameUsername);
       }
+      // Inform the game/HUD that onboarding finished and first task should be assigned
+      // Mark pending in case HUD hasn't mounted yet, then dispatch
+      (window as any).__assignFirstTaskPending = true;
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('assign-first-task'));
+      }, 500);
     } catch (error) {
       console.error("GamePage: Error updating tutorial status:", error);
       // Continue to game anyway
@@ -122,6 +128,10 @@ const GamePage: React.FC = () => {
       if (user?.gameUsername) {
         startGameFlow(user.gameUsername);
       }
+      (window as any).__assignFirstTaskPending = true;
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('assign-first-task'));
+      }, 500);
     }
   };
 

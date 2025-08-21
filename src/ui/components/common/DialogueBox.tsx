@@ -1,11 +1,20 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 
 interface DialogueBoxProps {
   text: string;
   characterName?: string;
   isVisible: boolean;
+  title?: string; // optional heading shown above the text
   onComplete?: () => void;
   onAdvance?: () => void;
+  // Positioning override: 'bottom' (default) or 'top-center'
+  position?: 'bottom' | 'top-center';
+  // Small alert variant for brief center-top alerts
+  small?: boolean;
+  // When true, show a 'Got it' button and require it to be clicked to dismiss
+  showGotItButton?: boolean;
+  onGotIt?: () => void;
   showProgressIndicator?: boolean;
   currentSlide?: number;
   totalSlides?: number;
@@ -100,6 +109,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   isVisible,
   onComplete,
   onAdvance,
+  title,
   showProgressIndicator = false,
   currentSlide = 0,
   totalSlides = 1,
@@ -107,6 +117,11 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   baseTypingSpeed = 50,
   fastTypingSpeed = 10,
   allowSpaceAdvance = true
+  ,
+  position = 'bottom',
+  small = false,
+  showGotItButton = false,
+  onGotIt
 }) => {
   const [lastActionTime, setLastActionTime] = useState(0);
   const mountedRef = useRef(true);
@@ -187,6 +202,9 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     if (now - lastActionTime < ACTION_COOLDOWN) return;
     setLastActionTime(now);
 
+    // If there's a mandatory Got it button, don't allow clicking the dialog to close it
+    if (showGotItButton) return;
+
     if (!isComplete) {
       complete();
     } else {
@@ -202,22 +220,56 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
   if (!isVisible) return null;
 
+  // container positioning
+  const containerClass = position === 'top-center'
+    ? 'absolute top-4 left-1/2 transform -translate-x-1/2 flex justify-center p-4 z-50'
+    : 'absolute bottom-0 left-0 right-0 flex justify-center p-4 z-20';
+
+  // size tweak for small alerts
+  const maxWidthClass = small ? 'max-w-md' : 'max-w-5xl';
+
   return (
-    <div className="absolute bottom-0 left-0 right-0 flex justify-center p-4 z-20">
-      <div className="relative w-full max-w-5xl">
+    <div className={`${containerClass} pointer-events-auto`}>
+      <div className={`relative w-full ${maxWidthClass}`}>
         {/* SVG Dialogue Box */}
         <img
           src="/UI/game/dialogue-box.svg"
           alt="Dialogue Box"
           className="w-full h-auto"
           style={{
-            minHeight: '180px',
-            maxHeight: '300px'
+            minHeight: small ? '80px' : '180px',
+            maxHeight: small ? '140px' : '300px'
           }}
         />
         
-        {/* Character name tag with background */}
-        {characterName && (
+        {/* Title (for tasks) */}
+        {title && (
+          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2">
+            <div 
+              className="relative inline-block"
+              style={{
+                backgroundImage: 'url(/UI/game/name-rectangle.png)',
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                minWidth: '140px',
+                height: '36px'
+              }}
+            >
+              <span 
+                className="absolute inset-0 flex items-center justify-center text-black text-sm font-bold"
+                style={{ 
+                  fontFamily: 'VCR OSD Mono, monospace',
+                }}
+              >
+                {title}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Character name tag with background (legacy placement) */}
+        {characterName && !title && (
           <div className="absolute -top-10 left-8">
             <div 
               className="relative inline-block"
@@ -300,6 +352,20 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
             >
               Click to continue
             </p>
+          </div>
+        )}
+
+        {/* Got it button for task dialogs */}
+        {showGotItButton && (
+          <div className="absolute top-4 right-8 pointer-events-auto">
+            <button
+              className="bg-black/80 text-white px-3 py-1 rounded font-bold text-sm border border-white/30 hover:bg-black/90"
+              onClick={() => {
+                onGotIt?.();
+              }}
+            >
+              Got it
+            </button>
           </div>
         )}
       </div>
