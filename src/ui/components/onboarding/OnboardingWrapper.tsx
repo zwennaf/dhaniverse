@@ -1,82 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DialogueBox from '../common/DialogueBox';
 
 interface OnboardingWrapperProps {
   onContinueToGame: () => void;
 }
-
-// Custom hook for typing animation
-const useTypingAnimation = (text: string, baseSpeed: number = 50, fastSpeed: number = 10) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [isComplete, setIsComplete] = useState(false);
-  const [isFast, setIsFast] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const indexRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize audio once
-  useEffect(() => {
-    audioRef.current = new Audio('/sounds/blip.mp3');
-    audioRef.current.volume = 0.2;
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  const playBlip = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0; // Reset to start
-      audioRef.current.play().catch(console.error);
-    }
-  };
-
-  const startTyping = (speed: number) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    
-    timerRef.current = setInterval(() => {
-      if (indexRef.current < text.length) {
-        setDisplayedText(text.slice(0, indexRef.current + 1));
-        indexRef.current++;
-      } else {
-        setIsComplete(true);
-        if (timerRef.current) clearInterval(timerRef.current);
-      }
-    }, speed);
-  };
-
-  useEffect(() => {
-    setDisplayedText('');
-    setIsComplete(false);
-    setIsFast(false);
-    indexRef.current = 0;
-    startTyping(baseSpeed);
-
-    // Play audio for first slide and subsequent slides
-    playBlip();
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [text]);
-
-  useEffect(() => {
-    if (!isComplete) {
-      startTyping(isFast ? fastSpeed : baseSpeed);
-    }
-  }, [isFast, isComplete]);
-
-  const speedUp = () => setIsFast(true);
-  const slowDown = () => setIsFast(false);
-  const complete = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setDisplayedText(text);
-    setIsComplete(true);
-  };
-
-  return { displayedText, isComplete, speedUp, slowDown, complete };
-};
 
 interface OnboardingSlide {
   id: number;
@@ -92,7 +19,7 @@ const ONBOARDING_SLIDES: OnboardingSlide[] = [
   },
   {
     id: 2,
-    text: "In Dhaniverse, you'll learn about investing, trading, and building wealth while having fun in our virtual world.",
+    text: "Let me teach you how to move around! Use W, A, S, D keys to move your character. Hold SHIFT to boost your speed and move faster.",
     character: "M.A.Y.A"
   },
   {
@@ -115,19 +42,10 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true); // For initial fade
-  const [typingKey, setTypingKey] = useState(0); // Force typing animation reset
-  const [lastActionTime, setLastActionTime] = useState(0);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const mountedRef = useRef(true);
 
-  const ACTION_COOLDOWN = 150; // ms cooldown between actions
-
   const currentSlideData = ONBOARDING_SLIDES[currentSlide];
-  const { displayedText, isComplete, speedUp, slowDown, complete } = useTypingAnimation(
-    currentSlideData.text, 
-    50, // base speed in ms
-    5   // fast speed in ms
-  );
 
   useEffect(() => {
     // inject float keyframes and helper classes once
@@ -163,7 +81,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
       if (mountedRef.current) {
         setIsInitialLoad(false);
       }
-    }, 200); // Reduced from 800ms to 200ms for quicker fade-in
+    }, 200);
 
     return () => {
       mountedRef.current = false;
@@ -178,102 +96,24 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
       return;
     }
     setCurrentSlide(nextIndex);
-    setTypingKey(prev => prev + 1); // Trigger typing animation reset
   };
 
-  const startTransition = () => {
-    if (isTransitioning) return; // guard
+  const handleAdvance = () => {
+    if (isTransitioning) return;
     
-    const now = Date.now();
-    if (now - lastActionTime < ACTION_COOLDOWN) return; // spam prevention
-    setLastActionTime(now);
-    
-    // If typing is not complete, complete it instantly
-    if (!isComplete) {
-      complete();
-      return;
-    }
-    
-    // Otherwise proceed with slide transition
     setIsTransitioning(true);
 
-    // wait for overlay to fade in, then change slide/finish
     setTimeout(() => {
       if (!mountedRef.current) return;
 
       const next = currentSlide + 1;
       changeSlideOrFinish(next);
 
-      // short delay so users see the transition, then fade out
       setTimeout(() => {
         if (!mountedRef.current) return;
         setIsTransitioning(false);
       }, 80);
     }, TRANSITION_MS);
-  };
-
-  // Handle keyboard events
-  useEffect(() => {
-    let keyHeldDown = false;
-    let speedUpTimeout: NodeJS.Timeout | null = null;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.code === 'Space') {
-        // Prevent default to avoid page scrolling with space
-        event.preventDefault();
-        
-        // Ignore if key is already being held down (spam prevention)
-        if (keyHeldDown) return;
-        keyHeldDown = true;
-
-        const now = Date.now();
-        if (now - lastActionTime < ACTION_COOLDOWN) return;
-
-        if (!isComplete) {
-          // Small delay before speeding up to prevent accidental speed-ups
-          speedUpTimeout = setTimeout(() => {
-            speedUp();
-          }, 50);
-        } else {
-          startTransition();
-        }
-      }
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.code === 'Space') {
-        keyHeldDown = false;
-        
-        // Cancel speed-up timeout if key released quickly
-        if (speedUpTimeout) {
-          clearTimeout(speedUpTimeout);
-          speedUpTimeout = null;
-        }
-        
-        slowDown();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      if (speedUpTimeout) clearTimeout(speedUpTimeout);
-    };
-  }, [isComplete, isTransitioning, lastActionTime]);
-
-  const handleClick = () => {
-    const now = Date.now();
-    if (now - lastActionTime < ACTION_COOLDOWN) return; // spam prevention
-    setLastActionTime(now);
-
-    if (!isComplete) {
-      complete();
-    } else {
-      startTransition();
-    }
   };
 
   return (
@@ -282,11 +122,10 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
       <div 
         className="absolute inset-0"
         style={{
-          backgroundImage: "url('/game/first-tutorial/w1.png')",
+          backgroundImage: `url('${currentSlide === 0 ? '/game/first-tutorial/w1.png' : '/game/first-tutorial/w1-dull.png'}')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          filter: 'blur(2px)',
           zIndex: 1
         }}
       />
@@ -294,133 +133,96 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
       {/* Main content layer (unblurred) */}
       <div 
         className="absolute inset-0"
-        onClick={handleClick}
         style={{ zIndex: 2 }}
       >
-      {/* Floating character overlay (d1) */}
-      <img
-        src="/game/first-tutorial/d1.png"
-        alt="Maya"
-        className="onboard-float"
-        style={{
-          position: 'absolute',
-          left: '50%',
-          bottom: '-150px', // anchor from bottom so character sits above dialogue box
-          transform: 'translate(-50%, 0)',
-          pointerEvents: 'none',
-          zIndex: 10,
-          maxWidth: '60%',
-          width: 'auto',
-          height: 'auto'
-        }}
-      />
-
-      {/* Instruction text at top */}
-      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 text-white text-center z-20">
-        <p 
-          className="text-lg opacity-90 drop-shadow-lg text-black"
-          style={{ fontFamily: 'VCR OSD Mono, monospace' }}
-        >
-          Press [Space] to Fast Forward
-        </p>
-      </div>
-
-      {/* Dialogue box at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center p-4 z-20">
-        <div className="relative w-full max-w-5xl">
-          {/* SVG Dialogue Box */}
+        {/* Character display - show different characters on different slides */}
+        {currentSlide === 0 && (
           <img
-            src="/UI/game/dialogue-box.svg"
-            alt="Dialogue Box"
-            className="w-full h-auto"
+            src="/game/first-tutorial/d1.png"
+            alt="Maya"
+            className="onboard-float"
             style={{
-              minHeight: '180px',
-              maxHeight: '300px'
+              position: 'absolute',
+              left: '50%',
+              bottom: '-150px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
             }}
           />
-          
-          {/* Character name tag with background */}
-          <div className="absolute -top-10 left-8">
-            <div 
-              className="relative inline-block"
-              style={{
-                backgroundImage: 'url(/UI/game/name-rectangle.png)',
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                minWidth: '120px',
-                height: '32px'
-              }}
-            >
-              <span 
-                className="absolute inset-0 flex items-center justify-center text-black text-sm font-bold"
-                style={{ 
-                  fontFamily: 'VCR OSD Mono, monospace',
-                }}
-              >
-                {currentSlideData.character}
-              </span>
-            </div>
-          </div>
+        )}
 
-          {/* Dialogue text area */}
-          <div className="absolute top-12 left-8 right-8 bottom-8 flex items-start">
-            <div 
-              className="w-full pt-4 px-4 rounded-lg"
-              style={{
-                backdropFilter: 'blur(2px)',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)'
-              }}
-            >
-              <p 
-                className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
-                style={{ 
-                  fontFamily: 'VCR OSD Mono, monospace',
-                  textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
-                  lineHeight: '1.6'
-                }}
-              >
-                {displayedText}
-              </p>
-            </div>
-          </div>
+        {currentSlide === 1 && (
+          <img
+            src="/game/first-tutorial/d2.png"
+            alt="Character D2"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '20%',
+              bottom: '-100px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
+            }}
+          />
+        )}
 
-          {/* Progress indicator */}
-          <div className="absolute bottom-4 right-8">
-            <div className="flex items-center space-x-2">
-              {/* Slide dots */}
-              <div className="flex space-x-1">
-                {ONBOARDING_SLIDES.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full ${
-                      index === currentSlide ? 'bg-black' : 'bg-gray-400'
-                    }`}
-                  />
-                ))}
-              </div>
-              
-              {/* Text indicator */}
-              <span 
-                className="text-black text-xs ml-2"
-                style={{ fontFamily: 'VCR OSD Mono, monospace' }}
-              >
-                {currentSlide + 1} / {ONBOARDING_SLIDES.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Click to continue hint */}
-          <div className="absolute bottom-4 left-8">
-            <p 
-              className="text-black text-xs opacity-70 animate-pulse"
-              style={{ fontFamily: 'VCR OSD Mono, monospace' }}
-            >
-              {currentSlide === ONBOARDING_SLIDES.length - 1 ? 'Click to start game' : 'Click to continue'}
-            </p>
-          </div>
+        {/* Tutorial content showcase - positioned on the right for slides after first */}
+      {currentSlide === 1 && (
+        <div 
+          className="absolute"
+          style={{
+            top: '15%',
+            right: '8%',
+            width: '45%',
+            zIndex: 15,
+            pointerEvents: 'none'
+          }}
+        >
+          {/* Movement controls tutorial */}
+          <img
+            src="/game/first-tutorial/controls.png"
+            alt="Movement Controls"
+            style={{
+              width: '100%',
+              height: 'auto',
+              maxWidth: '600px'
+            }}
+          />
         </div>
-      </div>
+      )}
+
+        {/* Instruction text at top */}
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 text-white text-center z-20">
+          <p 
+            className="text-lg opacity-90 drop-shadow-lg text-black"
+            style={{ fontFamily: 'VCR OSD Mono, monospace' }}
+          >
+            Press [Space] to Speed Up • Press [Mouse Click] to Continue
+          </p>
+        </div>
+
+        {/* DialogueBox Component */}
+        <DialogueBox
+          text={currentSlideData.text}
+          characterName={currentSlideData.character}
+          isVisible={true}
+          onAdvance={handleAdvance}
+          showProgressIndicator={true}
+          currentSlide={currentSlide}
+          totalSlides={ONBOARDING_SLIDES.length}
+          showContinueHint={true}
+          baseTypingSpeed={50}
+          fastTypingSpeed={5}
+          allowSpaceAdvance={false} // Disable space advancement for onboarding
+        />
 
       {/* Black transition overlay */}
       <div
