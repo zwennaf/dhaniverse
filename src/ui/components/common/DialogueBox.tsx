@@ -22,6 +22,7 @@ interface DialogueBoxProps {
   baseTypingSpeed?: number;
   fastTypingSpeed?: number;
   allowSpaceAdvance?: boolean; // New prop to control space advancement
+  compact?: boolean; // when true, use the older/smaller layout used for task dialogs
 }
 
 // Custom hook for typing animation
@@ -120,6 +121,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   ,
   position = 'bottom',
   small = false,
+  compact = false,
   showGotItButton = false,
   onGotIt
 }) => {
@@ -133,6 +135,14 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     fastTypingSpeed,
     allowSpaceAdvance
   );
+
+  // Prevent repeated "Got it" clicks from re-triggering dialogs
+  const [gotItClicked, setGotItClicked] = useState(false);
+
+  // Reset the gotItClicked guard whenever the dialog content or visibility changes
+  useEffect(() => {
+    setGotItClicked(false);
+  }, [text, isVisible, showGotItButton]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -225,8 +235,11 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     ? 'absolute top-4 left-1/2 transform -translate-x-1/2 flex justify-center p-4 z-50'
     : 'absolute bottom-0 left-0 right-0 flex justify-center p-4 z-20';
 
-  // size tweak for small alerts
-  const maxWidthClass = small ? 'max-w-md' : 'max-w-5xl';
+  // size tweak for small alerts; make default dialog wider and taller to avoid overflow
+  // compact restores the previous sizing used for task dialogs
+  const maxWidthClass = small
+    ? (compact ? 'max-w-md' : 'max-w-lg')
+    : (compact ? 'max-w-5xl' : 'max-w-6xl');
 
   return (
     <div className={`${containerClass} pointer-events-auto`}>
@@ -237,14 +250,17 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           alt="Dialogue Box"
           className="w-full h-auto"
           style={{
-            minHeight: small ? '80px' : '180px',
-            maxHeight: small ? '140px' : '300px'
+            // larger minimum to accommodate longer text without overflow.
+            // compact uses older, smaller values to match previous look for Task1
+            minHeight: small ? (compact ? '80px' : '96px') : (compact ? '180px' : '220px'),
+            // allow larger max height for long messages
+            maxHeight: small ? (compact ? '140px' : '180px') : (compact ? '300px' : '420px')
           }}
         />
         
         {/* Title (for tasks) */}
         {title && (
-          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2">
+          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
             <div 
               className="relative inline-block"
               style={{
@@ -270,7 +286,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Character name tag with background (legacy placement) */}
         {characterName && !title && (
-          <div className="absolute -top-10 left-8">
+          <div className="absolute -top-6 left-8">
             <div 
               className="relative inline-block"
               style={{
@@ -295,24 +311,28 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-12 left-8 right-8 bottom-8 flex items-start">
+        <div className="absolute top-6 left-6 right-6 bottom-6 flex items-start">
           <div 
-            className="w-full px-4 rounded-lg cursor-pointer"
+            className="w-full px-4 py-3 rounded-lg cursor-pointer overflow-auto"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.1)'
             }}
             onClick={handleClick}
           >
-            <p 
-              className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
-              style={{ 
-                fontFamily: 'VCR OSD Mono, monospace',
-                textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
-                lineHeight: '1.6'
-              }}
-            >
-              {displayedText}
-            </p>
+            <div style={{ maxHeight: small ? (compact ? '100px' : '120px') : (compact ? '260px' : '320px'), overflowY: 'auto' }}>
+              <p 
+                className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
+                style={{ 
+                  fontFamily: 'VCR OSD Mono, monospace',
+                  textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {displayedText}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -356,12 +376,20 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Got it button for task dialogs */}
-        {showGotItButton && (
+        {showGotItButton && !gotItClicked && (
           <div className="absolute top-4 right-8 pointer-events-auto">
             <button
               className="bg-black/80 text-white px-3 py-1 rounded font-bold text-sm border border-white/30 hover:bg-black/90"
               onClick={() => {
+                const now = Date.now();
+                // Prevent rapid double-clicks
+                if (now - lastActionTime < ACTION_COOLDOWN) return;
+                setLastActionTime(now);
+                // Guard to avoid re-triggering the same or subsequent dialogs
+                setGotItClicked(true);
                 onGotIt?.();
+                // Also notify parent to advance/close immediately
+                onAdvance?.();
               }}
             >
               Got it

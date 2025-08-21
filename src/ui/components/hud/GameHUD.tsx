@@ -56,6 +56,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>([]);
     // First task dialog state
     const [showFirstTaskDialog, setShowFirstTaskDialog] = useState(false);
+    const [firstTaskAcknowledged, setFirstTaskAcknowledged] = useState(false);
     const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
     const [smallAlertText, setSmallAlertText] = useState('');
     const [genericDialog, setGenericDialog] = useState<{
@@ -63,6 +64,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
         characterName?: string;
         isVisible: boolean;
         allowAdvance?: boolean;
+    showGotItButton?: boolean;
+    compact?: boolean;
     }>({ text: '', characterName: undefined, isVisible: false });
     const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
     const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
@@ -374,7 +377,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
     // Assign first task when onboarding completes
     useEffect(() => {
         const assignFirstTaskHandler = () => {
-            // Show a top-center task dialog
+            // Only show if not already acknowledged
+            if (firstTaskAcknowledged) return;
             setShowFirstTaskDialog(true);
         };
 
@@ -395,6 +399,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 characterName: d.characterName || 'Maya',
                 isVisible: true,
                 allowAdvance: d.allowAdvance !== false,
+                showGotItButton: d.showGotItButton || false,
+                compact: d.compact || false,
             });
         };
 
@@ -603,7 +609,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // When user clicks 'Got it' on the first task dialog
     const handleFirstTaskGotIt = () => {
-        setShowFirstTaskDialog(false);
+    setShowFirstTaskDialog(false);
+    setFirstTaskAcknowledged(true);
         // Enable Maya tracker at player's initial position (tracker manager already has Maya target but enable it)
         locationTrackerManager.setTargetEnabled('maya', true);
         // Notify game scene to show tracker (MainScene listens to tracker state) - also ensure position known
@@ -612,44 +619,27 @@ const GameHUD: React.FC<GameHUDProps> = ({
             // keep current maya target position
             locationTrackerManager.updateTargetPosition('maya', maya.position);
         }
-
-        // Start watching player movement and show small alert if player strays too far without going to Maya
-        let strayTimer: number | null = null;
-
-        const onPlayerPosition = (e: any) => {
-            const { x, y } = e.detail || {};
-            // compute distance if maya exists
-            const mayaTarget = locationTrackerManager.getTarget('maya');
-            if (!mayaTarget) return;
-            const dx = (mayaTarget.position.x || 0) - (x || 0);
-            const dy = (mayaTarget.position.y || 0) - (y || 0);
-            const distSq = dx * dx + dy * dy;
-            // threshold squared (approx 300^2)
-            if (distSq > (300 * 300)) {
-                // user is exploring far away - show a small alert every 12s
-                setSmallAlertText('Go meet Maya to start your journey');
-                setShowSmallAlertDialog(true);
-                if (strayTimer) window.clearTimeout(strayTimer as any);
-                strayTimer = window.setTimeout(() => {
-                    setShowSmallAlertDialog(false);
-                }, 5000);
-            } else {
-                setShowSmallAlertDialog(false);
-            }
-        };
-
-        window.addEventListener('player-position-update' as any, onPlayerPosition);
-        // cleanup when no longer necessary (for simplicity remove after 10 minutes)
-        window.setTimeout(() => {
-            window.removeEventListener('player-position-update' as any, onPlayerPosition);
-            if (strayTimer) window.clearTimeout(strayTimer as any);
-        }, 10 * 60 * 1000);
+    // NOTE: small stray-alerts (reminders like "Go meet Maya to start your journey")
+    // were previously shown here by attaching a 'player-position-update' listener.
+    // That caused an immediate small-dialog to appear right after the player
+    // clicked "Got it". To avoid that, the stray reminder listener has been
+    // removed — the tracker is enabled above and the game can still show
+    // temporary small dialogs via the 'show-temporary-dialog' event when
+    // appropriate.
     };
 
     // Handle player advancing/closing a generic dialogue from the HUD
-    const handleGenericAdvance = () => {
+        const handleGenericAdvance = () => {
         // Tell the game that the player advanced/closed the dialogue
         window.dispatchEvent(new CustomEvent('dialogue-advance'));
+        setGenericDialog((g) => ({ ...g, isVisible: false }));
+    };
+
+    // When user clicks 'Got it' on a dialog which requests an explicit acknowledgement
+    const handleGenericGotIt = () => {
+        // Notify game systems that user explicitly acknowledged the dialog
+        window.dispatchEvent(new CustomEvent('dialogue-gotit'));
+        // Also close the HUD dialog
         setGenericDialog((g) => ({ ...g, isVisible: false }));
     };
 
@@ -828,6 +818,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 position={'top-center'}
                 showGotItButton={true}
                 onGotIt={handleFirstTaskGotIt}
+                compact={true}
                 showProgressIndicator={false}
                 small={false}
             />
@@ -863,6 +854,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 isVisible={genericDialog.isVisible}
                 onAdvance={handleGenericAdvance}
                 onComplete={handleGenericComplete}
+                showGotItButton={genericDialog.showGotItButton}
+                compact={genericDialog.compact}
+                onGotIt={handleGenericGotIt}
                 showProgressIndicator={false}
                 showContinueHint={true}
                 allowSpaceAdvance={true}

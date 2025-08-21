@@ -31,7 +31,7 @@ export class MayaNPCManager {
     private pauseDurationMs: number = 1000; // 1 second pause at waypoints
     private followReminderText: GameObjects.Text | null = null;
     private alertText: GameObjects.Text | null = null;
-    private distanceThreshold: number = 500; // units (increased to 500 as requested)
+    private distanceThreshold: number = 1000; // units (show "too far" only when > 1000)
     private alertTimerEvent: Phaser.Time.TimerEvent | null = null;
     private alertIntervalMs: number = 60000; // 60 seconds
     private guideCompleted: boolean = false;
@@ -514,8 +514,18 @@ export class MayaNPCManager {
     // Ensure tracker has correct current position
     locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
 
-        // Show initial dialogue immediately
-        this.showTemporaryDialog("Follow me, I'll take you to the Bank.", 1500);
+        // Show initial dialogue via the HUD and require an explicit "Got it" click
+        // before Maya starts moving. Use compact layout so the dialog spacing
+        // matches the previous smaller task-style dialog.
+        window.dispatchEvent(new CustomEvent('show-dialogue', {
+            detail: {
+                text: "Follow me, I'll take you to the Bank.",
+                characterName: 'M.A.Y.A',
+                showGotItButton: true,
+                compact: true,
+                allowAdvance: false,
+            }
+        }));
 
         // Prepare single waypoint for this step: user asked to keep it simple
         // Maya should move only to this coordinate and stop; further path will be defined later.
@@ -527,24 +537,16 @@ export class MayaNPCManager {
         ];
         this.currentWaypointIndex = 0;
 
-        // Create on-screen follow reminder (fixed to camera)
-        this.followReminderText = this.scene.add
-            .text(this.scene.cameras.main.centerX, 50, "➡️ Follow Maya to continue your journey.", {
-                fontFamily: Constants.DIALOG_TEXT_FONT,
-                fontSize: "18px",
-                color: "#ffffff",
-                align: "center",
-                backgroundColor: "#000000b3",
-                padding: { x: 10, y: 6 },
-            })
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(2000);
+        // Start moving only after HUD signals the dialogue completed typing.
+        // Listen for a single 'dialogue-complete' event and then begin movement.
+        const startMove = () => {
+            window.removeEventListener('dialogue-gotit' as any, startMove as any);
+            this.scene.time.delayedCall(50, () => this.moveToNextWaypoint());
+        };
 
-        // Start moving after a short delay so the initial message is visible
-        this.scene.time.delayedCall(1600, () => {
-            this.moveToNextWaypoint();
-        });
+        window.addEventListener('dialogue-gotit' as any, startMove as any);
+        // store a reference so it can be cleaned up if the NPC is destroyed early
+        (this as any).__pendingMayaStartMove = startMove;
     }
 
     private showTemporaryDialog(text: string, durationMs: number = 1500): void {
@@ -814,6 +816,13 @@ export class MayaNPCManager {
         if (this.dialogContainer) {
             this.dialogContainer.destroy();
             this.dialogContainer = null;
+        }
+
+        // Cleanup any pending global listener for starting Maya move
+        const pending = (this as any).__pendingMayaStartMove;
+        if (pending) {
+            window.removeEventListener('dialogue-gotit' as any, pending as any);
+            (this as any).__pendingMayaStartMove = null;
         }
     }
 }
