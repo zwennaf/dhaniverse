@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { NumberCounter } from '../common';
 
 interface LoaderProps {
   onLoadingComplete: () => void;
@@ -39,24 +40,66 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
     setCurrentTip(randomTip);
 
+    let currentProgress = 0;
     let stepIndex = 0;
-    const progressInterval = setInterval(() => {
-      if (stepIndex < loadingSteps.length) {
-        const currentStep = loadingSteps[stepIndex];
-        setProgress(currentStep.progress);
-        setCurrentStatus(currentStep.status);
-        
-        if (currentStep.progress === 100) {
-          clearInterval(progressInterval);
-          setTimeout(() => {
-            setShowWelcome(true);
-          }, 400); // Reduced from 800ms to 400ms
-        }
-        stepIndex++;
+    let animationFrame: number;
+    
+    const updateProgress = () => {
+      // Calculate speed based on current progress (slower as it approaches 95)
+      let speed;
+      if (currentProgress < 60) {
+        speed = 0.8; // Fast initial speed
+      } else if (currentProgress < 80) {
+        speed = 0.4; // Medium speed
+      } else if (currentProgress < 95) {
+        speed = 0.15; // Slow down significantly
+      } else {
+        speed = 0.05; // Very slow crawl to 100
       }
-    }, 600);
+      
+      currentProgress += speed;
+      
+      // Update status messages at certain thresholds
+      if (currentProgress >= 10 && stepIndex === 0) {
+        setCurrentStatus('Loading Game Assets...');
+        stepIndex = 1;
+      } else if (currentProgress >= 25 && stepIndex === 1) {
+        setCurrentStatus('Loading Map Data...');
+        stepIndex = 2;
+      } else if (currentProgress >= 45 && stepIndex === 2) {
+        setCurrentStatus('Loading Buildings...');
+        stepIndex = 3;
+      } else if (currentProgress >= 65 && stepIndex === 3) {
+        setCurrentStatus('Loading Characters...');
+        stepIndex = 4;
+      } else if (currentProgress >= 80 && stepIndex === 4) {
+        setCurrentStatus('Connecting to Server...');
+        stepIndex = 5;
+      } else if (currentProgress >= 95 && stepIndex === 5) {
+        setCurrentStatus('Finalizing...');
+        stepIndex = 6;
+      } else if (currentProgress >= 100) {
+        setCurrentStatus('Ready!');
+        currentProgress = 100;
+        setProgress(100);
+        setTimeout(() => {
+          setShowWelcome(true);
+        }, 500);
+        return;
+      }
+      
+      setProgress(Math.floor(currentProgress));
+      animationFrame = requestAnimationFrame(updateProgress);
+    };
+    
+    // Start the continuous animation
+    animationFrame = requestAnimationFrame(updateProgress);
 
-    return () => clearInterval(progressInterval);
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
   }, [onLoadingComplete]);
 
   return (
@@ -74,30 +117,14 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       {/* Subtle dark overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-40" />
       
-      {/* Minimal particles overlay */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(30)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-0.5 h-0.5 bg-white rounded-full opacity-40"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `twinkle ${3 + Math.random() * 2}s infinite ease-in-out`,
-              animationDelay: `${Math.random() * 3}s`
-            }}
-          />
-        ))}
-      </div>
-      
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full text-white px-8">
-        <div className={`transition-opacity duration-300 ${showWelcome ? 'opacity-0' : 'opacity-100'}`}>
+      <div className="relative z-10 flex flex-col h-full text-white px-8">
+        <div className={`flex flex-col h-full transition-opacity duration-300 ${showWelcome ? 'opacity-0' : 'opacity-100'}`}>
           
           {/* Random Tip at the top */}
-          <div className="mb-16 text-center">
+          <div className="flex-none pt-16 text-center">
             <p 
-              className="text-lg text-orange-200 tracking-wide max-w-md mx-auto"
+              className="text-lg text-orange-200 tracking-wide max-w-lg mx-auto"
               style={{ 
                 fontFamily: 'VCR OSD Mono, monospace',
                 textShadow: '0 0 10px rgba(255,165,0,0.3)'
@@ -107,31 +134,36 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
             </p>
           </div>
 
-          {/* Sophisticated central loader */}
-          <div className="mb-12 flex flex-col items-center space-y-8">
-            
-            {/* Progress percentage */}
+          {/* Centered progress percentage */}
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <h1 
-                className="text-6xl font-bold text-white tracking-wider mb-2"
+                className="text-7xl font-bold text-white tracking-wider mb-4"
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
-                  textShadow: '0 0 20px rgba(255,255,255,0.5)'
+                  textShadow: '0 0 15px rgba(255,255,255,0.5), 0 0 30px rgba(255,255,255,0.3)',
+                  filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.4))'
                 }}
               >
-                {progress}%
+                <NumberCounter 
+                  value={progress} 
+                  duration={0.1}
+                />%
               </h1>
               <p 
-                className="text-sm text-gray-300 tracking-widest uppercase"
+                className="text-base text-gray-300 tracking-widest uppercase"
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
-                  letterSpacing: '0.2em'
+                  letterSpacing: '0.3em'
                 }}
               >
                 LOADED
               </p>
             </div>
+          </div>
 
+          {/* Loading status and progress bar at bottom */}
+          <div className="flex-none pb-16 flex flex-col items-center space-y-6">
             {/* Loading status */}
             <p 
               className="text-base text-blue-200 tracking-wide text-center"
@@ -143,7 +175,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
               {currentStatus}
             </p>
             
-            {/* Sophisticated progress bar */}
+            {/* Progress bar */}
             <div className="w-96 relative">
               <div className="h-0.5 bg-gray-700 bg-opacity-50 rounded-full overflow-hidden">
                 <div 
@@ -169,22 +201,32 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
         </div>
 
         {/* Welcome Screen */}
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
+        <div className={`absolute inset-0 flex flex-col transition-opacity duration-300 ${
           showWelcome ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}>
-          <div className="text-center space-y-8">
-            <h1 
-              className="text-5xl font-bold text-white tracking-wider"
-              style={{ 
-                fontFamily: 'VCR OSD Mono, monospace',
-                textShadow: '0 0 30px rgba(255,255,255,0.8)'
-              }}
-            >
-              Welcome to Dhaniverse
-            </h1>
-            
-            <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-white to-transparent mx-auto opacity-60" />
-            
+          {/* Spacer for top */}
+          <div className="flex-1"></div>
+          
+          {/* Centered welcome content */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-8">
+              <h1 
+                className="text-5xl font-bold text-white tracking-wider"
+                style={{ 
+                  fontFamily: 'VCR OSD Mono, monospace',
+                  textShadow: '0 0 15px rgba(255,255,255,0.6), 0 0 30px rgba(255,255,255,0.4)',
+                  filter: 'drop-shadow(0 0 25px rgba(255,255,255,0.5))'
+                }}
+              >
+                Welcome to Dhaniverse
+              </h1>
+              
+              <div className="w-32 h-0.5 bg-gradient-to-r from-transparent via-white to-transparent mx-auto opacity-60" />
+            </div>
+          </div>
+          
+          {/* Bottom content */}
+          <div className="flex-1 flex items-end justify-center pb-16">
             <p 
               className="text-lg text-gray-300 tracking-wide opacity-80"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}

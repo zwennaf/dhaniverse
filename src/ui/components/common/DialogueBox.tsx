@@ -245,7 +245,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         {/* Dialogue text area */}
         <div className="absolute top-12 left-8 right-8 bottom-8 flex items-start">
           <div 
-            className="w-full pt-4 px-4 rounded-lg cursor-pointer"
+            className="w-full px-4 rounded-lg cursor-pointer"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.1)'
             }}

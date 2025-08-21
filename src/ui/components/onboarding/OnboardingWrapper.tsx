@@ -24,12 +24,22 @@ const ONBOARDING_SLIDES: OnboardingSlide[] = [
   },
   {
     id: 3,
-    text: "You can explore different buildings, meet other players, and participate in various financial activities.",
+    text: "Meet the Central Bank of Dhaniverse! Here you can deposit your money safely, earn interest through fixed deposits, and manage your financial portfolio. Your money grows while you play!",
     character: "M.A.Y.A"
   },
   {
     id: 4,
-    text: "Ready to start your journey? Click to enter the world and begin your financial adventure!",
+    text: "ATMs can be found at most places in Dhaniverse world - there are 8 ATMs currently on this map! Withdraw money instantly, check balances, transfer funds between accounts, and access your financial portfolio from any location.",
+    character: "M.A.Y.A"
+  },
+  {
+    id: 5,
+    text: "Welcome to the Stock Market! Trade shares, analyze market trends, and build your investment portfolio. Watch your investments grow as you make smart trading decisions in real-time!",
+    character: "M.A.Y.A"
+  },
+  {
+    id: 6,
+    text: "Thank you so much! Now meet me at my house to continue your journey in Dhaniverse.",
     character: "M.A.Y.A"
   }
 ];
@@ -122,7 +132,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
       <div 
         className="absolute inset-0"
         style={{
-          backgroundImage: `url('${currentSlide === 0 ? '/game/first-tutorial/w1.png' : '/game/first-tutorial/w1-dull.png'}')`,
+          backgroundImage: `url('${currentSlide === 0 ? '/game/first-tutorial/w1.png' : currentSlide === 5 ? '/game/first-tutorial/w2.png' : '/game/first-tutorial/w1-dull.png'}')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -162,7 +172,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
             className="onboard-float"
             style={{
               position: 'absolute',
-              left: '20%',
+              left: '25%',
               bottom: '-100px',
               transform: 'translate(-50%, 0)',
               pointerEvents: 'none',
@@ -175,29 +185,210 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
         )}
 
         {/* Tutorial content showcase - positioned on the right for slides after first */}
-      {currentSlide === 1 && (
-        <div 
-          className="absolute"
-          style={{
-            top: '15%',
-            right: '8%',
-            width: '45%',
-            zIndex: 15,
-            pointerEvents: 'none'
-          }}
-        >
-          {/* Movement controls tutorial */}
-          <img
-            src="/game/first-tutorial/controls.png"
-            alt="Movement Controls"
+        {currentSlide === 1 && (
+          <div 
+            className="absolute"
             style={{
-              width: '100%',
-              height: 'auto',
-              maxWidth: '600px'
+              top: '15%',
+              right: '8%',
+              width: '45%',
+              zIndex: 15,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Movement controls tutorial */}
+            <img
+              src="/game/first-tutorial/controls.png"
+              alt="Movement Controls"
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxWidth: '600px'
+              }}
+            />
+          </div>
+        )}
+
+        {/* Character D2 for slide 3 */}
+        {currentSlide === 2 && (
+          <img
+            src="/game/first-tutorial/d2.png"
+            alt="Character D2"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '25%',
+              bottom: '-100px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
             }}
           />
-        </div>
-      )}
+        )}
+
+        {/* Character D3 for slide 4 */}
+        {currentSlide === 3 && (
+          <img
+            src="/game/first-tutorial/d3.png"
+            alt="Character D3"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '25%',
+              bottom: '-100px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'calc(100% - 80px)'
+            }}
+          />
+        )}
+
+        {/* Character D2 for slide 4 (additional character) */}
+        {currentSlide === 3 && (
+          <img
+            src="/game/first-tutorial/d2.png"
+            alt="Character D2"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '75%',
+              bottom: '-100px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
+            }}
+          />
+        )}
+
+        {/* Character D2 for stock intro slide (slide 5) */}
+        {currentSlide === 4 && (
+          <img
+            src="/game/first-tutorial/d2.png"
+            alt="Character D2"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '25%',
+              bottom: '-100px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
+            }}
+          />
+        )}
+
+        {/* Maya character for final slide (slide 6) - same as slide 0 */}
+        {currentSlide === 5 && (
+          <img
+            src="/game/first-tutorial/d1.png"
+            alt="Maya"
+            className="onboard-float"
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: '-150px',
+              transform: 'translate(-50%, 0)',
+              pointerEvents: 'none',
+              zIndex: 10,
+              maxWidth: '60%',
+              width: 'auto',
+              height: 'auto'
+            }}
+          />
+        )}
+
+        {/* Bank introduction showcase for slide 3 */}
+        {currentSlide === 2 && (
+          <div 
+            className="absolute"
+            style={{
+              top: '10%',
+              right: '5%',
+              width: '50%',
+              zIndex: 15,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Bank introduction image */}
+            <img
+              src="/game/first-tutorial/bank-intro.png"
+              alt="Central Bank Introduction"
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxWidth: '700px',
+                borderRadius: '12px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+              }}
+            />
+          </div>
+        )}
+
+        {/* ATM introduction showcase for slide 4 */}
+        {currentSlide === 3 && (
+          <div 
+            className="absolute"
+            style={{
+              top: '10%',
+              right: '5%',
+              width: '50%',
+              zIndex: 15,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* ATM introduction image */}
+            <img
+              src="/game/first-tutorial/atm-intro.png"
+              alt="ATM Introduction"
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxWidth: '700px',
+                borderRadius: '12px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+              }}
+            />
+          </div>
+        )}
+
+        {/* Stock Market introduction showcase for slide 5 */}
+        {currentSlide === 4 && (
+          <div 
+            className="absolute"
+            style={{
+              top: '10%',
+              right: '5%',
+              width: '50%',
+              zIndex: 15,
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Stock Market introduction image */}
+            <img
+              src="/game/first-tutorial/stock-intro.png"
+              alt="Stock Market Introduction"
+              style={{
+                width: '100%',
+                height: 'auto',
+                maxWidth: '700px',
+                borderRadius: '12px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+              }}
+            />
+          </div>
+        )}
 
         {/* Instruction text at top */}
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 text-white text-center z-20">
