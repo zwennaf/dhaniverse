@@ -1,5 +1,6 @@
 import { Web3BankingService, DualBalance, StakingPool, ExchangeResult, Achievement } from './Web3BankingService';
 import { Web3WalletService } from './Web3WalletService';
+import { ICPService } from './icp';
 
 // ICP Canister Types
 export interface StockPrice {
@@ -29,17 +30,40 @@ export interface BankAccount {
 
 export class ICPActorService {
     private web3BankingService: Web3BankingService | null = null;
+    private icpService: ICPService;
     private canisterId: string;
     private connected = false;
+    private connectedWallet: string | null = null;
 
-    constructor(canisterId: string) {
+    constructor(canisterId: string = 'dzbzg-eqaaa-aaaap-an3rq-cai') {
         this.canisterId = canisterId;
+        this.icpService = new ICPService();
     }
 
     // Connect with wallet identity
     async connect(walletService: Web3WalletService): Promise<boolean> {
         try {
+            // Connect to Web3 banking service for fallback
             this.web3BankingService = new Web3BankingService(walletService);
+            
+            // Get wallet info for ICP connection
+            const walletStatus = walletService.getStatus();
+            if (walletStatus.connected && walletStatus.address) {
+                // Connect wallet to ICP canister
+                const result = await this.icpService.connectWallet(
+                    walletStatus.walletType || 'MetaMask',
+                    walletStatus.address,
+                    '1' // Ethereum mainnet
+                );
+                
+                if (result.success) {
+                    this.connectedWallet = walletStatus.address;
+                    this.connected = true;
+                    return true;
+                }
+            }
+            
+            // Fallback to Web3 only
             this.connected = true;
             return true;
         } catch (error) {
@@ -58,6 +82,21 @@ export class ICPActorService {
         if (!this.web3BankingService) {
             throw new Error('Service not connected');
         }
+        
+        // Try ICP canister first, fallback to Web3
+        if (this.connectedWallet) {
+            try {
+                const icpBalance = await this.icpService.getDualBalance(this.connectedWallet);
+                return {
+                    rupeesBalance: icpBalance.rupees_balance,
+                    tokenBalance: icpBalance.token_balance,
+                    lastUpdated: icpBalance.last_updated
+                };
+            } catch (error) {
+                console.warn('ICP balance fetch failed, using Web3 fallback:', error);
+            }
+        }
+        
         return this.web3BankingService.getDualBalance();
     }
 
@@ -244,22 +283,23 @@ export class ICPActorService {
     // Get canister health status
     async getCanisterHealth(): Promise<{ status: string; stats: any }> {
         try {
-            // In a real implementation, this would call the canister's healthCheck method
+            const healthCheck = await this.icpService.healthCheck();
+            const metrics = await this.icpService.getCanisterMetrics();
+            
             return {
-                status: 'healthy',
+                status: healthCheck === 'OK' ? 'healthy' : 'error',
                 stats: {
-                    accounts: 150,
-                    transactions: 1250,
-                    newsItems: 25,
-                    stockPrices: 5,
-                    timersActive: true,
-                    httpOutcallsEnabled: true
+                    ...metrics,
+                    canisterId: this.canisterId,
+                    connected: this.connected,
+                    walletConnected: !!this.connectedWallet
                 }
             };
         } catch (error) {
+            console.error('Canister health check failed:', error);
             return {
                 status: 'error',
-                stats: {}
+                stats: { error: String(error) }
             };
         }
     }

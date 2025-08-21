@@ -2,6 +2,7 @@ import { ICPActorService } from './ICPActorService';
 import { WalletManager } from './WalletManager';
 import { DualStorageManager } from './DualStorageManager';
 import { ICPErrorHandler, NetworkHealthMonitor } from './ICPErrorHandler';
+import { ICP_CONFIG } from './config';
 
 export class ICPIntegrationManager {
   private static instance: ICPIntegrationManager | null = null;
@@ -15,11 +16,7 @@ export class ICPIntegrationManager {
   private constructor() {
     // Initialize services
     this.walletManager = new WalletManager();
-    this.icpService = new ICPActorService(
-      import.meta.env.VITE_DHANIVERSE_CANISTER_ID || 
-      import.meta.env.REACT_APP_CANISTER_ID || 
-      'rdmx6-jaaaa-aaaah-qcaiq-cai'
-    );
+    this.icpService = new ICPActorService(ICP_CONFIG.CANISTER_ID);
     this.dualStorageManager = new DualStorageManager(this.icpService, this.walletManager);
   }
 

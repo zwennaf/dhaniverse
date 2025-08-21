@@ -13,7 +13,13 @@
         "test:ui": "vitest --ui",
         "server:game": "deno run -A --unstable-detect-cjs --env-file=server/game/.env --watch server/game/index.ts",
         "server:ws": "deno run -A --env-file=server/ws/.env --watch server/ws/ws.ts",
-        "server": "start-servers.bat"
+        "server": "start-servers.bat",
+        "icp:generate": "bash scripts/generate-declarations.sh",
+        "icp:build": "cd packages/icp-canister && dfx build --network ic",
+        "icp:deploy": "cd packages/icp-canister && dfx deploy --network ic",
+        "icp:status": "cd packages/icp-canister && dfx canister --network ic status dhaniverse_backend",
+        "icp:health": "cd packages/icp-canister && dfx canister --network ic call dhaniverse_backend health_check",
+        "icp:setup": "cd packages/icp-canister && bash scripts/setup.sh"
     },
     "devDependencies": {
         "@changesets/cli": "^2.29.5",
