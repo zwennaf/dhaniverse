@@ -361,12 +361,13 @@ export class MainScene extends Scene implements MainGameScene {
         this.atmManager = new ATMManager(this);
 
         // Add Maya to the location tracker manager
+        // Initialize tracker with Maya's actual initial position
         locationTrackerManager.addTarget({
             id: 'maya',
             name: 'Maya',
-            position: { x: 7768, y: 3521 },
+            position: this.mayaNPCManager.getMayaPosition(),
             image: '/characters/maya-preview.png',
-            enabled: true // Start disabled, can be toggled by player
+            enabled: true // Start enabled; player can toggle
         });
 
         // Initialize the bank NPC manager (will be invisible until player enters the bank)

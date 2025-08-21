@@ -1,4 +1,5 @@
 import { GameObjects, Input } from "phaser";
+import { locationTrackerManager } from "../../services/LocationTrackerManager";
 import { MainGameScene } from "../scenes/MainScene.ts";
 import { Constants } from "../utils/Constants.ts";
 
@@ -18,9 +19,26 @@ export class MayaNPCManager {
     private dialogContainer: GameObjects.Container | null = null;
     private dialogKeyListeners: { [key: string]: (event: KeyboardEvent) => void } = {};
 
-    // Maya's position
-    public readonly x: number = 7768;
-    public readonly y: number = 3521;
+    // Guided sequence state
+    private guidedSequenceActive: boolean = false;
+    private waypoints: Array<{ x: number; y: number }> = [];
+    private currentWaypointIndex: number = 0;
+    private movingTween: Phaser.Tweens.Tween | null = null;
+    private movingToTarget: boolean = false;
+    private moveTarget: { x: number; y: number } | null = null;
+    private moveDir: { x: number; y: number } | null = null;
+    private moveSpeed: number = 220; // units per second used for per-frame movement (increased)
+    private pauseDurationMs: number = 1000; // 1 second pause at waypoints
+    private followReminderText: GameObjects.Text | null = null;
+    private alertText: GameObjects.Text | null = null;
+    private distanceThreshold: number = 500; // units (increased to 500 as requested)
+    private alertTimerEvent: Phaser.Time.TimerEvent | null = null;
+    private alertIntervalMs: number = 60000; // 60 seconds
+    private guideCompleted: boolean = false;
+
+    // Maya's position (starting condition specified)
+    public readonly x: number = 7779;
+    public readonly y: number = 3581;
 
     constructor(scene: MainGameScene) {
         this.scene = scene;
@@ -378,27 +396,33 @@ export class MayaNPCManager {
             this.maya.y
         );
 
-        // Maya looks at player based on direction (like NPCManager)
-        this.updateMayaDirectionToPlayer(playerSprite);
+        // Only auto-update Maya to face the player when a guided sequence is NOT active.
+        // When guidedSequenceActive is true, Maya should face the movement direction (set by movement logic)
+        if (!this.guidedSequenceActive) {
+            this.updateMayaDirectionToPlayer(playerSprite);
+        }
 
         const wasNearNPC = this.isPlayerNearNPC;
         this.isPlayerNearNPC = distance < this.interactionDistance;
 
         // Show/hide interaction text with smooth fade only when dialog is not active
-        if (this.isPlayerNearNPC && !wasNearNPC && !this.activeDialog) {
-            this.scene.tweens.add({
-                targets: this.interactionText,
-                alpha: 1,
-                duration: 200,
-                ease: "Power1",
-            });
-        } else if (!this.isPlayerNearNPC && wasNearNPC) {
-            this.scene.tweens.add({
-                targets: this.interactionText,
-                alpha: 0,
-                duration: 200,
-                ease: "Power1",
-            });
+        // and Maya is not currently moving in the guided sequence
+        if (!this.movingToTarget) {
+            if (this.isPlayerNearNPC && !wasNearNPC && !this.activeDialog) {
+                this.scene.tweens.add({
+                    targets: this.interactionText,
+                    alpha: 1,
+                    duration: 200,
+                    ease: "Power1",
+                });
+            } else if (!this.isPlayerNearNPC && wasNearNPC) {
+                this.scene.tweens.add({
+                    targets: this.interactionText,
+                    alpha: 0,
+                    duration: 200,
+                    ease: "Power1",
+                });
+            }
         }
 
         // Hide interaction text when dialog is active
@@ -409,6 +433,19 @@ export class MayaNPCManager {
         // Update interaction text position
         this.updateInteractionTextPosition();
 
+        // If guided sequence active, maintain reminder position and check follow distance
+        if (this.guidedSequenceActive) {
+            // Keep follow reminder positioned in case camera moves
+            if (this.followReminderText) {
+                this.followReminderText.x = this.scene.cameras.main.centerX;
+            }
+
+            // Check player's distance and show alerts if needed
+            if (this.scene.getPlayer()) {
+                this.checkFollowDistance(this.scene.getPlayer().getSprite());
+            }
+        }
+
         // Check for interaction key press when near Maya
         if (
             this.isPlayerNearNPC &&
@@ -416,7 +453,335 @@ export class MayaNPCManager {
             Phaser.Input.Keyboard.JustDown(this.interactionKey) &&
             !this.activeDialog
         ) {
-            this.showDialog();
+            // If the guide already completed and player presses E at destination,
+            // show the final arrival interaction. Otherwise start the guided sequence.
+            if (this.guideCompleted) {
+                this.showArrivalInteraction();
+            } else {
+                this.startGuidedSequence();
+            }
+        }
+
+        // Per-frame straight-line movement handling
+        if (this.movingToTarget && this.moveTarget && this.moveDir) {
+            // delta in seconds
+            const deltaMs = (this.scene.game.loop && (this.scene.game.loop.delta)) || 16;
+            const deltaSec = deltaMs / 1000;
+
+            const moveStepX = this.moveDir.x * this.moveSpeed * deltaSec;
+            const moveStepY = this.moveDir.y * this.moveSpeed * deltaSec;
+
+            // Compute remaining distance to target
+            const remX = this.moveTarget.x - this.maya.x;
+            const remY = this.moveTarget.y - this.maya.y;
+            const remDistSq = remX * remX + remY * remY;
+
+            // If next step would overshoot, snap to target and finish
+            const nextX = this.maya.x + moveStepX;
+            const nextY = this.maya.y + moveStepY;
+            const nextRemX = this.moveTarget.x - nextX;
+            const nextRemY = this.moveTarget.y - nextY;
+            const nextRemDistSq = nextRemX * nextRemX + nextRemY * nextRemY;
+
+            if (nextRemDistSq > remDistSq) {
+                // overshoot detected or very close; snap
+                this.maya.x = this.moveTarget.x;
+                this.maya.y = this.moveTarget.y;
+            } else {
+                this.maya.x = nextX;
+                this.maya.y = nextY;
+            }
+
+            // Update name/interact text positions
+            this.updateInteractionTextPosition();
+
+            // Update tracker position live so HUD follows Maya along the path
+            locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
+
+            // Check if reached target (within 2px)
+            const arrived = Phaser.Math.Distance.Between(this.maya.x, this.maya.y, this.moveTarget.x, this.moveTarget.y) < 2;
+            if (arrived) {
+                // Stop movement
+                this.movingToTarget = false;
+                this.moveDir = null;
+                this.moveTarget = null;
+
+                // Play idle facing next waypoint or player
+                const nextIndex = this.currentWaypointIndex + 1;
+                if (nextIndex < this.waypoints.length) {
+                    const nextTarget = this.waypoints[nextIndex];
+                    this.faceDirectionTowards(nextTarget.x, nextTarget.y, /*useWalk=*/false);
+                } else {
+                    // Final arrival: face player
+                    if (this.scene.getPlayer()) {
+                        this.updateMayaDirectionToPlayer(this.scene.getPlayer().getSprite());
+                    } else {
+                        this.maya.anims.play('maya-idle-down', true);
+                    }
+                }
+
+                this.playIdleForCurrentFacing();
+
+                // Increment waypoint index and schedule next move
+                this.currentWaypointIndex++;
+                this.scene.time.delayedCall(this.pauseDurationMs, () => {
+                    this.moveToNextWaypoint();
+                });
+            }
+        }
+    }
+
+    /**
+     * Start Maya's guided sequence: show initial message then move along waypoints.
+     */
+    private startGuidedSequence(): void {
+    // Do not start again if the guide already completed
+    if (this.guidedSequenceActive || this.guideCompleted) return;
+
+        // Ensure the player is close enough to start
+        if (!this.scene.getPlayer()) return;
+
+        const player = this.scene.getPlayer().getSprite();
+        const dist = Phaser.Math.Distance.Between(player.x, player.y, this.maya.x, this.maya.y);
+        if (dist > this.interactionDistance) return; // do not start if too far
+
+        this.guidedSequenceActive = true;
+
+        // Hide interaction text
+        this.interactionText.setAlpha(0);
+
+    // Enable Maya tracking so HUD tracker follows her live position while she moves
+    locationTrackerManager.setTargetEnabled('maya', true);
+    // Ensure tracker has correct current position
+    locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
+
+        // Show initial dialogue immediately
+        this.showTemporaryDialog("Follow me, I'll take you to the Bank.", 1500);
+
+        // Prepare single waypoint for this step: user asked to keep it simple
+        // Maya should move only to this coordinate and stop; further path will be defined later.
+        this.waypoints = [
+            { x: 8465, y: 3626 }, // first target
+            { x: 8486, y: 6378 }, // next leg towards final destination (as requested)
+            { x: 9415, y: 6368 }, // final destination
+            { x: 9411, y: 6297 },
+        ];
+        this.currentWaypointIndex = 0;
+
+        // Create on-screen follow reminder (fixed to camera)
+        this.followReminderText = this.scene.add
+            .text(this.scene.cameras.main.centerX, 50, "➡️ Follow Maya to continue your journey.", {
+                fontFamily: Constants.DIALOG_TEXT_FONT,
+                fontSize: "18px",
+                color: "#ffffff",
+                align: "center",
+                backgroundColor: "#000000b3",
+                padding: { x: 10, y: 6 },
+            })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(2000);
+
+        // Start moving after a short delay so the initial message is visible
+        this.scene.time.delayedCall(1600, () => {
+            this.moveToNextWaypoint();
+        });
+    }
+
+    private showTemporaryDialog(text: string, durationMs: number = 1500): void {
+        // Simple speech bubble above Maya with text for a short duration
+        const bubble = this.scene.add.rectangle(this.scene.cameras.main.centerX, this.scene.cameras.main.height - 140, this.scene.cameras.main.width * 0.7, 80, 0x000000, 0.8);
+        bubble.setScrollFactor(0).setDepth(2001);
+        const msg = this.scene.add
+            .text(bubble.x, bubble.y, text, {
+                fontFamily: Constants.DIALOG_TEXT_FONT,
+                fontSize: Constants.DIALOG_TEXT_SIZE,
+                color: Constants.DIALOG_TEXT_COLOR,
+                align: "center",
+                wordWrap: { width: bubble.width - 40 },
+            })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(2002);
+
+        // Auto-destroy after duration
+        this.scene.time.delayedCall(durationMs, () => {
+            msg.destroy();
+            bubble.destroy();
+        });
+    }
+
+    private moveToNextWaypoint(): void {
+        if (!this.guidedSequenceActive) return;
+
+        // If we've finished all waypoints, handle arrival
+        if (this.currentWaypointIndex >= this.waypoints.length) {
+            this.onArriveAtDestination();
+            return;
+        }
+
+        const target = this.waypoints[this.currentWaypointIndex];
+
+        // Face the direction Maya will move
+        // Compute direction vector and initialize per-frame movement to ensure straight-line travel
+        const dx = target.x - this.maya.x;
+        const dy = target.y - this.maya.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 1) {
+            // Already at or extremely close to target — treat as arrived
+            this.currentWaypointIndex++;
+            this.scene.time.delayedCall(this.pauseDurationMs, () => this.moveToNextWaypoint());
+            return;
+        }
+
+        // Normalize direction
+        this.moveDir = { x: dx / distance, y: dy / distance };
+    this.moveTarget = { x: target.x, y: target.y };
+    this.movingToTarget = true;
+    // Ensure interaction hint is hidden while Maya moves
+    this.interactionText.setAlpha(0);
+
+        // Face movement direction and play walking animation
+        this.faceDirectionTowards(target.x, target.y, /*useWalk=*/true);
+    }
+
+    private faceDirectionTowards(targetX: number, targetY: number, useWalk: boolean = false): void {
+        const dx = targetX - this.maya.x;
+        const dy = targetY - this.maya.y;
+        // Decide primary direction
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) {
+                if (useWalk) this.maya.anims.play("maya-walk-right", true);
+                else this.maya.anims.play("maya-idle-right", true);
+            } else {
+                if (useWalk) this.maya.anims.play("maya-walk-left", true);
+                else this.maya.anims.play("maya-idle-left", true);
+            }
+        } else {
+            if (dy > 0) {
+                if (useWalk) this.maya.anims.play("maya-walk-down", true);
+                else this.maya.anims.play("maya-idle-down", true);
+            } else {
+                if (useWalk) this.maya.anims.play("maya-walk-up", true);
+                else this.maya.anims.play("maya-idle-up", true);
+            }
+        }
+    }
+
+    private playIdleForCurrentFacing(): void {
+        // Attempt to keep the current animation frame direction by checking current anim key
+        const animKey = this.maya.anims.currentAnim?.key || '';
+        if (animKey.includes('walk')) {
+            const idleKey = animKey.replace('walk', 'idle');
+            if (this.scene.anims.exists(idleKey)) this.maya.anims.play(idleKey, true);
+            else this.maya.anims.stop();
+        } else {
+            // Default to down idle
+            this.maya.anims.play('maya-idle-down', true);
+        }
+    }
+
+    private onArriveAtDestination(): void {
+        // Ensure movement stopped
+        this.guidedSequenceActive = false;
+
+    // Mark that the guided sequence completed so it cannot be retriggered
+    this.guideCompleted = true;
+
+        if (this.movingTween) {
+            this.movingTween.stop();
+            this.movingTween = null;
+        }
+
+        // Stop any alert timer
+        if (this.alertTimerEvent) {
+            this.alertTimerEvent.remove(false);
+            this.alertTimerEvent = null;
+        }
+
+        // Remove follow reminder
+        if (this.followReminderText) {
+            this.followReminderText.destroy();
+            this.followReminderText = null;
+        }
+
+        // Play idle animation and face player
+        if (this.scene.getPlayer()) {
+            this.updateMayaDirectionToPlayer(this.scene.getPlayer().getSprite());
+        } else {
+            this.maya.anims.play('maya-idle-down', true);
+        }
+
+        // Show final dialogue message
+        this.showTemporaryDialog("We have arrived at the Bank. Let's go inside.", 3000);
+
+        // Update tracker final position and disable tracker if player is near Maya
+        locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
+        if (this.scene.getPlayer()) {
+            const playerSprite = this.scene.getPlayer().getSprite();
+            const dist = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
+            if (dist < this.interactionDistance) {
+                locationTrackerManager.setTargetEnabled('maya', false);
+            }
+        }
+    }
+
+    private checkFollowDistance(playerSprite: GameObjects.Sprite): void {
+        if (!this.guidedSequenceActive) return;
+
+        const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
+
+        if (distance > this.distanceThreshold) {
+            // Show alert immediately if not already showing
+            if (!this.alertText) {
+                this.alertText = this.scene.add
+                    .text(this.scene.cameras.main.centerX, 90, "⚠️ You are too far away! Follow Maya.", {
+                        fontFamily: Constants.DIALOG_TEXT_FONT,
+                        fontSize: "16px",
+                        color: "#ffcc00",
+                        align: "center",
+                        backgroundColor: "#000000b3",
+                        padding: { x: 10, y: 6 },
+                    })
+                    .setOrigin(0.5)
+                    .setScrollFactor(0)
+                    .setDepth(2000);
+            }
+
+            // If no timer scheduled, create a repeating timer to re-alert every 60s
+            if (!this.alertTimerEvent) {
+                this.alertTimerEvent = this.scene.time.addEvent({
+                    delay: this.alertIntervalMs,
+                    loop: true,
+                    callback: () => {
+                        if (this.alertText && !this.alertText.scene) return;
+                        if (!this.alertText) {
+                            this.alertText = this.scene.add
+                                .text(this.scene.cameras.main.centerX, 90, "⚠️ You are too far away! Follow Maya.", {
+                                    fontFamily: Constants.DIALOG_TEXT_FONT,
+                                    fontSize: "16px",
+                                    color: "#ffcc00",
+                                    align: "center",
+                                    backgroundColor: "#000000b3",
+                                    padding: { x: 10, y: 6 },
+                                })
+                                .setOrigin(0.5)
+                                .setScrollFactor(0)
+                                .setDepth(2000);
+                        }
+                    }
+                });
+            }
+        } else {
+            // Player is close enough: remove alert and timer
+            if (this.alertText) {
+                this.alertText.destroy();
+                this.alertText = null;
+            }
+            if (this.alertTimerEvent) {
+                this.alertTimerEvent.remove(false);
+                this.alertTimerEvent = null;
+            }
         }
     }
 
@@ -457,6 +822,55 @@ export class MayaNPCManager {
         
         // Also ensure name text stays aligned
         this.ensureTextAlignment();
+    }
+
+    private showArrivalInteraction(): void {
+        // Prevent multiple activations
+        if (this.activeDialog) return;
+
+        this.activeDialog = true;
+
+        // Show final dialog box with the requested message
+        const dialogBox = this.scene.add.rectangle(
+            this.scene.cameras.main.centerX,
+            this.scene.cameras.main.height - 150,
+            this.scene.cameras.main.width * 0.8,
+            120,
+            0x000000,
+            0.85
+        );
+        dialogBox.setScrollFactor(0).setDepth(2000);
+
+        const lines = "This is our Central Bank!\nGo inside and meet the bank manager.";
+        const dialogText = this.scene.add
+            .text(dialogBox.x, dialogBox.y, lines, {
+                fontFamily: Constants.DIALOG_TEXT_FONT,
+                fontSize: Constants.DIALOG_TEXT_SIZE,
+                color: Constants.DIALOG_TEXT_COLOR,
+                align: "center",
+                wordWrap: { width: dialogBox.width - 40 },
+            })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(2001);
+
+        // Close instruction
+        const closeText = this.scene.add
+            .text(dialogBox.x, dialogBox.y + 50, "Press E, Space or Enter to close", {
+                fontFamily: Constants.DIALOG_INSTRUCTION_FONT,
+                fontSize: Constants.DIALOG_INSTRUCTION_SIZE,
+                color: Constants.DIALOG_INSTRUCTION_COLOR,
+                align: "center",
+            })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(2001);
+
+        this.dialogContainer = this.scene.add.container(0, 0);
+        this.dialogContainer.add([dialogBox, dialogText, closeText]);
+
+        // Register key listeners to close
+        this.setupDialogKeyListeners();
     }
 
     private ensureTextAlignment(): void {
