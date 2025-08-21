@@ -108,8 +108,8 @@ gameRouter.get("/game/player-state", async (ctx) => {
                 userId,
                 position: { x: 400, y: 300, scene: "main" },
                 financial: {
-                    rupees: 25000, // Starting amount
-                    totalWealth: 25000,
+                    rupees: 0, // Starting amount
+                    totalWealth: 0,
                     bankBalance: 0,
                     stockPortfolioValue: 0,
                 },

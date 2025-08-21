@@ -228,7 +228,7 @@ impl UserData {
         Self {
             wallet_address,
             dual_balance: DualBalance {
-                rupees_balance: 25000.0, // Starting balance
+                rupees_balance: 0.0, // Starting balance
                 token_balance: 0.0,
                 last_updated: now,
             },

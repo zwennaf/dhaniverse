@@ -21,7 +21,7 @@ mod tests {
     #[test]
     fn test_dual_balance_serialization() {
         let balance = DualBalance {
-            rupees_balance: 25000.0,
+            rupees_balance: 0.0,
             token_balance: 100.0,
             last_updated: 1234567890,
         };
@@ -334,7 +334,7 @@ mod tests {
         let user_data = UserData::new(address.clone());
         
         assert_eq!(user_data.wallet_address, address);
-        assert_eq!(user_data.dual_balance.rupees_balance, 25000.0);
+        assert_eq!(user_data.dual_balance.rupees_balance, 0.0);
         assert_eq!(user_data.dual_balance.token_balance, 0.0);
         assert_eq!(user_data.staking_pools.len(), 0);
         assert_eq!(user_data.achievements.len(), 0);

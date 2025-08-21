@@ -255,7 +255,7 @@ const StockGraph: React.FC<StockGraphProps> = ({
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
                     {stock.marketCap > 1000000000 ? 'Large Cap' : 
-                     stock.marketCap > 250000000 ? 'Mid Cap' : 'Small Cap'}
+                     stock.marketCap > 100000000 ? 'Mid Cap' : 'Small Cap'}
                   </div>
                 </div>
                 

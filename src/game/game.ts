@@ -231,7 +231,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
 
         if (response.success && response.data) {
             const playerState = response.data;
-            const rupees = playerState.financial?.rupees || 25000;
+            const rupees = playerState.financial?.rupees || 0;
 
             console.log("Player state loaded successfully:", {
                 rupees,
@@ -281,7 +281,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
         }
 
         // Fallback to default if API fails
-        const defaultRupees = 25000;
+        const defaultRupees = 0;
         console.log("Using default rupees:", defaultRupees);
 
         initializeHUD(defaultRupees);
