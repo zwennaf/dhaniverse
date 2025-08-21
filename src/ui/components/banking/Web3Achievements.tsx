@@ -52,7 +52,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
                 description: 'Complete your first currency exchange',
                 category: 'trading',
                 rarity: 'common',
-                unlocked: rupeesBalance > 25000 || icpTokenBalance > 0,
+                unlocked: rupeesBalance > 0 || icpTokenBalance > 0,
                 reward: { type: 'icp', amount: 10 }
             },
             {

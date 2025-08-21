@@ -98,7 +98,7 @@ function initializeATMInterface() {
 }
 
 // Function to initialize HUD - will be called from game.ts when game starts
-export function initializeHUD(initialRupees = 25000) {
+export function initializeHUD(initialRupees = 0) {
   const hudContainer = document.getElementById('hud-container');
   
   if (hudContainer) {

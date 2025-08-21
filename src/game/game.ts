@@ -11,6 +11,185 @@ import { playerStateApi } from "../utils/api.ts";
 let game: Phaser.Game | null = null;
 let gameContainer: HTMLElement | null = null;
 let loadingText: HTMLElement | null = null;
+let assetLoader: AssetLoader | null = null;
+
+/**
+ * Asset loader class to handle background loading
+ */
+class AssetLoader {
+    private loadedAssets: number = 0;
+    private totalAssets: number = 0;
+    private onProgress: (progress: number) => void;
+    private onComplete: () => void;
+
+    constructor(onProgress: (progress: number) => void, onComplete: () => void) {
+        this.onProgress = onProgress;
+        this.onComplete = onComplete;
+    }
+
+    async loadAssets(): Promise<void> {
+        // Define all assets that need to be preloaded (excluding chunks - ChunkedMapManager handles those)
+        const assetsToLoad = [
+            // Interior building textures
+            { type: 'image', key: 'interior', url: '/maps/bank.png' },
+            { type: 'image', key: 'stockmarket', url: '/maps/stockmarket.png' },
+            // Character spritesheets
+            { type: 'spritesheet', key: 'C1', url: '/characters/C1.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },
+            { type: 'spritesheet', key: 'C2', url: '/characters/C2.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },
+            { type: 'spritesheet', key: 'C3', url: '/characters/C3.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },
+            { type: 'spritesheet', key: 'C4', url: '/characters/C4.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },
+            { type: 'spritesheet', key: 'maya', url: '/characters/maya.png', frameConfig: { frameWidth: 64, frameHeight: 64 } },
+            // Collision data
+            { type: 'json', key: 'collisionData', url: '/collisions/collisions.json' },
+            // UI assets
+            { type: 'spritesheet', key: 'speech_bubble_grey', url: '/UI/speech_bubble_grey.png', frameConfig: { frameWidth: 64, frameHeight: 64 } },
+            // Audio assets
+            { type: 'audio', key: 'coin-deposit', url: '/sounds/coin-deposit.mp3' },
+            { type: 'audio', key: 'coin-withdraw', url: '/sounds/coin-withdraw.mp3' }
+        ];
+
+        this.totalAssets = assetsToLoad.length;
+        this.loadedAssets = 0;
+
+        // Load all assets in parallel
+        const loadPromises = assetsToLoad.map(asset => this.loadSingleAsset(asset));
+        
+        try {
+            await Promise.all(loadPromises);
+            this.onComplete();
+        } catch (error) {
+            console.error('Error loading assets:', error);
+            // Continue anyway - Phaser will handle missing assets gracefully
+            this.onComplete();
+        }
+    }
+
+    private async loadSingleAsset(asset: any): Promise<void> {
+        return new Promise((resolve, reject) => {
+            try {
+                if (asset.type === 'image' || asset.type === 'spritesheet') {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            // Store the loaded image for Phaser to use later
+                            (window as any).preloadedAssets = (window as any).preloadedAssets || {};
+                            (window as any).preloadedAssets[asset.key] = {
+                                type: asset.type,
+                                element: img,
+                                frameConfig: asset.frameConfig
+                            };
+                            
+                            this.loadedAssets++;
+                            const progress = this.loadedAssets / this.totalAssets;
+                            
+                            // Dispatch detailed progress event
+                            window.dispatchEvent(new CustomEvent('gameAssetProgress', {
+                                detail: {
+                                    progress: Math.round(progress * 100),
+                                    loaded: this.loadedAssets,
+                                    total: this.totalAssets,
+                                    status: this.getStatusForProgress(Math.round(progress * 100))
+                                }
+                            }));
+                            
+                            this.onProgress(progress);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${asset.url}`);
+                        this.loadedAssets++;
+                        this.onProgress(this.loadedAssets / this.totalAssets);
+                        resolve(); // Don't reject, just continue
+                    };
+                    img.crossOrigin = 'anonymous';
+                    img.src = asset.url;
+                } else if (asset.type === 'json') {
+                    fetch(asset.url)
+                        .then(response => response.json())
+                        .then((data) => {
+                            // Store the loaded JSON data
+                            (window as any).preloadedAssets = (window as any).preloadedAssets || {};
+                            (window as any).preloadedAssets[asset.key] = {
+                                type: asset.type,
+                                data: data
+                            };
+                            
+                            this.loadedAssets++;
+                            this.onProgress(this.loadedAssets / this.totalAssets);
+                            resolve();
+                        })
+                        .catch(() => {
+                            console.warn(`Failed to load JSON: ${asset.url}`);
+                            this.loadedAssets++;
+                            this.onProgress(this.loadedAssets / this.totalAssets);
+                            resolve(); // Don't reject, just continue
+                        });
+                } else if (asset.type === 'audio') {
+                    const audio = new Audio();
+                    audio.oncanplaythrough = () => {
+                        // Store the loaded audio
+                        (window as any).preloadedAssets = (window as any).preloadedAssets || {};
+                        (window as any).preloadedAssets[asset.key] = {
+                            type: asset.type,
+                            element: audio
+                        };
+                        
+                        this.loadedAssets++;
+                        this.onProgress(this.loadedAssets / this.totalAssets);
+                        resolve();
+                    };
+                    audio.onerror = () => {
+                        console.warn(`Failed to load audio: ${asset.url}`);
+                        this.loadedAssets++;
+                        this.onProgress(this.loadedAssets / this.totalAssets);
+                        resolve(); // Don't reject, just continue
+                    };
+                    audio.src = asset.url;
+                } else {
+                    // Unknown asset type, just mark as loaded
+                    this.loadedAssets++;
+                    this.onProgress(this.loadedAssets / this.totalAssets);
+                    resolve();
+                }
+            } catch (error) {
+                console.warn(`Error loading asset ${asset.url}:`, error);
+                this.loadedAssets++;
+                this.onProgress(this.loadedAssets / this.totalAssets);
+                resolve(); // Don't reject, just continue
+            }
+        });
+    }
+
+    private getStatusForProgress(progress: number): string {
+        if (progress < 20) return 'Loading Game Assets...';
+        if (progress < 40) return 'Loading Characters...';
+        if (progress < 60) return 'Loading UI Elements...';
+        if (progress < 80) return 'Loading Audio...';
+        if (progress < 95) return 'Finalizing...';
+        return 'Ready!';
+    }
+
+    // Clean up method
+    public cleanup(): void {
+        // Clear preloaded assets from memory when no longer needed
+        if ((window as any).preloadedAssets) {
+            const assets = (window as any).preloadedAssets;
+            Object.keys(assets).forEach(key => {
+                const asset = assets[key];
+                if (asset.element && asset.element.src) {
+                    // Revoke blob URLs to prevent memory leaks
+                    if (asset.element.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(asset.element.src);
+                    }
+                }
+            });
+            delete (window as any).preloadedAssets;
+        }
+    }
+}
 
 /**
  * Start game with the provided username and selected character
@@ -35,22 +214,49 @@ export function startGame(username: string, selectedCharacter: string = 'C2'): v
     gameContainer.style.display = "block";
     gameContainer.style.width = "100%";
     gameContainer.style.height = "100vh";
-    // Create loading indicator
-    loadingText = document.createElement("div");
-    loadingText.textContent = "Loading game assets...";
-    loadingText.style.position = "absolute";
-    loadingText.style.top = "50%";
-    loadingText.style.left = "50%";
-    loadingText.style.transform = "translate(-50%, -50%)";
-    loadingText.style.color = "white";
-    loadingText.style.fontSize = "24px";
-    loadingText.style.fontFamily = "VCR OSD Mono, monospace";
-    loadingText.style.textAlign = "center";
-    loadingText.style.zIndex = "1000";
-    gameContainer.appendChild(loadingText);
 
     // Get any room code from local storage
     const roomCode = localStorage.getItem("dhaniverse_room_code") || "";
+
+    console.log(`Starting game with username: ${username}, room code: ${roomCode}`);
+
+    // Start loading assets in background while showing custom loader
+    startAssetLoading(username, selectedCharacter, roomCode);
+}
+
+/**
+ * Start asset loading in background and update custom loader
+ */
+function startAssetLoading(username: string, selectedCharacter: string, roomCode: string): void {
+    // Notify the custom loader to start
+    window.dispatchEvent(new CustomEvent('gameAssetLoadingStart'));
+
+    // Create asset loader with progress callbacks
+    assetLoader = new AssetLoader(
+        (progress: number) => {
+            // Update custom loader progress
+            window.dispatchEvent(new CustomEvent('gameAssetLoadingProgress', { 
+                detail: { progress: Math.round(progress * 100) } 
+            }));
+        },
+        () => {
+            // Assets loaded, now initialize Phaser game
+            initializePhaserGame(username, selectedCharacter, roomCode);
+        }
+    );
+
+    // Start loading assets
+    assetLoader.loadAssets();
+}
+
+/**
+ * Initialize Phaser game after assets are preloaded
+ */
+function initializePhaserGame(username: string, selectedCharacter: string, roomCode: string): void {
+    if (!gameContainer) {
+        console.error("Game container not found");
+        return;
+    }
 
     // Configure the game
     const config: Phaser.Types.Core.GameConfig = {
@@ -106,42 +312,33 @@ export function startGame(username: string, selectedCharacter: string = 'C2'): v
         gameContainer.removeChild(existingCanvas);
     }
 
-    console.log(
-        `Starting game with username: ${username}, room code: ${roomCode}`
-    );
+    try {
+        game = new Phaser.Game(config);
 
-    // Initialize the game after a short delay to allow DOM to update
-    setTimeout(() => {
-        try {
-            game = new Phaser.Game(config);
+        // Register the username, room code, and selected character for the game
+        game.registry.set("username", username);
+        game.registry.set("roomCode", roomCode);
+        game.registry.set("selectedCharacter", selectedCharacter);
 
-            // Register the username, room code, and selected character for the game
-            game.registry.set("username", username);
-            game.registry.set("roomCode", roomCode);
-            game.registry.set("selectedCharacter", selectedCharacter);
+        // Initialize the React HUD when game is ready
+        game.events.once("ready", () => {
+            // Load player state from backend and initialize HUD
+            loadPlayerStateAndInitializeHUD();
 
-            // Initialize the React HUD when game is ready
-            game.events.once("ready", () => {
-                // Load player state from backend and initialize HUD
-                loadPlayerStateAndInitializeHUD();
+            // Notify custom loader that game is ready
+            window.dispatchEvent(new CustomEvent('gameAssetLoadingComplete'));
 
-                // Remove loading indicator
-                if (loadingText && gameContainer) {
-                    gameContainer.removeChild(loadingText);
-                    loadingText = null;
-                }
-
-                // Setup resize handling after game is ready
-                setupResizeHandling();
-            });
-        } catch (error) {
-            console.error("Error initializing game:", error);
-            if (loadingText) {
-                loadingText.textContent =
-                    "Error starting game. Please refresh the page.";
-            }
-        }
-    }, 300);
+            // Setup resize handling after game is ready
+            setupResizeHandling();
+        });
+    } catch (error) {
+        console.error("Error initializing game:", error);
+        // Notify custom loader of error
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        window.dispatchEvent(new CustomEvent('gameAssetLoadingError', { 
+            detail: { error: errorMessage } 
+        }));
+    }
 }
 
 /**
@@ -150,6 +347,11 @@ export function startGame(username: string, selectedCharacter: string = 'C2'): v
 export function stopGame(): void {
     // Notify MainScene and systems to stop and disconnect first
     window.dispatchEvent(new Event("stopGame"));
+
+    // Clean up asset loader
+    if (assetLoader) {
+        assetLoader = null;
+    }
 
     // Clean up resize timeout
     if (resizeTimeout) {
@@ -231,7 +433,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
 
         if (response.success && response.data) {
             const playerState = response.data;
-            const rupees = playerState.financial?.rupees || 25000;
+            const rupees = playerState.financial?.rupees || 0;
 
             console.log("Player state loaded successfully:", {
                 rupees,
@@ -281,7 +483,7 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
         }
 
         // Fallback to default if API fails
-        const defaultRupees = 25000;
+        const defaultRupees = 0;
         console.log("Using default rupees:", defaultRupees);
 
         initializeHUD(defaultRupees);

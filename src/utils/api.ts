@@ -46,9 +46,10 @@ export const playerStateApi = {
                 // Create default player state
                 const defaultState = {
                     financial: {
-                        rupees: 25000,
-                        totalWealth: 25000,
+                        rupees: 0,
+                        totalWealth: 0,
                     },
+                    hasCompletedTutorial: false, // Default for new players
                 };
 
                 // Create the player state
@@ -74,9 +75,10 @@ export const playerStateApi = {
                 success: true,
                 data: {
                     financial: {
-                        rupees: 25000,
-                        totalWealth: 25000,
+                        rupees: 0,
+                        totalWealth: 0,
                     },
+                    hasCompletedTutorial: false, // Default for new players
                 },
             };
         }

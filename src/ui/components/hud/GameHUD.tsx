@@ -23,7 +23,7 @@ interface ConnectedPlayer {
 }
 
 const GameHUD: React.FC<GameHUDProps> = ({
-    rupees = 25000,
+    rupees = 0,
     username = "Player",
     walletManager,
     icpService,

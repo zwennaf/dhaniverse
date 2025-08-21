@@ -49,7 +49,7 @@ export class Web3BankingService {
     constructor(walletService: Web3WalletService) {
         this.walletService = walletService;
         this.dualBalance = {
-            rupeesBalance: 25000, // Starting balance
+            rupeesBalance: 0, // Starting balance
             tokenBalance: 0,
             lastUpdated: Date.now()
         };

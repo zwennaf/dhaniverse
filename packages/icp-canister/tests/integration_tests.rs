@@ -127,7 +127,7 @@ fn test_banking_operations() {
     
     assert!(balance_result.is_ok());
     let balance = balance_result.unwrap();
-    assert_eq!(balance.rupees_balance, 25000.0); // Starting balance
+    assert_eq!(balance.rupees_balance, 0.0); // Starting balance
     assert_eq!(balance.token_balance, 0.0);
     
     // Test currency exchange
@@ -159,7 +159,7 @@ fn test_banking_operations() {
     let balance_result: Result<DualBalance, String> = 
         Decode!(result.unwrap().bytes(), Result<DualBalance, String>).unwrap();
     let balance = balance_result.unwrap();
-    assert_eq!(balance.rupees_balance, 24000.0); // 25000 - 1000
+    assert_eq!(balance.rupees_balance, 24000.0); // 0 - 1000
     assert_eq!(balance.token_balance, 100.0); // 0 + 100
 }
 
@@ -577,7 +577,7 @@ fn test_concurrent_operations() {
         
         assert!(balance_result.is_ok());
         let balance = balance_result.unwrap();
-        assert_eq!(balance.rupees_balance, 24000.0); // 25000 - 1000
+        assert_eq!(balance.rupees_balance, 24000.0); // 0 - 1000
         assert_eq!(balance.token_balance, 100.0); // 1000 * 0.1
     }
 }

@@ -70,7 +70,7 @@ export class MainScene extends Scene implements MainGameScene {
     private loadingProgress: number = 0;
     private progressBar?: GameObjects.Graphics;
     private progressText?: GameObjects.Text;
-    playerRupees: number = 25000; // Store rupees in the scene
+    playerRupees: number = 0; // Store rupees in the scene
     private _bankingClosedListenerAdded: boolean = false;
     private _stockMarketClosedListenerAdded: boolean = false;
     private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
@@ -225,61 +225,52 @@ export class MainScene extends Scene implements MainGameScene {
     }
 
     preload(): void {
-        // Create loading progress bar
-        this.createProgressBar();
+        console.log("Assets already preloaded, registering with Phaser...");
 
-        // Map chunks will be loaded dynamically by ChunkedMapManager
-
-        // Load other assets normally
-        this.load.image("interior", "/maps/bank.png");
-        this.load.image("stockmarket", "/maps/stockmarket.png");
-
-        // Load all character skins so we can show others with different skins
-        const frameCfg = { frameWidth: 1000.25, frameHeight: 1000.25 };
-        ["C1", "C2", "C3", "C4"].forEach((skin) => {
-            this.load.spritesheet(skin, `/characters/${skin}.png`, frameCfg);
+        // Register preloaded assets with Phaser's texture and cache managers
+        const preloadedAssets = (window as any).preloadedAssets || {};
+        
+        Object.keys(preloadedAssets).forEach(key => {
+            const asset = preloadedAssets[key];
+            
+            try {
+                if (asset.type === 'image') {
+                    if (!this.textures.exists(key)) {
+                        this.textures.addImage(key, asset.element);
+                    }
+                } else if (asset.type === 'spritesheet') {
+                    if (!this.textures.exists(key)) {
+                        this.textures.addSpriteSheet(key, asset.element, asset.frameConfig);
+                    }
+                } else if (asset.type === 'json') {
+                    if (!this.cache.json.exists(key)) {
+                        this.cache.json.add(key, asset.data);
+                    }
+                } else if (asset.type === 'audio') {
+                    if (!this.cache.audio.exists(key)) {
+                        this.cache.audio.add(key, asset.element);
+                    }
+                }
+            } catch (error) {
+                console.warn(`Failed to register preloaded asset ${key}:`, error);
+            }
         });
-        // Maintain legacy key 'character' for the local player using selected skin
+
+        // Ensure legacy character key exists for backward compatibility
         const selectedCharacter = this.getSelectedCharacter();
-        this.load.spritesheet("character", `/characters/${selectedCharacter}.png`, frameCfg);
-
-        // Load Maya's spritesheet with 5 columns x 8 rows (64x64 each tile)
-        this.load.spritesheet("maya", "/characters/maya.png", {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-
-        this.load.json("collisionData", "/collisions/collisions.json");
-
-        // Load the speech bubble sprite sheet with proper dimensions
-        this.load.spritesheet(
-            "speech_bubble_grey",
-            "/UI/speech_bubble_grey.png",
-            {
-                frameWidth: 64,
-                frameHeight: 64,
+        if (preloadedAssets[selectedCharacter] && !this.textures.exists('character')) {
+            try {
+                this.textures.addSpriteSheet(
+                    'character', 
+                    preloadedAssets[selectedCharacter].element, 
+                    preloadedAssets[selectedCharacter].frameConfig
+                );
+            } catch (error) {
+                console.warn('Failed to create character texture:', error);
             }
-        );
+        }
 
-        // Load sound effects for banking transactions
-        this.load.audio("coin-deposit", "/sounds/coin-deposit.mp3");
-        this.load.audio("coin-withdraw", "/sounds/coin-withdraw.mp3");
-
-        // Track loading progress
-        this.load.on("progress", (value: number) => {
-            this.loadingProgress = value;
-            this.updateProgressBar();
-        });
-
-        this.load.on("complete", () => {
-            // Remove progress bar when loading is complete
-            if (this.progressBar) {
-                this.progressBar.destroy();
-            }
-            if (this.progressText) {
-                this.progressText.destroy();
-            }
-        });
+        console.log("Preloaded assets registered with Phaser");
     }
 
     // Create takes care of establishing game elements

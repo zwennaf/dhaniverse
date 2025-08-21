@@ -64,7 +64,7 @@ const DEFAULT_STAKING_POOLS: StakingPool[] = [
         minimumStake: '100',
         maximumStake: '10000',
         lockPeriod: 30,
-        totalStaked: '1250000',
+        totalStaked: '100',
         totalParticipants: 847,
         isActive: true,
         description: 'Low-risk staking pool for USDC with stable returns',
