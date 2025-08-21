@@ -107,7 +107,8 @@ const ONBOARDING_SLIDES: OnboardingSlide[] = [
   }
 ];
 
-const TRANSITION_MS = 350;
+// Transition timing - reduced for smoother experience
+const TRANSITION_MS = 150; // Reduced from 250ms to 150ms
 
 const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
   onContinueToGame,
@@ -157,12 +158,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
     `;
     document.head.appendChild(styleEl);
 
-    // Initial fade-in effect
+    // Initial fade-in effect - reduced timing
     setTimeout(() => {
       if (mountedRef.current) {
         setIsInitialLoad(false);
       }
-    }, 800); // Increased from 100ms to 800ms for visible fade-out
+    }, 200); // Reduced from 800ms to 200ms for quicker fade-in
 
     return () => {
       mountedRef.current = false;
@@ -285,7 +286,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          filter: 'blur(4px)',
+          filter: 'blur(2px)',
           zIndex: 1
         }}
       />

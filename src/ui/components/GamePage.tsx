@@ -6,10 +6,12 @@ import { playerStateApi } from '../../utils/api';
 import PixelButton from './atoms/PixelButton';
 import SEO from './SEO';
 import OnboardingWrapper from './onboarding/OnboardingWrapper';
+import Loader from './loader/Loader';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(true);
+  const [showLoader, setShowLoader] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Set to false for local development to test onboarding
   const navigate = useNavigate();
@@ -44,18 +46,19 @@ const GamePage: React.FC = () => {
         // This allows testing the onboarding flow
         const shouldShowOnboarding = !tutorialCompleted; // Show onboarding if tutorial not completed in backend
         console.log("GamePage: Should show onboarding:", shouldShowOnboarding);
-        setShowOnboarding(shouldShowOnboarding);
-        setIsLoading(false);
         
-        // Only start the game if tutorial is completed
-        if (tutorialCompleted) {
+        if (shouldShowOnboarding) {
+          // Show loader first for new users
+          setShowLoader(true);
+        } else {
+          // Returning users skip loader and onboarding
+          setIsLoading(false);
           startGameFlow(gameUsername);
         }
       } catch (error) {
         console.error("GamePage: Error checking tutorial status:", error);
-        // Default to showing onboarding on error for testing
-        setShowOnboarding(true);
-        setIsLoading(false);
+        // Default to showing loader and onboarding on error for testing
+        setShowLoader(true);
       }
     };
 
@@ -80,6 +83,19 @@ const GamePage: React.FC = () => {
     return () => {
       clearTimeout(gameStartTimeout);
     };
+  };
+
+  const handleLoaderComplete = () => {
+    console.log("GamePage: Loader completed");
+    setShowLoader(false);
+    setIsLoading(false);
+    
+    // Check if user needs onboarding
+    if (!hasCompletedTutorial) {
+      console.log("GamePage: Showing onboarding for new user");
+      setShowOnboarding(true);
+    }
+    // For returning users, the game will start automatically when isLoading becomes false
   };
 
   const handleContinueToGame = async () => {
@@ -137,15 +153,9 @@ const GamePage: React.FC = () => {
     };
   }, []);
    
-  if (isLoading || !isLoaded) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-black text-white">
-        <div className="text-center">
-          <h1 className="text-2xl mb-4">Loading game...</h1>
-          <div className="w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin mx-auto"></div>
-        </div>
-      </div>
-    );
+  // Show custom loader for first-time players or during initial loading
+  if (showLoader || (isLoading || !isLoaded)) {
+    return <Loader onLoadingComplete={handleLoaderComplete} />;
   }
 
   // Show onboarding for first-time players
