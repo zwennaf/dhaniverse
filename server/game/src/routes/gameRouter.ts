@@ -324,7 +324,7 @@ gameRouter.post("/game/bank-account/deposit", async (ctx) => {
                 $inc: { balance: amount },
                 $push: { transactions: transaction },
                 $set: { lastUpdated: new Date() },
-            },
+            } as unknown as Parameters<typeof bankAccounts.updateOne>[1],
             { upsert: true }
         );
 
@@ -395,7 +395,7 @@ gameRouter.post("/game/bank-account/withdraw", async (ctx) => {
                 $inc: { balance: -amount },
                 $push: { transactions: transaction },
                 $set: { lastUpdated: new Date() },
-            }
+            } as unknown as Parameters<typeof bankAccounts.updateOne>[1]
         );
 
         // Add rupees to player
@@ -534,7 +534,7 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
                     },
                 },
                 $set: { lastUpdated: new Date() },
-            }
+            } as unknown as Parameters<typeof bankAccounts.updateOne>[1]
         );
 
         ctx.response.body = {
@@ -624,7 +624,7 @@ gameRouter.post("/game/fixed-deposits/:id/claim", async (ctx) => {
                     },
                 },
                 $set: { lastUpdated: new Date() },
-            }
+            } as unknown as Parameters<typeof bankAccounts.updateOne>[1]
         );
 
         ctx.response.body = {
