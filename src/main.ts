@@ -9,11 +9,15 @@ import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
 import { balanceManager } from './services/BalanceManager.ts';
+import { suppressFedCMWarnings } from './utils/googleAuth.ts';
 
 let hudRootRef: ReactDOM.Root | null = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
+  // Suppress Google FedCM warnings early
+  suppressFedCMWarnings();
+  
   // Initialize game fonts first
   await FontUtils.initializeGameFonts();
   // Get root container for React

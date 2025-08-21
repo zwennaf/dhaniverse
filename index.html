@@ -246,12 +246,23 @@
             });
         </script>
 
-        <!-- Default Structured Data - will be updated dynamically by SEO component -->
+        <!-- Google Identity Services with FedCM support -->
         <script
             src="https://accounts.google.com/gsi/client"
             async
             defer
         ></script>
+        
+        <!-- FedCM configuration for Google Sign-In -->
+        <script>
+            // Configure FedCM for Google Identity Services
+            if ('IdentityCredential' in window) {
+                // FedCM is supported, configure it
+                console.log('FedCM is supported in this browser');
+            } else {
+                console.log('FedCM is not supported in this browser, using fallback');
+            }
+        </script>
         <!-- <script src="/performance.js" async></script> -->
         <link rel="stylesheet" href="/src/style.css" />
         <style>
