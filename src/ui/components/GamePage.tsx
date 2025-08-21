@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
+import { playerStateApi } from '../../utils/api';
 import PixelButton from './atoms/PixelButton';
 import SEO from './SEO';
+import OnboardingWrapper from './onboarding/OnboardingWrapper';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Set to false for local development to test onboarding
   const navigate = useNavigate();
    
   useEffect(() => {
@@ -25,14 +29,46 @@ const GamePage: React.FC = () => {
       navigate('/profile');
       return;
     }
-    
+
+    // Check player tutorial status
+    const checkTutorialStatus = async () => {
+      try {
+        console.log("GamePage: Checking tutorial status...");
+        const playerState = await playerStateApi.get();
+        const tutorialCompleted = playerState?.data?.hasCompletedTutorial ?? false;
+        
+        console.log("GamePage: Tutorial completed:", tutorialCompleted);
+        setHasCompletedTutorial(tutorialCompleted);
+        
+        // For local development, force show onboarding when hasCompletedTutorial is false
+        // This allows testing the onboarding flow
+        const shouldShowOnboarding = !tutorialCompleted; // Show onboarding if tutorial not completed in backend
+        console.log("GamePage: Should show onboarding:", shouldShowOnboarding);
+        setShowOnboarding(shouldShowOnboarding);
+        setIsLoading(false);
+        
+        // Only start the game if tutorial is completed
+        if (tutorialCompleted) {
+          startGameFlow(gameUsername);
+        }
+      } catch (error) {
+        console.error("GamePage: Error checking tutorial status:", error);
+        // Default to showing onboarding on error for testing
+        setShowOnboarding(true);
+        setIsLoading(false);
+      }
+    };
+
+    checkTutorialStatus();
+  }, [isLoaded, isSignedIn, user?.gameUsername, user?.selectedCharacter, navigate, hasCompletedTutorial]);
+
+  const startGameFlow = (gameUsername: string) => {
     console.log("GamePage useEffect: Starting game for", gameUsername);
     
     // All good: start game
     document.body.classList.add('game-active');
     const gameContainer = document.getElementById('game-container');
     if (gameContainer) gameContainer.style.display = 'block';
-    setIsLoading(false);
     
     // Start game with a slight delay
     const gameStartTimeout = setTimeout(() => {
@@ -42,8 +78,41 @@ const GamePage: React.FC = () => {
     }, 100);
 
     return () => {
-      console.log("GamePage: Cleanup - stopping game");
       clearTimeout(gameStartTimeout);
+    };
+  };
+
+  const handleContinueToGame = async () => {
+    console.log("GamePage: User clicked continue to game");
+    
+    try {
+      // Update the player state to mark tutorial as completed
+      await playerStateApi.update({
+        hasCompletedTutorial: false, // Keep as false as requested for testing
+      });
+      
+      console.log("GamePage: Updated hasCompletedTutorial to false for testing");
+      
+      // Hide onboarding and start the game
+      setShowOnboarding(false);
+      
+      if (user?.gameUsername) {
+        startGameFlow(user.gameUsername);
+      }
+    } catch (error) {
+      console.error("GamePage: Error updating tutorial status:", error);
+      // Continue to game anyway
+      setShowOnboarding(false);
+      if (user?.gameUsername) {
+        startGameFlow(user.gameUsername);
+      }
+    }
+  };
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      console.log("GamePage: Cleanup - stopping game");
       stopGame();
       
       const gameContainer = document.getElementById('game-container');
@@ -66,7 +135,7 @@ const GamePage: React.FC = () => {
       
       document.body.classList.remove('game-active');
     };
-  }, [isLoaded, isSignedIn, user?.gameUsername, user?.selectedCharacter, navigate]); // More specific dependency
+  }, []);
    
   if (isLoading || !isLoaded) {
     return (
@@ -77,6 +146,11 @@ const GamePage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // Show onboarding for first-time players
+  if (showOnboarding) {
+    return <OnboardingWrapper onContinueToGame={handleContinueToGame} />;
   }
    
   // The game will be rendered by Phaser in the game-container div

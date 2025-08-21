@@ -70,7 +70,7 @@ export class MainScene extends Scene implements MainGameScene {
     private loadingProgress: number = 0;
     private progressBar?: GameObjects.Graphics;
     private progressText?: GameObjects.Text;
-    playerRupees: number = 25000; // Store rupees in the scene
+    playerRupees: number = 0; // Store rupees in the scene
     private _bankingClosedListenerAdded: boolean = false;
     private _stockMarketClosedListenerAdded: boolean = false;
     private handleRupeeUpdateBound = this.handleRupeeUpdate.bind(this);
