@@ -4,6 +4,7 @@ import { PhaserChunkContainer } from "./PhaserChunkContainer.ts";
 import { PreloadingManager } from "./preloading/PreloadingManager.ts";
 import { PreloadingConfig } from "./preloading/IPreloadingStrategy.ts";
 import { ErrorHandlerChain } from "./error-handling/ErrorHandlerChain.ts";
+import { getChunkDataUrl, storeChunk } from "../cache/mapChunkCache.ts";
 
 interface MapCache {
     width: number;
@@ -73,6 +74,8 @@ export class ChunkedMapManager {
     private maxLoadedChunks: number = 40; // Reduced from 50
     private maxConcurrentLoads: number = 2; // Reduced from 4 to prevent stuttering
     private chunkAccessTimes: Map<string, number> = new Map(); // LRU tracking
+    private inFlightLoads: Map<string, Promise<void>> = new Map(); // de-dupe simultaneous requests
+    private lastRequestTimes: Map<string, number> = new Map(); // throttle rapid re-requests
 
     // Error handling
     private failedChunks: Map<string, number> = new Map(); // Track failed chunks and retry count
@@ -247,6 +250,13 @@ export class ChunkedMapManager {
         try {
             const textureKey = `chunk_${chunk.id}`;
 
+            // If already an in-flight load for this chunk, await it
+            const existing = this.inFlightLoads.get(chunk.id);
+            if (existing) {
+                await existing;
+                return;
+            }
+
             // Skip if already loaded
             if (this.scene.textures.exists(textureKey)) {
                 this.createChunkImage(chunk, textureKey);
@@ -255,39 +265,62 @@ export class ChunkedMapManager {
                 return;
             }
 
-            // Create a simple image element to load the chunk
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-
-            await new Promise<void>((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error(`Timeout loading chunk ${chunk.id}`));
-                }, 10000); // 10 second timeout
-
-                img.onload = () => {
-                    clearTimeout(timeout);
-                    try {
-                        // Add texture to Phaser
-                        this.scene.textures.addImage(textureKey, img);
-                        this.createChunkImage(chunk, textureKey);
-                        console.log(`✓ Chunk ${chunk.id} loaded`);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-
-                img.onerror = () => {
-                    clearTimeout(timeout);
-                    reject(
-                        new Error(
-                            `Failed to load image: /maps/chunks/${chunk.filename}`
-                        )
-                    );
-                };
-
-                img.src = `/maps/chunks/${chunk.filename}`;
-            });
+            const cachedDataUrl = getChunkDataUrl(chunk.id);
+            if (cachedDataUrl) {
+                await new Promise<void>((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            this.scene.textures.addImage(textureKey, img);
+                            this.createChunkImage(chunk, textureKey);
+                            console.log(`✓ Chunk ${chunk.id} loaded (cache)`);
+                            resolve();
+                        } catch (e) { reject(e); }
+                    };
+                    img.onerror = () => reject(new Error(`Failed to decode cached chunk ${chunk.id}`));
+                    img.src = cachedDataUrl;
+                });
+            } else {
+                // Fetch with timeout & cache
+                const loadPromise = new Promise<void>((resolve, reject) => {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => {
+                        controller.abort();
+                        reject(new Error(`Timeout loading chunk ${chunk.id}`));
+                    }, 10000);
+                    fetch(`/maps/chunks/${chunk.filename}`, { signal: controller.signal })
+                        .then(async resp => {
+                            clearTimeout(timeout);
+                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                            const blob = await resp.blob();
+                            const dataUrl = await new Promise<string>((res, rej) => {
+                                const reader = new FileReader();
+                                reader.onload = () => res(reader.result as string);
+                                reader.onerror = rej;
+                                reader.readAsDataURL(blob);
+                            });
+                            // Attempt to store (may evict others)
+                            storeChunk(chunk.id, dataUrl);
+                            const img = new Image();
+                            img.onload = () => {
+                                try {
+                                    this.scene.textures.addImage(textureKey, img);
+                                    this.createChunkImage(chunk, textureKey);
+                                    console.log(`✓ Chunk ${chunk.id} loaded`);
+                                    resolve();
+                                } catch (e) { reject(e); }
+                            };
+                            img.onerror = () => reject(new Error(`Failed to decode image for chunk ${chunk.id}`));
+                            img.src = dataUrl;
+                        })
+                        .catch(err => {
+                            clearTimeout(timeout);
+                            reject(err);
+                        });
+                });
+                this.inFlightLoads.set(chunk.id, loadPromise);
+                try { await loadPromise; } finally { this.inFlightLoads.delete(chunk.id); }
+            }
 
             // Clear any previous failure record on success
             this.failedChunks.delete(chunk.id);
@@ -648,6 +681,14 @@ export class ChunkedMapManager {
         if (this.loadedChunks.has(chunkId) || this.loadingChunks.has(chunkId)) {
             return;
         }
+
+        // Throttle rapid re-requests (e.g., oscillating visibility) within 250ms
+        const now = performance.now();
+        const last = this.lastRequestTimes.get(chunkId) || 0;
+        if (now - last < 250) {
+            return; // too soon, skip duplicate scheduling
+        }
+        this.lastRequestTimes.set(chunkId, now);
 
         // Check if we're already at max concurrent loads
         if (this.loadingChunks.size >= this.maxConcurrentLoads) {

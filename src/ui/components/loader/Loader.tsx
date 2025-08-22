@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cacheAssets } from '../../utils/assetCache';
+import { initChunkCache, preloadAndCacheChunks } from '../../../game/cache/mapChunkCache.ts';
 import { NumberCounter } from '../common';
 
 interface LoaderProps {
@@ -14,7 +15,9 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   const [currentTip, setCurrentTip] = useState('');
   const [shouldPreloadTutorial, setShouldPreloadTutorial] = useState(false);
   const [tutorialAssetsLoaded, setTutorialAssetsLoaded] = useState(false);
+  const [mapChunksPreloaded, setMapChunksPreloaded] = useState(false);
   const tutorialAssetsLoadedRef = useRef(false);
+  const mapChunksPreloadedRef = useRef(false);
 
   const loadingSteps = [
     { progress: 10, status: 'Loading Game Assets...' },
@@ -72,6 +75,35 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     return () => { cancelled = true; };
   }, []);
 
+  // Preload a small set of initial map chunks & metadata into localStorage cache
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const metaResp = await fetch('/maps/chunks/metadata.json');
+        if (!metaResp.ok) throw new Error('metadata http ' + metaResp.status);
+        const metadata = await metaResp.json();
+        if (cancelled) return;
+        initChunkCache(metadata.version ?? 1);
+
+        // Predict initial player spawn at chunk (0,0). Preload radius 2.
+        const radius = 2;
+        const targets = metadata.chunks.filter((c: any) => c.x <= radius && c.y <= radius);
+        // Keep cap small to respect storage limits
+        const limitedTargets = targets.slice(0, 25).map((c: any) => ({ id: c.id, filename: c.filename }));
+        await preloadAndCacheChunks('/maps/chunks', limitedTargets);
+      } catch (e) {
+        console.warn('Map chunk preloading skipped:', e);
+      } finally {
+        if (!cancelled) {
+          mapChunksPreloadedRef.current = true;
+          setMapChunksPreloaded(true);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     // Set random tip on component mount
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
@@ -96,6 +128,12 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       
       currentProgress += speed;
 
+      // Gate finishing at 45% until map chunks preloaded
+      if (currentProgress >= 45 && !mapChunksPreloadedRef.current) {
+        currentProgress = Math.min(currentProgress, 45);
+        if (currentStatus !== 'Caching Map Chunks...') setCurrentStatus('Caching Map Chunks...');
+      }
+
       // Gate finishing at 95% until tutorial assets (if required) are loaded
       if (shouldPreloadTutorial && !tutorialAssetsLoadedRef.current && currentProgress >= 95) {
         currentProgress = Math.min(currentProgress, 95);
@@ -109,8 +147,10 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
         setCurrentStatus('Loading Map Data...');
         stepIndex = 2;
       } else if (currentProgress >= 45 && stepIndex === 2) {
-        setCurrentStatus('Loading Buildings...');
-        stepIndex = 3;
+        if (mapChunksPreloadedRef.current) {
+          setCurrentStatus('Loading Buildings...');
+          stepIndex = 3;
+        }
       } else if (currentProgress >= 65 && stepIndex === 3) {
         setCurrentStatus('Loading Characters...');
         stepIndex = 4;
