@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { cacheAssets } from '../../utils/assetCache';
 import { NumberCounter } from '../common';
 
 interface LoaderProps {
@@ -11,6 +12,9 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [currentTip, setCurrentTip] = useState('');
+  const [shouldPreloadTutorial, setShouldPreloadTutorial] = useState(false);
+  const [tutorialAssetsLoaded, setTutorialAssetsLoaded] = useState(false);
+  const tutorialAssetsLoadedRef = useRef(false);
 
   const loadingSteps = [
     { progress: 10, status: 'Loading Game Assets...' },
@@ -35,6 +39,39 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     "TIP: Save regularly to protect your progress"
   ];
 
+  // Decide if tutorial should be shown & start preloading its assets if needed
+  useEffect(() => {
+    // Assumption: localStorage flag 'dhaniverse_onboarding_done' === 'true' means skip tutorial
+    const needsTutorial = localStorage.getItem('dhaniverse_onboarding_done') !== 'true';
+    setShouldPreloadTutorial(needsTutorial);
+    if (!needsTutorial) return;
+
+    const tutorialImages: string[] = [
+      '/game/first-tutorial/w1.png',
+      '/game/first-tutorial/w1-dull.png',
+      '/game/first-tutorial/w2.png',
+      '/game/first-tutorial/w3.png',
+      '/game/first-tutorial/w4.png',
+      '/game/first-tutorial/d1.png',
+      '/game/first-tutorial/d2.png',
+      '/game/first-tutorial/d3.png',
+      '/game/first-tutorial/d4.png',
+      '/game/first-tutorial/maya-waiting.png',
+      '/game/first-tutorial/controls.png',
+      '/game/first-tutorial/gui-intro.png',
+      '/game/first-tutorial/bank-intro.png',
+      '/game/first-tutorial/atm-intro.png',
+      '/game/first-tutorial/stock-intro.png'
+    ];
+    let cancelled = false;
+    cacheAssets(tutorialImages).then(() => {
+      if (cancelled) return; 
+      tutorialAssetsLoadedRef.current = true;
+      setTutorialAssetsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     // Set random tip on component mount
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
@@ -58,6 +95,11 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       }
       
       currentProgress += speed;
+
+      // Gate finishing at 95% until tutorial assets (if required) are loaded
+      if (shouldPreloadTutorial && !tutorialAssetsLoadedRef.current && currentProgress >= 95) {
+        currentProgress = Math.min(currentProgress, 95);
+      }
       
       // Update status messages at certain thresholds
       if (currentProgress >= 10 && stepIndex === 0) {
@@ -78,7 +120,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       } else if (currentProgress >= 95 && stepIndex === 5) {
         setCurrentStatus('Finalizing...');
         stepIndex = 6;
-      } else if (currentProgress >= 100) {
+  } else if (currentProgress >= 100 && (!shouldPreloadTutorial || tutorialAssetsLoadedRef.current)) {
         setCurrentStatus('Ready!');
         currentProgress = 100;
         setProgress(100);
@@ -100,7 +142,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, [onLoadingComplete]);
+  }, [onLoadingComplete, shouldPreloadTutorial]);
 
   return (
     <div 

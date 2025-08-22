@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { resolveAsset } from '../../utils/assetCache';
 import DialogueBox from '../common/DialogueBox';
 
 interface OnboardingWrapperProps {
@@ -112,7 +113,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
 
   return (
     <div className="fixed inset-0 z-50 select-none" onClick={handleAdvance}>
-      <div className="absolute inset-0" style={{ background: `url('${backgroundUrl}') center / cover no-repeat` }} />
+  <div className="absolute inset-0" style={{ background: `url('${resolveAsset(backgroundUrl)}') center / cover no-repeat` }} />
       <div className="relative flex flex-col h-full w-full">
         <div className="w-full flex justify-center pt-4 pointer-events-none" style={{ zIndex: 5 }}>
           <p className="text-black text-lg drop-shadow font-mono bg-white/60 px-4 py-1 rounded">Press [Space] to Speed Up • Click to Continue</p>
@@ -120,13 +121,13 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
         <div className="flex-1 flex items-center justify-center">
           <div className={`flex ${hasShowcase ? 'justify-between' : 'justify-center'} items-center w-full max-w-[1600px] px-16 gap-12`}>
             <div className={`flex justify-center ${hasShowcase ? 'basis-1/2' : 'basis-full'} relative`}>
-              {currentSlide === 0 && (<img src="/game/first-tutorial/d1.png" alt="Maya" className="onboard-float" style={{ maxWidth:600, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 1 && (<img src="/game/first-tutorial/d2.png" alt="D2" className="onboard-float" style={{ maxWidth:480, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 2 && (<img src="/game/first-tutorial/d3.png" alt="D3" className="onboard-float" style={{ maxWidth:480, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 3 && (<img src="/game/first-tutorial/d2.png" alt="D2" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 4 && (<img src="/game/first-tutorial/d4.png" alt="D3" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 5 && (<img src="/game/first-tutorial/d2.png" alt="D2" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
-              {currentSlide === 6 && (<img src="/game/first-tutorial/d1.png" alt="Maya" className="onboard-float" style={{ maxWidth:600, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 0 && (<img src={resolveAsset('/game/first-tutorial/d1.png')} alt="Maya" className="onboard-float" style={{ maxWidth:600, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 1 && (<img src={resolveAsset('/game/first-tutorial/d2.png')} alt="D2" className="onboard-float" style={{ maxWidth:480, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 2 && (<img src={resolveAsset('/game/first-tutorial/d3.png')} alt="D3" className="onboard-float" style={{ maxWidth:480, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 3 && (<img src={resolveAsset('/game/first-tutorial/d2.png')} alt="D2" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 4 && (<img src={resolveAsset('/game/first-tutorial/d4.png')} alt="D3" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 5 && (<img src={resolveAsset('/game/first-tutorial/d2.png')} alt="D2" className="onboard-float" style={{ maxWidth:520, width:'100%', height:'auto', pointerEvents:'none' }} />)}
+              {currentSlide === 6 && (<img src={resolveAsset('/game/first-tutorial/d1.png')} alt="Maya" className="onboard-float" style={{ maxWidth:600, width:'100%', height:'auto', pointerEvents:'none' }} />)}
             </div>
             {hasShowcase && (
               <div className="flex justify-end items-center basis-1/2 h-full">
@@ -134,7 +135,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
                   {[1,2,3,4,5,6].map(idx => (
                     <img
                       key={idx}
-                      src={showcaseImages[idx]}
+                      src={resolveAsset(showcaseImages[idx])}
                       alt={idx === 6 ? 'Maya Waiting' : 'Showcase'}
                       className={`absolute inset-0 object-contain p-2 showcase-fade ${currentSlide === idx ? 'show' : ''}`}
                       style={{ pointerEvents:'none' }}
