@@ -48,7 +48,7 @@ This is the dedicated WebSocket server for the Dhaniverse game, built with Deno 
 | JWT_SECRET                | Secret for JWT tokens (must match auth server)| (auto-generated)         |
 | ALLOWED_ORIGINS           | Comma-separated list of allowed CORS origins | (varies by environment)   |
 | AUTH_SERVER_URL           | URL of the authentication server (dev)       | http://localhost:8000     |
-| PRODUCTION_AUTH_SERVER_URL| URL of the authentication server (prod)      | https://dhaniverseapi.deno.dev |
+| PRODUCTION_AUTH_SERVER_URL| URL of the authentication server (prod)      | https://api.dhaniverse.in |
 
 ## Deployment
 

@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_BASE =
   (typeof window !== "undefined" && window.location.hostname === "localhost")
     ? "http://localhost:8000"
-    : "https://dhaniverseapi.deno.dev";
+    : "https://api.dhaniverse.in";
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

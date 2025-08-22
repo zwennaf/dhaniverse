@@ -2,7 +2,7 @@
 const API_BASE =
   (typeof window !== "undefined" && window.location.hostname === "localhost")
     ? "http://localhost:8000"
-    : "https://dhaniverseapi.deno.dev";
+    : "https://api.dhaniverse.in";
    
 
 // Helper function to get auth headers
