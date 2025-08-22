@@ -11,9 +11,10 @@ declare global {
 }
 
 interface EmailConfig {
-    host: string;
-    port: number;
-    secure: boolean;
+    host?: string;
+    port?: number;
+    secure?: boolean;
+    service?: string;
     auth: {
         user: string;
         pass: string;
@@ -23,6 +24,9 @@ interface EmailConfig {
         rejectUnauthorized: boolean;
         ciphers?: string;
     };
+    connectionTimeout?: number;
+    greetingTimeout?: number;
+    socketTimeout?: number;
 }
 
 interface OTPEmailData {
@@ -35,53 +39,178 @@ interface OTPEmailData {
 export class EmailService {
     private transporter: nodemailer.Transporter;
     private fromEmail: string;
+    private maxRetries: number = 3;
 
     constructor() {
         this.fromEmail =
-            Deno.env.get("SMTP_FROM_EMAIL") || "no-reply@dhaniverse.in";
+            Deno.env.get("SMTP_FROM_EMAIL") || "dhaniverse.game@gmail.com";
 
-        const config: EmailConfig = {
-            host: Deno.env.get("SMTP_HOST") || "smtp.zoho.com",
-            port: parseInt(Deno.env.get("SMTP_PORT") || "465"),
-            secure: Deno.env.get("SMTP_SECURE") === "true", // true for 465, false for other ports
-            auth: {
-                user: Deno.env.get("SMTP_USER") || "",
-                pass: Deno.env.get("SMTP_PASS") || "", // App password for Zoho
-            },
-            authMethod: "PLAIN",
-            tls: {
-                rejectUnauthorized: false,
-            },
-        };
-
+        const config: EmailConfig = this.getEmailConfig();
         this.transporter = nodemailer.createTransport(config);
+    }
+
+    private getEmailConfig(): EmailConfig {
+        const provider = Deno.env.get("EMAIL_PROVIDER") || "zoho";
+        const host = Deno.env.get("SMTP_HOST");
+        const port = Deno.env.get("SMTP_PORT");
+        const secure = Deno.env.get("SMTP_SECURE");
+
+        // If custom SMTP settings are provided, use them
+        if (host && port) {
+            return {
+                host,
+                port: parseInt(port),
+                secure: secure === "true",
+                auth: {
+                    user: Deno.env.get("SMTP_USER") || "",
+                    pass: Deno.env.get("SMTP_PASS") || "",
+                },
+                authMethod: "PLAIN",
+                tls: {
+                    rejectUnauthorized: false,
+                    ciphers: "SSLv3",
+                },
+                connectionTimeout: 10000,
+                greetingTimeout: 5000,
+                socketTimeout: 10000,
+            };
+        }
+
+        // Predefined provider configurations
+        switch (provider.toLowerCase()) {
+            case "gmail":
+            default: // Make Gmail the default instead of Zoho
+                return {
+                    service: "gmail",
+                    auth: {
+                        user: Deno.env.get("SMTP_USER") || "dhaniverse.game@gmail.com",
+                        pass: Deno.env.get("SMTP_PASS") || "fquz ehgi cztc adim", // App password
+                    },
+                    tls: {
+                        rejectUnauthorized: false,
+                    },
+                    connectionTimeout: 10000,
+                    greetingTimeout: 5000,
+                    socketTimeout: 10000,
+                };
+
+            case "sendgrid":
+                return {
+                    host: "smtp.sendgrid.net",
+                    port: 587,
+                    secure: false,
+                    auth: {
+                        user: "apikey",
+                        pass: Deno.env.get("SENDGRID_API_KEY") || "",
+                    },
+                    connectionTimeout: 10000,
+                };
+
+            case "mailgun":
+                return {
+                    host: "smtp.mailgun.org",
+                    port: 587,
+                    secure: false,
+                    auth: {
+                        user: Deno.env.get("MAILGUN_SMTP_LOGIN") || "",
+                        pass: Deno.env.get("MAILGUN_SMTP_PASSWORD") || "",
+                    },
+                    connectionTimeout: 10000,
+                };
+
+            case "zoho":
+                return {
+                    host: "smtp.zoho.com",
+                    port: 587,
+                    secure: false,
+                    auth: {
+                        user: Deno.env.get("SMTP_USER") || "",
+                        pass: Deno.env.get("SMTP_PASS") || "",
+                    },
+                    authMethod: "PLAIN",
+                    tls: {
+                        rejectUnauthorized: false,
+                    },
+                    connectionTimeout: 15000,
+                    greetingTimeout: 10000,
+                    socketTimeout: 15000,
+                };
+        }
+    }
+
+    private async sendEmailWithRetry(mailOptions: any, retries: number = 0): Promise<boolean> {
+        try {
+            const info = await this.transporter.sendMail(mailOptions);
+            console.log(`✅ Email sent successfully:`, info.messageId);
+            return true;
+        } catch (error) {
+            console.error(`❌ Email send attempt ${retries + 1} failed:`, error);
+            
+            if (retries < this.maxRetries) {
+                console.log(`🔄 Retrying email send (attempt ${retries + 2}/${this.maxRetries + 1})...`);
+                
+                // Wait before retry (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+                
+                // Try with alternative configuration on specific retry attempts
+                if (retries === 1) {
+                    await this.reconfigureWithAlternative();
+                }
+                
+                return this.sendEmailWithRetry(mailOptions, retries + 1);
+            }
+            
+            console.error(`❌ All email send attempts failed. Final error:`, error);
+            return false;
+        }
+    }
+
+    private async reconfigureWithAlternative(): Promise<void> {
+        try {
+            console.log("🔄 Trying alternative email configuration...");
+            
+            // Try alternative Gmail configuration with explicit SMTP settings
+            const alternativeConfig: EmailConfig = {
+                host: "smtp.gmail.com",
+                port: 587,
+                secure: false,
+                auth: {
+                    user: "dhaniverse.game@gmail.com",
+                    pass: "fquz ehgi cztc adim",
+                },
+                tls: {
+                    rejectUnauthorized: false,
+                },
+                connectionTimeout: 20000,
+                greetingTimeout: 15000,
+                socketTimeout: 20000,
+            };
+            
+            this.transporter = nodemailer.createTransport(alternativeConfig);
+            console.log("✅ Transporter reconfigured with Gmail SMTP settings");
+        } catch (error) {
+            console.error("❌ Failed to reconfigure transporter:", error);
+        }
     }
 
     /**
      * Send OTP email for email verification
      */
     async sendOTPEmail(data: OTPEmailData): Promise<boolean> {
-        try {
-            const { to, otp, username, expiresIn = 10 } = data;
+        const { to, otp, username, expiresIn = 10 } = data;
 
-            const mailOptions = {
-                from: {
-                    name: "Dhaniverse",
-                    address: this.fromEmail,
-                },
-                to: to,
-                subject: "Your Dhaniverse Verification Code",
-                html: this.generateOTPEmailHTML(otp, username, expiresIn),
-                text: this.generateOTPEmailText(otp, username, expiresIn),
-            };
+        const mailOptions = {
+            from: {
+                name: "Dhaniverse",
+                address: this.fromEmail,
+            },
+            to: to,
+            subject: "Your Dhaniverse Verification Code",
+            html: this.generateOTPEmailHTML(otp, username, expiresIn),
+            text: this.generateOTPEmailText(otp, username, expiresIn),
+        };
 
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log("OTP email sent successfully:", info.messageId);
-            return true;
-        } catch (error) {
-            console.error("Failed to send OTP email:", error);
-            return false;
-        }
+        return await this.sendEmailWithRetry(mailOptions);
     }
 
     /**
@@ -1446,31 +1575,24 @@ Financial education platform.
         gameUsername?: string;
         expiresIn?: number;
     }): Promise<boolean> {
-        try {
-            const { to, token, purpose, gameUsername, expiresIn = 15 } = data;
-            const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://dhaniverse.in";
-            const magicUrl = `${frontendUrl}/auth/magic?token=${token}`;
+        const { to, token, purpose, gameUsername, expiresIn = 15 } = data;
+        const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://dhaniverse.in";
+        const magicUrl = `${frontendUrl}/auth/magic?token=${token}`;
 
-            const mailOptions = {
-                from: {
-                    name: "Dhaniverse",
-                    address: this.fromEmail,
-                },
-                to: to,
-                subject: purpose === 'signin' 
-                    ? "Sign in to Dhaniverse" 
-                    : "Welcome to Dhaniverse",
-                html: this.generateMagicLinkEmailHTML(magicUrl, purpose, gameUsername, expiresIn),
-                text: this.generateMagicLinkEmailText(magicUrl, purpose, gameUsername, expiresIn),
-            };
+        const mailOptions = {
+            from: {
+                name: "Dhaniverse",
+                address: this.fromEmail,
+            },
+            to: to,
+            subject: purpose === 'signin' 
+                ? "Sign in to Dhaniverse" 
+                : "Welcome to Dhaniverse",
+            html: this.generateMagicLinkEmailHTML(magicUrl, purpose, gameUsername, expiresIn),
+            text: this.generateMagicLinkEmailText(magicUrl, purpose, gameUsername, expiresIn),
+        };
 
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log("Magic link email sent successfully:", info.messageId);
-            return true;
-        } catch (error) {
-            console.error("Failed to send magic link email:", error);
-            return false;
-        }
+        return await this.sendEmailWithRetry(mailOptions);
     }
 
     /**

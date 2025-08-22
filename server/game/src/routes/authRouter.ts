@@ -581,4 +581,45 @@ authRouter.post("/auth/cleanup-magic-links", async (ctx: Context) => {
     }
 });
 
+// Debug endpoint for testing email configuration in production
+authRouter.get("/auth/debug-email", async (ctx: Context) => {
+    try {
+        console.log("🔍 Email Debug Endpoint Called");
+        
+        // Test SMTP connection
+        const connectionTest = await emailService.testConnection();
+        
+        const debugInfo = {
+            timestamp: new Date().toISOString(),
+            environment: {
+                EMAIL_PROVIDER: Deno.env.get("EMAIL_PROVIDER") || "zoho (default)",
+                SMTP_HOST: Deno.env.get("SMTP_HOST") || "smtp.zoho.com (default)",
+                SMTP_PORT: Deno.env.get("SMTP_PORT") || "587 (default)",
+                SMTP_SECURE: Deno.env.get("SMTP_SECURE") || "false (default)",
+                SMTP_USER_SET: Deno.env.get("SMTP_USER") ? true : false,
+                SMTP_PASS_SET: Deno.env.get("SMTP_PASS") ? true : false,
+                SMTP_FROM_EMAIL: Deno.env.get("SMTP_FROM_EMAIL") || "no-reply@dhaniverse.in (default)"
+            },
+            connection: {
+                success: connectionTest,
+                message: connectionTest ? "SMTP connection successful" : "SMTP connection failed"
+            }
+        };
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            debug: debugInfo
+        };
+    } catch (error) {
+        console.error("Debug endpoint error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            error: error.message,
+            message: "Debug endpoint failed"
+        };
+    }
+});
+
 export default authRouter;
