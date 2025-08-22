@@ -22,6 +22,7 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
     const [arrowPosition, setArrowPosition] = useState({ x: 0, y: 0, angle: 0 });
     const [isTargetVisible, setIsTargetVisible] = useState(false);
     const [animationState, setAnimationState] = useState<'hidden' | 'photo-appearing' | 'arrow-appearing' | 'visible' | 'fading'>('hidden');
+    const initialSequenceStartedRef = useRef(false);
     const arrowRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -33,27 +34,46 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
         const screenTop = cameraPosition.y - screenSize.height / 2;
         const screenBottom = cameraPosition.y + screenSize.height / 2;
 
-        const targetVisible = 
+        const targetVisible =
             targetPosition.x >= screenLeft &&
             targetPosition.x <= screenRight &&
             targetPosition.y >= screenTop &&
             targetPosition.y <= screenBottom;
 
-        // Handle visibility changes with staggered animation
+        // Debug logging to trace tracker logic
+        if (!(window as any).__locationTrackerDebugSilenced) {
+            // Throttle logs slightly
+            if ((arrowRef.current as any)?.__lastLogTime === undefined || Date.now() - (arrowRef.current as any).__lastLogTime > 1000) {
+                (arrowRef.current as any).__lastLogTime = Date.now();
+                console.log(`[LocationTracker:${targetName}] vis=${targetVisible} anim=${animationState} isTargetVisibleState=${isTargetVisible}`,
+                    { targetPosition, playerPosition, cameraPosition, screenSize });
+            }
+        }
+
+        // Initial mount: start animation sequence if target starts off-screen
+        if (!targetVisible && animationState === 'hidden' && !initialSequenceStartedRef.current) {
+            initialSequenceStartedRef.current = true;
+            setAnimationState('photo-appearing');
+            setTimeout(() => setAnimationState('arrow-appearing'), 200);
+            setTimeout(() => setAnimationState('visible'), 500);
+            setIsTargetVisible(false);
+        }
+
+        // Handle subsequent visibility changes with staggered animation
         if (targetVisible !== isTargetVisible) {
             if (!targetVisible) {
-                // Target just became invisible - start appearing animation sequence
+                // Target just left the screen
                 setAnimationState('photo-appearing');
-                setTimeout(() => setAnimationState('arrow-appearing'), 200); // Photo appears first
-                setTimeout(() => setAnimationState('visible'), 500); // Then arrow and text
+                setTimeout(() => setAnimationState('arrow-appearing'), 200);
+                setTimeout(() => setAnimationState('visible'), 500);
                 setIsTargetVisible(false);
             } else {
-                // Target just became visible - fade out
+                // Target entered the screen
                 setAnimationState('fading');
                 setTimeout(() => {
                     setIsTargetVisible(true);
                     setAnimationState('hidden');
-                }, 300); // Match transition duration
+                }, 300);
             }
         }
 
@@ -61,30 +81,19 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
             // Calculate direction from player to target
             const deltaX = targetPosition.x - playerPosition.x;
             const deltaY = targetPosition.y - playerPosition.y;
-            
-            // Calculate angle in radians
             const angle = Math.atan2(deltaY, deltaX);
-            
-            // Convert to degrees for CSS transform
             const angleDegrees = angle * (180 / Math.PI);
-            
-            // Calculate arrow position on screen edge
             const arrowDistance = 100; // Distance from screen edge
             const centerX = screenSize.width / 2;
             const centerY = screenSize.height / 2;
-            
-            // Calculate position on screen edge
             let arrowX = centerX + Math.cos(angle) * (Math.min(screenSize.width, screenSize.height) / 2 - arrowDistance);
             let arrowY = centerY + Math.sin(angle) * (Math.min(screenSize.width, screenSize.height) / 2 - arrowDistance);
-            
-            // Clamp to screen bounds with margin
             const margin = 80;
             arrowX = Math.max(margin, Math.min(screenSize.width - margin, arrowX));
             arrowY = Math.max(margin, Math.min(screenSize.height - margin, arrowY));
-            
             setArrowPosition({ x: arrowX, y: arrowY, angle: angleDegrees });
         }
-    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled, isTargetVisible, animationState]);
+    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled, isTargetVisible, animationState, targetName]);
 
     if (!enabled || isTargetVisible) {
         return null;

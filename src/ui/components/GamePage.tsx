@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
@@ -7,6 +7,7 @@ import PixelButton from './atoms/PixelButton';
 import SEO from './SEO';
 import OnboardingWrapper from './onboarding/OnboardingWrapper';
 import Loader from './loader/Loader';
+import { enableMayaTrackerOnGameStart, locationTrackerManager } from '../../services/LocationTrackerManager';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -14,6 +15,8 @@ const GamePage: React.FC = () => {
   const [showLoader, setShowLoader] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Set to false for local development to test onboarding
+  // Ref to avoid duplicate tracker activation
+  const trackerActivatedRef = useRef(false);
   const navigate = useNavigate();
    
   useEffect(() => {
@@ -42,6 +45,9 @@ const GamePage: React.FC = () => {
         console.log("GamePage: Tutorial completed:", tutorialCompleted);
         setHasCompletedTutorial(tutorialCompleted);
         
+        // Set window flag for GameHUD to check
+        (window as any).__tutorialCompleted = tutorialCompleted;
+        
         // For local development, force show onboarding when hasCompletedTutorial is false
         // This allows testing the onboarding flow
         const shouldShowOnboarding = !tutorialCompleted; // Show onboarding if tutorial not completed in backend
@@ -54,6 +60,11 @@ const GamePage: React.FC = () => {
           // Returning users skip loader and onboarding
           setIsLoading(false);
           startGameFlow(gameUsername);
+          // ALSO enable tracker for returning users if tutorial flag is false
+          if (!tutorialCompleted) {
+            console.log("GamePage: Enabling tracker for returning user with false tutorial flag");
+            setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
+          }
         }
       } catch (error) {
         console.error("GamePage: Error checking tutorial status:", error);
@@ -115,6 +126,10 @@ const GamePage: React.FC = () => {
       if (user?.gameUsername) {
         startGameFlow(user.gameUsername);
       }
+      // After game starts, if tutorial not completed, enable Maya tracking
+      if (!hasCompletedTutorial) {
+        setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
+      }
       // Inform the game/HUD that onboarding finished and first task should be assigned
       // Mark pending in case HUD hasn't mounted yet, then dispatch
       (window as any).__assignFirstTaskPending = true;
@@ -128,12 +143,104 @@ const GamePage: React.FC = () => {
       if (user?.gameUsername) {
         startGameFlow(user.gameUsername);
       }
+      if (!hasCompletedTutorial) {
+        setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
+      }
       (window as any).__assignFirstTaskPending = true;
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('assign-first-task'));
       }, 500);
     }
   };
+
+  // Helper to enable Maya tracker once Maya target exists in manager
+  const attemptEnableMayaTracker = () => {
+    console.log("GamePage: attemptEnableMayaTracker called, trackerActivated:", trackerActivatedRef.current);
+    
+    // Estimated initial Maya spawn (keep synced with MayaNPCManager.x,y)
+    const EST_MAYA_POS = { x: 7779, y: 3581 };
+
+    const ensurePlaceholder = () => {
+      if (!locationTrackerManager.getTarget('maya')) {
+        console.log("GamePage: Creating Maya tracker placeholder");
+        locationTrackerManager.addTarget({
+          id: 'maya',
+          name: 'Maya',
+          position: EST_MAYA_POS,
+          image: '/characters/maya-preview.png',
+          enabled: true
+        });
+        trackerActivatedRef.current = true;
+        return true;
+      }
+      return false;
+    };
+
+    const tryEnable = () => {
+      const mayaTarget = locationTrackerManager.getTarget('maya');
+      if (mayaTarget) {
+        console.log("GamePage: Maya target found, enabled:", mayaTarget.enabled);
+        if (!mayaTarget.enabled) {
+          locationTrackerManager.setTargetEnabled('maya', true);
+          console.log("GamePage: Enabled Maya tracker");
+        }
+        trackerActivatedRef.current = true;
+        return true;
+      }
+      // create placeholder if still missing
+      return ensurePlaceholder();
+    };
+
+    // Always try to enable, regardless of previous state when tutorial not completed
+    if (!hasCompletedTutorial) {
+      console.log("GamePage: Tutorial not completed, forcing tracker enable");
+      trackerActivatedRef.current = false; // Reset to allow re-enabling
+    }
+    
+    if (trackerActivatedRef.current && hasCompletedTutorial) {
+      console.log("GamePage: Tracker already activated and tutorial completed, skipping");
+      return;
+    }
+
+    // Immediate attempt
+    if (tryEnable()) return;
+
+    // Aggressive retries for reliability
+    const retrySchedule = [50, 100, 200, 400, 800, 1200, 2000, 3000];
+    retrySchedule.forEach(delay => {
+      setTimeout(() => { 
+        if (!trackerActivatedRef.current || !hasCompletedTutorial) {
+          tryEnable(); 
+        }
+      }, delay);
+    });
+
+    // Safety long-poll as last resort
+    let attempts = 0;
+    const interval = setInterval(() => {
+      if (trackerActivatedRef.current && hasCompletedTutorial) { 
+        clearInterval(interval); 
+        return; 
+      }
+      attempts++;
+      if (tryEnable() || attempts > 60) { // ~12s max (60 * 200ms)
+        clearInterval(interval);
+      }
+    }, 200);
+  };
+
+
+
+  // Extra safeguard: attempt tracker each time this component becomes focused (e.g., after reloads/navigation back)
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !hasCompletedTutorial) {
+        attemptEnableMayaTracker();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [hasCompletedTutorial]);
 
   // Cleanup effect
   useEffect(() => {

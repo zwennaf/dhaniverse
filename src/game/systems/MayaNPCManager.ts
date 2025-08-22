@@ -1,6 +1,7 @@
 import { GameObjects, Input } from "phaser";
 import { locationTrackerManager } from "../../services/LocationTrackerManager";
 import { MainGameScene } from "../scenes/MainScene.ts";
+import { getTaskManager } from "../tasks/TaskManager.ts";
 import { Constants } from "../utils/Constants.ts";
 
 interface NPCSprite extends GameObjects.Sprite {
@@ -27,7 +28,7 @@ export class MayaNPCManager {
     private movingToTarget: boolean = false;
     private moveTarget: { x: number; y: number } | null = null;
     private moveDir: { x: number; y: number } | null = null;
-    private moveSpeed: number = 220; // units per second used for per-frame movement (increased)
+    private moveSpeed: number = 280; // slightly faster movement for better pacing
     private pauseDurationMs: number = 1000; // 1 second pause at waypoints
     private followReminderText: GameObjects.Text | null = null;
     private alertText: GameObjects.Text | null = null;
@@ -35,6 +36,7 @@ export class MayaNPCManager {
     private alertTimerEvent: Phaser.Time.TimerEvent | null = null;
     private alertIntervalMs: number = 60000; // 60 seconds
     private guideCompleted: boolean = false;
+    private initialDialogueTaskResolved: boolean = false; // ensures tasks update once
 
     // Track player's initial position and whether they have started moving
     private playerInitialPosition: { x: number; y: number } | null = null;
@@ -229,6 +231,15 @@ export class MayaNPCManager {
 
         this.activeDialog = true;
 
+        // Complete the initial 'meet-maya' task (if present) upon starting dialogue
+        if (!this.initialDialogueTaskResolved) {
+            const tm = getTaskManager();
+            const meetTask = tm.getActiveTasks().find(t => t.id === 'meet-maya');
+            if (meetTask) {
+                tm.completeTask('meet-maya');
+            }
+        }
+
         // Emit a UI event so the HUD DialogueBox shows the same UI as onboarding
         window.dispatchEvent(new CustomEvent('show-dialogue', {
             detail: {
@@ -257,8 +268,16 @@ export class MayaNPCManager {
             // Close local dialog state and cleanup visuals
             this.closeDialog();
             window.removeEventListener('dialogue-advance', onAdvance as any);
+            this.handlePostInitialDialogue();
         };
         window.addEventListener('dialogue-advance' as any, onAdvance as any);
+
+        // Also listen for dialogue-complete (typing finished) to queue next objective ONLY after close
+        const onComplete = () => {
+            window.removeEventListener('dialogue-complete' as any, onComplete as any);
+            // We'll rely on onAdvance to actually add follow-up to ensure player closed it
+        };
+        window.addEventListener('dialogue-complete' as any, onComplete as any);
     }
 
     private setupDialogKeyListeners(): void {
@@ -440,6 +459,11 @@ export class MayaNPCManager {
 
         // Update interaction text position
         this.updateInteractionTextPosition();
+        // Ensure name text follows Maya during movement
+        if (this.maya.nameText) {
+            this.maya.nameText.x = this.maya.x;
+            this.maya.nameText.y = this.maya.y - 50;
+        }
 
         // If guided sequence active, maintain reminder position and check follow distance
         if (this.guidedSequenceActive) {
@@ -563,16 +587,13 @@ export class MayaNPCManager {
     // Ensure tracker has correct current position
     locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
 
-        // Show initial dialogue via the HUD and require an explicit "Got it" click
-        // before Maya starts moving. Use compact layout so the dialog spacing
-        // matches the previous smaller task-style dialog.
+        // Show initial guidance dialogue (advance key or click to dismiss; movement begins after close)
         window.dispatchEvent(new CustomEvent('show-dialogue', {
             detail: {
-                text: "Follow me, I'll take you to the Bank.",
+                text: "Follow me. I'll guide you to the Central Bank.",
                 characterName: 'M.A.Y.A',
-                showGotItButton: true,
                 compact: true,
-                allowAdvance: false,
+                allowAdvance: true,
             }
         }));
 
@@ -586,15 +607,12 @@ export class MayaNPCManager {
         ];
         this.currentWaypointIndex = 0;
 
-        // Start moving only after HUD signals the dialogue completed typing.
-        // Listen for a single 'dialogue-complete' event and then begin movement.
+        // Start moving only after the player advances (dialogue-advance)
         const startMove = () => {
-            window.removeEventListener('dialogue-gotit' as any, startMove as any);
-            this.scene.time.delayedCall(50, () => this.moveToNextWaypoint());
+            window.removeEventListener('dialogue-advance' as any, startMove as any);
+            this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
         };
-
-        window.addEventListener('dialogue-gotit' as any, startMove as any);
-        // store a reference so it can be cleaned up if the NPC is destroyed early
+        window.addEventListener('dialogue-advance' as any, startMove as any);
         (this as any).__pendingMayaStartMove = startMove;
     }
 
@@ -816,6 +834,7 @@ export class MayaNPCManager {
         const onAdvance = () => {
             this.closeDialog();
             window.removeEventListener('dialogue-advance' as any, onAdvance as any);
+            // Potential place for future objective updates after arrival
         };
         window.addEventListener('dialogue-advance' as any, onAdvance as any);
     }
@@ -872,6 +891,23 @@ export class MayaNPCManager {
         if (pending) {
             window.removeEventListener('dialogue-gotit' as any, pending as any);
             (this as any).__pendingMayaStartMove = null;
+        }
+    }
+
+    // Handle adding the next objective after the initial Maya intro dialogue is fully closed
+    private handlePostInitialDialogue(): void {
+        if (this.initialDialogueTaskResolved) return;
+        this.initialDialogueTaskResolved = true;
+        const tm = getTaskManager();
+        // Only add follow-up if not already present
+        if (!tm.getActiveTasks().some(t => t.id === 'enter-bank')) {
+            tm.addTask({
+                id: 'enter-bank',
+                title: 'Enter the Bank',
+                description: 'Enter the Central Bank to continue your financial orientation.',
+                active: true,
+                completed: false
+            });
         }
     }
 }

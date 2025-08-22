@@ -403,8 +403,13 @@ export class MainScene extends Scene implements MainGameScene {
         window.addEventListener("typing-start", this.handleTypingStartBound);
         window.addEventListener("typing-end", this.handleTypingEndBound);
 
-        // Notify game is ready
+        // Notify game is ready (internal + global window event for UI hooks)
         this.game.events.emit("ready");
+        try {
+            window.dispatchEvent(new CustomEvent('phaser-game-ready'));
+        } catch (e) {
+            console.warn('Failed to dispatch phaser-game-ready event', e);
+        }
 
         // Setup periodic sync with backend (every 30 seconds)
         this.setupPeriodicBackendSync();
@@ -475,25 +480,27 @@ export class MainScene extends Scene implements MainGameScene {
         // Delta-based time stepping for consistent movement regardless of framerate
         const deltaFactor = delta / (1000 / 60); // Normalize to 60fps
 
-        // Update player only if not typing
-        if (!this.isTyping) {
+        // Update player only if not typing and player exists
+        if (!this.isTyping && this.player) {
             this.player.update(deltaFactor);
         }
 
-        // Then update all managers
-        this.collisionManager.update();
-        this.webSocketManager.update();
-        this.npcManager.update();
-        this.mayaNPCManager.update();
-        this.buildingManager.update();
-        this.bankNPCManager.update();
-        this.stockMarketManager.update();
-        this.atmManager.update();
+        // Then update all managers with null checks
+        if (this.collisionManager) this.collisionManager.update();
+        if (this.webSocketManager) this.webSocketManager.update();
+        if (this.npcManager) this.npcManager.update();
+        if (this.mayaNPCManager) this.mayaNPCManager.update();
+        if (this.buildingManager) this.buildingManager.update();
+        if (this.bankNPCManager) this.bankNPCManager.update();
+        if (this.stockMarketManager) this.stockMarketManager.update();
+        if (this.atmManager) this.atmManager.update();
 
-        // Emit position updates for location tracker
-        window.dispatchEvent(new CustomEvent('player-position-update', {
-            detail: { x: this.player.getSprite().x, y: this.player.getSprite().y }
-        }));
+        // Emit position updates for location tracker only if player exists
+        if (this.player) {
+            window.dispatchEvent(new CustomEvent('player-position-update', {
+                detail: { x: this.player.getSprite().x, y: this.player.getSprite().y }
+            }));
+        }
         
         window.dispatchEvent(new CustomEvent('camera-position-update', {
             detail: { x: this.cameras.main.scrollX + this.cameras.main.width / 2, y: this.cameras.main.scrollY + this.cameras.main.height / 2 }
@@ -502,10 +509,10 @@ export class MainScene extends Scene implements MainGameScene {
         
 
         // Update dynamic zoom based on player movement
-        this.dynamicZoomManager.update();
+        if (this.dynamicZoomManager) this.dynamicZoomManager.update();
 
         // Update map chunks based on player position
-        this.mapManager.update();
+        if (this.mapManager) this.mapManager.update();
     } // Method to open the banking UI
     openBankingUI(bankAccount: any): void {
         // Dispatch custom event for the React component to catch
