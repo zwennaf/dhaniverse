@@ -6,6 +6,7 @@ import LandingPage from './components/LandingPage';
 import GamePage from './components/GamePage';
 import CustomSignIn from './components/auth/CustomSignIn';
 import CustomSignUp from './components/auth/CustomSignUp';
+import MagicLinkVerification from './components/auth/MagicLinkVerification';
 import Profile from './components/auth/Profile';
 
 // Protected Route component
@@ -65,6 +66,9 @@ const AppRoutes = () => {
           </PublicRoute>
         } 
       />
+      
+      {/* Magic link verification route - accessible without authentication */}
+      <Route path="/auth/magic" element={<MagicLinkVerification />} />
       
       {/* Protected routes */}
       <Route

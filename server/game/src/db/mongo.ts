@@ -280,7 +280,7 @@ class MongoDatabase {
         const result = await bankAccounts.findOne({ userId });
         return result || null;
     }
-    private async createInitialPlayerState(userId: string): Promise<void> {
+    async createInitialPlayerState(userId: string): Promise<void> {
         // Create initial player state
         const playerState: PlayerStateDocument = {
             userId,
