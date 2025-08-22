@@ -26,7 +26,7 @@ const ONBOARDING_SLIDES: OnboardingSlide[] = [
   {
     id: 3,
     text: "Here's your game interface! Check the minimap to navigate around, use the chat option with voice chat to communicate with other players, and keep an eye on your cash indicator showing your current balance.",
-    character: "D3"
+    character: "M.A.Y.A"
   },
   {
     id: 4,

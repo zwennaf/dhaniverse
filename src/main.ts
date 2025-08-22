@@ -136,8 +136,8 @@ export function unmountHUD() {
 
 // Create a function to update the HUD from Phaser
 export function updateHUD(rupees: number) {
-  // Dispatch a custom event that the React component will listen for
-  window.dispatchEvent(
-    new CustomEvent('rupee-update', { detail: { rupees } })
-  );
+  // Use the balance manager as the single source of truth instead of dispatching events directly
+  import('./services/BalanceManager.ts').then(({ balanceManager }) => {
+    balanceManager.updateCash(rupees, false); // false = don't notify to prevent loops
+  }).catch(console.error);
 }

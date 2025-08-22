@@ -6,11 +6,10 @@ import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
 // ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
-import {
-    locationTrackerManager,
-    TrackingTarget,
-} from "../../../services/LocationTrackerManager";
-import DialogueBox from "../common/DialogueBox";
+import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
+import DialogueBox from '../common/DialogueBox';
+import { getTaskManager } from '../../../game/tasks/TaskManager';
+import { GameTask } from '../../../game/tasks/TaskTypes';
 
 interface GameHUDProps {
     rupees?: number;
@@ -56,12 +55,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
 
     // Location tracker state
-    const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>(
-        []
-    );
-    // First task dialog state
-    const [showFirstTaskDialog, setShowFirstTaskDialog] = useState(false);
-    const [firstTaskAcknowledged, setFirstTaskAcknowledged] = useState(false);
+    const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>([]);
+    // Task system state
+    const [activeTasks, setActiveTasks] = useState<GameTask[]>([]);
     const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
     const [smallAlertText, setSmallAlertText] = useState("");
     const [genericDialog, setGenericDialog] = useState<{
@@ -149,21 +145,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setCurrentRupees(balance.cash);
         });
 
-        // Also listen for legacy rupee updates for backward compatibility
-        const handleRupeeUpdate = (e: CustomEvent) => {
-            if (e.detail?.rupees !== undefined) {
-                balanceManager.updateCash(e.detail.rupees);
-            }
-        };
-
-        window.addEventListener("rupee-update" as any, handleRupeeUpdate);
+        // Legacy rupee updates - REMOVED to prevent infinite loop
+        // The balance manager should be the single source of truth
 
         return () => {
             unsubscribe();
-            window.removeEventListener(
-                "rupee-update" as any,
-                handleRupeeUpdate
-            );
+            // Removed legacy event listener cleanup
 
             // Cleanup voice command handler if voice was enabled
             if (voiceEnabled) {
@@ -399,12 +386,37 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
     }, []);
 
-    // Assign first task when onboarding completes
+    // Task manager integration
+    useEffect(() => {
+        const updateActive = () => setActiveTasks(getTaskManager().getActiveTasks());
+        const added = () => updateActive();
+        const updated = () => updateActive();
+        const removed = () => updateActive();
+        window.addEventListener('task-added' as any, added);
+        window.addEventListener('task-updated' as any, updated);
+        window.addEventListener('task-removed' as any, removed);
+        // initial
+        updateActive();
+        return () => {
+            window.removeEventListener('task-added' as any, added);
+            window.removeEventListener('task-updated' as any, updated);
+            window.removeEventListener('task-removed' as any, removed);
+        };
+    }, []);
+
+    // Listen for legacy onboarding completion event to create first task
     useEffect(() => {
         const assignFirstTaskHandler = () => {
-            // Only show if not already acknowledged
-            if (firstTaskAcknowledged) return;
-            setShowFirstTaskDialog(true);
+            // Create initial task if none exists (include completed check)
+            if (!getTaskManager().getTasks().some(t => t.id === 'meet-maya')) {
+                getTaskManager().addTask({
+                    id: 'meet-maya',
+                    title: 'Meet Maya',
+                    description: 'Proceed to Maya\'s home. Follow the tracker to initiate your journey.',
+                    active: true,
+                    completed: false
+                });
+            }
         };
 
         const handlePlayerNearMaya = (e: any) => {
@@ -479,10 +491,18 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
     }, []);
 
-    // If GamePage set a pending flag before HUD mounted, show the dialog now
+    // If GamePage set a pending flag before HUD mounted, ensure first task present
     useEffect(() => {
         if ((window as any).__assignFirstTaskPending) {
-            setShowFirstTaskDialog(true);
+            if (!getTaskManager().getTasks().some(t => t.id === 'meet-maya')) {
+                getTaskManager().addTask({
+                    id: 'meet-maya',
+                    title: 'Meet Maya',
+                    description: 'Proceed to Maya\'s home. Follow the tracker to initiate your journey.',
+                    active: true,
+                    completed: false
+                });
+            }
             (window as any).__assignFirstTaskPending = false;
         }
     }, []);
@@ -657,25 +677,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
         });
     };
 
-    // When user clicks 'Got it' on the first task dialog
-    const handleFirstTaskGotIt = () => {
-        setShowFirstTaskDialog(false);
-        setFirstTaskAcknowledged(true);
-        // Enable Maya tracker at player's initial position (tracker manager already has Maya target but enable it)
-        locationTrackerManager.setTargetEnabled("maya", true);
-        // Notify game scene to show tracker (MainScene listens to tracker state) - also ensure position known
-        const maya = locationTrackerManager.getTarget("maya");
-        if (maya) {
-            // keep current maya target position
-            locationTrackerManager.updateTargetPosition("maya", maya.position);
-        }
-        // NOTE: small stray-alerts (reminders like "Go meet Maya to start your journey")
-        // were previously shown here by attaching a 'player-position-update' listener.
-        // That caused an immediate small-dialog to appear right after the player
-        // clicked "Got it". To avoid that, the stray reminder listener has been
-        // removed — the tracker is enabled above and the game can still show
-        // temporary small dialogs via the 'show-temporary-dialog' event when
-        // appropriate.
+    // Mark task complete helper (future use)
+    const completeTask = (id: string) => {
+        getTaskManager().completeTask(id);
     };
 
     // Handle player advancing/closing a generic dialogue from the HUD
@@ -905,20 +909,20 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
-            {/* First Task Dialogue (top-center) */}
-            <DialogueBox
-                text={
-                    "GO AND MEET MAYA AT HER HOUSE\nFOLLOW THE TRACKER TO REACH HER HOUSE"
-                }
-                title={"TASK 1:"}
-                isVisible={showFirstTaskDialog}
-                position={"top-center"}
-                showGotItButton={true}
-                onGotIt={handleFirstTaskGotIt}
-                compact={true}
-                showProgressIndicator={false}
-                small={false}
-            />
+                        {/* Active Tasks Banner */}
+                        {activeTasks.length > 0 && !genericDialog.isVisible && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none">
+                                {activeTasks.slice(0,3).map(task => (
+                                    <div key={task.id} className="bg-black/70 border border-white/20 text-white px-5 py-3 rounded-lg shadow-lg font-['Tickerbit',Arial,sans-serif] tracking-wider text-sm max-w-2xl pointer-events-auto">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-dhani-green font-bold uppercase text-xs">Objective</span>
+                                            {task.completed && <span className="text-dhani-green text-[10px]">Completed</span>}
+                                        </div>
+                                        <p className="leading-snug whitespace-pre-wrap">{task.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
             {/* Small alert/dialog for stray reminders (small, top-center) */}
             <DialogueBox
@@ -951,9 +955,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 isVisible={genericDialog.isVisible}
                 onAdvance={handleGenericAdvance}
                 onComplete={handleGenericComplete}
-                showGotItButton={genericDialog.showGotItButton}
+                // Got it button removed
                 compact={genericDialog.compact}
-                onGotIt={handleGenericGotIt}
+                // onGotIt removed
                 showProgressIndicator={false}
                 showContinueHint={true}
                 allowSpaceAdvance={true}

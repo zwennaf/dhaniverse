@@ -12,9 +12,7 @@ interface DialogueBoxProps {
   position?: 'bottom' | 'top-center';
   // Small alert variant for brief center-top alerts
   small?: boolean;
-  // When true, show a 'Got it' button and require it to be clicked to dismiss
-  showGotItButton?: boolean;
-  onGotIt?: () => void;
+  // Got it button removed per latest requirements
   showProgressIndicator?: boolean;
   currentSlide?: number;
   totalSlides?: number;
@@ -122,8 +120,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   position = 'bottom',
   small = false,
   compact = false,
-  showGotItButton = false,
-  onGotIt
+  // removed props
 }) => {
   const [lastActionTime, setLastActionTime] = useState(0);
   const mountedRef = useRef(true);
@@ -137,12 +134,10 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   );
 
   // Prevent repeated "Got it" clicks from re-triggering dialogs
-  const [gotItClicked, setGotItClicked] = useState(false);
+  // removed gotItClicked state
 
   // Reset the gotItClicked guard whenever the dialog content or visibility changes
-  useEffect(() => {
-    setGotItClicked(false);
-  }, [text, isVisible, showGotItButton]);
+  // removed gotItClicked reset
 
   useEffect(() => {
     mountedRef.current = true;
@@ -166,12 +161,9 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         if (now - lastActionTime < ACTION_COOLDOWN) return;
 
         if (!isComplete) {
-          // If text is not complete, start speeding up (only on first press)
           if (!keyHeldDown) {
             keyHeldDown = true;
-            speedUpTimeout = setTimeout(() => {
-              speedUp();
-            }, 50);
+            speedUp(); // speed up instantly on first press
           }
         } else {
           // If text is complete, only advance on a fresh key press
@@ -185,14 +177,10 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.code === 'Space') {
+  if (event.key === 'Enter' || event.code === 'Space') {
         keyHeldDown = false;
         
-        if (speedUpTimeout) {
-          clearTimeout(speedUpTimeout);
-          speedUpTimeout = null;
-        }
-        
+  if (speedUpTimeout) { clearTimeout(speedUpTimeout); speedUpTimeout = null; }
         slowDown();
       }
     };
@@ -212,8 +200,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     if (now - lastActionTime < ACTION_COOLDOWN) return;
     setLastActionTime(now);
 
-    // If there's a mandatory Got it button, don't allow clicking the dialog to close it
-    if (showGotItButton) return;
+  // Got it button removed; normal click behavior
 
     if (!isComplete) {
       complete();
@@ -311,12 +298,10 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-6 left-6 right-6 bottom-6 flex items-start">
+        <div className="absolute top-4 left-4 right-4 bottom-4 flex items-start">
           <div 
-            className="w-full px-4 py-3 rounded-lg cursor-pointer overflow-auto"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.1)'
-            }}
+            className="w-full px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
+            style={{}}
             onClick={handleClick}
           >
             <div style={{ maxHeight: small ? (compact ? '100px' : '120px') : (compact ? '260px' : '320px'), overflowY: 'auto' }}>
@@ -324,7 +309,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                 className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
-                  textShadow: '1px 1px 2px rgba(255,255,255,0.8)',
+                  textShadow: '1px 1px 2px rgba(255,255,255,0.5)',
                   lineHeight: '1.6',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word'
@@ -338,7 +323,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Progress indicator */}
         {showProgressIndicator && (
-          <div className="absolute bottom-4 right-8">
+          <div className="absolute bottom-8 right-12">
             <div className="flex items-center space-x-2">
               {/* Slide dots */}
               <div className="flex space-x-1">
@@ -365,7 +350,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Click to continue hint */}
         {showContinueHint && (
-          <div className="absolute bottom-4 left-8">
+          <div className="absolute bottom-8 left-8">
             <p 
               className="text-black text-xs opacity-70 animate-pulse"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}
@@ -375,27 +360,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           </div>
         )}
 
-        {/* Got it button for task dialogs */}
-        {showGotItButton && !gotItClicked && (
-          <div className="absolute top-4 right-8 pointer-events-auto">
-            <button
-              className="bg-black/80 text-white px-3 py-1 rounded font-bold text-sm border border-white/30 hover:bg-black/90"
-              onClick={() => {
-                const now = Date.now();
-                // Prevent rapid double-clicks
-                if (now - lastActionTime < ACTION_COOLDOWN) return;
-                setLastActionTime(now);
-                // Guard to avoid re-triggering the same or subsequent dialogs
-                setGotItClicked(true);
-                onGotIt?.();
-                // Also notify parent to advance/close immediately
-                onAdvance?.();
-              }}
-            >
-              Got it
-            </button>
-          </div>
-        )}
+  {/* Got it button removed */}
       </div>
     </div>
   );

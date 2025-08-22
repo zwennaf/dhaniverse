@@ -105,13 +105,6 @@ class BalanceManager {
 
     // Setup event listeners for legacy systems
     private setupEventListeners() {
-        // Listen for rupee updates from game
-        window.addEventListener("rupee-update", (event: any) => {
-            if (event.detail?.rupees !== undefined) {
-                this.updateCash(event.detail.rupees, false);
-            }
-        });
-
         // Listen for player rupee updates
         window.addEventListener("updatePlayerRupees", (event: any) => {
             if (event.detail?.rupees !== undefined) {
