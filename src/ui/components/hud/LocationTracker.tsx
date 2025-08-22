@@ -20,9 +20,9 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
     targetImage = '/characters/maya-preview.png'
 }) => {
     const [arrowPosition, setArrowPosition] = useState({ x: 0, y: 0, angle: 0 });
-    const [isTargetVisible, setIsTargetVisible] = useState(false);
+    const [showArrow, setShowArrow] = useState(false); // whether tracker UI should render
     const [animationState, setAnimationState] = useState<'hidden' | 'photo-appearing' | 'arrow-appearing' | 'visible' | 'fading'>('hidden');
-    const initialSequenceStartedRef = useRef(false);
+    const prevVisibleRef = useRef<boolean | null>(null);
     const arrowRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -33,57 +33,51 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
         const screenRight = cameraPosition.x + screenSize.width / 2;
         const screenTop = cameraPosition.y - screenSize.height / 2;
         const screenBottom = cameraPosition.y + screenSize.height / 2;
-
-        const targetVisible =
+        const targetVisible = (
             targetPosition.x >= screenLeft &&
             targetPosition.x <= screenRight &&
             targetPosition.y >= screenTop &&
-            targetPosition.y <= screenBottom;
+            targetPosition.y <= screenBottom
+        );
 
-        // Debug logging to trace tracker logic
+        const prevVisible = prevVisibleRef.current;
+        const visibilityChanged = prevVisible === null ? true : prevVisible !== targetVisible;
+        prevVisibleRef.current = targetVisible;
+
         if (!(window as any).__locationTrackerDebugSilenced) {
-            // Throttle logs slightly
-            if ((arrowRef.current as any)?.__lastLogTime === undefined || Date.now() - (arrowRef.current as any).__lastLogTime > 1000) {
+            // Add null check for arrowRef.current before accessing properties
+            if (arrowRef.current && ((arrowRef.current as any).__lastLogTime === undefined || Date.now() - (arrowRef.current as any).__lastLogTime > 1500)) {
                 (arrowRef.current as any).__lastLogTime = Date.now();
-                console.log(`[LocationTracker:${targetName}] vis=${targetVisible} anim=${animationState} isTargetVisibleState=${isTargetVisible}`,
-                    { targetPosition, playerPosition, cameraPosition, screenSize });
+                console.log(`[LocationTracker:${targetName}] targetVisible=${targetVisible} prev=${prevVisible} showArrow=${showArrow} anim=${animationState}`, { targetPosition, playerPosition });
             }
         }
 
-        // Initial mount: start animation sequence if target starts off-screen
-        if (!targetVisible && animationState === 'hidden' && !initialSequenceStartedRef.current) {
-            initialSequenceStartedRef.current = true;
-            setAnimationState('photo-appearing');
-            setTimeout(() => setAnimationState('arrow-appearing'), 200);
-            setTimeout(() => setAnimationState('visible'), 500);
-            setIsTargetVisible(false);
-        }
-
-        // Handle subsequent visibility changes with staggered animation
-        if (targetVisible !== isTargetVisible) {
+        if (visibilityChanged) {
             if (!targetVisible) {
-                // Target just left the screen
+                // Became off-screen: play appearance sequence once
+                setShowArrow(true);
                 setAnimationState('photo-appearing');
                 setTimeout(() => setAnimationState('arrow-appearing'), 200);
                 setTimeout(() => setAnimationState('visible'), 500);
-                setIsTargetVisible(false);
             } else {
-                // Target entered the screen
-                setAnimationState('fading');
-                setTimeout(() => {
-                    setIsTargetVisible(true);
-                    setAnimationState('hidden');
-                }, 300);
+                // Became visible on-screen: fade out then hide
+                if (showArrow) {
+                    setAnimationState('fading');
+                    setTimeout(() => {
+                        setShowArrow(false);
+                        setAnimationState('hidden');
+                    }, 300);
+                }
             }
         }
 
         if (!targetVisible) {
-            // Calculate direction from player to target
+            // Direction & edge positioning
             const deltaX = targetPosition.x - playerPosition.x;
             const deltaY = targetPosition.y - playerPosition.y;
             const angle = Math.atan2(deltaY, deltaX);
             const angleDegrees = angle * (180 / Math.PI);
-            const arrowDistance = 100; // Distance from screen edge
+            const arrowDistance = 100;
             const centerX = screenSize.width / 2;
             const centerY = screenSize.height / 2;
             let arrowX = centerX + Math.cos(angle) * (Math.min(screenSize.width, screenSize.height) / 2 - arrowDistance);
@@ -93,9 +87,10 @@ const LocationTracker: React.FC<LocationTrackerProps> = ({
             arrowY = Math.max(margin, Math.min(screenSize.height - margin, arrowY));
             setArrowPosition({ x: arrowX, y: arrowY, angle: angleDegrees });
         }
-    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled, isTargetVisible, animationState, targetName]);
+    // Deliberately exclude animationState from deps to avoid retrigger loops
+    }, [targetPosition, playerPosition, cameraPosition, screenSize, enabled, targetName]);
 
-    if (!enabled || isTargetVisible) {
+    if (!enabled || !showArrow) {
         return null;
     }
 

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
 import { playerStateApi } from '../../utils/api';
-import PixelButton from './atoms/PixelButton';
 import SEO from './SEO';
 import OnboardingWrapper from './onboarding/OnboardingWrapper';
 import Loader from './loader/Loader';
@@ -17,6 +16,7 @@ const GamePage: React.FC = () => {
   const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Set to false for local development to test onboarding
   // Ref to avoid duplicate tracker activation
   const trackerActivatedRef = useRef(false);
+  const gameStartedRef = useRef(false);
   const navigate = useNavigate();
    
   useEffect(() => {
@@ -54,22 +54,27 @@ const GamePage: React.FC = () => {
         console.log("GamePage: Should show onboarding:", shouldShowOnboarding);
         
         if (shouldShowOnboarding) {
-          // Show loader first for new users
+          // NEW user (tutorial incomplete): show loader first; game will start after onboarding continue
+          console.log("GamePage: New/incomplete tutorial user -> showing loader then onboarding; delaying game start");
           setShowLoader(true);
         } else {
-          // Returning users skip loader and onboarding
-          setIsLoading(false);
-          startGameFlow(gameUsername);
-          // ALSO enable tracker for returning users if tutorial flag is false
-          if (!tutorialCompleted) {
-            console.log("GamePage: Enabling tracker for returning user with false tutorial flag");
-            setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
-          }
+          // RETURNING user (tutorial completed): skip onboarding, start immediately
+            console.log("GamePage: Returning user -> starting game immediately");
+            setIsLoading(false);
+            if (!gameStartedRef.current) {
+              startGameFlow(gameUsername);
+              gameStartedRef.current = true;
+            }
+            // Edge case: backend flag false but considered returning (shouldShowOnboarding false) -> still enable tracker if necessary
+            if (!tutorialCompleted) {
+              setTimeout(() => enableMayaTrackerOnGameStart(), 2000);
+            }
         }
       } catch (error) {
         console.error("GamePage: Error checking tutorial status:", error);
         // Default to showing loader and onboarding on error for testing
         setShowLoader(true);
+        // Do NOT start game yet; maintain expected flow
       }
     };
 
@@ -123,8 +128,10 @@ const GamePage: React.FC = () => {
       // Hide onboarding and start the game
       setShowOnboarding(false);
       
-      if (user?.gameUsername) {
+      if (user?.gameUsername && !gameStartedRef.current) {
+        // Start game only now (after onboarding) for new users
         startGameFlow(user.gameUsername);
+        gameStartedRef.current = true;
       }
       // After game starts, if tutorial not completed, enable Maya tracking
       if (!hasCompletedTutorial) {
@@ -140,8 +147,9 @@ const GamePage: React.FC = () => {
       console.error("GamePage: Error updating tutorial status:", error);
       // Continue to game anyway
       setShowOnboarding(false);
-      if (user?.gameUsername) {
+      if (user?.gameUsername && !gameStartedRef.current) {
         startGameFlow(user.gameUsername);
+        gameStartedRef.current = true;
       }
       if (!hasCompletedTutorial) {
         setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
@@ -244,29 +252,54 @@ const GamePage: React.FC = () => {
 
   // Cleanup effect
   useEffect(() => {
+    // Track if we've been unmounted due to navigation vs React remounting
+    let hasNavigatedAway = false;
+    
+    const handleBeforeUnload = () => {
+      hasNavigatedAway = true;
+    };
+    
+    const handlePopState = () => {
+      hasNavigatedAway = true;
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+    
     return () => {
-      console.log("GamePage: Cleanup - stopping game");
-      stopGame();
+      // Remove event listeners first
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
       
-      const gameContainer = document.getElementById('game-container');
-      if (gameContainer) {
-        gameContainer.style.display = 'none';
-        // Safely clear container contents
-        while (gameContainer.firstChild) {
-          gameContainer.removeChild(gameContainer.firstChild);
+      // Check if we're actually navigating away from /game
+      const currentPath = window.location.pathname;
+      const shouldCleanup = hasNavigatedAway || currentPath !== '/game';
+      
+      console.log("GamePage: Cleanup triggered. pathname=", currentPath, "hasNavigatedAway=", hasNavigatedAway, "willStop=", shouldCleanup);
+      
+      // Only stop game and clear containers if we're actually leaving the game
+      if (shouldCleanup) {
+        stopGame();
+        
+        const gameContainer = document.getElementById('game-container');
+        if (gameContainer) {
+          gameContainer.style.display = 'none';
+          // Safely clear container contents
+          while (gameContainer.firstChild) {
+            gameContainer.removeChild(gameContainer.firstChild);
+          }
         }
-      }
-      
-      const hudContainer = document.getElementById('hud-container');
-      if (hudContainer) {
-        hudContainer.style.display = 'none';
-        // Safely clear container contents
-        while (hudContainer.firstChild) {
-          hudContainer.removeChild(hudContainer.firstChild);
+        
+        const hudContainer = document.getElementById('hud-container');
+        if (hudContainer) {
+          hudContainer.style.display = 'none';
+          while (hudContainer.firstChild) hudContainer.removeChild(hudContainer.firstChild);
         }
+        
+        document.body.classList.remove('game-active');
+      } else {
+        console.warn('GamePage: Prevented cleanup during React remount - keeping game state');
       }
-      
-      document.body.classList.remove('game-active');
     };
   }, []);
    
@@ -286,20 +319,12 @@ const GamePage: React.FC = () => {
       <SEO 
         title="Play Dhaniverse Game - Financial RPG | Learn Money Management Online"
         description="Play Dhaniverse, the immersive 2D RPG that teaches real financial skills. Explore buildings, trade stocks, manage budgets, and level up your money knowledge through interactive gameplay."
-        keywords="play dhaniverse, dhaniverse game online, dhaniverse RPG, financial RPG game, money management game online, stock trading game, budgeting game online, financial education RPG, investing game online, personal finance simulator, financial literacy game online, money RPG online, financial simulation game, stock market simulator, budget management game, financial planning game online, investment trading game, money skills RPG, financial learning game, gamified finance online, interactive finance game, financial education simulator, money management RPG, financial game play online"
+        keywords="play dhaniverse, dhaniverse game online, dhaniverse RPG, financial RPG game, money management game online, stock trading game, budgeting game online, financial education RPG, investing game online, personal finance simulator, financial literacy game online, money RPG online, financial simulation game, stock market simulator, budget management game, financial planning game online, investment trading game, money skills RPG, financial learning game, money skills RPG, financial learning game, gamified finance online, interactive finance game, financial education simulator, money management RPG, financial game play online"
         url="https://dhaniverse.in/game"
         type="game"
         image="https://dhaniverse.in/og-image.jpg"
       />
-      <div className="fixed top-4 left-4 z-50">
-        <PixelButton 
-          variant="outline" 
-          onClick={() => navigate('/')} 
-          className="bg-black/50 backdrop-blur-sm border-yellow-400/50 hover:bg-black/70"
-        >
-          Return to Home
-        </PixelButton>
-      </div>
+      {/* Return button hidden during active gameplay - players should stay in game */}
     </div>
   );
 };
