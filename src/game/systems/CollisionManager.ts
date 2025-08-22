@@ -33,6 +33,12 @@ export class CollisionManager {
     const player = this.scene.getPlayer();
     if (!player || this.collisionObjects.length === 0) return;
     
+    // Check if player is inside a building - skip collisions if so
+    const mapManager = this.scene.mapManager;
+    if (mapManager && mapManager.isPlayerInBuilding()) {
+      return; // No collisions inside buildings
+    }
+    
     // Get player sprite for collision checks
     const playerSprite = player.getSprite();
     
@@ -170,6 +176,12 @@ export class CollisionManager {
   
   // Helper method to check if a point would collide with any collision object
   hasCollisionAt(x: number, y: number): boolean {
+    // Check if player is inside a building - no collisions if so
+    const mapManager = this.scene.mapManager;
+    if (mapManager && mapManager.isPlayerInBuilding()) {
+      return false; // No collisions inside buildings
+    }
+    
     // Check cache first
     const now = Date.now();
     const cacheKey = `${Math.round(x)},${Math.round(y)}|${now}`;
