@@ -36,6 +36,13 @@ export class MayaNPCManager {
     private alertIntervalMs: number = 60000; // 60 seconds
     private guideCompleted: boolean = false;
 
+    // Track player's initial position and whether they have started moving
+    private playerInitialPosition: { x: number; y: number } | null = null;
+    private playerHasMoved: boolean = false;
+
+    // Fixed initial tracker start point (points A-D as requested)
+    private readonly initialTrackerPoint = { x: 1043, y: 669 };
+
     // Maya's position (starting condition specified)
     public readonly x: number = 7779;
     public readonly y: number = 3581;
@@ -114,6 +121,18 @@ export class MayaNPCManager {
 
         // Create animations for Maya
         this.createMayaAnimations();
+
+        // Capture player's initial position (for movement detection) if available.
+        const player = this.scene.getPlayer && this.scene.getPlayer();
+        if (player) {
+            const ps = player.getSprite();
+            this.playerInitialPosition = { x: ps.x, y: ps.y };
+        }
+
+        // Initially set the location tracker target to the fixed start point so the
+        // HUD arrow begins at the requested coordinate and will later lead toward Maya.
+        locationTrackerManager.setTargetEnabled('maya', true);
+        locationTrackerManager.updateTargetPosition('maya', { x: this.initialTrackerPoint.x, y: this.initialTrackerPoint.y });
     }
 
     private createMayaAnimations(): void {
@@ -346,6 +365,36 @@ export class MayaNPCManager {
 
         const player = this.scene.getPlayer();
         const playerSprite = player.getSprite();
+
+        // If we don't yet have the player's initial position (player may not have been
+        // available in the constructor), capture it now and set the tracker to point
+        // to the player's starting spot.
+        if (!this.playerInitialPosition) {
+            this.playerInitialPosition = { x: playerSprite.x, y: playerSprite.y };
+            locationTrackerManager.setTargetEnabled('maya', true);
+            locationTrackerManager.updateTargetPosition('maya', { x: playerSprite.x, y: playerSprite.y });
+        }
+
+        // If we have recorded a player initial position and the player hasn't moved yet,
+        // check whether they've started moving. If so, switch the tracker to point to
+        // Maya's initial location (where Maya spawned).
+        if (this.playerInitialPosition && !this.playerHasMoved) {
+            const movedDist = Phaser.Math.Distance.Between(
+                playerSprite.x,
+                playerSprite.y,
+                this.playerInitialPosition.x,
+                this.playerInitialPosition.y
+            );
+
+            // Consider movement if player moved more than 4 pixels
+            if (movedDist > 4) {
+                this.playerHasMoved = true;
+
+                // Now switch the HUD tracker to point at Maya's initial position
+                locationTrackerManager.setTargetEnabled('maya', true);
+                locationTrackerManager.updateTargetPosition('maya', { x: this.x, y: this.y });
+            }
+        }
 
         // Calculate distance between player and Maya
         const distance = Phaser.Math.Distance.Between(
