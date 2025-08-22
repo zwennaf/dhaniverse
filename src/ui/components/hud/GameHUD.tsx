@@ -4,7 +4,7 @@ import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
-import ChatVoiceControls from "../voice/ChatVoiceControls";
+// ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
 import DialogueBox from '../common/DialogueBox';
@@ -34,7 +34,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
-        { id: string; username: string; message: string }[]
+        { id: string; username: string; message: string; timestamp?: number }[]
     >([]);
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
@@ -59,18 +59,21 @@ const GameHUD: React.FC<GameHUDProps> = ({
     // Task system state
     const [activeTasks, setActiveTasks] = useState<GameTask[]>([]);
     const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
-    const [smallAlertText, setSmallAlertText] = useState('');
+    const [smallAlertText, setSmallAlertText] = useState("");
     const [genericDialog, setGenericDialog] = useState<{
         text: string;
         characterName?: string;
         isVisible: boolean;
         allowAdvance?: boolean;
-    showGotItButton?: boolean;
-    compact?: boolean;
-    }>({ text: '', characterName: undefined, isVisible: false });
+        showGotItButton?: boolean;
+        compact?: boolean;
+    }>({ text: "", characterName: undefined, isVisible: false });
     const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
     const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
-    const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+    const [screenSize, setScreenSize] = useState({
+        width: window.innerWidth,
+        height: window.innerHeight,
+    });
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +188,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             .substring(2, 9)}`,
                         username: "System",
                         message: `${player.username} joined the game`,
+                        timestamp: Date.now(),
                     };
                     const newMessages = [...prev, joinMessage];
                     return newMessages.length > 50
@@ -209,6 +213,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             .substring(2, 9)}`,
                         username: "System",
                         message: `${username} left the game`,
+                        timestamp: Date.now(),
                     };
                     const newMessages = [...prev, leaveMessage];
                     return newMessages.length > 50
@@ -314,7 +319,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 // Keep only the last 50 messages to prevent memory issues
                 const newMessages = [
                     ...prev,
-                    { id: messageId, username, message },
+                    { id: messageId, username, message, timestamp: Date.now() },
                 ];
                 if (newMessages.length > 50) {
                     return newMessages.slice(-50);
@@ -351,18 +356,33 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         // Listen for window resize
         const handleResize = () => {
-            setScreenSize({ width: window.innerWidth, height: window.innerHeight });
+            setScreenSize({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
         };
 
-        window.addEventListener('player-position-update' as any, handlePlayerPositionUpdate);
-        window.addEventListener('camera-position-update' as any, handleCameraPositionUpdate);
-        window.addEventListener('resize', handleResize);
+        window.addEventListener(
+            "player-position-update" as any,
+            handlePlayerPositionUpdate
+        );
+        window.addEventListener(
+            "camera-position-update" as any,
+            handleCameraPositionUpdate
+        );
+        window.addEventListener("resize", handleResize);
 
         return () => {
             unsubscribe();
-            window.removeEventListener('player-position-update' as any, handlePlayerPositionUpdate);
-            window.removeEventListener('camera-position-update' as any, handleCameraPositionUpdate);
-            window.removeEventListener('resize', handleResize);
+            window.removeEventListener(
+                "player-position-update" as any,
+                handlePlayerPositionUpdate
+            );
+            window.removeEventListener(
+                "camera-position-update" as any,
+                handleCameraPositionUpdate
+            );
+            window.removeEventListener("resize", handleResize);
         };
     }, []);
 
@@ -404,16 +424,22 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setShowSmallAlertDialog(false);
         };
 
-    window.addEventListener('assign-first-task' as any, assignFirstTaskHandler);
-        window.addEventListener('player-near-maya' as any, handlePlayerNearMaya);
+        window.addEventListener(
+            "assign-first-task" as any,
+            assignFirstTaskHandler
+        );
+        window.addEventListener(
+            "player-near-maya" as any,
+            handlePlayerNearMaya
+        );
 
         // Generic dialogue events (from game systems like Maya)
         const showDialogueHandler = (e: any) => {
             const d = e.detail || {};
-            console.debug('GameHUD: show-dialogue event received', d);
+            console.debug("GameHUD: show-dialogue event received", d);
             setGenericDialog({
-                text: d.text || '',
-                characterName: d.characterName || 'Maya',
+                text: d.text || "",
+                characterName: d.characterName || "Maya",
                 isVisible: true,
                 allowAdvance: d.allowAdvance !== false,
                 showGotItButton: d.showGotItButton || false,
@@ -423,7 +449,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         const showTemporaryHandler = (e: any) => {
             const d = e.detail || {};
-            const text = d.text || '';
+            const text = d.text || "";
             const duration = d.durationMs || 1500;
             setSmallAlertText(text);
             setShowSmallAlertDialog(true);
@@ -434,16 +460,34 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setGenericDialog((g) => ({ ...g, isVisible: false }));
         };
 
-        window.addEventListener('show-dialogue' as any, showDialogueHandler);
-        window.addEventListener('show-temporary-dialog' as any, showTemporaryHandler);
-        window.addEventListener('close-dialogue' as any, closeDialogueHandler);
+        window.addEventListener("show-dialogue" as any, showDialogueHandler);
+        window.addEventListener(
+            "show-temporary-dialog" as any,
+            showTemporaryHandler
+        );
+        window.addEventListener("close-dialogue" as any, closeDialogueHandler);
 
         return () => {
-            window.removeEventListener('assign-first-task' as any, assignFirstTaskHandler);
-            window.removeEventListener('player-near-maya' as any, handlePlayerNearMaya);
-            window.removeEventListener('show-dialogue' as any, showDialogueHandler);
-            window.removeEventListener('show-temporary-dialog' as any, showTemporaryHandler);
-            window.removeEventListener('close-dialogue' as any, closeDialogueHandler);
+            window.removeEventListener(
+                "assign-first-task" as any,
+                assignFirstTaskHandler
+            );
+            window.removeEventListener(
+                "player-near-maya" as any,
+                handlePlayerNearMaya
+            );
+            window.removeEventListener(
+                "show-dialogue" as any,
+                showDialogueHandler
+            );
+            window.removeEventListener(
+                "show-temporary-dialog" as any,
+                showTemporaryHandler
+            );
+            window.removeEventListener(
+                "close-dialogue" as any,
+                closeDialogueHandler
+            );
         };
     }, []);
 
@@ -467,10 +511,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         const pending = (window as any).__pendingShowDialogue;
         if (pending && pending.text) {
-            console.debug('GameHUD: consuming pending show-dialogue', pending);
+            console.debug("GameHUD: consuming pending show-dialogue", pending);
             setGenericDialog({
                 text: pending.text,
-                characterName: pending.characterName || 'Maya',
+                characterName: pending.characterName || "Maya",
                 isVisible: true,
                 allowAdvance: pending.allowAdvance !== false,
             });
@@ -624,6 +668,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     .substring(2, 9)}`,
                 username: "System",
                 message,
+                timestamp: Date.now(),
             };
             const newMessages = [...prev, systemMessage];
             return newMessages.length > 50
@@ -638,22 +683,22 @@ const GameHUD: React.FC<GameHUDProps> = ({
     };
 
     // Handle player advancing/closing a generic dialogue from the HUD
-        const handleGenericAdvance = () => {
+    const handleGenericAdvance = () => {
         // Tell the game that the player advanced/closed the dialogue
-        window.dispatchEvent(new CustomEvent('dialogue-advance'));
+        window.dispatchEvent(new CustomEvent("dialogue-advance"));
         setGenericDialog((g) => ({ ...g, isVisible: false }));
     };
 
     // When user clicks 'Got it' on a dialog which requests an explicit acknowledgement
     const handleGenericGotIt = () => {
         // Notify game systems that user explicitly acknowledged the dialog
-        window.dispatchEvent(new CustomEvent('dialogue-gotit'));
+        window.dispatchEvent(new CustomEvent("dialogue-gotit"));
         // Also close the HUD dialog
         setGenericDialog((g) => ({ ...g, isVisible: false }));
     };
 
     const handleGenericComplete = () => {
-        window.dispatchEvent(new CustomEvent('dialogue-complete'));
+        window.dispatchEvent(new CustomEvent("dialogue-complete"));
     };
 
     return (
@@ -698,7 +743,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Player connection display */}
             <div className="absolute bottom-[45vh] left-5 w-[28ch] pointer-events-none">
                 {/* Online count */}
-                <div className="mb-2 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
+                <div className="mb-10 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
                     <span className="text-dhani-green">●</span> {onlineCount}{" "}
                     online
                 </div>
@@ -727,95 +772,140 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-0 left-0 w-[28ch] max-h-[40vh] flex flex-col bg-black/70 rounded-tr-lg p-2 text-[14px] text-white pointer-events-auto backdrop-blur-sm border border-white/10 transition-all duration-300 ${
-                    isChatFocused
-                        ? "opacity-100 border-dhani-green/30 shadow-lg shadow-dhani-green/10"
-                        : "opacity-75"
+                className={`absolute bottom-4 left-4 w-[35ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                    isChatFocused ? "opacity-100" : "opacity-95"
                 }`}
             >
                 {/* Chat messages area */}
                 <div
-                    className="h-[20vh] overflow-y-auto mb-2 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+                    className="h-[36vh] overflow-y-auto mb-3 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
                     ref={messagesRef}
                 >
-                    {chatMessages.length === 0 ? (
-                        <div className="text-white/50 italic text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider p-2 space-y-1">
-                            <div>No messages yet. Press / to chat.</div>
-                            {voiceEnabled && (
-                                <div className="text-xs text-white/40">
-                                    Voice controls are below.
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        chatMessages.map((msg, idx) => (
-                            <div
-                                key={idx}
-                                className="mb-1.5 leading-[1.3] px-1"
-                            >
-                                <div className="flex items-start space-x-2">
-                                    <span
-                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex-shrink-0 ${
-                                            msg.username === "System"
-                                                ? "text-yellow-100 italic"
-                                                : "text-dhani-green"
-                                        }`}
-                                    >
-                                        {msg.username === "System"
-                                            ? ""
-                                            : `${msg.username}:`}
-                                    </span>
-                                    <span
-                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider break-words ${
-                                            msg.username === "System"
-                                                ? "text-cyan-100 italic"
-                                                : "text-white"
-                                        }`}
-                                    >
-                                        {msg.message}
-                                    </span>
-                                </div>
-                            </div>
-                        ))
-                    )}
+                    {chatMessages.length === 0
+                        ? null
+                        : chatMessages.map((msg) => (
+                              <div
+                                  key={msg.id}
+                                  className="flex items-start gap-3 mb-4"
+                              >
+                                  {/* avatar */}
+                                  <div className="w-8 h-8 rounded-full flex-shrink-0">
+                                      <div
+                                          className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
+                                          style={{
+                                              backgroundImage: `url('/characters/C1.png')`,
+                                          }}
+                                      />
+                                  </div>
+
+                                  {/* bubble */}
+                                  <div className="relative">
+                                      <div className="bg-[rgba(12,28,12,0.78)] text-white rounded-2xl px-3 py-3 max-w-[22ch] inline-block border border-black/30 backdrop-blur-sm shadow-md">
+                                          <div className="flex items-start justify-between gap-2">
+                                              <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                                  {msg.username}
+                                              </div>
+                                              <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                                  {msg.timestamp
+                                                      ? new Date(
+                                                            msg.timestamp
+                                                        ).toLocaleTimeString(
+                                                            [],
+                                                            {
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            }
+                                                        )
+                                                      : ""}
+                                              </div>
+                                          </div>
+                                          <div
+                                              className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] overflow-hidden"
+                                              style={{
+                                                  display: "-webkit-box",
+                                                  WebkitLineClamp: 3 as any,
+                                                  WebkitBoxOrient: "vertical",
+                                              }}
+                                          >
+                                              {msg.message}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
                 </div>
 
                 {/* Voice controls over the chat input */}
-                {voiceEnabled && selfPlayerId && (
-                    <div className="mb-2">
-                        <ChatVoiceControls
-                            roomName="dhaniverse-main"
-                            participantName={selfPlayerId}
-                        />
-                    </div>
-                )}
+                {/* Headphone icon left + input + send button right (minimal controls) */}
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        className="w-10 h-10 rounded-full bg-black/90 flex items-center justify-center shadow-sm"
+                        aria-label="Headphone"
+                    >
+                        {/* headphone icon larger */}
+                        <svg
+                            className="w-9 h-9 scale-[4]"
+                            viewBox="0 0 19 19"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M9.77218 3.30326C6.50045 3.30326 3.84819 5.95553 3.84819 9.22726H6.06968C6.88762 9.22726 7.55068 9.8903 7.55068 10.7083V14.4108C7.55068 15.2287 6.88762 15.8918 6.06968 15.8918H3.84819C3.03025 15.8918 2.36719 15.2287 2.36719 14.4108V9.22726C2.36719 5.13759 5.68251 1.82227 9.77218 1.82227C13.8618 1.82227 17.1772 5.13759 17.1772 9.22726V14.4108C17.1772 15.2287 16.5141 15.8918 15.6962 15.8918H13.4747C12.6567 15.8918 11.9937 15.2287 11.9937 14.4108V10.7083C11.9937 9.8903 12.6567 9.22726 13.4747 9.22726H15.6962C15.6962 5.95553 13.0439 3.30326 9.77218 3.30326ZM3.84819 10.7083V14.4108H6.06968V10.7083H3.84819ZM13.4747 10.7083V14.4108H15.6962V10.7083H13.4747Z"
+                                fill="white"
+                            />
+                        </svg>
+                    </button>
 
-                {/* Chat input */}
-                <div className="relative">
-                    <input
-                        ref={chatInputRef}
-                        className={`w-full px-3 py-2 border rounded-md bg-black/40 text-sm text-white outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider transition-all duration-200 ${
-                            isChatFocused
-                                ? "border-dhani-green/50 bg-black/60 shadow-sm shadow-dhani-green/20"
-                                : "border-white/20 hover:border-white/30"
-                        }`}
-                        type="text"
-                        placeholder={
-                            isChatFocused
-                                ? "Type a message..."
-                                : "Press / to chat"
-                        }
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onFocus={handleChatFocus}
-                        onBlur={handleChatBlur}
-                        onKeyDown={handleChatKeyDown}
-                    />
-                    {isChatFocused && (
-                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/40 text-xs font-['Tickerbit',Arial,sans-serif]">
-                            Enter
-                        </div>
-                    )}
+                    <div className="relative flex-1">
+                        <input
+                            ref={chatInputRef}
+                            className={`w-full pr-14 pl-5 h-10 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${
+                                isChatFocused
+                                    ? "ring-1 ring-white/20"
+                                    : "opacity-95"
+                            }`}
+                            type="text"
+                            placeholder={
+                                isChatFocused
+                                    ? "Type a message..."
+                                    : "Press / to chat"
+                            }
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onFocus={handleChatFocus}
+                            onBlur={handleChatBlur}
+                            onKeyDown={handleChatKeyDown}
+                        />
+
+                        {/* forward button inside input, right */}
+                        <button
+                            onClick={() => {
+                                const message = chatInput.trim();
+                                if (!message) return;
+                                window.dispatchEvent(
+                                    new CustomEvent("send-chat", {
+                                        detail: { message },
+                                    })
+                                );
+                                setChatInput("");
+                                setTimeout(
+                                    () => chatInputRef.current?.focus(),
+                                    0
+                                );
+                            }}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center  border-2 "
+                            aria-label="Send message"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="w-6 h-6 fill-black scale-[18] ml-0.5"
+                                aria-hidden
+                            >
+                                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -838,7 +928,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             <DialogueBox
                 text={smallAlertText}
                 isVisible={showSmallAlertDialog}
-                position={'top-center'}
+                position={"top-center"}
                 small={true}
                 showProgressIndicator={false}
                 showContinueHint={false}

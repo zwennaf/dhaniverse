@@ -11,8 +11,8 @@ interface AuthContextType {
   user: User | null;
   isLoaded: boolean;
   isSignedIn: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean; message?: string }>;
-  signUp: (email: string, password: string, gameUsername: string) => Promise<{ success: boolean; error?: string }>;
+  sendMagicLink: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
+  verifyMagicLink: (token: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean; message?: string }>;
   signInWithGoogle: (googleToken: string, gameUsername?: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean }>;
   signOut: () => Promise<void>;
   updateProfile: (gameUsername: string, selectedCharacter?: string) => Promise<{ success: boolean; error?: string }>;
@@ -62,32 +62,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoaded(true);
     }
-  };  const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string; isNewUser?: boolean; message?: string }> => {
+  };  const sendMagicLink = async (email: string): Promise<{ success: boolean; error?: string; message?: string }> => {
     try {
-      // First attempt: try to sign in normally
-      let response = await fetch(`${API_BASE}/auth/login`, {
+      const response = await fetch(`${API_BASE}/auth/send-magic-link`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       });
 
-      let data = await response.json();
+      const data = await response.json();
 
-      // If user doesn't exist, try auto-registration
-      if (!response.ok && data.error === 'Invalid email or password') {
-        // Attempt auto-registration
-        response = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password, autoRegister: true }),
-        });
-
-        data = await response.json();
+      if (response.ok) {
+        return { 
+          success: true, 
+          message: data.message 
+        };
+      } else {
+        return { success: false, error: data.error || 'Failed to send magic link' };
       }
+    } catch (error) {
+      console.error('Send magic link error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  };
+
+  const verifyMagicLink = async (token: string): Promise<{ success: boolean; error?: string; isNewUser?: boolean; message?: string }> => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/verify-magic-link?token=${encodeURIComponent(token)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
 
       if (response.ok) {
         localStorage.setItem('dhaniverse_token', data.token);
@@ -98,33 +108,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           message: data.message 
         };
       } else {
-        return { success: false, error: data.error || 'Sign in failed' };
+        return { success: false, error: data.error || 'Invalid magic link' };
       }
     } catch (error) {
-      console.error('Sign in error:', error);
-      return { success: false, error: 'Network error. Please try again.' };
-    }
-  };  const signUp = async (email: string, password: string, gameUsername: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const response = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, gameUsername }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem('dhaniverse_token', data.token);
-        setUser(data.user);
-        return { success: true };
-      } else {
-        return { success: false, error: data.error || 'Sign up failed' };
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('Verify magic link error:', error);
       return { success: false, error: 'Network error. Please try again.' };
     }
   };  const signInWithGoogle = async (googleToken: string, gameUsername?: string): Promise<{ success: boolean; error?: string; isNewUser?: boolean }> => {
@@ -218,8 +205,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     isLoaded,
     isSignedIn,
-    signIn,
-    signUp,
+    sendMagicLink,
+    verifyMagicLink,
     signInWithGoogle,
     signOut,
     updateProfile,

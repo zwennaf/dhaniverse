@@ -5,12 +5,14 @@ import { createToken, verifyToken } from "../auth/jwt.ts";
 import type { UserDocument } from "../db/schemas.ts";
 import { EmailService } from "../services/EmailService.ts";
 import { OTPService } from "../services/OTPService.ts";
+import { MagicLinkService } from "../services/MagicLinkService.ts";
 
 const authRouter = new Router();
 
 // Initialize services
 const emailService = new EmailService();
 const otpService = new OTPService(mongodb);
+const magicLinkService = new MagicLinkService();
 
 // Rate limiting helper
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -30,15 +32,6 @@ function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMs: n
     
     record.count++;
     return true;
-}
-
-// Helper function to hash passwords (basic implementation)
-async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Database connection middleware
@@ -84,8 +77,8 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
     await next();
 });
 
-// Register endpoint
-authRouter.post("/auth/register", async (ctx: Context) => {
+// Send Magic Link for passwordless authentication
+authRouter.post("/auth/send-magic-link", async (ctx: Context) => {
     try {
         // Check database connection first
         if (!mongodb.isHealthy()) {
@@ -95,82 +88,59 @@ authRouter.post("/auth/register", async (ctx: Context) => {
         }
 
         const body = await ctx.request.body.json();
-        const { email, password, gameUsername } = body;
+        const { email, gameUsername, selectedCharacter } = body;
 
         // Validation
-        if (!email || !password || !gameUsername) {
+        if (!email) {
             ctx.response.status = 400;
             ctx.response.body = {
-                error: "Email, password, and game username are required",
+                error: "Email is required",
             };
             return;
         }
 
-        if (password.length < 6) {
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
             ctx.response.status = 400;
             ctx.response.body = {
-                error: "Password must be at least 6 characters",
+                error: "Please enter a valid email address",
             };
             return;
         }
 
-        if (gameUsername.length < 3) {
-            ctx.response.status = 400;
+        // Rate limiting
+        if (!checkRateLimit(`magic:${email}`, 3, 5 * 60 * 1000)) {
+            ctx.response.status = 429;
             ctx.response.body = {
-                error: "Game username must be at least 3 characters",
+                error: "Too many magic link requests. Please wait 5 minutes.",
             };
             return;
         }
 
-        // Check if user already exists
-        const existingEmailUser = await mongodb.findUserByEmail(email);
-        if (existingEmailUser) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                error: "User with this email already exists",
-            };
-            return;
-        }
-
-        const existingUsernameUser = await mongodb.findUserByGameUsername(
-            gameUsername
-        );
-        if (existingUsernameUser) {
-            ctx.response.status = 400;
-            ctx.response.body = { error: "Game username is already taken" };
-            return;
-        }
-
-        // Create user
-        const passwordHash = await hashPassword(password);
-        const user = await mongodb.createUser({
-            email,
-            passwordHash,
+        // Send magic link
+        const result = await magicLinkService.sendMagicLink({
+            email: email.toLowerCase(),
             gameUsername,
-            createdAt: new Date(),
+            selectedCharacter
         });
 
-        // Create session token
-        const token = await createToken(user.id);
-
+        ctx.response.status = result.success ? 200 : 400;
         ctx.response.body = {
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                gameUsername: user.gameUsername,
-                selectedCharacter: "C2", // Default for new users
-            },
+            success: result.success,
+            message: result.message,
+            ...(result.expiresAt && { expiresAt: result.expiresAt.toISOString() })
         };
+
     } catch (error) {
         ctx.response.status = 500;
         ctx.response.body = { error: "Internal server error" };
-        console.error("Registration error:", error);
+        console.error("Send magic link error:", error);
     }
 });
 
-// Login endpoint with auto-registration for new users
-authRouter.post("/auth/login", async (ctx: Context) => {
+// Verify Magic Link
+authRouter.get("/auth/verify-magic-link", async (ctx: Context) => {
     try {
         // Check database connection first
         if (!mongodb.isHealthy()) {
@@ -179,101 +149,40 @@ authRouter.post("/auth/login", async (ctx: Context) => {
             return;
         }
 
-        const body = await ctx.request.body.json();
-        const { email, password, autoRegister } = body;
+        const url = new URL(ctx.request.url);
+        const token = url.searchParams.get("token");
 
-        if (!email || !password) {
+        if (!token) {
             ctx.response.status = 400;
-            ctx.response.body = { error: "Email and password are required" };
+            ctx.response.body = {
+                error: "Magic link token is required",
+            };
             return;
         }
 
-        // Find user
-        let user = await mongodb.findUserByEmail(email);
+        // Verify magic link
+        const result = await magicLinkService.verifyMagicLink(token);
 
-        if (!user) {
-            // If autoRegister is enabled, create a new user
-            if (autoRegister) {
-                // Validate password for new user
-                if (password.length < 6) {
-                    ctx.response.status = 400;
-                    ctx.response.body = {
-                        error: "Password must be at least 6 characters for new account",
-                    };
-                    return;
-                }
-
-                // Generate a default game username from email
-                const defaultGameUsername =
-                    email.split("@")[0] +
-                    "_" +
-                    Math.floor(Math.random() * 1000);
-
-                // Ensure the generated username is unique
-                let gameUsername = defaultGameUsername;
-                let counter = 1;
-                while (await mongodb.findUserByGameUsername(gameUsername)) {
-                    gameUsername = defaultGameUsername + "_" + counter;
-                    counter++;
-                }
-
-                // Create new user
-                const passwordHash = await hashPassword(password);
-                user = await mongodb.createUser({
-                    email,
-                    passwordHash,
-                    gameUsername,
-                    createdAt: new Date(),
-                });
-
-                // Create session token
-                const token = await createToken(user.id);
-
-                ctx.response.status = 201;
-                ctx.response.body = {
-                    token,
-                    user: {
-                        id: user.id,
-                        email: user.email,
-                        gameUsername: user.gameUsername,
-                    },
-                    isNewUser: true,
-                    message:
-                        "Account created successfully! You can change your username in your profile.",
-                };
-                return;
-            } else {
-                ctx.response.status = 401;
-                ctx.response.body = { error: "Invalid email or password" };
-                return;
-            }
+        if (result.success) {
+            ctx.response.status = 200;
+            ctx.response.body = {
+                success: true,
+                message: result.message,
+                token: result.authToken,
+                user: result.user,
+                isNewUser: result.isNewUser
+            };
+        } else {
+            ctx.response.status = 400;
+            ctx.response.body = {
+                error: result.message
+            };
         }
 
-        // Verify password for existing user
-        const passwordHash = await hashPassword(password);
-        if (passwordHash !== user.passwordHash) {
-            ctx.response.status = 401;
-            ctx.response.body = { error: "Invalid email or password" };
-            return;
-        }
-
-        // Create session token
-        const token = await createToken(user.id);
-
-        ctx.response.body = {
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                gameUsername: user.gameUsername,
-                selectedCharacter: user.selectedCharacter || "C2",
-            },
-            isNewUser: false,
-        };
     } catch (error) {
         ctx.response.status = 500;
         ctx.response.body = { error: "Internal server error" };
-        console.error("Login error:", error);
+        console.error("Verify magic link error:", error);
     }
 });
 
@@ -629,387 +538,21 @@ async function verifyGoogleToken(
 }
 
 // ==========================================
-// OTP ROUTES FOR EMAIL VERIFICATION
+// GOOGLE OAUTH ROUTES
 // ==========================================
 
-// Send OTP for email verification
-authRouter.post("/auth/send-otp", async (ctx: Context) => {
+// Health check for authentication services
+authRouter.get("/auth/health", async (ctx: Context) => {
     try {
-        const body = await ctx.request.body.json();
-        const { email, purpose = 'email_verification' } = body;
-
-        if (!email) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "Email is required"
-            };
-            return;
-        }
-
-        // Rate limiting
-        if (!checkRateLimit(`otp:${email}`, 3, 5 * 60 * 1000)) {
-            ctx.response.status = 429;
-            ctx.response.body = {
-                success: false,
-                message: "Too many OTP requests. Please wait 5 minutes."
-            };
-            return;
-        }
-
-        // Check if user has a valid OTP already
-        const hasValidOTP = await otpService.hasValidOTP(email, purpose);
-        if (hasValidOTP) {
-            const expiryTime = await otpService.getOTPExpiryTime(email, purpose);
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "A valid OTP already exists. Please check your email or wait for it to expire.",
-                expiresAt: expiryTime?.toISOString()
-            };
-            return;
-        }
-
-        // Generate and send OTP
-        const { otp, expiresAt } = await otpService.generateOTP(email, {
-            purpose: purpose as 'email_verification' | 'password_reset',
-            expiresInMinutes: 10
-        });
-
-        const emailSent = await emailService.sendOTPEmail({
-            to: email,
-            otp,
-            expiresIn: 10
-        });
-
-        if (!emailSent) {
-            ctx.response.status = 500;
-            ctx.response.body = {
-                success: false,
-                message: "Failed to send verification email. Please try again."
-            };
-            return;
-        }
+        const isEmailHealthy = await emailService.testConnection();
+        const magicLinkStats = await magicLinkService.getMagicLinkStats();
 
         ctx.response.status = 200;
         ctx.response.body = {
             success: true,
-            message: "Verification code sent to your email.",
-            expiresAt: expiresAt.toISOString()
-        };
-
-    } catch (error) {
-        console.error("Send OTP error:", error);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            message: "Internal server error"
-        };
-    }
-});
-
-// Verify OTP
-authRouter.post("/auth/verify-otp", async (ctx: Context) => {
-    try {
-        const body = await ctx.request.body.json();
-        const { email, otp, purpose = 'email_verification' } = body;
-
-        if (!email || !otp) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "Email and OTP are required"
-            };
-            return;
-        }
-
-        // Rate limiting
-        if (!checkRateLimit(`verify:${email}`, 5, 15 * 60 * 1000)) {
-            ctx.response.status = 429;
-            ctx.response.body = {
-                success: false,
-                message: "Too many verification attempts. Please try again in 15 minutes."
-            };
-            return;
-        }
-
-        // Verify OTP
-        const verification = await otpService.verifyOTP(email, otp, purpose);
-        
-        if (!verification.valid) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: verification.message
-            };
-            return;
-        }
-
-        ctx.response.status = 200;
-        ctx.response.body = {
-            success: true,
-            message: "OTP verified successfully"
-        };
-
-    } catch (error) {
-        console.error("Verify OTP error:", error);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            message: "Internal server error"
-        };
-    }
-});
-
-// Enhanced registration with email verification
-authRouter.post("/auth/register-with-otp", async (ctx: Context) => {
-    try {
-        const body = await ctx.request.body.json();
-        const { email, password, gameUsername, otp, selectedCharacter } = body;
-
-        // Validation
-        if (!email || !password || !gameUsername || !otp) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "Email, password, game username, and OTP are required"
-            };
-            return;
-        }
-
-        // Rate limiting
-        if (!checkRateLimit(`register:${email}`, 3, 15 * 60 * 1000)) {
-            ctx.response.status = 429;
-            ctx.response.body = {
-                success: false,
-                message: "Too many registration attempts. Please try again in 15 minutes."
-            };
-            return;
-        }
-
-        // Verify OTP first
-        const verification = await otpService.verifyOTP(email, otp, 'email_verification');
-        if (!verification.valid) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: verification.message
-            };
-            return;
-        }
-
-        // Check if user already exists
-        const existingUser = await mongodb.findUserByEmail(email);
-        if (existingUser) {
-            ctx.response.status = 409;
-            ctx.response.body = {
-                success: false,
-                message: "User with this email already exists"
-            };
-            return;
-        }
-
-        // Check if username is taken
-        const existingUsername = await mongodb.findUserByGameUsername(gameUsername);
-        if (existingUsername) {
-            ctx.response.status = 409;
-            ctx.response.body = {
-                success: false,
-                message: "Username is already taken"
-            };
-            return;
-        }
-
-        // Create user
-        const passwordHash = await hashPassword(password);
-        const user = await mongodb.createUser({
-            email,
-            passwordHash,
-            gameUsername,
-            selectedCharacter: selectedCharacter || 'C1',
-            createdAt: new Date()
-        });
-
-        // Create initial player state
-        await mongodb.createInitialPlayerState(user.id);
-
-        // Send welcome email
-        await emailService.sendWelcomeEmail(email, gameUsername);
-
-        // Generate JWT token
-        const token = await createToken(user.id, gameUsername);
-
-        ctx.response.status = 201;
-        ctx.response.body = {
-            success: true,
-            message: "Registration completed successfully!",
-            user: {
-                id: user.id,
-                email: user.email,
-                gameUsername: user.gameUsername,
-                selectedCharacter: user.selectedCharacter
-            },
-            token
-        };
-
-    } catch (error) {
-        console.error("Registration with OTP error:", error);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            message: "Internal server error"
-        };
-    }
-});
-
-// Password reset request
-authRouter.post("/auth/forgot-password", async (ctx: Context) => {
-    try {
-        const body = await ctx.request.body.json();
-        const { email } = body;
-
-        if (!email) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "Email is required"
-            };
-            return;
-        }
-
-        // Rate limiting
-        if (!checkRateLimit(`forgot:${email}`, 3, 15 * 60 * 1000)) {
-            ctx.response.status = 429;
-            ctx.response.body = {
-                success: false,
-                message: "Too many password reset attempts. Please try again in 15 minutes."
-            };
-            return;
-        }
-
-        // Check if user exists (but don't reveal if they don't)
-        const user = await mongodb.findUserByEmail(email);
-        
-        if (user) {
-            // Generate and send OTP
-            const { otp, expiresAt } = await otpService.generateOTP(email, {
-                purpose: 'password_reset',
-                expiresInMinutes: 15
-            });
-
-            await emailService.sendOTPEmail({
-                to: email,
-                otp,
-                username: user.gameUsername,
-                expiresIn: 15
-            });
-        }
-
-        // Always return success to prevent email enumeration
-        ctx.response.status = 200;
-        ctx.response.body = {
-            success: true,
-            message: "If an account with this email exists, you will receive a password reset code."
-        };
-
-    } catch (error) {
-        console.error("Forgot password error:", error);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            message: "Internal server error"
-        };
-    }
-});
-
-// Reset password with OTP
-authRouter.post("/auth/reset-password", async (ctx: Context) => {
-    try {
-        const body = await ctx.request.body.json();
-        const { email, otp, newPassword } = body;
-
-        if (!email || !otp || !newPassword) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: "Email, OTP, and new password are required"
-            };
-            return;
-        }
-
-        // Rate limiting
-        if (!checkRateLimit(`reset:${email}`, 5, 15 * 60 * 1000)) {
-            ctx.response.status = 429;
-            ctx.response.body = {
-                success: false,
-                message: "Too many reset attempts. Please try again in 15 minutes."
-            };
-            return;
-        }
-
-        // Verify OTP
-        const verification = await otpService.verifyOTP(email, otp, 'password_reset');
-        
-        if (!verification.valid) {
-            ctx.response.status = 400;
-            ctx.response.body = {
-                success: false,
-                message: verification.message
-            };
-            return;
-        }
-
-        // Find user
-        const user = await mongodb.findUserByEmail(email);
-        if (!user) {
-            ctx.response.status = 404;
-            ctx.response.body = {
-                success: false,
-                message: "User not found"
-            };
-            return;
-        }
-
-        // Update password
-        const hashedPassword = await hashPassword(newPassword);
-        const collection = mongodb.getCollection('users');
-        await collection.updateOne(
-            { _id: user._id },
-            { 
-                $set: { 
-                    passwordHash: hashedPassword,
-                    updatedAt: new Date()
-                } 
-            }
-        );
-
-        ctx.response.status = 200;
-        ctx.response.body = {
-            success: true,
-            message: "Password reset successfully. You can now login with your new password."
-        };
-
-    } catch (error) {
-        console.error("Reset password error:", error);
-        ctx.response.status = 500;
-        ctx.response.body = {
-            success: false,
-            message: "Internal server error"
-        };
-    }
-});
-
-// Health check for email service
-authRouter.get("/auth/email-health", async (ctx: Context) => {
-    try {
-        const isHealthy = await emailService.testConnection();
-        const otpStats = await otpService.getOTPStats();
-
-        ctx.response.status = 200;
-        ctx.response.body = {
-            success: true,
-            emailService: isHealthy ? 'healthy' : 'unhealthy',
-            otpStats
+            emailService: isEmailHealthy ? 'healthy' : 'unhealthy',
+            magicLinkStats,
+            authMethods: ['google', 'magic_link']
         };
     } catch (error) {
         ctx.response.status = 500;
@@ -1020,20 +563,61 @@ authRouter.get("/auth/email-health", async (ctx: Context) => {
     }
 });
 
-// Cleanup expired OTPs (call this periodically)
-authRouter.post("/auth/cleanup-otps", async (ctx: Context) => {
+// Cleanup expired magic links (call this periodically)
+authRouter.post("/auth/cleanup-magic-links", async (ctx: Context) => {
     try {
-        const cleaned = await otpService.cleanupExpiredOTPs();
+        const cleaned = await magicLinkService.cleanupExpiredLinks();
         ctx.response.status = 200;
         ctx.response.body = {
             success: true,
-            message: `Cleaned up ${cleaned} expired OTPs`
+            message: `Cleaned up ${cleaned} expired magic links`
         };
     } catch (error) {
         ctx.response.status = 500;
         ctx.response.body = {
             success: false,
             message: "Cleanup failed"
+        };
+    }
+});
+
+// Debug endpoint for testing email configuration in production
+authRouter.get("/auth/debug-email", async (ctx: Context) => {
+    try {
+        console.log("🔍 Email Debug Endpoint Called");
+        
+        // Test SMTP connection
+        const connectionTest = await emailService.testConnection();
+        
+        const debugInfo = {
+            timestamp: new Date().toISOString(),
+            environment: {
+                EMAIL_PROVIDER: Deno.env.get("EMAIL_PROVIDER") || "zoho (default)",
+                SMTP_HOST: Deno.env.get("SMTP_HOST") || "smtp.zoho.com (default)",
+                SMTP_PORT: Deno.env.get("SMTP_PORT") || "587 (default)",
+                SMTP_SECURE: Deno.env.get("SMTP_SECURE") || "false (default)",
+                SMTP_USER_SET: Deno.env.get("SMTP_USER") ? true : false,
+                SMTP_PASS_SET: Deno.env.get("SMTP_PASS") ? true : false,
+                SMTP_FROM_EMAIL: Deno.env.get("SMTP_FROM_EMAIL") || "no-reply@dhaniverse.in (default)"
+            },
+            connection: {
+                success: connectionTest,
+                message: connectionTest ? "SMTP connection successful" : "SMTP connection failed"
+            }
+        };
+
+        ctx.response.status = 200;
+        ctx.response.body = {
+            success: true,
+            debug: debugInfo
+        };
+    } catch (error) {
+        console.error("Debug endpoint error:", error);
+        ctx.response.status = 500;
+        ctx.response.body = {
+            success: false,
+            error: error.message,
+            message: "Debug endpoint failed"
         };
     }
 });
