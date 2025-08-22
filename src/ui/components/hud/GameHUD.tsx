@@ -4,7 +4,7 @@ import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
-import ChatVoiceControls from "../voice/ChatVoiceControls";
+// ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
 import DialogueBox from '../common/DialogueBox';
@@ -32,7 +32,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
-        { id: string; username: string; message: string }[]
+        { id: string; username: string; message: string; timestamp?: number }[]
     >([]);
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
@@ -168,7 +168,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         const handlePlayerJoined = (e: any) => {
             const { player } = e.detail;
-            if (player && player.username) {
+        if (player && player.username) {
                 setConnectedPlayers((prev) => {
                     // Remove any existing entry with same id or username to avoid duplicates
                     const filtered = prev.filter(
@@ -193,6 +193,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             .substring(2, 9)}`,
                         username: "System",
                         message: `${player.username} joined the game`,
+                        timestamp: Date.now(),
                     };
                     const newMessages = [...prev, joinMessage];
                     return newMessages.length > 50
@@ -217,6 +218,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             .substring(2, 9)}`,
                         username: "System",
                         message: `${username} left the game`,
+                        timestamp: Date.now(),
                     };
                     const newMessages = [...prev, leaveMessage];
                     return newMessages.length > 50
@@ -322,7 +324,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 // Keep only the last 50 messages to prevent memory issues
                 const newMessages = [
                     ...prev,
-                    { id: messageId, username, message },
+                    { id: messageId, username, message, timestamp: Date.now() },
                 ];
                 if (newMessages.length > 50) {
                     return newMessages.slice(-50);
@@ -599,6 +601,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     .substring(2, 9)}`,
                 username: "System",
                 message,
+                timestamp: Date.now(),
             };
             const newMessages = [...prev, systemMessage];
             return newMessages.length > 50
@@ -718,10 +721,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-0 left-0 w-[28ch] max-h-[40vh] flex flex-col bg-black/70 rounded-tr-lg p-2 text-[14px] text-white pointer-events-auto backdrop-blur-sm border border-white/10 transition-all duration-300 ${
-                    isChatFocused
-                        ? "opacity-100 border-dhani-green/30 shadow-lg shadow-dhani-green/10"
-                        : "opacity-75"
+                className={`absolute bottom-0 left-0 w-[28ch] max-h-[40vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                    isChatFocused ? 'opacity-100' : 'opacity-95'
                 }`}
             >
                 {/* Chat messages area */}
@@ -729,42 +730,21 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     className="h-[20vh] overflow-y-auto mb-2 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
                     ref={messagesRef}
                 >
-                    {chatMessages.length === 0 ? (
-                        <div className="text-white/50 italic text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider p-2 space-y-1">
-                            <div>No messages yet. Press / to chat.</div>
-                            {voiceEnabled && (
-                                <div className="text-xs text-white/40">
-                                    Voice controls are below.
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        chatMessages.map((msg, idx) => (
-                            <div
-                                key={idx}
-                                className="mb-1.5 leading-[1.3] px-1"
-                            >
-                                <div className="flex items-start space-x-2">
-                                    <span
-                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex-shrink-0 ${
-                                            msg.username === "System"
-                                                ? "text-yellow-100 italic"
-                                                : "text-dhani-green"
-                                        }`}
-                                    >
-                                        {msg.username === "System"
-                                            ? ""
-                                            : `${msg.username}:`}
-                                    </span>
-                                    <span
-                                        className={`text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider break-words ${
-                                            msg.username === "System"
-                                                ? "text-cyan-100 italic"
-                                                : "text-white"
-                                        }`}
-                                    >
+                    {chatMessages.length === 0 ? null : (
+                        chatMessages.map((msg) => (
+                            <div key={msg.id} className="mb-4 px-1">
+                                <div className="bg-black text-white rounded-xl px-3 py-2 max-w-[22ch] inline-block">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                            {msg.username}
+                                        </div>
+                                        <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                            {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                        </div>
+                                    </div>
+                                    <div className="mt-1 text-white text-sm leading-[1.2] font-['Tickerbit',Arial,sans-serif] overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 3 as any, WebkitBoxOrient: 'vertical'}}>
                                         {msg.message}
-                                    </span>
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -772,41 +752,48 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
 
                 {/* Voice controls over the chat input */}
-                {voiceEnabled && selfPlayerId && (
-                    <div className="mb-2">
-                        <ChatVoiceControls
-                            roomName="dhaniverse-main"
-                            participantName={selfPlayerId}
+                {/* Headphone icon left + input + send button right (minimal controls) */}
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        className="w-9 h-9 rounded-full bg-black/90 flex items-center justify-center"
+                        aria-label="Headphone"
+                    >
+                        {/* headphone icon */}
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" aria-hidden>
+                            <path d="M12 2a9 9 0 00-9 9v3a3 3 0 003 3h1a1 1 0 001-1v-5a1 1 0 00-1-1H7a5 5 0 0110 0h-1a1 1 0 00-1 1v5a1 1 0 001 1h1a3 3 0 003-3v-3a9 9 0 00-9-9z"/>
+                        </svg>
+                    </button>
+
+                    <div className="relative flex-1">
+                        <input
+                            ref={chatInputRef}
+                            className={`w-full px-4 py-3 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${isChatFocused ? 'ring-1 ring-white/20' : 'opacity-95'}`}
+                            type="text"
+                            placeholder={isChatFocused ? 'Type a message...' : 'Press / to chat'}
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onFocus={handleChatFocus}
+                            onBlur={handleChatBlur}
+                            onKeyDown={handleChatKeyDown}
                         />
                     </div>
-                )}
 
-                {/* Chat input */}
-                <div className="relative">
-                    <input
-                        ref={chatInputRef}
-                        className={`w-full px-3 py-2 border rounded-md bg-black/40 text-sm text-white outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider transition-all duration-200 ${
-                            isChatFocused
-                                ? "border-dhani-green/50 bg-black/60 shadow-sm shadow-dhani-green/20"
-                                : "border-white/20 hover:border-white/30"
-                        }`}
-                        type="text"
-                        placeholder={
-                            isChatFocused
-                                ? "Type a message..."
-                                : "Press / to chat"
-                        }
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onFocus={handleChatFocus}
-                        onBlur={handleChatBlur}
-                        onKeyDown={handleChatKeyDown}
-                    />
-                    {isChatFocused && (
-                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/40 text-xs font-['Tickerbit',Arial,sans-serif]">
-                            Enter
-                        </div>
-                    )}
+                    <button
+                        onClick={() => {
+                            const message = chatInput.trim();
+                            if (!message) return;
+                            window.dispatchEvent(new CustomEvent('send-chat', { detail: { message } }));
+                            setChatInput('');
+                            setTimeout(() => chatInputRef.current?.focus(), 0);
+                        }}
+                        className="w-10 h-10 rounded-full bg-[#F1CD36] flex items-center justify-center shadow-md"
+                        aria-label="Send message"
+                    >
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-black" aria-hidden>
+                            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                        </svg>
+                    </button>
                 </div>
             </div>
 
