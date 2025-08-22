@@ -104,7 +104,7 @@ export class MapManager {
       this.map.setOrigin(0.5, 0.5);
       
       // Apply a larger scale to make the map bigger
-      const scale = 2.3; // Scale factor for larger map
+      const scale = 0.5; // Scale factor for larger map
       this.map.setScale(scale);
       
       // Get the device dimensions

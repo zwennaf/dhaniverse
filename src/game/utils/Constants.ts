@@ -32,7 +32,7 @@ export const Constants = {
     PLAYER_NAME_BACKGROUND: "#00000050",
     PLAYER_NAME_PADDING: { x: 6, y: 0 },
     // NPC name styling (different color to distinguish from players)
-    NPC_NAME_FONT: "Pixeloid",
+    NPC_NAME_FONT: "Tickerbit",
     NPC_NAME_SIZE: "16px",
     NPC_NAME_COLOR: "#ffff00",
     NPC_NAME_BACKGROUND: "#00000080",

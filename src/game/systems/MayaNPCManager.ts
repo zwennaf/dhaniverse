@@ -60,7 +60,6 @@ export class MayaNPCManager {
         // Create Maya at specified position
         this.maya = scene.add.sprite(this.x, this.y, "maya") as NPCSprite;
         this.maya.setScale(3);
-        this.maya.setDepth(50); // Set lower depth than player (1000) but higher than map
         
         // Ensure Maya is perfectly aligned at 0 degrees with no flipping
         this.maya.setFlipX(false);

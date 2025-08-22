@@ -33,6 +33,7 @@ class AssetLoader {
             // Interior building textures
             { type: 'image', key: 'interior', url: '/maps/bank.png' },
             { type: 'image', key: 'stockmarket', url: '/maps/stockmarket.png' },
+            { type: 'image', key: 'bank-manager', url: '/characters/bank-manager.png' },
             // Character spritesheets
             { type: 'spritesheet', key: 'C1', url: '/characters/C1.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },
             { type: 'spritesheet', key: 'C2', url: '/characters/C2.png', frameConfig: { frameWidth: 1000.25, frameHeight: 1000.25 } },

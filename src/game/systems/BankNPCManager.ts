@@ -2,7 +2,7 @@ import { GameObjects, Input } from 'phaser';
 import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants.ts';
 
-interface NPCSprite extends GameObjects.Sprite {
+interface NPCSprite extends GameObjects.Image {
   nameText?: GameObjects.Text;
 }
 
@@ -70,14 +70,12 @@ export class BankNPCManager {
     };
     
     // Create banker NPC at predefined position
-    const bankerX = 800;
-    const bankerY = 500;
-    this.banker = scene.add.sprite(bankerX, bankerY, 'character') as NPCSprite;
-    this.banker.setScale(0.3);
-    this.banker.setDepth(50); // Same depth as other NPCs
-    this.banker.anims.play('idle-down');
+    const bankerX = 1000;
+    const bankerY = 700;
+    this.banker = scene.add.image(bankerX, bankerY, 'bank-manager') as NPCSprite;
+    this.banker.setScale(0.2);
       // Add banker name text
-    const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 50, "Bank Teller", {
+    const bankerNameText = scene.add.text(this.banker.x, this.banker.y - 100, "Bank Teller", {
       fontFamily: Constants.NPC_NAME_FONT,
       fontSize: Constants.NPC_NAME_SIZE,
       color: Constants.NPC_NAME_COLOR,
@@ -223,33 +221,17 @@ export class BankNPCManager {
     } else if (!this.isPlayerNearBanker && wasNearBanker) {
       // Player just left interaction zone
       this.interactionText.setAlpha(0);
-      this.banker.anims.play('idle-front', true);
+      // Bank manager is static, no animation needed
     }
   }
   
   /**
    * Update the banker's facing direction to look at the player
+   * Bank manager is static, so no visual changes needed
    */
   private updateBankerOrientation(playerX: number, playerY: number): void {
-    const dx = playerX - this.banker.x;
-    const dy = playerY - this.banker.y;
-    
-    // Determine which direction the banker should face
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal movement is greater
-      if (dx > 0) {
-        this.banker.anims.play('idle-right', true);
-      } else {
-        this.banker.anims.play('idle-left', true);
-      }
-    } else {
-      // Vertical movement is greater
-      if (dy > 0) {
-        this.banker.anims.play('idle-down', true);
-      } else {
-        this.banker.anims.play('idle-up', true);
-      }
-    }
+    // Bank manager is a static image, no orientation changes needed
+    // This method is kept for compatibility but does nothing
   }
   
   /**

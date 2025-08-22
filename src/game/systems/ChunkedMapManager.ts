@@ -810,7 +810,7 @@ export class ChunkedMapManager {
             interiorMap.setOrigin(0.5, 0.5);
 
             // Apply a larger scale to make the map bigger
-            const scale = 2.3;
+            const scale = 1.5;
             interiorMap.setScale(scale);
 
             // Get the device dimensions
@@ -841,6 +841,30 @@ export class ChunkedMapManager {
             const centerX = Math.floor(deviceWidth / 2);
             const centerY = Math.floor(deviceHeight / 2);
             interiorMap.setPosition(centerX, centerY);
+
+            // Add bank manager if this is a bank interior
+            if (buildingType === "bank") {
+                // Position bank manager relative to the interior center
+                // Adjust these coordinates based on where you want the banker in the bank
+                const bankManagerX = 1383; // Slightly to the right of center
+                const bankManagerY = 835; // Slightly above center
+                
+                // Access the bank NPC manager from the scene
+                const mainScene = this.scene as any;
+                if (mainScene.bankNPCManager && mainScene.bankNPCManager.banker) {
+                    const banker = mainScene.bankNPCManager.banker;
+                    banker.setPosition(bankManagerX, bankManagerY);
+                    banker.setVisible(true);
+                    banker.setDepth(10); // Ensure banker appears above the map
+                    
+                    // Also update the banker's name text position if it exists
+                    if (banker.nameText) {
+                        banker.nameText.setPosition(bankManagerX, bankManagerY - 50);
+                    }
+                    
+                    console.log(`Positioned bank manager at (${bankManagerX}, ${bankManagerY})`);
+                }
+            }
 
             // Set camera and physics bounds to match the scaled interior size and position
             const boundsX = centerX - scaledWidth / 2;
@@ -910,6 +934,25 @@ export class ChunkedMapManager {
 
         // Show the chunked map container again
         this.mapContainer.setVisible(true);
+
+        // Restore bank manager to outdoor position if exiting bank
+        if (this.currentBuildingType === "bank") {
+            const mainScene = this.scene as any;
+            if (mainScene.bankNPCManager && mainScene.bankNPCManager.banker) {
+                const banker = mainScene.bankNPCManager.banker;
+                // Restore to original outdoor position
+                const originalX = 1000;
+                const originalY = 700;
+                banker.setPosition(originalX, originalY);
+                
+                // Also update the banker's name text position if it exists
+                if (banker.nameText) {
+                    banker.nameText.setPosition(originalX, originalY - 50);
+                }
+                
+                console.log(`Restored bank manager to outdoor position (${originalX}, ${originalY})`);
+            }
+        }
 
         // Restore original min/max zoom constraints if they were saved
         const camera = this.scene.cameras.main as ExtendedCamera;
