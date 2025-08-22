@@ -231,15 +231,6 @@ export class MayaNPCManager {
 
         this.activeDialog = true;
 
-        // Complete the initial 'meet-maya' task (if present) upon starting dialogue
-        if (!this.initialDialogueTaskResolved) {
-            const tm = getTaskManager();
-            const meetTask = tm.getActiveTasks().find(t => t.id === 'meet-maya');
-            if (meetTask) {
-                tm.completeTask('meet-maya');
-            }
-        }
-
         // Emit a UI event so the HUD DialogueBox shows the same UI as onboarding
         window.dispatchEvent(new CustomEvent('show-dialogue', {
             detail: {
@@ -610,6 +601,16 @@ export class MayaNPCManager {
         // Start moving only after the player advances (dialogue-advance)
         const startMove = () => {
             window.removeEventListener('dialogue-advance' as any, startMove as any);
+            
+            // Complete the "meet-maya" task when Maya starts walking towards the bank
+            this.completeMeetMayaTask();
+            
+            // Re-enable the location tracker so player can follow Maya to the bank
+            locationTrackerManager.setTargetEnabled('maya', true);
+            
+            // Set a new objective to enter the bank and speak to bank teller
+            this.setEnterBankTask();
+            
             this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
         };
         window.addEventListener('dialogue-advance' as any, startMove as any);
@@ -730,15 +731,11 @@ export class MayaNPCManager {
         // Show final dialogue message
         this.showTemporaryDialog("We have arrived at the Bank. Let's go inside.", 3000);
 
-        // Update tracker final position and disable tracker if player is near Maya
+        // Update tracker final position and disable tracker since we've arrived at destination
         locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
-        if (this.scene.getPlayer()) {
-            const playerSprite = this.scene.getPlayer().getSprite();
-            const dist = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
-            if (dist < this.interactionDistance) {
-                locationTrackerManager.setTargetEnabled('maya', false);
-            }
-        }
+        // Disable the tracker since Maya has completed guiding the player to the bank
+        locationTrackerManager.setTargetEnabled('maya', false);
+        console.log("MayaNPCManager: Disabled Maya tracker as she arrived at the bank");
     }
 
     private checkFollowDistance(playerSprite: GameObjects.Sprite): void {
@@ -905,6 +902,41 @@ export class MayaNPCManager {
                 id: 'enter-bank',
                 title: 'Enter the Bank',
                 description: 'Enter the Central Bank to continue your financial orientation.',
+                active: true,
+                completed: false
+            });
+        }
+    }
+
+    /**
+     * Complete the "meet-maya" task when Maya starts walking towards the bank
+     */
+    private completeMeetMayaTask(): void {
+        const tm = getTaskManager();
+        const meetTask = tm.getActiveTasks().find(t => t.id === 'meet-maya');
+        if (meetTask) {
+            console.log("MayaNPCManager: Completing 'meet-maya' task as Maya starts walking to bank");
+            tm.completeTask('meet-maya');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('meet-maya');
+            }, 1000);
+        }
+    }
+
+    /**
+     * Set new objective to enter the bank and speak to bank teller
+     */
+    private setEnterBankTask(): void {
+        const tm = getTaskManager();
+        // Only add if not already present
+        if (!tm.getActiveTasks().some(t => t.id === 'enter-bank-speak-teller')) {
+            console.log("MayaNPCManager: Setting new objective to enter bank and speak to teller");
+            tm.addTask({
+                id: 'enter-bank-speak-teller',
+                title: 'Enter Bank & Meet Teller',
+                description: 'Go inside the Central Bank and speak to the bank teller to learn about financial services.',
                 active: true,
                 completed: false
             });
