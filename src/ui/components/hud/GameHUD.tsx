@@ -6,8 +6,11 @@ import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
 // ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
-import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
-import DialogueBox from '../common/DialogueBox';
+import {
+    locationTrackerManager,
+    TrackingTarget,
+} from "../../../services/LocationTrackerManager";
+import DialogueBox from "../common/DialogueBox";
 
 interface GameHUDProps {
     rupees?: number;
@@ -53,23 +56,28 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [selfPlayerId, setSelfPlayerId] = useState<string | null>(null);
 
     // Location tracker state
-    const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>([]);
+    const [trackingTargets, setTrackingTargets] = useState<TrackingTarget[]>(
+        []
+    );
     // First task dialog state
     const [showFirstTaskDialog, setShowFirstTaskDialog] = useState(false);
     const [firstTaskAcknowledged, setFirstTaskAcknowledged] = useState(false);
     const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
-    const [smallAlertText, setSmallAlertText] = useState('');
+    const [smallAlertText, setSmallAlertText] = useState("");
     const [genericDialog, setGenericDialog] = useState<{
         text: string;
         characterName?: string;
         isVisible: boolean;
         allowAdvance?: boolean;
-    showGotItButton?: boolean;
-    compact?: boolean;
-    }>({ text: '', characterName: undefined, isVisible: false });
+        showGotItButton?: boolean;
+        compact?: boolean;
+    }>({ text: "", characterName: undefined, isVisible: false });
     const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
     const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
-    const [screenSize, setScreenSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+    const [screenSize, setScreenSize] = useState({
+        width: window.innerWidth,
+        height: window.innerHeight,
+    });
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -168,7 +176,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         const handlePlayerJoined = (e: any) => {
             const { player } = e.detail;
-        if (player && player.username) {
+            if (player && player.username) {
                 setConnectedPlayers((prev) => {
                     // Remove any existing entry with same id or username to avoid duplicates
                     const filtered = prev.filter(
@@ -361,18 +369,33 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         // Listen for window resize
         const handleResize = () => {
-            setScreenSize({ width: window.innerWidth, height: window.innerHeight });
+            setScreenSize({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            });
         };
 
-        window.addEventListener('player-position-update' as any, handlePlayerPositionUpdate);
-        window.addEventListener('camera-position-update' as any, handleCameraPositionUpdate);
-        window.addEventListener('resize', handleResize);
+        window.addEventListener(
+            "player-position-update" as any,
+            handlePlayerPositionUpdate
+        );
+        window.addEventListener(
+            "camera-position-update" as any,
+            handleCameraPositionUpdate
+        );
+        window.addEventListener("resize", handleResize);
 
         return () => {
             unsubscribe();
-            window.removeEventListener('player-position-update' as any, handlePlayerPositionUpdate);
-            window.removeEventListener('camera-position-update' as any, handleCameraPositionUpdate);
-            window.removeEventListener('resize', handleResize);
+            window.removeEventListener(
+                "player-position-update" as any,
+                handlePlayerPositionUpdate
+            );
+            window.removeEventListener(
+                "camera-position-update" as any,
+                handleCameraPositionUpdate
+            );
+            window.removeEventListener("resize", handleResize);
         };
     }, []);
 
@@ -389,16 +412,22 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setShowSmallAlertDialog(false);
         };
 
-    window.addEventListener('assign-first-task' as any, assignFirstTaskHandler);
-        window.addEventListener('player-near-maya' as any, handlePlayerNearMaya);
+        window.addEventListener(
+            "assign-first-task" as any,
+            assignFirstTaskHandler
+        );
+        window.addEventListener(
+            "player-near-maya" as any,
+            handlePlayerNearMaya
+        );
 
         // Generic dialogue events (from game systems like Maya)
         const showDialogueHandler = (e: any) => {
             const d = e.detail || {};
-            console.debug('GameHUD: show-dialogue event received', d);
+            console.debug("GameHUD: show-dialogue event received", d);
             setGenericDialog({
-                text: d.text || '',
-                characterName: d.characterName || 'Maya',
+                text: d.text || "",
+                characterName: d.characterName || "Maya",
                 isVisible: true,
                 allowAdvance: d.allowAdvance !== false,
                 showGotItButton: d.showGotItButton || false,
@@ -408,7 +437,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         const showTemporaryHandler = (e: any) => {
             const d = e.detail || {};
-            const text = d.text || '';
+            const text = d.text || "";
             const duration = d.durationMs || 1500;
             setSmallAlertText(text);
             setShowSmallAlertDialog(true);
@@ -419,16 +448,34 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setGenericDialog((g) => ({ ...g, isVisible: false }));
         };
 
-        window.addEventListener('show-dialogue' as any, showDialogueHandler);
-        window.addEventListener('show-temporary-dialog' as any, showTemporaryHandler);
-        window.addEventListener('close-dialogue' as any, closeDialogueHandler);
+        window.addEventListener("show-dialogue" as any, showDialogueHandler);
+        window.addEventListener(
+            "show-temporary-dialog" as any,
+            showTemporaryHandler
+        );
+        window.addEventListener("close-dialogue" as any, closeDialogueHandler);
 
         return () => {
-            window.removeEventListener('assign-first-task' as any, assignFirstTaskHandler);
-            window.removeEventListener('player-near-maya' as any, handlePlayerNearMaya);
-            window.removeEventListener('show-dialogue' as any, showDialogueHandler);
-            window.removeEventListener('show-temporary-dialog' as any, showTemporaryHandler);
-            window.removeEventListener('close-dialogue' as any, closeDialogueHandler);
+            window.removeEventListener(
+                "assign-first-task" as any,
+                assignFirstTaskHandler
+            );
+            window.removeEventListener(
+                "player-near-maya" as any,
+                handlePlayerNearMaya
+            );
+            window.removeEventListener(
+                "show-dialogue" as any,
+                showDialogueHandler
+            );
+            window.removeEventListener(
+                "show-temporary-dialog" as any,
+                showTemporaryHandler
+            );
+            window.removeEventListener(
+                "close-dialogue" as any,
+                closeDialogueHandler
+            );
         };
     }, []);
 
@@ -444,10 +491,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         const pending = (window as any).__pendingShowDialogue;
         if (pending && pending.text) {
-            console.debug('GameHUD: consuming pending show-dialogue', pending);
+            console.debug("GameHUD: consuming pending show-dialogue", pending);
             setGenericDialog({
                 text: pending.text,
-                characterName: pending.characterName || 'Maya',
+                characterName: pending.characterName || "Maya",
                 isVisible: true,
                 allowAdvance: pending.allowAdvance !== false,
             });
@@ -612,42 +659,42 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // When user clicks 'Got it' on the first task dialog
     const handleFirstTaskGotIt = () => {
-    setShowFirstTaskDialog(false);
-    setFirstTaskAcknowledged(true);
+        setShowFirstTaskDialog(false);
+        setFirstTaskAcknowledged(true);
         // Enable Maya tracker at player's initial position (tracker manager already has Maya target but enable it)
-        locationTrackerManager.setTargetEnabled('maya', true);
+        locationTrackerManager.setTargetEnabled("maya", true);
         // Notify game scene to show tracker (MainScene listens to tracker state) - also ensure position known
-        const maya = locationTrackerManager.getTarget('maya');
+        const maya = locationTrackerManager.getTarget("maya");
         if (maya) {
             // keep current maya target position
-            locationTrackerManager.updateTargetPosition('maya', maya.position);
+            locationTrackerManager.updateTargetPosition("maya", maya.position);
         }
-    // NOTE: small stray-alerts (reminders like "Go meet Maya to start your journey")
-    // were previously shown here by attaching a 'player-position-update' listener.
-    // That caused an immediate small-dialog to appear right after the player
-    // clicked "Got it". To avoid that, the stray reminder listener has been
-    // removed — the tracker is enabled above and the game can still show
-    // temporary small dialogs via the 'show-temporary-dialog' event when
-    // appropriate.
+        // NOTE: small stray-alerts (reminders like "Go meet Maya to start your journey")
+        // were previously shown here by attaching a 'player-position-update' listener.
+        // That caused an immediate small-dialog to appear right after the player
+        // clicked "Got it". To avoid that, the stray reminder listener has been
+        // removed — the tracker is enabled above and the game can still show
+        // temporary small dialogs via the 'show-temporary-dialog' event when
+        // appropriate.
     };
 
     // Handle player advancing/closing a generic dialogue from the HUD
-        const handleGenericAdvance = () => {
+    const handleGenericAdvance = () => {
         // Tell the game that the player advanced/closed the dialogue
-        window.dispatchEvent(new CustomEvent('dialogue-advance'));
+        window.dispatchEvent(new CustomEvent("dialogue-advance"));
         setGenericDialog((g) => ({ ...g, isVisible: false }));
     };
 
     // When user clicks 'Got it' on a dialog which requests an explicit acknowledgement
     const handleGenericGotIt = () => {
         // Notify game systems that user explicitly acknowledged the dialog
-        window.dispatchEvent(new CustomEvent('dialogue-gotit'));
+        window.dispatchEvent(new CustomEvent("dialogue-gotit"));
         // Also close the HUD dialog
         setGenericDialog((g) => ({ ...g, isVisible: false }));
     };
 
     const handleGenericComplete = () => {
-        window.dispatchEvent(new CustomEvent('dialogue-complete'));
+        window.dispatchEvent(new CustomEvent("dialogue-complete"));
     };
 
     return (
@@ -692,7 +739,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Player connection display */}
             <div className="absolute bottom-[45vh] left-5 w-[28ch] pointer-events-none">
                 {/* Online count */}
-                <div className="mb-2 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
+                <div className="mb-10 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
                     <span className="text-dhani-green">●</span> {onlineCount}{" "}
                     online
                 </div>
@@ -721,88 +768,151 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-0 left-0 w-[28ch] max-h-[40vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
-                    isChatFocused ? 'opacity-100' : 'opacity-95'
+                className={`absolute bottom-4 left-4 w-[35ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                    isChatFocused ? "opacity-100" : "opacity-95"
                 }`}
             >
                 {/* Chat messages area */}
                 <div
-                    className="h-[20vh] overflow-y-auto mb-2 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+                    className="h-[36vh] overflow-y-auto mb-3 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
                     ref={messagesRef}
                 >
-                    {chatMessages.length === 0 ? null : (
-                        chatMessages.map((msg) => (
-                            <div key={msg.id} className="mb-4 px-1">
-                                <div className="bg-black text-white rounded-xl px-3 py-2 max-w-[22ch] inline-block">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
-                                            {msg.username}
-                                        </div>
-                                        <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
-                                            {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-                                        </div>
-                                    </div>
-                                    <div className="mt-1 text-white text-sm leading-[1.2] font-['Tickerbit',Arial,sans-serif] overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 3 as any, WebkitBoxOrient: 'vertical'}}>
-                                        {msg.message}
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
+                    {chatMessages.length === 0
+                        ? null
+                        : chatMessages.map((msg) => (
+                              <div
+                                  key={msg.id}
+                                  className="flex items-start gap-3 mb-4"
+                              >
+                                  {/* avatar */}
+                                  <div className="w-8 h-8 rounded-full flex-shrink-0">
+                                      <div
+                                          className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
+                                          style={{
+                                              backgroundImage: `url('/characters/C1.png')`,
+                                          }}
+                                      />
+                                  </div>
+
+                                  {/* bubble */}
+                                  <div className="relative">
+                                      <div className="bg-[rgba(12,28,12,0.78)] text-white rounded-2xl px-3 py-3 max-w-[22ch] inline-block border border-black/30 backdrop-blur-sm shadow-md">
+                                          <div className="flex items-start justify-between gap-2">
+                                              <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                                  {msg.username}
+                                              </div>
+                                              <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                                  {msg.timestamp
+                                                      ? new Date(
+                                                            msg.timestamp
+                                                        ).toLocaleTimeString(
+                                                            [],
+                                                            {
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            }
+                                                        )
+                                                      : ""}
+                                              </div>
+                                          </div>
+                                          <div
+                                              className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] overflow-hidden"
+                                              style={{
+                                                  display: "-webkit-box",
+                                                  WebkitLineClamp: 3 as any,
+                                                  WebkitBoxOrient: "vertical",
+                                              }}
+                                          >
+                                              {msg.message}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
                 </div>
 
                 {/* Voice controls over the chat input */}
                 {/* Headphone icon left + input + send button right (minimal controls) */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <button
                         type="button"
-                        className="w-9 h-9 rounded-full bg-black/90 flex items-center justify-center"
+                        className="w-10 h-10 rounded-full bg-black/90 flex items-center justify-center shadow-sm"
                         aria-label="Headphone"
                     >
-                        {/* headphone icon */}
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" aria-hidden>
-                            <path d="M12 2a9 9 0 00-9 9v3a3 3 0 003 3h1a1 1 0 001-1v-5a1 1 0 00-1-1H7a5 5 0 0110 0h-1a1 1 0 00-1 1v5a1 1 0 001 1h1a3 3 0 003-3v-3a9 9 0 00-9-9z"/>
+                        {/* headphone icon larger */}
+                        <svg
+                            className="w-9 h-9 scale-[4]"
+                            viewBox="0 0 19 19"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                d="M9.77218 3.30326C6.50045 3.30326 3.84819 5.95553 3.84819 9.22726H6.06968C6.88762 9.22726 7.55068 9.8903 7.55068 10.7083V14.4108C7.55068 15.2287 6.88762 15.8918 6.06968 15.8918H3.84819C3.03025 15.8918 2.36719 15.2287 2.36719 14.4108V9.22726C2.36719 5.13759 5.68251 1.82227 9.77218 1.82227C13.8618 1.82227 17.1772 5.13759 17.1772 9.22726V14.4108C17.1772 15.2287 16.5141 15.8918 15.6962 15.8918H13.4747C12.6567 15.8918 11.9937 15.2287 11.9937 14.4108V10.7083C11.9937 9.8903 12.6567 9.22726 13.4747 9.22726H15.6962C15.6962 5.95553 13.0439 3.30326 9.77218 3.30326ZM3.84819 10.7083V14.4108H6.06968V10.7083H3.84819ZM13.4747 10.7083V14.4108H15.6962V10.7083H13.4747Z"
+                                fill="white"
+                            />
                         </svg>
                     </button>
 
                     <div className="relative flex-1">
                         <input
                             ref={chatInputRef}
-                            className={`w-full px-4 py-3 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${isChatFocused ? 'ring-1 ring-white/20' : 'opacity-95'}`}
+                            className={`w-full pr-14 pl-5 h-10 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${
+                                isChatFocused
+                                    ? "ring-1 ring-white/20"
+                                    : "opacity-95"
+                            }`}
                             type="text"
-                            placeholder={isChatFocused ? 'Type a message...' : 'Press / to chat'}
+                            placeholder={
+                                isChatFocused
+                                    ? "Type a message..."
+                                    : "Press / to chat"
+                            }
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onFocus={handleChatFocus}
                             onBlur={handleChatBlur}
                             onKeyDown={handleChatKeyDown}
                         />
-                    </div>
 
-                    <button
-                        onClick={() => {
-                            const message = chatInput.trim();
-                            if (!message) return;
-                            window.dispatchEvent(new CustomEvent('send-chat', { detail: { message } }));
-                            setChatInput('');
-                            setTimeout(() => chatInputRef.current?.focus(), 0);
-                        }}
-                        className="w-10 h-10 rounded-full bg-[#F1CD36] flex items-center justify-center shadow-md"
-                        aria-label="Send message"
-                    >
-                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-black" aria-hidden>
-                            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                        </svg>
-                    </button>
+                        {/* forward button inside input, right */}
+                        <button
+                            onClick={() => {
+                                const message = chatInput.trim();
+                                if (!message) return;
+                                window.dispatchEvent(
+                                    new CustomEvent("send-chat", {
+                                        detail: { message },
+                                    })
+                                );
+                                setChatInput("");
+                                setTimeout(
+                                    () => chatInputRef.current?.focus(),
+                                    0
+                                );
+                            }}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center  border-2 "
+                            aria-label="Send message"
+                        >
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="w-6 h-6 fill-black scale-[18] ml-0.5"
+                                aria-hidden
+                            >
+                                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* First Task Dialogue (top-center) */}
             <DialogueBox
-                text={"GO AND MEET MAYA AT HER HOUSE\nFOLLOW THE TRACKER TO REACH HER HOUSE"}
+                text={
+                    "GO AND MEET MAYA AT HER HOUSE\nFOLLOW THE TRACKER TO REACH HER HOUSE"
+                }
                 title={"TASK 1:"}
                 isVisible={showFirstTaskDialog}
-                position={'top-center'}
+                position={"top-center"}
                 showGotItButton={true}
                 onGotIt={handleFirstTaskGotIt}
                 compact={true}
@@ -814,7 +924,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             <DialogueBox
                 text={smallAlertText}
                 isVisible={showSmallAlertDialog}
-                position={'top-center'}
+                position={"top-center"}
                 small={true}
                 showProgressIndicator={false}
                 showContinueHint={false}
