@@ -4,7 +4,7 @@ interface Achievement {
     id: string;
     title: string;
     description: string;
-    category: 'trading' | 'saving' | 'staking' | 'learning';
+    category: 'trading' | 'saving' | 'learning';
     rarity: 'common' | 'rare' | 'epic' | 'legendary';
     unlocked: boolean;
     unlockedAt?: number;
@@ -95,15 +95,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
                 unlocked: false,
                 reward: { type: 'rupees', amount: 2500 }
             },
-            {
-                id: 'staking_master',
-                title: 'Staking Master',
-                description: 'Complete a 180-day staking period',
-                category: 'staking',
-                rarity: 'epic',
-                unlocked: false,
-                reward: { type: 'icp', amount: 100 }
-            },
+            // staking achievement removed
             {
                 id: 'whale_status',
                 title: 'Crypto Whale',
@@ -153,7 +145,6 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
         switch (category) {
             case 'trading': return '📈';
             case 'saving': return '💰';
-            case 'staking': return '🏦';
             case 'learning': return '📚';
             default: return '🏆';
         }
@@ -210,7 +201,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
 
                 {/* Category Filter */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                    {['all', 'trading', 'saving', 'staking', 'learning'].map(category => (
+                    {['all', 'trading', 'saving', 'learning'].map(category => (
                         <button
                             key={category}
                             onClick={() => setSelectedCategory(category)}
@@ -347,7 +338,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
                         <li>• Complete currency exchanges to unlock trading achievements</li>
                         <li>• Build up your balance to reach saving milestones</li>
                         <li>• Try DeFi simulations to earn learning achievements</li>
-                        <li>• Stake tokens for extended periods to unlock staking rewards</li>
+                        {/* staking tips removed */}
                         <li>• Legendary achievements require significant dedication</li>
                     </ul>
                 </div>
