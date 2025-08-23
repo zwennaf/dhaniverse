@@ -3,6 +3,17 @@ import { WalletManager } from './WalletManager';
 import { DualStorageManager } from './DualStorageManager';
 import { ICPErrorHandler, NetworkHealthMonitor } from './ICPErrorHandler';
 import { ICP_CONFIG } from './config';
+import { icpBalanceManager, ICPToken } from './TestnetBalanceManager';
+import { stakingService, StakingPool, UserStake, StakingStats } from './StakingService';
+
+// Unified connection status type (superset of legacy ICPIntegrationService)
+export interface ICPConnectionStatus {
+  isConnected: boolean;
+  isAuthenticated: boolean;
+  walletAddress: string;
+  connectionType: 'internet-identity' | 'web3-wallet' | 'none';
+  network: string;
+}
 
 export class ICPIntegrationManager {
   private static instance: ICPIntegrationManager | null = null;
@@ -10,8 +21,12 @@ export class ICPIntegrationManager {
   public readonly walletManager: WalletManager;
   public readonly icpService: ICPActorService;
   public readonly dualStorageManager: DualStorageManager;
+  // Expose underlying balance & staking services for advanced use
+  public readonly icpBalanceManager = icpBalanceManager;
+  public readonly stakingService = stakingService;
   
   private initialized = false;
+  private connectionListeners: Set<(status: ICPConnectionStatus) => void> = new Set();
 
   private constructor() {
     // Initialize services
@@ -31,6 +46,12 @@ export class ICPIntegrationManager {
     if (this.initialized) return;
 
     try {
+      // Initialize balance manager & staking (legacy services) to unify old & new APIs
+      await this.icpBalanceManager.initialize();
+      if (ICP_CONFIG.FEATURES.STAKING) {
+        await this.stakingService.initialize();
+      }
+
       // Start network health monitoring
       NetworkHealthMonitor.startHealthMonitoring(
         async () => {
@@ -58,15 +79,20 @@ export class ICPIntegrationManager {
       // Listen for wallet connection changes
       this.walletManager.onConnectionChange(async (status) => {
         if (status.connected) {
-          const identity = this.walletManager.getIdentity();
-          if (identity) {
-            await this.icpService.connect(identity);
-            this.dualStorageManager.setStorageMode('hybrid');
-          }
+          // Web3 wallet connected
+          // Connect ICP actor using wallet service (passes through Web3WalletService)
+          await this.icpService.connect(this.walletManager.getWeb3Service());
+          this.dualStorageManager.setStorageMode('hybrid');
         } else {
           this.icpService.disconnect();
           this.dualStorageManager.setStorageMode('local');
         }
+        this.notifyConnectionListeners();
+      });
+
+      // Balance updates can reflect authentication (II) state changes
+      this.icpBalanceManager.onBalanceUpdate(() => {
+        this.notifyConnectionListeners();
       });
 
       this.initialized = true;
@@ -89,6 +115,7 @@ export class ICPIntegrationManager {
 
   public disconnectWallet(): void {
     this.walletManager.disconnectWallet();
+  this.notifyConnectionListeners();
   }
 
   public isWalletConnected(): boolean {
@@ -178,10 +205,79 @@ export class ICPIntegrationManager {
     };
   }
 
+  // ===== Unified (legacy-compatible) API surface =====
+
+  public getConnectionStatus(): ICPConnectionStatus {
+    const walletStatus = this.walletManager.getConnectionStatus();
+    const isAuthenticated = this.icpBalanceManager.isAuthenticated();
+    const walletAddress = (isAuthenticated && this.icpBalanceManager.getWalletAddress()) || walletStatus.address || '';
+    let connectionType: ICPConnectionStatus['connectionType'] = 'none';
+    if (isAuthenticated) connectionType = 'internet-identity';
+    else if (walletStatus.connected) connectionType = 'web3-wallet';
+    return {
+      isConnected: !!walletAddress,
+      isAuthenticated,
+      walletAddress,
+      connectionType,
+      network: ICP_CONFIG.NETWORK
+    };
+  }
+
+  public onConnectionChange(callback: (status: ICPConnectionStatus) => void) {
+    this.connectionListeners.add(callback);
+    // immediate emit
+    callback(this.getConnectionStatus());
+    return () => this.connectionListeners.delete(callback);
+  }
+
+  private notifyConnectionListeners() {
+    const status = this.getConnectionStatus();
+    this.connectionListeners.forEach(cb => cb(status));
+  }
+
+  // Internet Identity authentication
+  public async authenticateWithInternetIdentity(): Promise<boolean> {
+    try {
+      const success = await this.icpBalanceManager.authenticateWithII();
+      if (success) this.notifyConnectionListeners();
+      return success;
+    } catch (e) {
+      console.error('II auth failed:', e);
+      return false;
+    }
+  }
+
+  // Tokens / balances (legacy wrappers)
+  public getTokens(): ICPToken[] { return this.icpBalanceManager.getAllTokens(); }
+  public onBalanceUpdate(callback: (tokens: ICPToken[]) => void) { return this.icpBalanceManager.onBalanceUpdate(callback); }
+  public async getDualBalance() { return await this.icpBalanceManager.getDualBalance(); }
+  public async syncWithCanister(): Promise<boolean> {
+    try {
+      await this.icpBalanceManager.refreshAllBalances();
+      if (ICP_CONFIG.FEATURES.STAKING) {
+        // Optionally could pull remote staking info (TODO if backend supports)
+      }
+      return true;
+    } catch (e) {
+      console.warn('syncWithCanister failed:', e);
+      return false;
+    }
+  }
+
+  // Staking wrappers
+  public getStakingPools(): StakingPool[] { return this.stakingService.getStakingPools(); }
+  public getUserStakes(): UserStake[] { return this.stakingService.getUserStakes(); }
+  public getStakingStats(): StakingStats { return this.stakingService.getStakingStats(); }
+  public async stakeTokens(poolId: string, amount: string) { return this.stakingService.stakeTokens(poolId, amount); }
+  public async unstakeTokens(stakeId: string) { return this.stakingService.unstakeTokens(stakeId); }
+  public async claimRewards(stakeId: string) { return this.stakingService.claimRewards(stakeId); }
+  public onStakingUpdate(cb: (stakes: UserStake[]) => void) { return this.stakingService.onStakingUpdate(cb); }
+
   public cleanup(): void {
     NetworkHealthMonitor.stopHealthMonitoring();
     this.walletManager.disconnectWallet();
     this.icpService.disconnect();
+    this.connectionListeners.clear();
   }
 }
 

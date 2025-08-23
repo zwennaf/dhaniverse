@@ -197,7 +197,7 @@ const CurrencyExchange: React.FC<CurrencyExchangeProps> = ({
             <div className="mt-6 bg-blue-900/30 border border-blue-600 p-4 rounded">
                 <div className="text-blue-400 text-sm font-bold tracking-wider mb-2">💡 EXCHANGE TIPS</div>
                 <ul className="text-blue-200 text-xs space-y-1">
-                    <li>• Exchange rates are simulated and update in real-time</li>
+                    <li>• Exchange rates are processed via ICP canister backend</li>
                     <li>• No fees for currency exchange in this demo</li>
                     <li>• ICP Tokens can be used for staking and DeFi features</li>
                     <li>• Rupees are the traditional currency for banking operations</li>

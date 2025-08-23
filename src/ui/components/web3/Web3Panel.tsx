@@ -18,7 +18,7 @@ import {
     User
 } from 'lucide-react';
 import StakingPanel from './StakingPanel';
-import { icpIntegration, ICPConnectionStatus } from '../../../services/ICPIntegrationService';
+import { icpIntegration, ICPConnectionStatus } from '../../../services/ICPIntegrationManager';
 import { ICPToken } from '../../../services/TestnetBalanceManager';
 import { stakingService } from '../../../services/StakingService';
 

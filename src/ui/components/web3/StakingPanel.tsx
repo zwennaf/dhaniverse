@@ -19,7 +19,7 @@ import {
     BarChart3
 } from 'lucide-react';
 import { stakingService, StakingPool, UserStake, StakingStats } from '../../../services/StakingService';
-import { icpIntegration } from '../../../services/ICPIntegrationService';
+import { icpIntegration } from '../../../services/ICPIntegrationManager';
 import { ICPToken } from '../../../services/TestnetBalanceManager';
 
 interface StakingPanelProps {

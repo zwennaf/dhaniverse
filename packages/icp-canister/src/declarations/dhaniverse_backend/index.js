@@ -10,7 +10,7 @@ export { idlFactory } from "./dhaniverse_backend.did.js";
  * beginning in dfx 0.15.0
  */
 export const canisterId =
-  process.env.CANISTER_ID_DHANIVERSE_BACKEND;
+  process.env.CANISTER_ID_DHANIVERSE_BACKEND || 'dzbzg-eqaaa-aaaap-an3rq-cai';
 
 export const createActor = (canisterId, options = {}) => {
   const agent = options.agent || new HttpAgent({ ...options.agentOptions });

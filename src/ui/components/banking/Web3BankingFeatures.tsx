@@ -163,7 +163,7 @@ const Web3BankingFeatures: React.FC<Web3BankingFeaturesProps> = ({
                         <li>• Currency exchange and conversion</li>
                         <li>• Blockchain-verified transactions</li>
                         <li>• NFT-like achievement badges</li>
-                        <li>• DeFi educational simulations</li>
+                        <li>• Real DeFi operations via ICP canister</li>
                     </ul>
                 </div>
             </div>

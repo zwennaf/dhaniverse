@@ -170,15 +170,11 @@ export class ICPBalanceManager {
             await agent.fetchRootKey();
         }
 
-        const canisterId = process.env.CANISTER_ID_DHANIVERSE_BACKEND;
-        if (canisterId) {
-            this.actor = dhaniverse_backend || createActor(canisterId, {
-                agent,
-            });
-        } else {
-            console.warn('CANISTER_ID_DHANIVERSE_BACKEND not found in environment');
-            this.actor = dhaniverse_backend;
-        }
+        // Use the known canister ID for dhaniverse_backend
+        const canisterId = 'dzbzg-eqaaa-aaaap-an3rq-cai';
+        this.actor = dhaniverse_backend || createActor(canisterId, {
+            agent,
+        });
     }
 
     // Authenticate with Internet Identity

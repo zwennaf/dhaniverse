@@ -34,47 +34,73 @@ export class ICPActorService {
     private canisterId: string;
     private connected = false;
     private connectedWallet: string | null = null;
+    private icpReady = false;
 
     constructor(canisterId: string = 'dzbzg-eqaaa-aaaap-an3rq-cai') {
         this.canisterId = canisterId;
         this.icpService = new ICPService();
+        this.initializeICP();
+    }
+
+    private async initializeICP() {
+        try {
+            // Wait for ICP service to be ready
+            await this.icpService.healthCheck();
+            this.icpReady = true;
+            console.log('ICP Service initialized successfully');
+        } catch (error) {
+            console.warn('ICP Service initialization failed, will use fallback:', error);
+            this.icpReady = false;
+        }
     }
 
     // Connect with wallet identity
     async connect(walletService: Web3WalletService): Promise<boolean> {
         try {
-            // Connect to Web3 banking service for fallback
+            // Always set up Web3 banking service for fallback
             this.web3BankingService = new Web3BankingService(walletService);
             
-            // Get wallet info for ICP connection
+            // Get wallet info
             const walletStatus = walletService.getStatus();
-            if (walletStatus.connected && walletStatus.address) {
-                // Connect wallet to ICP canister
-                const result = await this.icpService.connectWallet(
-                    walletStatus.walletType || 'MetaMask',
-                    walletStatus.address,
-                    '1' // Ethereum mainnet
-                );
-                
-                if (result.success) {
-                    this.connectedWallet = walletStatus.address;
-                    this.connected = true;
-                    return true;
+            
+            // Try ICP connection if service is ready
+            if (this.icpReady && walletStatus.connected && walletStatus.address) {
+                try {
+                    const result = await this.icpService.connectWallet(
+                        walletStatus.walletType || 'MetaMask',
+                        walletStatus.address,
+                        '1' // Ethereum mainnet
+                    );
+                    
+                    if (result.success) {
+                        this.connectedWallet = walletStatus.address;
+                        this.connected = true;
+                        console.log('ICP connection successful');
+                        return true;
+                    }
+                } catch (error) {
+                    console.warn('ICP connection failed, using Web3 fallback:', error);
                 }
             }
             
-            // Fallback to Web3 only
+            // Set connection status (with or without ICP)
             this.connected = true;
+            console.log('Service connected with Web3 fallback');
             return true;
         } catch (error) {
-            console.error('Failed to connect ICP Actor Service:', error);
+            console.error('Failed to connect Actor Service:', error);
             return false;
         }
     }
 
     // Check if actor is connected
     isActorConnected(): boolean {
-        return this.connected && this.web3BankingService !== null;
+        return this.connected;
+    }
+
+    // Check if ICP canister is available
+    isICPReady(): boolean {
+        return this.icpReady && this.connectedWallet !== null;
     }
 
     // Get dual balance (Rupees + Tokens)
@@ -371,19 +397,47 @@ export class ICPActorService {
         }
     }
 
-    // DeFi simulation methods
+    // DeFi canister methods
     async simulateLiquidityPool(amount: number): Promise<{ success: boolean; rewards?: number; error?: string }> {
-        if (!this.web3BankingService) {
-            throw new Error('Service not connected');
+        try {
+            // Check wallet connection
+            if (!this.connectedWallet) {
+                return { success: false, error: 'Wallet not connected' };
+            }
+
+            // Call real ICP canister method
+            const result = await this.icpService.simulateLiquidityPool(this.connectedWallet, amount);
+            
+            if ('Ok' in result) {
+                return { success: true, rewards: result.Ok };
+            } else {
+                return { success: false, error: result.Err };
+            }
+        } catch (error) {
+            console.error('Liquidity pool simulation failed:', error);
+            return { success: false, error: String(error) };
         }
-        return this.web3BankingService.simulateLiquidityPool(amount);
     }
 
     async simulateYieldFarming(amount: number): Promise<{ success: boolean; rewards?: number; error?: string }> {
-        if (!this.web3BankingService) {
-            throw new Error('Service not connected');
+        try {
+            // Check wallet connection
+            if (!this.connectedWallet) {
+                return { success: false, error: 'Wallet not connected' };
+            }
+
+            // Call real ICP canister method
+            const result = await this.icpService.simulateYieldFarming(this.connectedWallet, amount);
+            
+            if ('Ok' in result) {
+                return { success: true, rewards: result.Ok };
+            } else {
+                return { success: false, error: result.Err };
+            }
+        } catch (error) {
+            console.error('Yield farming simulation failed:', error);
+            return { success: false, error: String(error) };
         }
-        return this.web3BankingService.simulateYieldFarming(amount);
     }
 
     // Banking operations (for compatibility)

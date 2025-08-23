@@ -17,9 +17,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
+  define: {
+    'process.env.CANISTER_ID_DHANIVERSE_BACKEND': JSON.stringify('dzbzg-eqaaa-aaaap-an3rq-cai'),
+    'process.env.DFX_NETWORK': JSON.stringify('ic'),
   },
 });
