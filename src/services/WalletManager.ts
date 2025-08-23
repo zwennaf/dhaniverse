@@ -52,7 +52,16 @@ export class WalletManager {
                 error: result.error
             };
         } else {
-            return await this.autoDetectAndConnect();
+            // User explicitly requested a connection (e.g., clicked "Connect Wallet").
+            // Perform an interactive connect which will prompt wallets (eth_requestAccounts / phantom.connect).
+            const result = await this.web3Service.connectWallet(WalletType.INJECTED);
+            const status = this.web3Service.getStatus();
+            return {
+                success: result.success,
+                address: status.address,
+                walletType: status.walletType,
+                error: result.error
+            };
         }
     }
 

@@ -76,23 +76,47 @@ export class Web3WalletService {
                 installed: this.isCoinbaseInstalled(),
                 downloadUrl: 'https://www.coinbase.com/wallet'
             }
+            ,
+            {
+                name: 'Injected',
+                type: WalletType.INJECTED,
+                icon: '🔌',
+                installed: this.isInjectedAvailable(),
+                downloadUrl: undefined
+            }
         ];
     }
 
     // Check wallet installations
     private isMetaMaskInstalled(): boolean {
-        return typeof (window as any).ethereum !== 'undefined' && 
-               (window as any).ethereum.isMetaMask;
+        const eth = (window as any).ethereum;
+        if (!eth) return false;
+
+        // Some browsers expose multiple providers (e.g. window.ethereum.providers)
+        if (Array.isArray(eth.providers)) {
+            return eth.providers.some((p: any) => p && p.isMetaMask);
+        }
+
+        return !!eth.isMetaMask;
     }
 
     private isPhantomInstalled(): boolean {
-        return typeof (window as any).solana !== 'undefined' && 
-               (window as any).solana.isPhantom;
+    return typeof (window as any).solana !== 'undefined' && (window as any).solana.isPhantom;
     }
 
     private isCoinbaseInstalled(): boolean {
-        return typeof (window as any).ethereum !== 'undefined' && 
-               (window as any).ethereum.isCoinbaseWallet;
+        const eth = (window as any).ethereum;
+        if (!eth) return false;
+
+        if (Array.isArray(eth.providers)) {
+            return eth.providers.some((p: any) => p && p.isCoinbaseWallet);
+        }
+
+        return !!eth.isCoinbaseWallet;
+    }
+
+    private isInjectedAvailable(): boolean {
+        return typeof (window as any).ethereum !== 'undefined';
     }
 
     // Connect to wallet
@@ -111,6 +135,9 @@ export class Web3WalletService {
                     break;
                 case WalletType.COINBASE:
                     connection = await this.connectCoinbase();
+                    break;
+                case WalletType.INJECTED:
+                    connection = await this.connectInjected();
                     break;
                 default:
                     throw new Error(`Unsupported wallet type: ${walletType}`);
@@ -235,21 +262,197 @@ export class Web3WalletService {
     // Auto-detect and connect
     async autoConnect(): Promise<{ success: boolean; error?: string }> {
         const wallets = this.getAvailableWallets();
-        
-        // Try installed wallets in order of preference
+        // First, attempt a silent check (no popup) to see if a wallet is already authorized for this site.
+        // For Ethereum providers we use 'eth_accounts' which does not prompt. For Phantom we use onlyIfTrusted.
+
+        // Helper: try silent connect for an ethereum provider
+        const trySilentEthereum = async (provider: any): Promise<WalletConnection | null> => {
+            try {
+                if (!provider || !provider.request) return null;
+                const accounts = await provider.request({ method: 'eth_accounts' });
+                if (!accounts || accounts.length === 0) return null;
+                const chainId = await provider.request({ method: 'eth_chainId' });
+                const balance = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
+                return {
+                    address: accounts[0],
+                    chainId,
+                    walletType: WalletType.INJECTED,
+                    balance: this.formatBalance(balance)
+                };
+            } catch (e) {
+                return null;
+            }
+        };
+
+        // Helper: try silent connect for Phantom
+        const trySilentPhantom = async (): Promise<WalletConnection | null> => {
+            try {
+                const solana = (window as any).solana;
+                if (!solana) return null;
+                // some phantom builds support onlyIfTrusted to avoid prompting
+                if (solana.isConnected) {
+                    const pub = solana.publicKey?.toString?.() || (await solana.connect({ onlyIfTrusted: true })).publicKey.toString();
+                    if (!pub) return null;
+                    const balance = await this.getSolanaBalance(pub);
+                    return {
+                        address: pub,
+                        chainId: 'solana-mainnet',
+                        walletType: WalletType.PHANTOM,
+                        balance
+                    };
+                } else {
+                    // attempt onlyIfTrusted which should not prompt
+                    const res = await solana.connect?.({ onlyIfTrusted: true });
+                    if (res?.publicKey) {
+                        const pub = res.publicKey.toString();
+                        const balance = await this.getSolanaBalance(pub);
+                        return {
+                            address: pub,
+                            chainId: 'solana-mainnet',
+                            walletType: WalletType.PHANTOM,
+                            balance
+                        };
+                    }
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        };
+
+        // Check named wallets first with silent checks
         for (const wallet of wallets) {
-            if (wallet.installed) {
-                const result = await this.connectWallet(wallet.type);
-                if (result.success) {
-                    return result;
+            if (!wallet.installed) continue;
+
+            if (wallet.type === WalletType.PHANTOM) {
+                const conn = await trySilentPhantom();
+                if (conn) {
+                    this.currentConnection = conn;
+                    this.storeConnection(conn);
+                    this.notifyStatusChange({ connected: true, address: conn.address, walletType: conn.walletType, balance: conn.balance });
+                    return { success: true };
+                }
+                continue;
+            }
+
+            if (wallet.type === WalletType.METAMASK || wallet.type === WalletType.COINBASE) {
+                // iterate ethereum providers and look for provider flagged as the wallet type
+                const win: any = window as any;
+                const eth = win.ethereum;
+                const candidates: any[] = [];
+                if (eth) {
+                    if (Array.isArray(eth.providers) && eth.providers.length > 0) candidates.push(...eth.providers);
+                    else candidates.push(eth);
+                }
+
+                for (const provider of candidates) {
+                    try {
+                        if (!provider) continue;
+                        // If checking specific wallet, skip providers that don't match when possible
+                        if (wallet.type === WalletType.METAMASK && provider.isMetaMask === false) continue;
+                        if (wallet.type === WalletType.COINBASE && provider.isCoinbaseWallet === false) continue;
+
+                        const conn = await trySilentEthereum(provider);
+                        if (conn) {
+                            // assign proper walletType if provider reports identity
+                            conn.walletType = wallet.type === WalletType.METAMASK ? WalletType.METAMASK : WalletType.COINBASE;
+                            this.currentConnection = conn;
+                            this.storeConnection(conn);
+                            this.notifyStatusChange({ connected: true, address: conn.address, walletType: conn.walletType, balance: conn.balance });
+                            return { success: true };
+                        }
+                    } catch (e) {
+                        continue;
+                    }
                 }
             }
         }
 
-        return { 
-            success: false, 
-            error: 'No compatible wallets found. Please install MetaMask, Phantom, or Coinbase Wallet.' 
+        // If no silent connection found, try generic injected providers silently
+        const winAny: any = window as any;
+        const ethAny = winAny.ethereum || (winAny.web3 && winAny.web3.currentProvider);
+        if (ethAny) {
+            const candidates: any[] = [];
+            if (Array.isArray(ethAny.providers) && ethAny.providers.length > 0) candidates.push(...ethAny.providers);
+            else candidates.push(ethAny);
+
+            for (const provider of candidates) {
+                const conn = await (async () => {
+                    try {
+                        if (!provider) return null;
+                        return await (async () => {
+                            const accounts = await provider.request({ method: 'eth_accounts' });
+                            if (!accounts || accounts.length === 0) return null;
+                            const chainId = await provider.request({ method: 'eth_chainId' });
+                            const balance = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
+                            return {
+                                address: accounts[0],
+                                chainId,
+                                walletType: WalletType.INJECTED,
+                                balance: this.formatBalance(balance)
+                            } as WalletConnection;
+                        })();
+                    } catch (e) {
+                        return null;
+                    }
+                })();
+
+                if (conn) {
+                    this.currentConnection = conn;
+                    this.storeConnection(conn);
+                    this.notifyStatusChange({ connected: true, address: conn.address, walletType: conn.walletType, balance: conn.balance });
+                    return { success: true };
+                }
+            }
+        }
+
+        // No silent connection - return clear guidance. Do not trigger eth_requestAccounts here to avoid unwanted popups.
+        return {
+            success: false,
+            error: 'No compatible wallets found or no wallet is authorized for this site. Please install/enable MetaMask, Phantom, or Coinbase Wallet and click Connect Wallet.'
         };
+    }
+
+    // Fallback for generic injected providers
+    private async connectInjected(): Promise<WalletConnection> {
+        // Prefer window.ethereum but also accept legacy window.web3
+        const win: any = window as any;
+        const eth = win.ethereum || (win.web3 && win.web3.currentProvider);
+        if (!eth) throw new Error('No injected provider found');
+
+        // Build a list of candidate providers to try
+        const candidates: any[] = [];
+        if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+            candidates.push(...eth.providers);
+        } else {
+            candidates.push(eth);
+        }
+
+        // Try each provider until one responds to requests
+        for (const provider of candidates) {
+            try {
+                if (!provider || !provider.request) continue;
+
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                if (!accounts || accounts.length === 0) continue;
+
+                const chainId = await provider.request({ method: 'eth_chainId' });
+                const balance = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
+
+                return {
+                    address: accounts[0],
+                    chainId,
+                    walletType: WalletType.INJECTED,
+                    balance: this.formatBalance(balance)
+                };
+            } catch (e) {
+                // try next provider
+                console.warn('Injected provider failed to respond, trying next if available:', e);
+                continue;
+            }
+        }
+
+        throw new Error('No injected provider responded. Ensure your wallet is enabled for this site and try again.');
     }
 
     // Disconnect wallet
