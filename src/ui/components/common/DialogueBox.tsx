@@ -356,7 +356,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   // compact restores the previous sizing used for task dialogs
   const maxWidthClass = small
     ? (compact ? 'max-w-md' : 'max-w-lg')
-    : (compact ? 'max-w-5xl' : 'max-w-6xl');
+    : (compact ? 'max-w-3xl' : 'max-w-4xl');
 
   return (
     <>
@@ -386,17 +386,9 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
             <div 
               className="relative inline-block"
-              style={{
-                backgroundImage: 'url(/UI/game/name-rectangle.png)',
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                minWidth: '140px',
-                height: '36px'
-              }}
             >
               <span 
-                className="absolute inset-0 flex items-center justify-center text-black text-sm font-bold"
+                className="absolute inset-0 flex items-center justify-center text-[#2B2621] text-sm font-bold"
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
                 }}
@@ -409,22 +401,15 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Character name tag with background (legacy placement) */}
         {characterName && !title && (
-          <div className="absolute -top-6 left-8">
+          <div className="absolute top-0 left-24">
             <div 
-              className="relative inline-block"
-              style={{
-                backgroundImage: 'url(/UI/game/name-rectangle.png)',
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                minWidth: '120px',
-                height: '32px'
-              }}
+              className="relative inline-block"              
             >
               <span 
-                className="absolute inset-0 flex items-center justify-center text-black text-sm font-bold"
+                className="absolute inset-0 flex items-center justify-center text-[#2B2621] text-base font-robert"
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
+                  fontWeight: '800',
                 }}
               >
                 {characterName}
@@ -434,7 +419,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-6 left-6 right-6 bottom-6 flex flex-col">
+        <div className="absolute top-12 left-6 right-6 bottom-6 flex flex-col">
           <div 
             className="flex-1 px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
             style={{}}
@@ -450,7 +435,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               className="[&::-webkit-scrollbar]:hidden"
             >
               <p 
-                className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
+                className={`text-[#2B2621] text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
                   textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
@@ -467,7 +452,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           {/* Text Input Area */}
           {requiresTextInput && isComplete && (
             <div className="mt-4 px-4">
-              <div className="text-xs text-black/70 text-center" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
+              <div className="text-xs text-[#2B2621]/70 text-center" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
                 Please enter your response above
               </div>
             </div>
@@ -490,13 +475,13 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                   }`}
                   style={{ fontFamily: 'VCR OSD Mono, monospace' }}
                 >
-                  <span className="text-black font-medium">
+                  <span className="text-[#2B2621] font-medium">
                     {index === selectedOptionIndex ? '→ ' : '  '}
                     {option.text}
                   </span>
                 </button>
               ))}
-              <div className="text-xs text-black/70 mt-2" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
+              <div className="text-xs text-[#2B2621]/70 mt-2" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
                 Use ↑↓ arrows to select, Enter to choose
               </div>
             </div>
@@ -505,7 +490,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Progress indicator */}
         {showProgressIndicator && (
-          <div className="absolute bottom-8 right-12">
+          <div className="absolute bottom-6 right-12">
             <div className="flex items-center space-x-2">
               {/* Slide dots */}
               <div className="flex space-x-1">
@@ -521,7 +506,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               
               {/* Text indicator */}
               <span 
-                className="text-black text-xs ml-2"
+                className="text-[#2B2621] text-xs ml-2"
                 style={{ fontFamily: 'VCR OSD Mono, monospace' }}
               >
                 {currentSlide + 1} / {totalSlides}
@@ -532,9 +517,9 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Click to continue hint */}
         {showContinueHint && !showOptions && !requiresTextInput && (
-          <div className="absolute bottom-8 left-8">
+          <div className="absolute bottom-6 left-8">
             <p 
-              className="text-black text-xs opacity-70 animate-pulse"
+              className="text-[#2B2621] text-xs opacity-70 animate-pulse"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}
             >
               Click to continue
@@ -633,7 +618,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                     disabled={!textInputValue.trim()}
                     className={`absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                       textInputValue.trim()
-                        ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-black hover:shadow-lg hover:shadow-dhani-gold/30'
+                        ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-[#2B2621] hover:shadow-lg hover:shadow-dhani-gold/30'
                         : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                     }`}
                     aria-label="Submit"
@@ -668,7 +653,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                   disabled={!textInputValue.trim() || textInputValue.trim().length < 2}
                   className={`w-full px-4 py-3 rounded-lg font-medium transition-all ${
                     textInputValue.trim() && textInputValue.trim().length >= 2
-                      ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-black hover:shadow-lg hover:shadow-dhani-gold/30'
+                      ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-[#2B2621] hover:shadow-lg hover:shadow-dhani-gold/30'
                       : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                   }`}
                 >
