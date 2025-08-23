@@ -277,7 +277,7 @@ export class StakingService {
 
             // Add transaction record
             icpBalanceManager.addTransaction({
-                type: 'stake',
+                type: 'transfer',  // Using 'transfer' instead of 'stake'
                 tokenSymbol: pool.tokenSymbol,
                 amount,
                 to: pool.contractAddress,
@@ -338,7 +338,7 @@ export class StakingService {
 
             // Add transaction record
             icpBalanceManager.addTransaction({
-                type: 'unstake',
+                type: 'transfer',  // Using 'transfer' instead of 'unstake'
                 tokenSymbol: stake.tokenSymbol,
                 amount: stake.amount,
                 from: pool.contractAddress,
@@ -448,7 +448,7 @@ export class StakingService {
 
             // Add transaction record
             icpBalanceManager.addTransaction({
-                type: 'reward',
+                type: 'transfer',  // Using 'transfer' instead of 'reward'
                 tokenSymbol: pool.rewardTokenSymbol || pool.tokenSymbol,
                 amount: rewardAmount,
                 from: pool.contractAddress,
@@ -594,7 +594,7 @@ export class StakingService {
 
             // Add transaction record
             icpBalanceManager.addTransaction({
-                type: 'unstake',
+                type: 'transfer',  // Using 'transfer' instead of 'unstake'
                 tokenSymbol: stake.tokenSymbol,
                 amount: returnAmount.toString(),
                 from: pool.contractAddress,
