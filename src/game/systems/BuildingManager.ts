@@ -9,6 +9,8 @@ export class BuildingManager {
   private buildingEntrance: { x: number, y: number };
   private stockMarketEntrance: { x: number, y: number };
   private bankExitLocation: { x: number, y: number };
+  private bankCenterTerminal: { x: number, y: number };
+  private bankCenterInteractionText: GameObjects.Text;
   private buildingInteractionText: GameObjects.Text;
   private stockMarketInteractionText: GameObjects.Text;
   private bankExitInteractionText: GameObjects.Text;
@@ -25,6 +27,7 @@ export class BuildingManager {
     this.buildingEntrance = { x: 9383, y: 6087 };
     this.stockMarketEntrance = { x: 2565, y: 3550 }; // Stock market building entrance
     this.bankExitLocation = { x: 550, y: 2918 }; // Exit location inside bank building
+  this.bankCenterTerminal = { x: 586, y: 2918 }; // Center terminal to open banking dashboard
       // Initialize buildingInteractionText with improved visual style
     this.buildingInteractionText = scene.add.text(
       this.buildingEntrance.x, 
@@ -91,6 +94,22 @@ export class BuildingManager {
         }
       }
     ).setOrigin(0.5).setAlpha(0);
+
+    // Add bank center interaction text (open dashboard)
+    this.bankCenterInteractionText = scene.add.text(
+      this.bankCenterTerminal.x,
+      this.bankCenterTerminal.y - 110,
+      "Press E to open Banking", 
+      {
+        fontFamily: Constants.UI_TEXT_FONT,
+        fontSize: Constants.UI_TEXT_SIZE,
+        color: Constants.UI_TEXT_COLOR,
+        align: 'center',
+        backgroundColor: Constants.UI_TEXT_BACKGROUND,
+        padding: Constants.UI_TEXT_PADDING,
+        shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true }
+      }
+    ).setOrigin(0.5).setAlpha(0);
     
     // Setup keys for interaction with null checks
     if (scene.input.keyboard) {
@@ -117,6 +136,7 @@ export class BuildingManager {
       gameContainer.add(this.buildingInteractionText);
       gameContainer.add(this.stockMarketInteractionText);
       gameContainer.add(this.bankExitInteractionText);
+  gameContainer.add(this.bankCenterInteractionText);
     }
   }
 
@@ -166,6 +186,33 @@ export class BuildingManager {
            (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
         this.exitBuilding();
         return;
+      }
+
+      // --- Bank center terminal (open dashboard) ---
+      const termDx = playerPos.x - this.bankCenterTerminal.x;
+      const termDy = playerPos.y - this.bankCenterTerminal.y;
+      const termDistance = Math.sqrt(termDx * termDx + termDy * termDy);
+      const isNearTerminal = termDistance <= Constants.BUILDING_INTERACTION_DISTANCE * 0.6; // slightly tighter
+
+      if (isNearTerminal && this.bankCenterInteractionText.alpha === 0) {
+        this.scene.tweens.add({ targets: this.bankCenterInteractionText, alpha: 1, duration: 200, ease: 'Power1' });
+      } else if (!isNearTerminal && this.bankCenterInteractionText.alpha === 1) {
+        this.scene.tweens.add({ targets: this.bankCenterInteractionText, alpha: 0, duration: 200, ease: 'Power1' });
+      }
+
+      if (isNearTerminal && !dialogueManager.isDialogueActive() &&
+          ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
+           (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+           (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
+        // Open banking UI via mainScene helper
+        const mainScene: any = this.scene;
+        if (mainScene.bankNPCManager) {
+          const account = mainScene.bankNPCManager.getBankAccountData();
+          mainScene.openBankingUI(account);
+        } else {
+          // Fallback event
+            window.dispatchEvent(new CustomEvent('openBankingUI', { detail: {} }));
+        }
       }
     }
     
@@ -218,6 +265,19 @@ export class BuildingManager {
     if (this.bankExitInteractionText) {
       this.bankExitInteractionText.x = this.bankExitLocation.x;
       this.bankExitInteractionText.y = this.bankExitLocation.y - 50;
+    }
+
+    if (this.bankCenterInteractionText) {
+      // If player is inside bank, try to anchor to banker NPC position for true center
+      const mainScene: any = this.scene;
+      if (mainScene.bankNPCManager && mainScene.mapManager?.isPlayerInBuilding()) {
+        const pos = mainScene.bankNPCManager.getPosition();
+        this.bankCenterInteractionText.x = pos.x;
+        this.bankCenterInteractionText.y = pos.y - 140; // above banker
+      } else {
+        this.bankCenterInteractionText.x = this.bankCenterTerminal.x;
+        this.bankCenterInteractionText.y = this.bankCenterTerminal.y - 110;
+      }
     }
   }
   

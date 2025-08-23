@@ -70,8 +70,11 @@ export class BankOnboardingManager {
   }
 
   public startConversation(): void {
-    // Prevent double start
-    if (dialogueManager.isDialogueActive()) return;
+    // If a dialogue is active we let DialogueManager advance/close first; do not hard return for returning flow
+    if (dialogueManager.isDialogueActive()) {
+      // Attempt a graceful close then proceed (only for returning greeting)
+      dialogueManager.closeDialogue();
+    }
 
     // Completed previously – lightweight return greeting
     if (this.hasCompletedBankOnboarding()) {
@@ -196,14 +199,32 @@ export class BankOnboardingManager {
     const acc = this.getBankAccount();
     const shortAcc = acc ? acc.accountNumber.slice(-4) : '----';
     dialogueManager.showDialogue({
-      text: `Welcome back${storedName ? ' ' + storedName : ''}! Your account${acc ? ' ending with ' + shortAcc : ''} is active. Need balance info or future services? I'm here anytime.`,
+      text: `Welcome back${storedName ? ' ' + storedName : ''}! Your account${acc ? ' ending •••' + shortAcc : ''} is active. Want to check your banking dashboard now?`,
       characterName: 'Bank Manager',
       showBackdrop: true,
-      allowSpaceAdvance: true
+      showOptions: true,
+      options: [
+        { id: 'open', text: 'Yes, open dashboard' },
+        { id: 'later', text: 'No, maybe later' }
+      ]
     }, {
-      onAdvance: () => { 
-        dialogueManager.closeDialogue(); 
-        this.notifyConversationEnded();
+      onOptionSelect: (optionId: string) => {
+        if (optionId === 'open') {
+          const mainScene: any = this.scene;
+          const account = this.getBankAccount();
+          dialogueManager.closeDialogue();
+          // Open dashboard via scene helper or fallback event
+          if (mainScene && typeof mainScene.openBankingUI === 'function') {
+            mainScene.openBankingUI(account);
+          } else {
+            window.dispatchEvent(new CustomEvent('openBankingUI', { detail: { account } }));
+          }
+      // Keep interaction available after UI closes (end event still dispatched elsewhere)
+      this.notifyConversationEnded();
+        } else if (optionId === 'later') {
+          dialogueManager.closeDialogue();
+          this.notifyConversationEnded();
+        }
       }
     });
   }

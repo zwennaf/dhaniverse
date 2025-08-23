@@ -291,10 +291,9 @@ export class BankNPCManager {
       this.bankOnboardingManager.startOnboarding();
       return;
     }
-    
-    // If onboarding is complete, show a simple dialogue
-    console.log("🏦 Bank onboarding already completed - showing simple dialogue");
-    this.showCompletedOnboardingDialogue();
+  // Onboarding complete or not needed: always delegate to bank manager conversation (returning greeting + options)
+  console.log("🏦 Bank onboarding already completed - showing returning greeting");
+  this.bankOnboardingManager.startConversation();
   }
   
   /**
@@ -310,21 +309,8 @@ export class BankNPCManager {
    * Show a simple dialogue for when onboarding is already completed
    */
   private showCompletedOnboardingDialogue(): void {
-    // Create a simple dialogue event
-    window.dispatchEvent(new CustomEvent('show-dialogue', {
-      detail: {
-        text: "Welcome back! Your account is all set up. Use the banking terminal to access all banking services.",
-        characterName: 'Bank Manager',
-        allowAdvance: true
-      }
-    }));
-
-    // When dialogue is closed, reset the interaction state
-    const onAdvance = () => {
-      this.endBankingInteraction();
-      window.removeEventListener('dialogue-advance' as any, onAdvance as any);
-    };
-    window.addEventListener('dialogue-advance' as any, onAdvance as any);
+  // Legacy method retained for compatibility; now delegates to unified conversation flow
+  this.bankOnboardingManager.startConversation();
   }
 
   /**
@@ -397,6 +383,13 @@ export class BankNPCManager {
    */
   public getBankOnboardingManager(): BankOnboardingManager {
     return this.bankOnboardingManager;
+  }
+
+  /**
+   * Public accessor for banker position (used for placing interaction hotspots)
+   */
+  public getPosition(): { x: number; y: number } {
+    return { x: this.banker.x, y: this.banker.y };
   }
   
   /**
