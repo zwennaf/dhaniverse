@@ -24,7 +24,7 @@ export const ICP_CONFIG = {
     INTERNET_IDENTITY: true,
     DUAL_STORAGE: true,
     ACHIEVEMENTS: true,
-    STAKING: true,
+  STAKING: false,
     DEFI_SIMULATIONS: true,
     HTTP_OUTCALLS: true,
     LEADERBOARD: true,

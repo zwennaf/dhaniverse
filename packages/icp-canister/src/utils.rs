@@ -96,12 +96,7 @@ pub fn generate_transaction_id() -> String {
 }
 
 // Generate unique staking pool ID
-pub fn generate_staking_id() -> String {
-    let timestamp = ic_cdk::api::time();
-    let random_bytes = get_random_bytes(8);
-    let random_hex = hex::encode(random_bytes);
-    format!("stake_{}_{}", timestamp, random_hex)
-}
+// Staking ID generation removed
 
 // Generate transaction hash (simulated)
 pub fn generate_transaction_hash() -> String {
@@ -147,33 +142,7 @@ pub fn calculate_exchange(from_amount: f64, rate: f64) -> CanisterResult<f64> {
 }
 
 // Calculate staking rewards
-pub fn calculate_staking_rewards(
-    staked_amount: f64,
-    apy: f64,
-    start_time: u64,
-    current_time: u64,
-) -> CanisterResult<f64> {
-    validate_amount(staked_amount)?;
-    
-    if apy < 0.0 || !apy.is_finite() {
-        return Err(CanisterError::InvalidAmount);
-    }
-    
-    if current_time < start_time {
-        return Ok(0.0);
-    }
-    
-    let elapsed_nanos = current_time - start_time;
-    let elapsed_years = elapsed_nanos as f64 / (365.25 * 24.0 * 60.0 * 60.0 * 1_000_000_000.0);
-    
-    let rewards = staked_amount * (apy / 100.0) * elapsed_years;
-    
-    if !rewards.is_finite() {
-        return Err(CanisterError::InvalidAmount);
-    }
-    
-    Ok(rewards.max(0.0))
-}
+// Staking rewards calculation removed
 
 // Format balance for display
 pub fn format_balance(balance: f64) -> String {
@@ -196,12 +165,7 @@ pub fn sanitize_string(input: &str) -> String {
 }
 
 // Check if duration is valid for staking
-pub fn validate_staking_duration(duration: u32) -> CanisterResult<()> {
-    match duration {
-        30 | 90 | 180 => Ok(()),
-        _ => Err(CanisterError::InvalidInput("Invalid staking duration. Supported: 30, 90, 180 days".to_string())),
-    }
-}
+// Staking duration validation removed
 
 // Generate authentication message for signing
 pub fn generate_auth_message(wallet_address: &str, timestamp: u64) -> String {
@@ -308,11 +272,5 @@ mod tests {
         assert!(validate_currency("bitcoin").is_err());
     }
 
-    #[test]
-    fn test_validate_staking_duration() {
-        assert!(validate_staking_duration(30).is_ok());
-        assert!(validate_staking_duration(90).is_ok());
-        assert!(validate_staking_duration(180).is_ok());
-        assert!(validate_staking_duration(60).is_err());
-    }
+    // Staking-related tests removed
 }

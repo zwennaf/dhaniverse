@@ -276,7 +276,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                             {[
                                 { id: 'wallet', label: 'Wallet', icon: Wallet },
                                 { id: 'faucet', label: 'Faucet', icon: Plus },
-                                // staking removed
+                                // legacy feature removed
                                 { id: 'transactions', label: 'History', icon: History }
                             ].map(tab => (
                                 <button
@@ -409,7 +409,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                             </div>
                         )}
 
-                        {/* staking removed */}
+                        {/* legacy feature removed */}
 
                         {activeTab === 'transactions' && (
                             <div className="space-y-6">
@@ -462,8 +462,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                 </div>
             </div>
 
-            {/* Staking Panel */}
-                        {/* staking panel removed */}
+            {/* Web3 features panel */}
         </>
     );
 };

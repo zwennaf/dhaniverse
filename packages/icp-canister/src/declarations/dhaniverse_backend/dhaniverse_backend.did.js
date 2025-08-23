@@ -47,7 +47,6 @@ export const idlFactory = ({ IDL }) => {
   const Result_1 = IDL.Variant({ 'Ok' : Web3Session, 'Err' : IDL.Text });
   const TransactionType = IDL.Variant({
     'Withdraw' : IDL.Null,
-    'Stake' : IDL.Null,
     'Deposit' : IDL.Null,
     'Exchange' : IDL.Null,
   });
@@ -80,7 +79,6 @@ export const idlFactory = ({ IDL }) => {
     'Learning' : IDL.Null,
     'Trading' : IDL.Null,
     'Saving' : IDL.Null,
-    'Staking' : IDL.Null,
   });
   const AchievementRarity = IDL.Variant({
     'Epic' : IDL.Null,
@@ -111,21 +109,7 @@ export const idlFactory = ({ IDL }) => {
     'token_balance' : IDL.Float64,
   });
   const Result_4 = IDL.Variant({ 'Ok' : DualBalance, 'Err' : IDL.Text });
-  const StakingStatus = IDL.Variant({
-    'Claimed' : IDL.Null,
-    'Active' : IDL.Null,
-    'Matured' : IDL.Null,
-  });
-  const StakingPool = IDL.Record({
-    'id' : IDL.Text,
-    'apy' : IDL.Float64,
-    'status' : StakingStatus,
-    'staked_amount' : IDL.Float64,
-    'maturity_date' : IDL.Nat64,
-    'start_date' : IDL.Nat64,
-    'current_rewards' : IDL.Float64,
-  });
-  const Result_6 = IDL.Variant({ 'Ok' : StakingPool, 'Err' : IDL.Text });
+  // (staking types removed)
   return IDL.Service({
     'authenticate_with_signature' : IDL.Func(
         [IDL.Text, IDL.Text],
@@ -133,7 +117,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'claim_achievement_reward' : IDL.Func([IDL.Text, IDL.Text], [Result_8], []),
-    'claim_staking_rewards' : IDL.Func([IDL.Text, IDL.Text], [Result_7], []),
     'clear_session' : IDL.Func([IDL.Text], [Result_2], []),
     'connect_wallet' : IDL.Func(
         [WalletType, IDL.Text, IDL.Text],
@@ -160,11 +143,6 @@ export const idlFactory = ({ IDL }) => {
     'get_available_wallets' : IDL.Func([], [IDL.Vec(WalletInfo)], ['query']),
     'get_dual_balance' : IDL.Func([IDL.Text], [Result_4], ['query']),
     'get_session' : IDL.Func([IDL.Text], [IDL.Opt(Web3Session)], ['query']),
-    'get_staking_info' : IDL.Func(
-        [IDL.Text],
-        [IDL.Vec(StakingPool)],
-        ['query'],
-      ),
     'get_transaction_history' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Web3Transaction)],
@@ -186,11 +164,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_7],
         [],
       ),
-    'stake_tokens' : IDL.Func(
-        [IDL.Text, IDL.Float64, IDL.Nat32],
-        [Result_6],
-        [],
-      ),
+  // (staking methods removed)
   });
 };
 export const init = ({ IDL }) => { return []; };

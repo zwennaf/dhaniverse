@@ -163,65 +163,7 @@ fn test_banking_operations() {
     assert_eq!(balance.token_balance, 100.0); // 0 + 100
 }
 
-#[test]
-fn test_staking_operations() {
-    let (pic, canister_id) = setup_canister();
-    
-    // Setup wallet and session
-    let address = "0x1234567890123456789012345678901234567890".to_string();
-    let connection = WalletConnection {
-        address: address.clone(),
-        chain_id: "1".to_string(),
-        wallet_type: WalletType::MetaMask,
-        balance: Some("1.5 ETH".to_string()),
-    };
-    
-    pic.update_call(
-        canister_id,
-        Principal::anonymous(),
-        "create_session",
-        Encode!(&connection).unwrap(),
-    ).unwrap();
-    
-    // First exchange some rupees to tokens
-    pic.update_call(
-        canister_id,
-        Principal::anonymous(),
-        "exchange_currency",
-        Encode!(&address, &"rupees".to_string(), &"tokens".to_string(), &5000.0).unwrap(),
-    ).unwrap();
-    
-    // Test token staking
-    let result = pic.update_call(
-        canister_id,
-        Principal::anonymous(),
-        "stake_tokens",
-        Encode!(&address, &200.0, &30u32).unwrap(),
-    );
-    
-    assert!(result.is_ok());
-    let staking_result: Result<StakingPool, String> = 
-        Decode!(result.unwrap().bytes(), Result<StakingPool, String>).unwrap();
-    
-    assert!(staking_result.is_ok());
-    let pool = staking_result.unwrap();
-    assert_eq!(pool.staked_amount, 200.0);
-    assert_eq!(pool.apy, 5.0); // 30-day APY
-    assert_eq!(pool.status, StakingStatus::Active);
-    
-    // Test get staking info
-    let result = pic.query_call(
-        canister_id,
-        Principal::anonymous(),
-        "get_staking_info",
-        Encode!(&address).unwrap(),
-    );
-    
-    assert!(result.is_ok());
-    let pools: Vec<StakingPool> = Decode!(result.unwrap().bytes(), Vec<StakingPool>).unwrap();
-    assert_eq!(pools.len(), 1);
-    assert_eq!(pools[0].staked_amount, 200.0);
-}
+// staking integration tests removed
 
 #[test]
 fn test_achievement_system() {

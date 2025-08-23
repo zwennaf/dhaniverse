@@ -22,8 +22,6 @@ pub enum CanisterError {
     InsufficientBalance,
     InvalidAmount,
     ExchangeRateFailed,
-    StakingPoolNotFound,
-    StakingNotMatured,
     InvalidCurrency,
     NegativeAmount,
     
@@ -68,8 +66,7 @@ impl fmt::Display for CanisterError {
             CanisterError::InsufficientBalance => write!(f, "Insufficient balance for this operation"),
             CanisterError::InvalidAmount => write!(f, "Invalid amount specified"),
             CanisterError::ExchangeRateFailed => write!(f, "Failed to calculate exchange rate"),
-            CanisterError::StakingPoolNotFound => write!(f, "Staking pool not found"),
-            CanisterError::StakingNotMatured => write!(f, "Staking period has not completed yet"),
+            // staking errors removed
             CanisterError::InvalidCurrency => write!(f, "Invalid currency type"),
             CanisterError::NegativeAmount => write!(f, "Amount cannot be negative"),
             
@@ -140,8 +137,7 @@ impl CanisterError {
             CanisterError::WalletNotConnected |
             CanisterError::WalletAlreadyConnected |
             CanisterError::InsufficientBalance |
-            CanisterError::StakingPoolNotFound |
-            CanisterError::StakingNotMatured |
+            // staking errors removed
             CanisterError::TransactionNotFound |
             CanisterError::SignatureVerificationFailed => false,
         }

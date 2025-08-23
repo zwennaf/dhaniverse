@@ -247,17 +247,7 @@ export class ICPActorService {
     }
 
     // Advanced staking with timer-based rewards
-    async createAdvancedStakingPool(amount: number, durationDays: number): Promise<{ success: boolean; poolId?: string; error?: string }> {
-        try {
-            // Staking feature removed. Return not-implemented response.
-            return { success: false, error: 'Staking feature has been removed' };
-        } catch (error) {
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-        }
-    }
+    // Staking feature has been removed
 
     // Get canister health status
     async getCanisterHealth(): Promise<{ status: string; stats: any }> {

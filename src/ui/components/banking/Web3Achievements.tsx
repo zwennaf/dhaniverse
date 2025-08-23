@@ -95,7 +95,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
                 unlocked: false,
                 reward: { type: 'rupees', amount: 2500 }
             },
-            // staking achievement removed
+            // legacy achievement removed
             {
                 id: 'whale_status',
                 title: 'Crypto Whale',
@@ -338,7 +338,7 @@ const Web3Achievements: React.FC<Web3AchievementsProps> = ({
                         <li>• Complete currency exchanges to unlock trading achievements</li>
                         <li>• Build up your balance to reach saving milestones</li>
                         <li>• Try DeFi simulations to earn learning achievements</li>
-                        {/* staking tips removed */}
+                        {/* legacy tips removed */}
                         <li>• Legendary achievements require significant dedication</li>
                     </ul>
                 </div>

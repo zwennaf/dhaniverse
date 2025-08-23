@@ -1,6 +1,6 @@
 /**
  * Web3Integration - Component to integrate Web3 functionality into the game
- * This can be added to your GamePage or GameHUD to provide access to staking features
+ * This can be added to your GamePage or GameHUD to provide access to Web3 features
  */
 
 import React, { useState } from 'react';
@@ -49,7 +49,7 @@ const Web3Integration: React.FC<Web3IntegrationProps> = ({
                     <span className="hidden group-hover:block text-sm font-medium">Web3</span>
                 </button>
 
-                {/* Staking removed */}
+                {/* Web3 features panel */}
             </div>
 
             {/* Web3 Panel Modal */}
@@ -60,7 +60,7 @@ const Web3Integration: React.FC<Web3IntegrationProps> = ({
                 />
             )}
 
-            {/* staking removed */}
+            {/* legacy feature removed */}
         </>
     );
 };

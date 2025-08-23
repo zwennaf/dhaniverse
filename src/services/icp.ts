@@ -200,21 +200,15 @@ export class ICPService {
   }
 
   async stakeTokens(walletAddress: string, amount: number, duration: number) {
-    try {
-      return await this.actor.stake_tokens(walletAddress, amount, duration);
-    } catch (error) {
-      console.error('Stake tokens failed:', error);
-      throw error;
-    }
+  // Staking removed — return not-implemented error
+  console.warn('stakeTokens called but staking feature removed');
+  throw new Error('Staking feature has been removed');
   }
 
   async getStakingInfo(walletAddress: string) {
-    try {
-      return await this.actor.get_staking_info(walletAddress);
-    } catch (error) {
-      console.error('Get staking info failed:', error);
-      throw error;
-    }
+  // Staking removed — return empty list
+  console.warn('getStakingInfo called but staking feature removed');
+  return [] as any[];
   }
 
   async getTransactionHistory(walletAddress: string) {
@@ -227,12 +221,8 @@ export class ICPService {
   }
 
   async claimStakingRewards(walletAddress: string, stakingId: string) {
-    try {
-      return await this.actor.claim_staking_rewards(walletAddress, stakingId);
-    } catch (error) {
-      console.error('Claim staking rewards failed:', error);
-      throw error;
-    }
+  console.warn('claimStakingRewards called but staking feature removed');
+  throw new Error('Staking feature has been removed');
   }
 
   async simulateLiquidityPool(walletAddress: string, amount: number) {

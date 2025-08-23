@@ -420,9 +420,9 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-12 left-6 right-6 bottom-6 flex flex-col">
+        <div className="absolute top-12 left-6 right-6 bottom-6 flex flex-col items-center">
           <div 
-            className="flex-1 px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
+            className="flex-1 px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent w-full"
             style={{}}
             onClick={handleClick}
           >
@@ -433,10 +433,10 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                 scrollbarWidth: 'none', // Firefox
                 msOverflowStyle: 'none', // Internet Explorer 10+
               }}
-              className="[&::-webkit-scrollbar]:hidden"
+              className="[&::-webkit-scrollbar]:hidden mx-auto w-full max-w-2xl"
             >
               <p 
-                className={`text-[#2B2621] text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
+                className={`text-[#2B2621] text-lg leading-relaxed font-medium text-center mx-auto ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
                   textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
@@ -452,7 +452,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
           {/* Text Input Area */}
           {requiresTextInput && isComplete && (
-            <div className="mt-4 px-4">
+            <div className="mt-4 px-4 w-full max-w-2xl mx-auto">
               <div className="text-xs text-[#2B2621]/70 text-center" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
                 Please enter your response above
               </div>
@@ -461,7 +461,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
           {/* Options Area */}
           {showOptions && options.length > 0 && isComplete && (
-            <div className="mt-4 px-4 space-y-2">
+            <div className="mt-4 px-4 space-y-2 w-full max-w-2xl mx-auto">
               {options.map((option, index) => (
                 <button
                   key={option.id}
@@ -482,7 +482,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                   </span>
                 </button>
               ))}
-              <div className="text-xs text-[#2B2621]/70 mt-2" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
+              <div className="text-xs text-[#2B2621]/70 mt-2 text-center" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
                 Use ↑↓ arrows to select, Enter to choose
               </div>
             </div>

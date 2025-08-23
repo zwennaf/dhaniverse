@@ -49,23 +49,7 @@ pub struct DualBalance {
     pub last_updated: u64,
 }
 
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub enum StakingStatus {
-    Active,
-    Matured,
-    Claimed,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
-pub struct StakingPool {
-    pub id: String,
-    pub staked_amount: f64,
-    pub apy: f64,
-    pub start_date: u64,
-    pub maturity_date: u64,
-    pub current_rewards: f64,
-    pub status: StakingStatus,
-}
+// Staking feature removed: StakingStatus and StakingPool types deleted
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct ExchangeResult {
@@ -82,7 +66,6 @@ pub struct ExchangeResult {
 pub enum AchievementCategory {
     Trading,
     Saving,
-    Staking,
     Learning,
 }
 
@@ -118,7 +101,6 @@ pub enum TransactionType {
     Deposit,
     Withdraw,
     Exchange,
-    Stake,
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -191,7 +173,7 @@ pub struct CanisterState {
 pub struct UserData {
     pub wallet_address: String,
     pub dual_balance: DualBalance,
-    pub staking_pools: Vec<StakingPool>,
+    pub staking_pools: Vec<()> /* staking removed */,
     pub achievements: Vec<Achievement>,
     pub transactions: Vec<Web3Transaction>,
     pub created_at: u64,
@@ -201,18 +183,14 @@ pub struct UserData {
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct GlobalSettings {
     pub exchange_rate: f64, // 1 Rupee = 0.1 Token
-    pub staking_apys: HashMap<u32, f64>, // Duration -> APY mapping
+    pub staking_apys: HashMap<u32, f64>, // Staking removed: left empty by default
     pub achievement_definitions: Vec<Achievement>,
     pub session_timeout: u64, // in nanoseconds
 }
 
 impl Default for GlobalSettings {
     fn default() -> Self {
-        let mut staking_apys = HashMap::new();
-        staking_apys.insert(30, 5.0);  // 30 days -> 5% APY
-        staking_apys.insert(90, 7.0);  // 90 days -> 7% APY
-        staking_apys.insert(180, 10.0); // 180 days -> 10% APY
-
+    let staking_apys = HashMap::new();
         Self {
             exchange_rate: 0.1,
             staking_apys,
@@ -260,7 +238,7 @@ impl From<&str> for TransactionType {
             "deposit" => TransactionType::Deposit,
             "withdraw" => TransactionType::Withdraw,
             "exchange" => TransactionType::Exchange,
-            "stake" => TransactionType::Stake,
+            // "stake" mapping removed
             _ => TransactionType::Deposit,
         }
     }
@@ -271,7 +249,6 @@ impl From<&str> for AchievementCategory {
         match s.to_lowercase().as_str() {
             "trading" => AchievementCategory::Trading,
             "saving" => AchievementCategory::Saving,
-            "staking" => AchievementCategory::Staking,
             "learning" => AchievementCategory::Learning,
             _ => AchievementCategory::Trading,
         }

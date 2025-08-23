@@ -27,21 +27,6 @@ type DualBalance = record {
   last_updated: nat64;
 };
 
-type StakingStatus = variant {
-  Active;
-  Matured;
-  Claimed;
-};
-
-type StakingPool = record {
-  id: text;
-  staked_amount: float64;
-  apy: float64;
-  start_date: nat64;
-  maturity_date: nat64;
-  current_rewards: float64;
-  status: StakingStatus;
-};
 
 type ExchangeResult = record {
   success: bool;
@@ -55,7 +40,7 @@ type ExchangeResult = record {
 type AchievementCategory = variant {
   Trading;
   Saving;
-  Staking;
+  # Staking types removed
   Learning;
 };
 
@@ -162,10 +147,7 @@ type Result_5 = variant {
   Err: text;
 };
 
-type Result_6 = variant {
-  Ok: StakingPool;
-  Err: text;
-};
+// Staking types removed
 
 type Result_7 = variant {
   Ok: float64;
@@ -198,9 +180,7 @@ service : {
   // Banking Methods
   get_dual_balance: (text) -> (Result_4) query;
   exchange_currency: (text, text, text, float64) -> (Result_5);
-  stake_tokens: (text, float64, nat32) -> (Result_6);
-  get_staking_info: (text) -> (vec StakingPool) query;
-  claim_staking_rewards: (text, text) -> (Result_7);
+  // Staking methods removed
   get_achievements: (text) -> (vec Achievement) query;
   claim_achievement_reward: (text, text) -> (Result_8);
 

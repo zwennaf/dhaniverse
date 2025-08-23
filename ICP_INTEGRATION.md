@@ -27,7 +27,7 @@ Dhaniverse is now integrated with the Internet Computer (ICP) blockchain, provid
    - Rust-based smart contract on IC mainnet
    - Stores all user data in stable memory
    - Handles Web3 authentication and transactions
-   - Provides DeFi features (staking, exchanges)
+   - Provides DeFi features (exchanges)
 
 2. **Frontend Integration**
    - React services for ICP communication
@@ -109,7 +109,7 @@ npm run test           # Run tests
 pub struct UserData {
     pub wallet_address: String,
     pub dual_balance: DualBalance,      // Rupees + Tokens
-    pub staking_pools: Vec<StakingPool>, // Token staking
+   -- staking_pools removed
     pub achievements: Vec<Achievement>,  // Game achievements
     pub transactions: Vec<Web3Transaction>, // Transaction history
     pub created_at: u64,
@@ -128,7 +128,7 @@ pub struct Web3Session {
 // Global Settings
 pub struct GlobalSettings {
     pub exchange_rate: f64,              // Rupee to Token rate
-    pub staking_apys: HashMap<u32, f64>, // Staking APYs
+   -- staking_apys removed
     pub achievement_definitions: Vec<Achievement>,
     pub session_timeout: u64,
 }
@@ -196,8 +196,7 @@ const reward = await icpService.claimAchievementReward(achievementId);
 
 ### DeFi Features
 ```typescript
-// Token staking
-const stakingResult = await icpService.stakeTokens(walletAddress, 1000, 90);
+// Token staking removed
 
 // Currency exchange
 const exchangeResult = await icpService.exchangeCurrency(

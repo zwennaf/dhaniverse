@@ -222,11 +222,7 @@ pub fn get_exchange_rate() -> f64 {
     })
 }
 
-pub fn get_staking_apy(duration: u32) -> Option<f64> {
-    STATE.with(|state| {
-        state.borrow().global_settings.staking_apys.get(&duration).copied()
-    })
-}
+// Staking APY removed
 
 // Helper function to create default global settings
 fn create_default_global_settings() -> GlobalSettings {
@@ -248,19 +244,6 @@ fn create_default_global_settings() -> GlobalSettings {
             }),
         },
         Achievement {
-            id: "first_stake".to_string(),
-            title: "Staking Pioneer".to_string(),
-            description: "Stake tokens for the first time".to_string(),
-            category: AchievementCategory::Staking,
-            rarity: AchievementRarity::Common,
-            unlocked: false,
-            unlocked_at: None,
-            reward: Some(AchievementReward {
-                reward_type: "tokens".to_string(),
-                amount: 10.0,
-            }),
-        },
-        Achievement {
             id: "big_exchange".to_string(),
             title: "High Roller".to_string(),
             description: "Exchange over 10,000 rupees in a single transaction".to_string(),
@@ -273,19 +256,7 @@ fn create_default_global_settings() -> GlobalSettings {
                 amount: 50.0,
             }),
         },
-        Achievement {
-            id: "long_stake".to_string(),
-            title: "Patient Investor".to_string(),
-            description: "Stake tokens for 180 days".to_string(),
-            category: AchievementCategory::Staking,
-            rarity: AchievementRarity::Epic,
-            unlocked: false,
-            unlocked_at: None,
-            reward: Some(AchievementReward {
-                reward_type: "rupees".to_string(),
-                amount: 5000.0,
-            }),
-        },
+// Staking achievements removed
         Achievement {
             id: "defi_master".to_string(),
             title: "DeFi Master".to_string(),

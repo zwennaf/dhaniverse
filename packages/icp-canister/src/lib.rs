@@ -101,26 +101,7 @@ async fn exchange_currency(
         .map_err(|e| e.to_string())
 }
 
-#[ic_cdk::update]
-async fn stake_tokens(
-    wallet_address: String,
-    amount: f64,
-    duration: u32,
-) -> Result<StakingPool, String> {
-    banking::stake_tokens(wallet_address, amount, duration).await
-        .map_err(|e| e.to_string())
-}
-
-#[ic_cdk::query]
-fn get_staking_info(wallet_address: String) -> Vec<StakingPool> {
-    banking::get_staking_info(wallet_address)
-}
-
-#[ic_cdk::update]
-async fn claim_staking_rewards(wallet_address: String, staking_id: String) -> Result<f64, String> {
-    banking::claim_staking_rewards(wallet_address, staking_id).await
-        .map_err(|e| e.to_string())
-}
+// Staking entry points removed
 
 #[ic_cdk::query]
 fn get_achievements(wallet_address: String) -> Vec<Achievement> {

@@ -9,7 +9,7 @@ pub struct CanisterMetrics {
     pub total_users: usize,
     pub active_sessions: usize,
     pub total_transactions: usize,
-    pub total_staking_pools: usize,
+    // staking removed
     pub total_achievements_unlocked: usize,
     pub memory_usage: MemoryMetrics,
     pub performance_metrics: PerformanceMetrics,
@@ -62,7 +62,7 @@ pub struct TransactionMetrics {
     pub total_volume_rupees: f64,
     pub total_volume_tokens: f64,
     pub exchange_count: usize,
-    pub staking_count: usize,
+    // staking counters removed
     pub average_transaction_size: f64,
     pub transaction_success_rate: f64,
 }
@@ -130,7 +130,7 @@ pub fn get_canister_metrics() -> CanisterMetrics {
             total_users: storage::get_users_count(),
             active_sessions: storage::get_active_sessions_count(),
             total_transactions: calculate_total_transactions(),
-            total_staking_pools: calculate_total_staking_pools(),
+            // staking removed
             total_achievements_unlocked: calculate_total_achievements(),
             memory_usage: get_memory_metrics(),
             performance_metrics: get_performance_metrics(&store),
@@ -186,24 +186,23 @@ pub fn get_transaction_metrics() -> TransactionMetrics {
     // Calculate from all user transactions
     let total_volume_rupees = 0.0;
     let total_volume_tokens = 0.0;
-    let exchange_count = 0;
-    let staking_count = 0;
-    let total_transactions = 0;
-    let successful_transactions = 0;
-    
-    // This would iterate through all users in a real implementation
-    // For now, return estimated metrics
-    
+    // staking removed: return metrics without staking-specific counters
     TransactionMetrics {
         total_volume_rupees,
         total_volume_tokens,
         exchange_count,
-        staking_count,
+        staking_count: 0,
         average_transaction_size: if total_transactions > 0 {
             (total_volume_rupees + total_volume_tokens) / total_transactions as f64
         } else {
             0.0
         },
+        transaction_success_rate: if total_transactions > 0 {
+            (successful_transactions as f64 / total_transactions as f64) * 100.0
+        } else {
+            100.0
+        },
+    }
         transaction_success_rate: if total_transactions > 0 {
             (successful_transactions as f64 / total_transactions as f64) * 100.0
         } else {
@@ -311,11 +310,7 @@ fn calculate_total_transactions() -> usize {
     storage::get_users_count() * 5 // Estimate 5 transactions per user
 }
 
-fn calculate_total_staking_pools() -> usize {
-    // This would sum staking pools across all users
-    // For now, return estimated count
-    storage::get_users_count() * 2 // Estimate 2 staking pools per user
-}
+// staking removed
 
 fn calculate_total_achievements() -> usize {
     // This would sum unlocked achievements across all users

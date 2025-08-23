@@ -60,7 +60,7 @@ The system automatically handles:
 - ✅ **Canister Connection**: Connects to the appropriate canister based on environment
 - ✅ **Network Detection**: Automatically switches between local/IC networks
 - ✅ **Authentication Flow**: Manages Internet Identity and wallet connections
-- ✅ **Token Operations**: All token transfers, exchanges, and staking operations
+- ✅ **Token Operations**: All token transfers and exchanges
 - ✅ **Error Handling**: Comprehensive error handling for all canister calls
 
 ## Configuration
@@ -166,7 +166,7 @@ class ICPIntegrationService {
 ## Next Steps
 
 1. **Deploy to Production**: Use `dfx deploy --network ic` to deploy to IC mainnet
-2. **Test All Features**: Verify wallet connection, token operations, and staking
+2. **Test All Features**: Verify wallet connection and token operations
 3. **Monitor Performance**: Use ICP dashboard to monitor canister performance
 4. **Update Documentation**: Keep this guide updated as features evolve
 
@@ -178,4 +178,4 @@ For issues or questions:
 3. Ensure Internet Identity service is accessible
 4. Review network connectivity
 
-The system is designed to handle all ICP operations automatically, including Dhani Coin management, staking, and Web3 integration.
+The system is designed to handle all ICP operations automatically, including Dhani Coin management and Web3 integration.

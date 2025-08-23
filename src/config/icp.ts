@@ -23,7 +23,7 @@ export const ICP_CONFIG = {
         WEB3_INTEGRATION: true,
         DUAL_STORAGE: true,
         ACHIEVEMENTS: true,
-        STAKING: true,
+    STAKING: false,
         DEFI_SIMULATIONS: true,
         HTTP_OUTCALLS: true,
         LEADERBOARD: true,
@@ -50,12 +50,7 @@ export const ICP_CONFIG = {
     DEFAULTS: {
         EXCHANGE_RATE: 0.1, // 1 Rupee = 0.1 Token
         SESSION_TIMEOUT: 24 * 60 * 60 * 1000, // 24 hours
-        STAKING_APYS: {
-            30: 5.0, // 30 days = 5% APY
-            90: 7.5, // 90 days = 7.5% APY
-            180: 10.0, // 180 days = 10% APY
-            365: 15.0, // 365 days = 15% APY
-        },
+    STAKING_APYS: {},
     },
 } as const;
 

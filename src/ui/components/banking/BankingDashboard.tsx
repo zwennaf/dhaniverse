@@ -70,7 +70,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 await icpBalanceManager.initialize();
                 setIcpTokens(icpBalanceManager.getAllTokens());
                 
-                // Initialize staking service
+                // Initialize Web3 services
                 
                 // Set up listeners
                 icpIntegration.walletManager.onConnectionChange((status) => {
@@ -436,7 +436,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             name: "ICP Tokens",
             icon: "🪙",
         },
-    // staking tab removed
+    // legacy feature tab removed
         ...(walletStatus.connected ? [{
             id: "web3",
             name: "Web3 Features",
@@ -519,7 +519,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                     <div className="text-2xl mb-2">🪙</div>
                                     <div className="text-sm font-medium">ICP Tokens</div>
                                 </button>
-                                {/* staking button removed */}
+                                {/* feature button removed */}
                             </div>
                         </div>
 
@@ -529,7 +529,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-yellow-300 font-bold">🔗 Connect Your Wallet</h3>
-                                        <p className="text-yellow-200 text-sm">Unlock Web3 features, staking, and DeFi operations</p>
+                                        <p className="text-yellow-200 text-sm">Unlock Web3 features and DeFi operations</p>
                                     </div>
                                     <button
                                         onClick={() => handleConnectWallet()}
@@ -628,7 +628,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     </div>
                 );
 
-            // staking content removed
+            // feature content removed
 
             case "web3":
                 return (
