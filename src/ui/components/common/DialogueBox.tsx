@@ -401,15 +401,16 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Character name tag with background (legacy placement) */}
         {characterName && !title && (
-          <div className="absolute top-0 left-24">
+          <div className="absolute top-0 left-28">
             <div 
               className="relative inline-block"              
             >
               <span 
-                className="absolute inset-0 flex items-center justify-center text-[#2B2621] text-base font-robert"
+                className="absolute inset-0 flex items-center justify-center text-[#2B2621] text-base font-robert whitespace-nowrap"
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
                   fontWeight: '800',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {characterName}

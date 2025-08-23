@@ -889,14 +889,55 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
                         {/* Active Tasks Banner */}
                         {activeTasks.length > 0 && !isDialogueActive && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none">
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none w-full max-w-4xl px-4">
                                 {activeTasks.slice(0,3).map(task => (
-                                    <div key={task.id} className="bg-black/70 border border-white/20 text-white px-5 py-3 rounded-lg shadow-lg font-['Tickerbit',Arial,sans-serif] tracking-wider text-sm max-w-2xl pointer-events-auto">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-dhani-green font-bold uppercase text-xs">Objective</span>
-                                            {task.completed && <span className="text-dhani-green text-[10px]">Completed</span>}
+                                    <div key={task.id} className="relative w-full pointer-events-auto">
+                                        {/* SVG Objective Box Background - Stretchable */}
+                                        <img
+                                            src="/UI/game/objective-box.svg"
+                                            alt="Objective Box"
+                                            className="w-full h-auto min-w-fit"
+                                            style={{
+                                                minHeight: '50px',
+                                                maxHeight: '60px',
+                                                objectFit: 'fill'
+                                            }}
+                                        />
+                                        
+                                        {/* Objective Content - Forced Single Line */}
+                                        <div className="absolute inset-0 flex items-center px-6 overflow-hidden">
+                                            <div className="flex items-center space-x-3 w-full min-w-0">
+                                                <span 
+                                                    className="font-bold uppercase text-sm whitespace-nowrap flex-shrink-0"
+                                                    style={{ 
+                                                        color: '#F0C33A',
+                                                        fontFamily: 'VCR OSD Mono, monospace',
+                                                        textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
+                                                    }}
+                                                >
+                                                    Objective:
+                                                </span>
+                                                <p 
+                                                    className="text-sm leading-snug flex-1 min-w-0 truncate whitespace-nowrap overflow-hidden"
+                                                    style={{ 
+                                                        color: '#FFF5DA',
+                                                        fontFamily: 'VCR OSD Mono, monospace',
+                                                        fontWeight: '600',
+                                                        textShadow: '1px 1px 1px rgba(0,0,0,0.3)'
+                                                    }}
+                                                >
+                                                    {task.description}
+                                                </p>
+                                                {task.completed && (
+                                                    <span 
+                                                        className="text-green-400 text-xs font-bold whitespace-nowrap flex-shrink-0"
+                                                        style={{ fontFamily: 'VCR OSD Mono, monospace' }}
+                                                    >
+                                                        ✓ COMPLETED
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <p className="leading-snug whitespace-pre-wrap">{task.description}</p>
                                     </div>
                                 ))}
                             </div>
