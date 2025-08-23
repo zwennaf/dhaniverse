@@ -95,15 +95,17 @@ export class BankNPCManager {
       padding: Constants.NPC_NAME_PADDING
     }).setOrigin(0.5).setDepth(51);
     
-    // Add interaction text (initially hidden)
-    this.interactionText = scene.add.text(this.banker.x, this.banker.y - 80, "Press E to interact", {
+  // Add interaction text (initially hidden)
+  // Use scrollFactor=1 so text follows world coordinates (over NPC) and will
+  // appear at the bank manager's position on screen. Keep depth high but under UI.
+  this.interactionText = scene.add.text(this.banker.x, this.banker.y - 80, "Press E to interact", {
       fontFamily: Constants.UI_TEXT_FONT,
       fontSize: Constants.UI_TEXT_SIZE,
       color: Constants.UI_TEXT_COLOR,
       align: 'center',
       backgroundColor: Constants.UI_TEXT_BACKGROUND,
       padding: Constants.UI_TEXT_PADDING
-    }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(52);
+  }).setOrigin(0.5).setAlpha(0).setScrollFactor(1).setDepth(52);
     
     // Add to game container
     const gameContainer = scene.getGameContainer();

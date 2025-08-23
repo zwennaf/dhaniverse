@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import BankOnboardingDialogue from './BankOnboardingDialogue';
 import BankNameInput from './BankNameInput';
 
@@ -39,6 +40,20 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     window.addEventListener('show-bank-onboarding-dialogue', handleDialogue as EventListener);
     window.addEventListener('show-bank-name-input', handleNameInput as EventListener);
 
+    // Consume any pending dialogue that may have been dispatched before this UI mounted
+    try {
+      const pending = (window as any).__pendingBankOnboardingDialogue;
+      if (pending && pending.messages) {
+        console.log('🏦 BankOnboardingUI consuming pending dialogue', pending);
+        setDialogueData({ messages: pending.messages, characterName: pending.characterName || 'Bank Manager', onComplete: pending.onComplete });
+        setShowDialogue(true);
+        // clear pending so it doesn't fire again
+        (window as any).__pendingBankOnboardingDialogue = null;
+      }
+    } catch (err) {
+      // ignore
+    }
+
     return () => {
       console.log('🏦 BankOnboardingUI: Removing event listeners');
       window.removeEventListener('show-bank-onboarding-dialogue', handleDialogue as EventListener);
@@ -67,7 +82,13 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     setNameInputData(null);
   };
 
-  return (
+  // Render dialogues into a portal attached to document.body so they escape the
+  // #root stacking context which uses z-index:100 in index.html.
+  const mountNode = typeof document !== 'undefined' ? document.body : null;
+
+  if (!mountNode) return null;
+
+  return ReactDOM.createPortal(
     <>
       {showDialogue && dialogueData && (
         <BankOnboardingDialogue
@@ -83,7 +104,8 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
           onCancel={handleNameCancel}
         />
       )}
-    </>
+    </>,
+    mountNode
   );
 };
 

@@ -184,6 +184,17 @@ export class BankOnboardingManager {
     console.log('🏦 showDialogue called with messages:', messages);
     
     // Create dialogue event for the game
+    // Also save a pending payload so UI can consume it if it hasn't mounted yet
+    try {
+      (window as any).__pendingBankOnboardingDialogue = {
+        messages,
+        characterName: 'Bank Manager',
+        onComplete
+      };
+    } catch (err) {
+      // ignore
+    }
+
     window.dispatchEvent(new CustomEvent('show-bank-onboarding-dialogue', {
       detail: {
         messages,

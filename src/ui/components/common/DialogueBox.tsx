@@ -218,9 +218,11 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   if (!isVisible) return null;
 
   // container positioning
+  // Ensure the dialogue sits above other HUD elements (trackers, overlays).
+  // Use a high z-index so dialog is always visible when mounted.
   const containerClass = position === 'top-center'
-    ? 'absolute top-4 left-1/2 transform -translate-x-1/2 flex justify-center p-4 z-50'
-    : 'absolute bottom-0 left-0 right-0 flex justify-center p-4 z-20';
+    ? 'absolute top-4 left-1/2 transform -translate-x-1/2 flex justify-center p-4 z-[1200]'
+    : 'absolute bottom-0 left-0 right-0 flex justify-center p-4 z-[1200]';
 
   // size tweak for small alerts; make default dialog wider and taller to avoid overflow
   // compact restores the previous sizing used for task dialogs
@@ -306,7 +308,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           >
             <div style={{ maxHeight: small ? (compact ? '100px' : '120px') : (compact ? '260px' : '320px'), overflowY: 'auto' }}>
               <p 
-                className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
+                className={`text-white text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
                   textShadow: '1px 1px 2px rgba(255,255,255,0.5)',
@@ -339,7 +341,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               
               {/* Text indicator */}
               <span 
-                className="text-black text-xs ml-2"
+                className="text-white text-xs ml-2"
                 style={{ fontFamily: 'VCR OSD Mono, monospace' }}
               >
                 {currentSlide + 1} / {totalSlides}
@@ -352,7 +354,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         {showContinueHint && (
           <div className="absolute bottom-8 left-8">
             <p 
-              className="text-black text-xs opacity-70 animate-pulse"
+              className="text-white text-xs opacity-70 animate-pulse"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}
             >
               Click to continue
