@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import DepositWithdrawPanel from "./DepositWithdrawPanel";
 import FixedDepositPanel from "./FixedDepositPanel";
 import Web3BankingFeatures from "./Web3BankingFeatures";
-import StakingPanel from "../web3/StakingPanel";
 import Web3Integration from "../Web3Integration";
 import {
     bankingApi,
@@ -16,7 +15,6 @@ import { ICP_CONFIG } from "../../../services/config";
 import { BankingPolish } from "../polish/FinalPolish";
 import { balanceManager } from "../../../services/BalanceManager";
 import { icpBalanceManager, ICPToken } from "../../../services/TestnetBalanceManager";
-import { stakingService } from "../../../services/StakingService";
 
 interface FixedDeposit {
     _id?: string;
@@ -52,7 +50,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [walletStatus, setWalletStatus] = useState<WalletStatus>({ connected: false });
     const [icpTokens, setIcpTokens] = useState<ICPToken[]>([]);
     const [syncInProgress, setSyncInProgress] = useState(false);
-    const [showStakingPanel, setShowStakingPanel] = useState(false);
     const [showWeb3Integration, setShowWeb3Integration] = useState(false);
 
     // Initialize all Web3 services
@@ -74,7 +71,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 setIcpTokens(icpBalanceManager.getAllTokens());
                 
                 // Initialize staking service
-                await stakingService.initialize();
                 
                 // Set up listeners
                 icpIntegration.walletManager.onConnectionChange((status) => {
@@ -440,11 +436,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             name: "ICP Tokens",
             icon: "🪙",
         },
-        {
-            id: "staking",
-            name: "Staking",
-            icon: "🔒",
-        },
+    // staking tab removed
         ...(walletStatus.connected ? [{
             id: "web3",
             name: "Web3 Features",
@@ -527,13 +519,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                     <div className="text-2xl mb-2">🪙</div>
                                     <div className="text-sm font-medium">ICP Tokens</div>
                                 </button>
-                                <button
-                                    onClick={() => setShowStakingPanel(true)}
-                                    className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 text-white p-4 rounded-lg transition-colors text-center"
-                                >
-                                    <div className="text-2xl mb-2">🔒</div>
-                                    <div className="text-sm font-medium">Staking</div>
-                                </button>
+                                {/* staking button removed */}
                             </div>
                         </div>
 
@@ -642,25 +628,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                     </div>
                 );
 
-            case "staking":
-                return (
-                    <div className="space-y-6">
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-xl">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-white font-bold text-lg">🔒 Staking Dashboard</h3>
-                                <button
-                                    onClick={() => setShowStakingPanel(true)}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition-colors"
-                                >
-                                    Open Staking Panel
-                                </button>
-                            </div>
-                            <p className="text-gray-300">
-                                Stake your tokens to earn rewards. Click the button above to access the full staking interface.
-                            </p>
-                        </div>
-                    </div>
-                );
+            // staking content removed
 
             case "web3":
                 return (
@@ -758,17 +726,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             </BankingPolish>
 
             {/* Modals */}
-            {showStakingPanel && (
-                <StakingPanel
-                    isOpen={showStakingPanel}
-                    onClose={() => setShowStakingPanel(false)}
-                />
-            )}
-
             {showWeb3Integration && (
                 <Web3Integration
                     position="bottom-right"
-                    showStakingButton={true}
                 />
             )}
         </div>

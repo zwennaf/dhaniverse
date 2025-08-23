@@ -6,15 +6,7 @@ export interface DualBalance {
     lastUpdated: number;
 }
 
-export interface StakingPool {
-    id: string;
-    stakedAmount: number;
-    apy: number;
-    startDate: number;
-    maturityDate: number;
-    currentRewards: number;
-    status: 'active' | 'matured' | 'claimed';
-}
+// staking removed
 
 export interface ExchangeResult {
     success: boolean;
@@ -29,7 +21,7 @@ export interface Achievement {
     id: string;
     title: string;
     description: string;
-    category: 'trading' | 'saving' | 'staking' | 'learning';
+    category: 'trading' | 'saving' | 'learning';
     rarity: 'common' | 'rare' | 'epic' | 'legendary';
     unlocked: boolean;
     unlockedAt?: number;
@@ -42,7 +34,7 @@ export interface Achievement {
 export class Web3BankingService {
     private walletService: Web3WalletService;
     private dualBalance: DualBalance;
-    private stakingPools: StakingPool[] = [];
+    // staking removed
     private achievements: Achievement[] = [];
     private exchangeRate = 0.1; // 1 Rupee = 0.1 Token
 
@@ -132,82 +124,7 @@ export class Web3BankingService {
         }
     }
 
-    // Token staking
-    async stakeTokens(amount: number, duration: number): Promise<{ success: boolean; stakingPool?: StakingPool; error?: string }> {
-        try {
-            if (amount <= 0) {
-                throw new Error('Staking amount must be positive');
-            }
-
-            if (this.dualBalance.tokenBalance < amount) {
-                throw new Error('Insufficient token balance');
-            }
-
-            const apy = this.getStakingAPY(duration);
-            const startDate = Date.now();
-            const maturityDate = startDate + (duration * 24 * 60 * 60 * 1000);
-
-            const stakingPool: StakingPool = {
-                id: this.generateStakingId(),
-                stakedAmount: amount,
-                apy,
-                startDate,
-                maturityDate,
-                currentRewards: 0,
-                status: 'active'
-            };
-
-            this.dualBalance.tokenBalance -= amount;
-            this.stakingPools.push(stakingPool);
-            this.dualBalance.lastUpdated = Date.now();
-            this.saveData();
-
-            // Create transaction record
-            await this.walletService.stakeTokens(amount, duration);
-
-            // Check for achievements
-            this.checkStakingAchievements();
-
-            return { success: true, stakingPool };
-        } catch (error) {
-            return { success: false, error: String(error) };
-        }
-    }
-
-    // Get staking information
-    getStakingInfo(): StakingPool[] {
-        // Update rewards for active pools
-        this.updateStakingRewards();
-        return [...this.stakingPools];
-    }
-
-    // Claim staking rewards
-    async claimStakingRewards(stakingId: string): Promise<{ success: boolean; rewards?: number; error?: string }> {
-        try {
-            const pool = this.stakingPools.find(p => p.id === stakingId);
-            if (!pool) {
-                throw new Error('Staking pool not found');
-            }
-
-            if (pool.status !== 'active') {
-                throw new Error('Staking pool is not active');
-            }
-
-            if (Date.now() < pool.maturityDate) {
-                throw new Error('Staking period not completed');
-            }
-
-            const totalRewards = pool.stakedAmount + pool.currentRewards;
-            this.dualBalance.tokenBalance += totalRewards;
-            pool.status = 'claimed';
-            this.dualBalance.lastUpdated = Date.now();
-            this.saveData();
-
-            return { success: true, rewards: totalRewards };
-        } catch (error) {
-            return { success: false, error: String(error) };
-        }
-    }
+    // Token staking removed
 
     // Get achievements
     getAchievements(): Achievement[] {
@@ -292,33 +209,7 @@ export class Web3BankingService {
     }
 
     // Private helper methods
-    private getStakingAPY(duration: number): number {
-        switch (duration) {
-            case 30: return 5;
-            case 90: return 7;
-            case 180: return 10;
-            default: return 5;
-        }
-    }
-
-    private updateStakingRewards(): void {
-        const now = Date.now();
-        
-        this.stakingPools.forEach(pool => {
-            if (pool.status === 'active') {
-                const elapsed = now - pool.startDate;
-                const totalDuration = pool.maturityDate - pool.startDate;
-                const progress = Math.min(elapsed / totalDuration, 1);
-                
-                const totalRewards = (pool.stakedAmount * pool.apy / 100);
-                pool.currentRewards = totalRewards * progress;
-                
-                if (now >= pool.maturityDate) {
-                    pool.status = 'matured';
-                }
-            }
-        });
-    }
+    // staking helper methods removed
 
     private initializeAchievements(): void {
         this.achievements = [
@@ -332,15 +223,6 @@ export class Web3BankingService {
                 reward: { type: 'rupees', amount: 1000 }
             },
             {
-                id: 'first_stake',
-                title: 'Staking Pioneer',
-                description: 'Stake tokens for the first time',
-                category: 'staking',
-                rarity: 'common',
-                unlocked: false,
-                reward: { type: 'tokens', amount: 10 }
-            },
-            {
                 id: 'big_exchange',
                 title: 'High Roller',
                 description: 'Exchange over 10,000 rupees in a single transaction',
@@ -349,15 +231,7 @@ export class Web3BankingService {
                 unlocked: false,
                 reward: { type: 'tokens', amount: 50 }
             },
-            {
-                id: 'long_stake',
-                title: 'Patient Investor',
-                description: 'Stake tokens for 180 days',
-                category: 'staking',
-                rarity: 'epic',
-                unlocked: false,
-                reward: { type: 'rupees', amount: 5000 }
-            },
+            // staking achievements removed
             {
                 id: 'defi_master',
                 title: 'DeFi Master',
@@ -379,23 +253,11 @@ export class Web3BankingService {
         }
     }
 
-    private checkStakingAchievements(): void {
-        // First stake achievement
-        const firstStake = this.achievements.find(a => a.id === 'first_stake');
-        if (firstStake && !firstStake.unlocked) {
-            firstStake.unlocked = true;
-            firstStake.unlockedAt = Date.now();
-        }
-    }
-
-    private generateStakingId(): string {
-        return `stake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
+    // staking achievements removed
 
     private saveData(): void {
         const data = {
             dualBalance: this.dualBalance,
-            stakingPools: this.stakingPools,
             achievements: this.achievements
         };
         localStorage.setItem('dhaniverse_web3_banking', JSON.stringify(data));
@@ -407,7 +269,6 @@ export class Web3BankingService {
             if (stored) {
                 const data = JSON.parse(stored);
                 if (data.dualBalance) this.dualBalance = data.dualBalance;
-                if (data.stakingPools) this.stakingPools = data.stakingPools;
                 if (data.achievements) this.achievements = data.achievements;
             }
         } catch (error) {

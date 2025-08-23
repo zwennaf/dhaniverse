@@ -4,7 +4,6 @@ import { DualStorageManager } from './DualStorageManager';
 import { ICPErrorHandler, NetworkHealthMonitor } from './ICPErrorHandler';
 import { ICP_CONFIG } from './config';
 import { icpBalanceManager, ICPToken } from './TestnetBalanceManager';
-import { stakingService, StakingPool, UserStake, StakingStats } from './StakingService';
 
 // Unified connection status type (superset of legacy ICPIntegrationService)
 export interface ICPConnectionStatus {
@@ -21,9 +20,8 @@ export class ICPIntegrationManager {
   public readonly walletManager: WalletManager;
   public readonly icpService: ICPActorService;
   public readonly dualStorageManager: DualStorageManager;
-  // Expose underlying balance & staking services for advanced use
+  // Expose underlying balance service for advanced use
   public readonly icpBalanceManager = icpBalanceManager;
-  public readonly stakingService = stakingService;
   
   private initialized = false;
   private connectionListeners: Set<(status: ICPConnectionStatus) => void> = new Set();
@@ -47,10 +45,7 @@ export class ICPIntegrationManager {
 
     try {
       // Initialize balance manager & staking (legacy services) to unify old & new APIs
-      await this.icpBalanceManager.initialize();
-      if (ICP_CONFIG.FEATURES.STAKING) {
-        await this.stakingService.initialize();
-      }
+  await this.icpBalanceManager.initialize();
 
       // Start network health monitoring
       NetworkHealthMonitor.startHealthMonitoring(
@@ -254,9 +249,7 @@ export class ICPIntegrationManager {
   public async syncWithCanister(): Promise<boolean> {
     try {
       await this.icpBalanceManager.refreshAllBalances();
-      if (ICP_CONFIG.FEATURES.STAKING) {
-        // Optionally could pull remote staking info (TODO if backend supports)
-      }
+  // staking feature removed
       return true;
     } catch (e) {
       console.warn('syncWithCanister failed:', e);
@@ -264,14 +257,7 @@ export class ICPIntegrationManager {
     }
   }
 
-  // Staking wrappers
-  public getStakingPools(): StakingPool[] { return this.stakingService.getStakingPools(); }
-  public getUserStakes(): UserStake[] { return this.stakingService.getUserStakes(); }
-  public getStakingStats(): StakingStats { return this.stakingService.getStakingStats(); }
-  public async stakeTokens(poolId: string, amount: string) { return this.stakingService.stakeTokens(poolId, amount); }
-  public async unstakeTokens(stakeId: string) { return this.stakingService.unstakeTokens(stakeId); }
-  public async claimRewards(stakeId: string) { return this.stakingService.claimRewards(stakeId); }
-  public onStakingUpdate(cb: (stakes: UserStake[]) => void) { return this.stakingService.onStakingUpdate(cb); }
+  // staking API removed
 
   public cleanup(): void {
     NetworkHealthMonitor.stopHealthMonitoring();

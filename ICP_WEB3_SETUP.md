@@ -1,7 +1,7 @@
 # ICP Web3 Integration Setup Guide
 
 ## Overview
-This project integrates Internet Computer Protocol (ICP) for Web3 functionality including wallet connection, token management, and staking features.
+This project integrates Internet Computer Protocol (ICP) for Web3 functionality including wallet connection and token management.
 
 ## Canister Configuration
 
@@ -52,11 +52,8 @@ The application is configured to automatically use the production canister on IC
 - **Exchange**: Convert between game tokens and ICP tokens
 - **Balance Tracking**: Real-time balance updates
 
-### 🥩 Staking
-- **Token Staking**: Stake tokens to earn rewards
-- **Multiple Pools**: Different staking pools with varying APY
-- **Claim Rewards**: Claim accumulated staking rewards
-- **Staking History**: Track all staking activities
+### Note
+Staking features have been removed from this project. The repo focuses on wallet connection, token management, and exchange functionality.
 
 ### 🔄 Canister Integration
 The system automatically handles:
@@ -81,9 +78,6 @@ NODE_ENV=development
 
 ### Canister Methods Available
 The system integrates with these canister methods:
-- `stake_tokens(amount: nat64) -> Result<(), String>`
-- `get_staking_info() -> Result<StakingInfo, String>`
-- `claim_staking_rewards() -> Result<nat64, String>`
 - `get_dual_balance() -> Result<{game_tokens: nat64, icp_tokens: nat64}, String>`
 - `exchange_currency(from_game_to_icp: bool, amount: nat64) -> Result<(), String>`
 
@@ -93,14 +87,12 @@ The system integrates with these canister methods:
 Dhani Coin is the native game token that:
 - 🎮 **Powers the Game Economy**: Used for in-game purchases, upgrades, and transactions
 - 💱 **Exchangeable with ICP**: Players can convert between Dhani Coins and ICP tokens
-- 🥩 **Stakeable**: Players can stake Dhani Coins to earn rewards
 - 🏆 **Earned Through Gameplay**: Players earn Dhani Coins by playing the game
 
 ### Automatic Handling
 The system handles everything automatically:
 - ✅ **Balance Management**: Tracks both Dhani Coins and ICP tokens
 - ✅ **Exchange Rates**: Maintains current exchange rates between tokens
-- ✅ **Staking Rewards**: Calculates and distributes staking rewards
 - ✅ **Transaction History**: Records all token movements and exchanges
 - ✅ **Game Integration**: Seamlessly integrates with the Phaser game engine
 
@@ -144,11 +136,9 @@ src/
 ├── services/
 │   ├── ICPIntegrationService.ts     # Main ICP integration service
 │   ├── TestnetBalanceManager.ts     # Balance and wallet management
-│   └── StakingService.ts           # Staking operations
 ├── ui/components/web3/
 │   ├── Web3Integration.tsx         # Main Web3 wrapper component
-│   ├── Web3Panel.tsx              # Web3 wallet panel UI
-│   └── StakingPanel.tsx           # Staking interface UI
+│   ├── Web3Panel.tsx               # Web3 wallet panel UI
 └── types/
     └── web3.ts                     # TypeScript type definitions
 ```
@@ -169,10 +159,7 @@ class ICPIntegrationService {
     getDualBalance(): Promise<{game_tokens: number, icp_tokens: number}>
     exchangeCurrency(fromGameToIcp: boolean, amount: number): Promise<boolean>
     
-    // Staking operations
-    stakeTokens(amount: number): Promise<boolean>
-    claimStakingRewards(): Promise<number>
-    getStakingInfo(): Promise<StakingInfo>
+    // (Staking operations removed)
 }
 ```
 

@@ -36,7 +36,7 @@ export interface Web3Transaction {
     from: string;
     to?: string;
     amount: number;
-    type: 'deposit' | 'withdraw' | 'exchange' | 'stake';
+    type: 'deposit' | 'withdraw' | 'exchange';
     timestamp: number;
     status: 'pending' | 'confirmed' | 'failed';
     hash?: string;
@@ -608,30 +608,7 @@ export class Web3WalletService {
         return transaction;
     }
 
-    async stakeTokens(amount: number, duration: number): Promise<Web3Transaction> {
-        if (!this.currentConnection) {
-            throw new Error('No wallet connected');
-        }
-
-        const transaction: Web3Transaction = {
-            id: this.generateTransactionId(),
-            from: this.currentConnection.address,
-            amount,
-            type: 'stake',
-            timestamp: Date.now(),
-            status: 'pending'
-        };
-
-        this.transactions.push(transaction);
-        
-        // Simulate staking processing
-        setTimeout(() => {
-            transaction.status = 'confirmed';
-            transaction.hash = this.generateTxHash();
-        }, 3000);
-
-        return transaction;
-    }
+    // staking removed
 
     // Get transaction history
     getTransactionHistory(): Web3Transaction[] {

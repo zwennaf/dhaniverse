@@ -18,7 +18,7 @@ export interface ICPToken {
 
 export interface ICPTransaction {
     id: string;
-    type: 'faucet' | 'transfer' | 'stake' | 'unstake' | 'reward' | 'exchange';
+    type: 'faucet' | 'transfer' | 'exchange';
     tokenSymbol: string;
     amount: string;
     from?: string;

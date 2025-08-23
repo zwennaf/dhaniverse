@@ -1,4 +1,4 @@
-import { Web3BankingService, DualBalance, StakingPool, ExchangeResult, Achievement } from './Web3BankingService';
+import { Web3BankingService, DualBalance, ExchangeResult, Achievement } from './Web3BankingService';
 import { Web3WalletService } from './Web3WalletService';
 import { ICPService } from './icp';
 
@@ -138,35 +138,7 @@ export class ICPActorService {
         return this.web3BankingService.exchangeCurrency(fromCurrency, toCurrency, amount);
     }
 
-    // Token staking
-    async stakeTokens(amount: number, duration: number): Promise<{ success: boolean; apy?: number; error?: string }> {
-        if (!this.web3BankingService) {
-            throw new Error('Service not connected');
-        }
-        
-        const result = await this.web3BankingService.stakeTokens(amount, duration);
-        return {
-            success: result.success,
-            apy: result.stakingPool?.apy,
-            error: result.error
-        };
-    }
-
-    // Get staking information
-    async getStakingInfo(): Promise<StakingPool[]> {
-        if (!this.web3BankingService) {
-            throw new Error('Service not connected');
-        }
-        return this.web3BankingService.getStakingInfo();
-    }
-
-    // Claim staking rewards
-    async claimStakingRewards(stakingId: string): Promise<{ success: boolean; rewards?: number; error?: string }> {
-        if (!this.web3BankingService) {
-            throw new Error('Service not connected');
-        }
-        return this.web3BankingService.claimStakingRewards(stakingId);
-    }
+    // staking API removed
 
     // Get achievements
     async getAchievements(): Promise<Achievement[]> {
@@ -277,27 +249,8 @@ export class ICPActorService {
     // Advanced staking with timer-based rewards
     async createAdvancedStakingPool(amount: number, durationDays: number): Promise<{ success: boolean; poolId?: string; error?: string }> {
         try {
-            if (!this.web3BankingService) {
-                throw new Error('Service not connected');
-            }
-
-            // This would call the canister's createStakingPool method which uses ICP timers
-            const poolId = `stake_${Date.now()}`;
-            
-            // Simulate the canister call
-            const result = await this.web3BankingService.stakeTokens(amount, durationDays);
-            
-            if (result.success) {
-                return {
-                    success: true,
-                    poolId,
-                };
-            } else {
-                return {
-                    success: false,
-                    error: result.error
-                };
-            }
+            // Staking feature removed. Return not-implemented response.
+            return { success: false, error: 'Staking feature has been removed' };
         } catch (error) {
             return {
                 success: false,

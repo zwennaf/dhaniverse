@@ -17,10 +17,8 @@ import {
     Unlock,
     User
 } from 'lucide-react';
-import StakingPanel from './StakingPanel';
 import { icpIntegration, ICPConnectionStatus } from '../../../services/ICPIntegrationManager';
 import { ICPToken } from '../../../services/TestnetBalanceManager';
-import { stakingService } from '../../../services/StakingService';
 
 interface Web3PanelProps {
     isOpen?: boolean;
@@ -28,8 +26,7 @@ interface Web3PanelProps {
 }
 
 const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'wallet' | 'faucet' | 'staking' | 'transactions'>('wallet');
-    const [showStakingPanel, setShowStakingPanel] = useState(false);
+    const [activeTab, setActiveTab] = useState<'wallet' | 'faucet' | 'transactions'>('wallet');
     const [tokens, setTokens] = useState<ICPToken[]>([]);
     const [connectionStatus, setConnectionStatus] = useState<ICPConnectionStatus>({
         isConnected: false,
@@ -175,7 +172,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
         return [
             {
                 id: '1',
-                type: 'stake',
+                type: 'transfer',
                 amount: '100',
                 symbol: 'ICP',
                 timestamp: Date.now() - 86400000,
@@ -183,7 +180,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
             },
             {
                 id: '2',
-                type: 'reward',
+                type: 'faucet',
                 amount: '5.2',
                 symbol: 'ICP',
                 timestamp: Date.now() - 43200000,
@@ -279,7 +276,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                             {[
                                 { id: 'wallet', label: 'Wallet', icon: Wallet },
                                 { id: 'faucet', label: 'Faucet', icon: Plus },
-                                { id: 'staking', label: 'Staking', icon: TrendingUp },
+                                // staking removed
                                 { id: 'transactions', label: 'History', icon: History }
                             ].map(tab => (
                                 <button
@@ -412,46 +409,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                             </div>
                         )}
 
-                        {activeTab === 'staking' && (
-                            <div className="space-y-6">
-                                <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-semibold text-white">DeFi Staking</h3>
-                                        <button
-                                            onClick={() => setShowStakingPanel(true)}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                                        >
-                                            Open Staking Dashboard
-                                        </button>
-                                    </div>
-                                    <p className="text-gray-400 mb-6">
-                                        Stake your testnet tokens to earn rewards and participate in DeFi protocols.
-                                    </p>
-
-                                    {/* Quick Stats */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="bg-gray-700 rounded-lg p-4">
-                                            <div className="text-gray-400 text-sm">Active Stakes</div>
-                                            <div className="text-white text-xl font-bold">
-                                                {stakingService.getUserStakes().length}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-700 rounded-lg p-4">
-                                            <div className="text-gray-400 text-sm">Total Staked</div>
-                                            <div className="text-white text-xl font-bold">
-                                                ${stakingService.getStakingStats().totalValueStaked.toFixed(2)}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-700 rounded-lg p-4">
-                                            <div className="text-gray-400 text-sm">Rewards Earned</div>
-                                            <div className="text-green-400 text-xl font-bold">
-                                                ${stakingService.getStakingStats().totalRewardsEarned.toFixed(2)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* staking removed */}
 
                         {activeTab === 'transactions' && (
                             <div className="space-y-6">
@@ -463,16 +421,11 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                                                 <div className="flex items-center space-x-3">
                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                                                         tx.type === 'faucet' ? 'bg-blue-500' :
-                                                        tx.type === 'stake' ? 'bg-purple-500' :
-                                                        tx.type === 'unstake' ? 'bg-red-500' :
-                                                        tx.type === 'reward' ? 'bg-green-500' :
+                                                        tx.type === 'transfer' ? 'bg-gray-600' :
                                                         'bg-gray-500'
                                                     }`}>
                                                         {tx.type === 'faucet' && <Plus className="h-4 w-4 text-white" />}
-                                                        {tx.type === 'stake' && <Lock className="h-4 w-4 text-white" />}
-                                                        {tx.type === 'unstake' && <Unlock className="h-4 w-4 text-white" />}
-                                                        {tx.type === 'reward' && <TrendingUp className="h-4 w-4 text-white" />}
-                                                        {!['faucet', 'stake', 'unstake', 'reward'].includes(tx.type) && <ArrowUpDown className="h-4 w-4 text-white" />}
+                                                        {tx.type === 'transfer' && <ArrowUpDown className="h-4 w-4 text-white" />}
                                                     </div>
                                                     <div>
                                                         <div className="text-white font-medium capitalize">
@@ -485,12 +438,10 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                                                 </div>
                                                 <div className="text-right">
                                                     <div className={`font-medium ${
-                                                        tx.type === 'faucet' || tx.type === 'reward' ? 'text-green-400' :
-                                                        tx.type === 'stake' ? 'text-red-400' :
+                                                        tx.type === 'faucet' ? 'text-green-400' :
                                                         'text-white'
                                                     }`}>
-                                                        {tx.type === 'faucet' || tx.type === 'reward' ? '+' : 
-                                                         tx.type === 'stake' ? '-' : ''}
+                                                        {tx.type === 'faucet' ? '+' : ''}
                                                         {tx.amount} {tx.symbol}
                                                     </div>
                                                     <div className={`text-sm ${
@@ -512,12 +463,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
             </div>
 
             {/* Staking Panel */}
-            {showStakingPanel && (
-                <StakingPanel 
-                    isOpen={showStakingPanel} 
-                    onClose={() => setShowStakingPanel(false)} 
-                />
-            )}
+                        {/* staking panel removed */}
         </>
     );
 };
