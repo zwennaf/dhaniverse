@@ -171,27 +171,44 @@ export class Web3WalletService {
             throw new Error('MetaMask not installed');
         }
 
-        const ethereum = (window as any).ethereum;
-        
-        // Request account access
-        const accounts = await ethereum.request({ 
-            method: 'eth_requestAccounts' 
-        });
+        const win: any = window as any;
+        const eth = win.ethereum;
+
+        // If multiple providers exposed, pick the MetaMask provider when possible
+        let provider = eth;
+        if (eth && Array.isArray(eth.providers) && eth.providers.length > 0) {
+            const meta = eth.providers.find((p: any) => p && p.isMetaMask);
+            if (meta) provider = meta;
+        }
+
+    // Attach listeners for this specific provider
+    this.attachProviderListeners(provider);
+
+        // Request account access (interactive). Try a timed request first so we don't hang the UI indefinitely.
+    console.log('[Web3WalletService] connectMetaMask requesting accounts');
+        let accounts: string[] | null = null;
+        try {
+            const resp = await this.doRequestWithTimeout(provider, { method: 'eth_requestAccounts' }, 12000);
+            if (Array.isArray(resp) && resp.length > 0) accounts = resp;
+            else if (resp === undefined) {
+                // request timed out or is pending; wait for accounts via event/polling
+                console.log('[Web3WalletService] connectMetaMask request timed out; waiting for accounts via event/poll');
+                accounts = await this.waitForAccounts(provider, 30000);
+            }
+        } catch (e) {
+            console.log('[Web3WalletService] connectMetaMask request rejected; waiting for accounts via event/poll', e);
+            accounts = await this.waitForAccounts(provider, 30000);
+        }
 
         if (!accounts || accounts.length === 0) {
             throw new Error('No accounts found');
         }
 
         // Get chain ID
-        const chainId = await ethereum.request({ 
-            method: 'eth_chainId' 
-        });
+    const chainId = await provider.request({ method: 'eth_chainId' });
 
         // Get balance
-        const balance = await ethereum.request({
-            method: 'eth_getBalance',
-            params: [accounts[0], 'latest']
-        });
+    const balance = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
 
         return {
             address: accounts[0],
@@ -232,24 +249,39 @@ export class Web3WalletService {
             throw new Error('Coinbase Wallet not installed');
         }
 
-        const ethereum = (window as any).ethereum;
-        
-        const accounts = await ethereum.request({ 
-            method: 'eth_requestAccounts' 
-        });
+        const win: any = window as any;
+        const eth = win.ethereum;
+
+        // If multiple providers exposed, pick the Coinbase provider when possible
+        let provider = eth;
+        if (eth && Array.isArray(eth.providers) && eth.providers.length > 0) {
+            const coinbase = eth.providers.find((p: any) => p && p.isCoinbaseWallet);
+            if (coinbase) provider = coinbase;
+        }
+
+    // Attach listeners for this specific provider
+    this.attachProviderListeners(provider);
+
+    console.log('[Web3WalletService] connectCoinbase requesting accounts');
+        let accounts: string[] | null = null;
+        try {
+            const resp = await this.doRequestWithTimeout(provider, { method: 'eth_requestAccounts' }, 12000);
+            if (Array.isArray(resp) && resp.length > 0) accounts = resp;
+            else if (resp === undefined) {
+                console.log('[Web3WalletService] connectCoinbase request timed out; waiting for accounts via event/poll');
+                accounts = await this.waitForAccounts(provider, 30000);
+            }
+        } catch (e) {
+            console.log('[Web3WalletService] connectCoinbase request rejected; waiting for accounts via event/poll', e);
+            accounts = await this.waitForAccounts(provider, 30000);
+        }
 
         if (!accounts || accounts.length === 0) {
             throw new Error('No accounts found');
         }
 
-        const chainId = await ethereum.request({ 
-            method: 'eth_chainId' 
-        });
-
-        const balance = await ethereum.request({
-            method: 'eth_getBalance',
-            params: [accounts[0], 'latest']
-        });
+    const chainId = await provider.request({ method: 'eth_chainId' });
+    const balance = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
 
         return {
             address: accounts[0],
@@ -429,11 +461,26 @@ export class Web3WalletService {
         }
 
         // Try each provider until one responds to requests
-        for (const provider of candidates) {
+    for (const provider of candidates) {
             try {
                 if (!provider || !provider.request) continue;
 
-                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        // attach events for this provider so accountsChanged is observed
+        this.attachProviderListeners(provider);
+
+                let accounts: string[] | null = null;
+                try {
+                    const resp = await this.doRequestWithTimeout(provider, { method: 'eth_requestAccounts' }, 12000);
+                    if (Array.isArray(resp) && resp.length > 0) accounts = resp;
+                    else if (resp === undefined) {
+                        console.log('[Web3WalletService] connectInjected request timed out; waiting for accounts via event/poll');
+                        accounts = await this.waitForAccounts(provider, 30000);
+                    }
+                } catch (e) {
+                    console.log('[Web3WalletService] connectInjected request rejected; waiting for accounts via event/poll', e);
+                    accounts = await this.waitForAccounts(provider, 30000);
+                }
+
                 if (!accounts || accounts.length === 0) continue;
 
                 const chainId = await provider.request({ method: 'eth_chainId' });
@@ -606,25 +653,33 @@ export class Web3WalletService {
     // Private helper methods
     private setupEventListeners(): void {
         // Listen for account changes
-        if (typeof (window as any).ethereum !== 'undefined') {
-            (window as any).ethereum.on('accountsChanged', (accounts: string[]) => {
-                if (accounts.length === 0) {
-                    this.disconnectWallet();
-                } else if (this.currentConnection) {
-                    this.currentConnection.address = accounts[0];
-                    this.notifyStatusChange({
-                        connected: true,
-                        address: accounts[0],
-                        walletType: this.currentConnection.walletType
-                    });
-                }
-            });
+        const win: any = window as any;
+        const eth = win.ethereum;
+        if (eth) {
+            // If multiple providers present, attach to each
+            const providers = Array.isArray(eth.providers) && eth.providers.length > 0 ? eth.providers : [eth];
+            for (const p of providers) {
+                try {
+                    if (p && p.on) {
+                        p.on('accountsChanged', (accounts: string[]) => {
+                            if (accounts.length === 0) {
+                                this.disconnectWallet();
+                            } else if (this.currentConnection) {
+                                this.currentConnection.address = accounts[0];
+                                this.notifyStatusChange({ connected: true, address: accounts[0], walletType: this.currentConnection.walletType });
+                            }
+                        });
 
-            (window as any).ethereum.on('chainChanged', (chainId: string) => {
-                if (this.currentConnection) {
-                    this.currentConnection.chainId = chainId;
+                        p.on('chainChanged', (chainId: string) => {
+                            if (this.currentConnection) {
+                                this.currentConnection.chainId = chainId;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    // ignore provider attach errors
                 }
-            });
+            }
         }
 
         // Listen for Phantom events
@@ -632,6 +687,35 @@ export class Web3WalletService {
             (window as any).solana.on('disconnect', () => {
                 this.disconnectWallet();
             });
+        }
+    }
+
+    // Attach listeners to a specific provider instance so providers that live in ethereum.providers fire events
+    private attachProviderListeners(provider: any): void {
+        try {
+            if (!provider || !provider.on) return;
+
+            provider.on('accountsChanged', (accounts: string[]) => {
+                if (!accounts || accounts.length === 0) {
+                    this.disconnectWallet();
+                } else {
+                    if (this.currentConnection) {
+                        this.currentConnection.address = accounts[0];
+                        this.notifyStatusChange({ connected: true, address: accounts[0], walletType: this.currentConnection.walletType });
+                    } else {
+                        // store a minimal connection if none exists
+                        this.currentConnection = { address: accounts[0], chainId: '', walletType: WalletType.INJECTED };
+                        this.storeConnection(this.currentConnection);
+                        this.notifyStatusChange({ connected: true, address: accounts[0], walletType: this.currentConnection.walletType });
+                    }
+                }
+            });
+
+            provider.on('chainChanged', (chainId: string) => {
+                if (this.currentConnection) this.currentConnection.chainId = chainId;
+            });
+        } catch (e) {
+            // ignore
         }
     }
 
@@ -692,6 +776,80 @@ export class Web3WalletService {
         const balanceInWei = parseInt(balance, 16);
         const balanceInEth = balanceInWei / Math.pow(10, 18);
         return balanceInEth.toFixed(4);
+    }
+
+    // Wait for accounts to become available after eth_requestAccounts triggered a popup
+    private async waitForAccounts(provider: any, timeoutMs = 30000): Promise<string[] | null> {
+        if (!provider) return null;
+
+        // If provider exposes on/off event API
+        let resolved: ((v: string[] | null) => void) | null = null;
+        const p = new Promise<string[] | null>((resolve) => { resolved = resolve; });
+
+        const handleAccounts = (accounts: any) => {
+            if (resolved) resolved(Array.isArray(accounts) ? accounts : null);
+        };
+
+        try {
+            if (provider.on) {
+                provider.on('accountsChanged', handleAccounts);
+            }
+        } catch (_) {
+            // ignore
+        }
+
+        // Poll eth_accounts as fallback
+        const start = Date.now();
+        const poll = async () => {
+            try {
+                const accounts = await provider.request({ method: 'eth_accounts' });
+                if (accounts && accounts.length > 0) {
+                    if (resolved) resolved(accounts);
+                    return;
+                }
+            } catch (_) {
+                // ignore
+            }
+
+            if (Date.now() - start >= timeoutMs) {
+                if (resolved) resolved(null);
+                return;
+            }
+
+            setTimeout(poll, 500);
+        };
+
+        // start polling
+        poll();
+
+        const result = await p;
+
+        try {
+            if (provider.removeListener && handleAccounts) {
+                provider.removeListener('accountsChanged', handleAccounts);
+            }
+        } catch (_) {
+            // ignore
+        }
+
+        return result;
+    }
+
+    // Request helper with timeout; if request doesn't resolve within timeout, returns undefined so caller can fallback to polling
+    private async doRequestWithTimeout(provider: any, payload: any, timeoutMs = 10000): Promise<any> {
+        if (!provider || !provider.request) throw new Error('Provider missing request method');
+
+        console.debug('[Web3WalletService] doRequestWithTimeout start', { method: payload.method, timeoutMs });
+
+        const reqPromise = provider.request(payload);
+
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(undefined), timeoutMs));
+
+        const result = await Promise.race([reqPromise, timeoutPromise]);
+
+        console.debug('[Web3WalletService] doRequestWithTimeout result', { method: payload.method, result });
+
+        return result;
     }
 
     private async getSolanaBalance(publicKey: string): Promise<string> {

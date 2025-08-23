@@ -52,8 +52,27 @@ export class WalletManager {
                 error: result.error
             };
         } else {
-            // User explicitly requested a connection (e.g., clicked "Connect Wallet").
-            // Perform an interactive connect which will prompt wallets (eth_requestAccounts / phantom.connect).
+            // No preferred wallet specified: try interactive connects for known installed wallets in order
+            const wallets = this.web3Service.getAvailableWallets();
+            // Preference order: MetaMask, Coinbase, Phantom
+            const preferred = [WalletType.METAMASK, WalletType.COINBASE, WalletType.PHANTOM];
+
+            for (const p of preferred) {
+                const w = wallets.find(w => w.type === p && w.installed);
+                if (w) {
+                    const result = await this.web3Service.connectWallet(p);
+                    const status = this.web3Service.getStatus();
+                    if (result.success) {
+                        return {
+                            success: true,
+                            address: status.address,
+                            walletType: status.walletType
+                        };
+                    }
+                }
+            }
+
+            // Fallback: try generic injected interactive connect (will prompt wallets)
             const result = await this.web3Service.connectWallet(WalletType.INJECTED);
             const status = this.web3Service.getStatus();
             return {
