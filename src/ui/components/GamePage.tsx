@@ -15,7 +15,7 @@ const GamePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showLoader, setShowLoader] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(true); // Toggle this to control onboarding
+  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Toggle this to control onboarding
   // Ref to avoid duplicate tracker activation
   const trackerActivatedRef = useRef(false);
   const gameStartedRef = useRef(false);
