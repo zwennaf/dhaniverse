@@ -38,6 +38,7 @@ export class BankNPCManager {
   private speechBubble: GameObjects.Sprite | null = null;
   private playerBankAccount: BankAccount;
   private handleBankingClosedBound = this.handleBankingClosed.bind(this);
+  private handleConversationEndedBound = this.handleConversationEnded.bind(this);
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -126,7 +127,7 @@ export class BankNPCManager {
     window.addEventListener('closeBankingUI', this.handleBankingClosedBound);
     
     // Listen for bank conversation ended event
-    window.addEventListener('bank-conversation-ended', this.handleConversationEnded.bind(this));
+  window.addEventListener('bank-conversation-ended', this.handleConversationEndedBound);
     
     console.log("Bank NPC created at position:", bankerX, bankerY);
   }
@@ -404,7 +405,7 @@ export class BankNPCManager {
   public destroy(): void {
     // Remove event listeners
     window.removeEventListener('closeBankingUI', this.handleBankingClosedBound);
-    window.removeEventListener('bank-conversation-ended', this.handleConversationEnded.bind(this));
+  window.removeEventListener('bank-conversation-ended', this.handleConversationEndedBound);
     
     if (this.banker.nameText) {
       this.banker.nameText.destroy();

@@ -30,6 +30,11 @@ export class BankOnboardingManager {
   private userDeclined: boolean = false; // Track if user declined account creation
   private hasSpokenBefore: boolean = false; // Track if player has talked to bank manager before
   private conversationStage: 'IDLE' | 'INTRO' | 'ASK_NAME' | 'PROCESSING_1' | 'PROCESSING_2' | 'ACCOUNT_CREATED' | 'FINISHED' = 'IDLE';
+  private introSegments: string[] = [
+    "Hey there! Welcome to Dhaniverse Bank. I'm the manager who helps new adventurers get their first financial foothold.",
+    "Here you'll safely store earnings, earn interest, and later unlock deposits, withdrawals, fixed returns and real‑time tracking.",
+    "We keep things simple now and unlock depth as you progress. Let's set up your account so future systems can recognize you."
+  ];
   
   private onboardingSteps: OnboardingStep[] = [
     {
@@ -84,13 +89,34 @@ export class BankOnboardingManager {
     this.hasSpokenBefore = true;
     localStorage.setItem('dhaniverse_bank_conversation_started', 'true');
     this.conversationStage = 'INTRO';
+    this.currentDialogueStep = 0;
+    this.showIntroSegment();
+  }
+
+  private showIntroSegment(): void {
+    const idx = this.currentDialogueStep;
+    // Safety: if past last, move to name
+    if (idx >= this.introSegments.length) {
+      this.promptForName();
+      return;
+    }
+
     dialogueManager.showDialogue({
-      text: "Hey there! Welcome to Dhaniverse Bank. I'm the manager that gets new adventurers set up with their very first account. Here you'll safely store earnings, earn interest, and later unlock deposits, withdrawals, fixed returns and more. Let's get you started!",
+      text: this.introSegments[idx],
       characterName: 'Bank Manager',
       showBackdrop: true,
-      allowSpaceAdvance: true
+      allowSpaceAdvance: true,
+      currentSlide: idx + 1,
+      totalSlides: this.introSegments.length
     }, {
-      onAdvance: () => this.promptForName()
+      onAdvance: () => {
+        this.currentDialogueStep++;
+        if (this.currentDialogueStep < this.introSegments.length) {
+          this.showIntroSegment();
+        } else {
+          this.promptForName();
+        }
+      }
     });
   }
 
@@ -162,6 +188,7 @@ export class BankOnboardingManager {
     this.conversationStage = 'FINISHED';
     this.completeOnboarding();
     dialogueManager.closeDialogue();
+  this.notifyConversationEnded();
   }
 
   private showReturningGreeting(): void {
@@ -174,7 +201,10 @@ export class BankOnboardingManager {
       showBackdrop: true,
       allowSpaceAdvance: true
     }, {
-      onAdvance: () => dialogueManager.closeDialogue()
+      onAdvance: () => { 
+        dialogueManager.closeDialogue(); 
+        this.notifyConversationEnded();
+      }
     });
   }
 
@@ -497,5 +527,11 @@ export class BankOnboardingManager {
     const stored = localStorage.getItem('dhaniverse_bank_account_holder_name');
     if (stored) this.playerName = stored;
     return stored;
+  }
+
+  private notifyConversationEnded(): void {
+    try {
+      window.dispatchEvent(new CustomEvent('bank-conversation-ended'));
+    } catch {}
   }
 }
