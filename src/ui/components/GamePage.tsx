@@ -5,15 +5,17 @@ import { startGame, stopGame } from '../../game/game';
 import { playerStateApi } from '../../utils/api';
 import SEO from './SEO';
 import OnboardingWrapper from './onboarding/OnboardingWrapper';
+import BankOnboardingUI from './banking/onboarding/BankOnboardingUI';
 import Loader from './loader/Loader';
 import { enableMayaTrackerOnGameStart, locationTrackerManager } from '../../services/LocationTrackerManager';
+import { shouldShowMainTutorial } from '../../config/onboarding';
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [showLoader, setShowLoader] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Set to false for local development to test onboarding
+  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(true); // Toggle this to control onboarding
   // Ref to avoid duplicate tracker activation
   const trackerActivatedRef = useRef(false);
   const gameStartedRef = useRef(false);
@@ -39,36 +41,31 @@ const GamePage: React.FC = () => {
     const checkTutorialStatus = async () => {
       try {
         console.log("GamePage: Checking tutorial status...");
-        const playerState = await playerStateApi.get();
-        const tutorialCompleted = playerState?.data?.hasCompletedTutorial ?? false;
         
-        console.log("GamePage: Tutorial completed:", tutorialCompleted);
-        setHasCompletedTutorial(tutorialCompleted);
+        // Use centralized configuration to determine if tutorial should be shown
+        const shouldShowTutorial = shouldShowMainTutorial();
+        console.log("GamePage: Should show tutorial:", shouldShowTutorial);
+        
+        setHasCompletedTutorial(!shouldShowTutorial);
         
         // Set window flag for GameHUD to check
-        (window as any).__tutorialCompleted = tutorialCompleted;
+        (window as any).__tutorialCompleted = !shouldShowTutorial;
         
-        // For local development, force show onboarding when hasCompletedTutorial is false
-        // This allows testing the onboarding flow
-        const shouldShowOnboarding = !tutorialCompleted; // Show onboarding if tutorial not completed in backend
-        console.log("GamePage: Should show onboarding:", shouldShowOnboarding);
-        
-        if (shouldShowOnboarding) {
+        if (shouldShowTutorial) {
           // NEW user (tutorial incomplete): show loader first; game will start after onboarding continue
           console.log("GamePage: New/incomplete tutorial user -> showing loader then onboarding; delaying game start");
           setShowLoader(true);
         } else {
-          // RETURNING user (tutorial completed): skip onboarding, start immediately
-            console.log("GamePage: Returning user -> starting game immediately");
+          // RETURNING user (tutorial completed): show loader briefly then start game immediately
+          console.log("GamePage: Returning user -> showing loader then starting game");
+          setShowLoader(true);
+          setTimeout(() => {
             setIsLoading(false);
             if (!gameStartedRef.current) {
               startGameFlow(gameUsername);
               gameStartedRef.current = true;
             }
-            // Edge case: backend flag false but considered returning (shouldShowOnboarding false) -> still enable tracker if necessary
-            if (!tutorialCompleted) {
-              setTimeout(() => enableMayaTrackerOnGameStart(), 2000);
-            }
+          }, 1000); // Brief loader for consistent UX
         }
       } catch (error) {
         console.error("GamePage: Error checking tutorial status:", error);
@@ -133,8 +130,8 @@ const GamePage: React.FC = () => {
         startGameFlow(user.gameUsername);
         gameStartedRef.current = true;
       }
-      // After game starts, if tutorial not completed, enable Maya tracking
-      if (!hasCompletedTutorial) {
+      // After game starts, if tutorial not completed AND main tutorial is enabled, enable Maya tracking
+      if (!hasCompletedTutorial && shouldShowMainTutorial()) {
         setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
       }
       // Inform the game/HUD that onboarding finished and first task should be assigned
@@ -242,12 +239,26 @@ const GamePage: React.FC = () => {
   // Extra safeguard: attempt tracker each time this component becomes focused (e.g., after reloads/navigation back)
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && !hasCompletedTutorial) {
+      // Only enable Maya tracker if tutorial is enabled AND not completed
+      if (document.visibilityState === 'visible' && !hasCompletedTutorial && shouldShowMainTutorial()) {
         attemptEnableMayaTracker();
       }
     };
+    
+    // Handle Maya tracker removal event
+    const handleRemoveMayaTracker = () => {
+      console.log("GamePage: Removing Maya tracker");
+      locationTrackerManager.setTargetEnabled('maya', false);
+      trackerActivatedRef.current = false;
+    };
+    
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('remove-maya-tracker', handleRemoveMayaTracker);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('remove-maya-tracker', handleRemoveMayaTracker);
+    };
   }, [hasCompletedTutorial]);
 
   // Cleanup effect
@@ -308,8 +319,8 @@ const GamePage: React.FC = () => {
     return <Loader onLoadingComplete={handleLoaderComplete} />;
   }
 
-  // Show onboarding for first-time players
-  if (showOnboarding) {
+  // Show onboarding for first-time players (only if tutorial not completed)
+  if (showOnboarding && !hasCompletedTutorial) {
     return <OnboardingWrapper onContinueToGame={handleContinueToGame} />;
   }
    
@@ -324,6 +335,10 @@ const GamePage: React.FC = () => {
         type="game"
         image="https://dhaniverse.in/og-image.jpg"
       />
+      
+      {/* Bank Onboarding UI */}
+      <BankOnboardingUI />
+      
       {/* Return button hidden during active gameplay - players should stay in game */}
     </div>
   );

@@ -1,6 +1,9 @@
 import { GameObjects, Input } from 'phaser';
 import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants.ts';
+import { BankOnboardingManager } from './banking/BankOnboardingManager';
+import { shouldShowBankOnboarding } from '../../config/onboarding';
+import { getTaskManager } from '../tasks/TaskManager.ts';
 
 interface NPCSprite extends GameObjects.Image {
   nameText?: GameObjects.Text;
@@ -28,6 +31,8 @@ export class BankNPCManager {
   private interactionKey: Input.Keyboard.Key | null = null;
   private readonly interactionDistance: number = 150;
   private interactionText: GameObjects.Text;
+  private isOnboardingMode: boolean = false;
+  private bankOnboardingManager: BankOnboardingManager;
   private isPlayerNearBanker: boolean = false;
   private activeDialog: boolean = false;
   private speechBubble: GameObjects.Sprite | null = null;
@@ -36,6 +41,12 @@ export class BankNPCManager {
 
   constructor(scene: MainScene) {
     this.scene = scene;
+    
+    // Initialize bank onboarding manager
+    this.bankOnboardingManager = new BankOnboardingManager(scene);
+    
+    // Check if we should start in onboarding mode based on configuration
+    this.isOnboardingMode = shouldShowBankOnboarding() && this.bankOnboardingManager.shouldShowOnboarding();
     
     // Setup interaction key with null check
     if (scene.input.keyboard) {
@@ -235,22 +246,41 @@ export class BankNPCManager {
   }
   
   /**
-   * Start the banking interaction UI
+   * Start the bank manager interaction - only onboarding or simple dialogue
    */
   private startBankingInteraction(): void {
     if (this.activeDialog) return;
     
-    console.log("Starting bank interaction");
+    console.log("🏦 Starting bank manager interaction");
     this.activeDialog = true;
     this.interactionText.setAlpha(0);
     
-    // Skip showing speech bubble - direct banking UI open
+    // Complete the bank entry task when player talks to bank manager
+    const tm = getTaskManager();
+    const bankTask = tm.getTasks().find(t => t.id === 'enter-bank-speak-teller');
+    if (bankTask && bankTask.active && !bankTask.completed) {
+      console.log("🏦 Completing bank entry task - player spoke to bank manager");
+      tm.completeTask('enter-bank-speak-teller');
+    }
     
-    // Force the banking UI container to be active
-    document.getElementById('banking-ui-container')?.classList.add('active');
+    // Check if we should start bank onboarding (check dynamically each time)
+    const shouldStartOnboarding = shouldShowBankOnboarding() && this.bankOnboardingManager.shouldShowOnboarding();
     
-    // Signal to MainScene to open banking UI
-    this.scene.openBankingUI(this.playerBankAccount);
+    console.log("🏦 Onboarding check:", {
+      configEnabled: shouldShowBankOnboarding(),
+      managerShouldShow: this.bankOnboardingManager.shouldShowOnboarding(),
+      finalDecision: shouldStartOnboarding
+    });
+    
+    if (shouldStartOnboarding) {
+      console.log("🏦 Starting bank onboarding...");
+      this.bankOnboardingManager.startOnboarding();
+      return;
+    }
+    
+    // If onboarding is complete, show a simple dialogue
+    console.log("🏦 Bank onboarding already completed - showing simple dialogue");
+    this.showCompletedOnboardingDialogue();
   }
   
   /**
@@ -263,18 +293,40 @@ export class BankNPCManager {
   }
   
   /**
-   * Close the banking interaction
+   * Show a simple dialogue for when onboarding is already completed
+   */
+  private showCompletedOnboardingDialogue(): void {
+    // Create a simple dialogue event
+    window.dispatchEvent(new CustomEvent('show-dialogue', {
+      detail: {
+        text: "Welcome back! Your account is all set up. Use the banking terminal to access all banking services.",
+        characterName: 'Bank Manager',
+        allowAdvance: true
+      }
+    }));
+
+    // When dialogue is closed, reset the interaction state
+    const onAdvance = () => {
+      this.endBankingInteraction();
+      window.removeEventListener('dialogue-advance' as any, onAdvance as any);
+    };
+    window.addEventListener('dialogue-advance' as any, onAdvance as any);
+  }
+
+  /**
+   * Close the bank manager interaction
    */
   public endBankingInteraction(): void {
+    // Don't end interaction if bank onboarding is still active
+    if (this.bankOnboardingManager && this.bankOnboardingManager.isOnboardingActiveNow()) {
+      console.log("Not ending interaction - bank onboarding still active");
+      return;
+    }
+    
     if (!this.activeDialog) return;
     
-    console.log("Ending bank interaction");
+    console.log("Ending bank manager interaction");
     this.activeDialog = false;
-    
-    // Remove the active class from banking container
-    document.getElementById('banking-ui-container')?.classList.remove('active');
-    
-    // Skip speech bubble closing animation since we're not showing it anymore
     
     // Show interaction text again if player is still nearby
     if (this.isPlayerNearBanker) {
@@ -283,90 +335,8 @@ export class BankNPCManager {
   }
   
   /**
-   * Deposit money into the player's bank account
-   */
-  public depositMoney(amount: number): boolean {
-    if (amount <= 0) return false;
-    
-    // Check if player has enough money (would need PlayerInventory integration)
-    // For now, just add it directly
-    this.playerBankAccount.balance += amount;
-    console.log(`Deposited ${amount} coins, new balance: ${this.playerBankAccount.balance}`);
-    return true;
-  }
-  
-  /**
-   * Withdraw money from the player's bank account
-   */
-  public withdrawMoney(amount: number): boolean {
-    if (amount <= 0 || amount > this.playerBankAccount.balance) return false;
-    
-    this.playerBankAccount.balance -= amount;
-    console.log(`Withdrew ${amount} coins, new balance: ${this.playerBankAccount.balance}`);
-    return true;
-  }
-  
-  /**
-   * Create a new fixed deposit
-   */
-  public createFixedDeposit(amount: number, duration: number): boolean {
-    if (amount <= 0 || amount > this.playerBankAccount.balance) return false;
-    if (duration < 1) return false;
-    
-    // Deduct the amount from balance
-    this.playerBankAccount.balance -= amount;
-    
-    // Calculate interest rate based on duration (longer duration = better rate)
-    const baseRate = 0.05; // 5% annual
-    const interestRate = baseRate + (duration / 365 * 0.02); // Additional 2% for each year
-    
-    const now = Date.now();
-    const maturityDate = now + (duration * 24 * 60 * 60 * 1000); // Convert days to milliseconds
-    
-    // Create and add the fixed deposit
-    const newDeposit: FixedDeposit = {
-      id: `fd-${now}-${Math.floor(Math.random() * 1000)}`,
-      amount,
-      interestRate,
-      startDate: now,
-      duration,
-      maturityDate,
-      matured: false
-    };
-    
-    this.playerBankAccount.fixedDeposits.push(newDeposit);
-    console.log(`Created fixed deposit for ${amount} coins for ${duration} days`);
-    return true;
-  }
-  
-  /**
-   * Check if any fixed deposits have matured and process them
-   */
-  public checkMaturedDeposits(): FixedDeposit[] {
-    const now = Date.now();
-    const maturedDeposits: FixedDeposit[] = [];
-    
-    this.playerBankAccount.fixedDeposits.forEach(deposit => {
-      if (!deposit.matured && now >= deposit.maturityDate) {
-        // Mark as matured
-        deposit.matured = true;
-        maturedDeposits.push(deposit);
-        
-        // Calculate interest earned
-        const interestEarned = deposit.amount * deposit.interestRate * (deposit.duration / 365);
-        const totalAmount = deposit.amount + interestEarned;
-        
-        // Add to balance
-        this.playerBankAccount.balance += totalAmount;
-        console.log(`Fixed deposit matured! Added ${totalAmount} coins to balance`);
-      }
-    });
-    
-    return maturedDeposits;
-  }
-  
-  /**
    * Get the current player bank account data
+   * This is kept for compatibility but banking functionality moved to terminals
    */
   public getBankAccountData(): BankAccount {
     return this.playerBankAccount;
@@ -391,6 +361,28 @@ export class BankNPCManager {
     // Hide the banker when exiting any building
     this.toggleVisibility(false);
     console.log("Player exited building, hiding banker");
+  }
+  
+  /**
+   * Set onboarding mode
+   */
+  public setOnboardingMode(enabled: boolean): void {
+    this.isOnboardingMode = enabled;
+    console.log("Bank onboarding mode set to:", enabled);
+  }
+  
+  /**
+   * Check if currently in onboarding mode
+   */
+  public isInOnboardingMode(): boolean {
+    return this.isOnboardingMode;
+  }
+  
+  /**
+   * Get bank onboarding manager
+   */
+  public getBankOnboardingManager(): BankOnboardingManager {
+    return this.bankOnboardingManager;
   }
   
   /**

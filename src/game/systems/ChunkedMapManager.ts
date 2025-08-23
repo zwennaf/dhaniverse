@@ -907,7 +907,20 @@ export class ChunkedMapManager {
             // Store reference to interior map for cleanup
             (this as any).currentInteriorMap = interiorMap;
 
-            return { x: centerX, y: centerY };
+            // Calculate player spawn position for bank
+            let playerSpawnX = centerX;
+            let playerSpawnY = centerY;
+            
+            if (buildingType === "bank") {
+                // Spawn player horizontally center - 200px, vertically at the bottom (at the gate)
+                // playerSpawnX = centerX - 250; // Horizontally centered minus 200px as requested
+                // playerSpawnY = centerY + (scaledHeight / 2) - 100; // Near the bottom (gate), with some padding
+                playerSpawnX = 586; // Horizontally centered minus 200px as requested
+                playerSpawnY = 3018; // Near the bottom (gate), with some padding
+                console.log(`Bank spawn position: (${playerSpawnX}, ${playerSpawnY})`);
+            }
+
+            return { x: playerSpawnX, y: playerSpawnY };
         } catch (error) {
             console.error("Error entering building:", error);
             this.isInBuilding = false;

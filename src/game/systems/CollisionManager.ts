@@ -1,6 +1,7 @@
 import { GameObjects, Physics } from 'phaser';
 import { Constants } from '../utils/Constants.ts';
 import { MainGameScene } from '../scenes/MainScene.ts';
+import { shouldEnableIndoorCollisions } from '../../config/onboarding';
 
 interface CollisionBoxData {
   id?: string;
@@ -33,10 +34,13 @@ export class CollisionManager {
     const player = this.scene.getPlayer();
     if (!player || this.collisionObjects.length === 0) return;
     
-    // Check if player is inside a building - skip collisions if so
+    // Check if player is inside a building - conditionally skip collisions based on config
     const mapManager = this.scene.mapManager;
     if (mapManager && mapManager.isPlayerInBuilding()) {
-      return; // No collisions inside buildings
+      const shouldEnableCollisions = shouldEnableIndoorCollisions();
+      if (!shouldEnableCollisions) {
+        return; // No collisions inside buildings when disabled via config
+      }
     }
     
     // Get player sprite for collision checks
@@ -176,10 +180,13 @@ export class CollisionManager {
   
   // Helper method to check if a point would collide with any collision object
   hasCollisionAt(x: number, y: number): boolean {
-    // Check if player is inside a building - no collisions if so
+    // Check if player is inside a building - conditionally allow collisions based on config
     const mapManager = this.scene.mapManager;
     if (mapManager && mapManager.isPlayerInBuilding()) {
-      return false; // No collisions inside buildings
+      const shouldEnableCollisions = shouldEnableIndoorCollisions();
+      if (!shouldEnableCollisions) {
+        return false; // No collisions inside buildings when disabled via config
+      }
     }
     
     // Check cache first

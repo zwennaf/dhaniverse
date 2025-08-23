@@ -28,11 +28,14 @@ export class MayaNPCManager {
     private movingToTarget: boolean = false;
     private moveTarget: { x: number; y: number } | null = null;
     private moveDir: { x: number; y: number } | null = null;
-    private moveSpeed: number = 280; // slightly faster movement for better pacing
+    private moveSpeed: number = 400; // increased movement speed for better pacing
     private pauseDurationMs: number = 1000; // 1 second pause at waypoints
     private followReminderText: GameObjects.Text | null = null;
     private alertText: GameObjects.Text | null = null;
     private distanceThreshold: number = 1000; // units (show "too far" only when > 1000)
+    
+    // Bank task location monitoring
+    private bankTaskLocationInterval: NodeJS.Timeout | null = null;
     private alertTimerEvent: Phaser.Time.TimerEvent | null = null;
     private alertIntervalMs: number = 60000; // 60 seconds
     private guideCompleted: boolean = false;
@@ -888,6 +891,12 @@ export class MayaNPCManager {
             window.removeEventListener('dialogue-gotit' as any, pending as any);
             (this as any).__pendingMayaStartMove = null;
         }
+
+        // Cleanup bank task location monitoring interval
+        if (this.bankTaskLocationInterval) {
+            clearInterval(this.bankTaskLocationInterval);
+            this.bankTaskLocationInterval = null;
+        }
     }
 
     // Handle adding the next objective after the initial Maya intro dialogue is fully closed
@@ -935,10 +944,68 @@ export class MayaNPCManager {
             tm.addTask({
                 id: 'enter-bank-speak-teller',
                 title: 'Enter Bank & Meet Teller',
-                description: 'Go inside the Central Bank and speak to the bank teller to learn about financial services.',
+                description: 'Go inside the Central Bank building to continue your journey.',
                 active: true,
                 completed: false
             });
+            
+            // Start monitoring player location for dynamic task updates
+            this.startBankTaskLocationMonitoring();
+        }
+    }
+
+    /**
+     * Monitor player location and update bank task description dynamically
+     */
+    private startBankTaskLocationMonitoring(): void {
+        // Check location every second
+        const checkLocation = () => {
+            const tm = getTaskManager();
+            const bankTask = tm.getTasks().find(t => t.id === 'enter-bank-speak-teller');
+            
+            // If task no longer exists or is completed, stop monitoring
+            if (!bankTask || bankTask.completed || !bankTask.active) {
+                this.stopBankTaskLocationMonitoring();
+                return;
+            }
+            
+            const mapManager = this.scene.mapManager;
+            const currentBuilding = mapManager ? mapManager.getCurrentBuildingType() : null;
+            
+            let newDescription: string;
+            if (currentBuilding === 'bank') {
+                // Player is inside the bank
+                newDescription = 'Speak to the bank manager to learn about financial services.';
+            } else {
+                // Player is outside the bank
+                newDescription = 'Go inside the Central Bank building to continue your journey.';
+            }
+            
+            // Only update if description has changed
+            if (bankTask.description !== newDescription) {
+                console.log(`MayaNPCManager: Updating bank task description based on location - inside bank: ${currentBuilding === 'bank'}`);
+                tm.updateTask({
+                    id: 'enter-bank-speak-teller',
+                    changes: { description: newDescription }
+                });
+            }
+        };
+        
+        // Initial check
+        checkLocation();
+        
+        // Set up interval to check location periodically
+        this.bankTaskLocationInterval = setInterval(checkLocation, 1000);
+    }
+
+    /**
+     * Stop monitoring bank task location (called when task is completed)
+     */
+    private stopBankTaskLocationMonitoring(): void {
+        if (this.bankTaskLocationInterval) {
+            clearInterval(this.bankTaskLocationInterval);
+            this.bankTaskLocationInterval = null;
+            console.log('MayaNPCManager: Stopped bank task location monitoring');
         }
     }
 }

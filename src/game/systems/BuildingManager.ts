@@ -1,6 +1,7 @@
 import { GameObjects, Input } from 'phaser';
 import { Constants } from '../utils/Constants.ts';
-import { MainGameScene } from '../scenes/MainScene.ts';
+import { MainGameScene } from '../scenes/MainScene';
+import { shouldAutoOpenBankingUI } from '../../config/onboarding';
 
 export class BuildingManager {
   private scene: MainGameScene;
@@ -266,18 +267,21 @@ export class BuildingManager {
       if (mainScene.bankNPCManager && typeof mainScene.bankNPCManager.onEnterBuilding === 'function') {
         mainScene.bankNPCManager.onEnterBuilding('bank');
         
-        // Force the banking UI to be active container
-        document.getElementById('banking-ui-container')?.classList.add('active');
-        
-        // Ensure playerRupees is available for the banking UI
-        if (mainScene.playerRupees !== undefined) {
-          // Manually trigger the banking UI to open with current bank account data
-          this.scene.time.delayedCall(300, () => {
-            if (mainScene.bankNPCManager) {
-              const bankAccount = mainScene.bankNPCManager.getBankAccountData();
-              mainScene.openBankingUI(bankAccount);
-            }
-          });
+        // Only auto-open banking UI if configured to do so (disabled during onboarding)
+        if (shouldAutoOpenBankingUI()) {
+          // Force the banking UI to be active container
+          document.getElementById('banking-ui-container')?.classList.add('active');
+          
+          // Ensure playerRupees is available for the banking UI
+          if (mainScene.playerRupees !== undefined) {
+            // Manually trigger the banking UI to open with current bank account data
+            this.scene.time.delayedCall(300, () => {
+              if (mainScene.bankNPCManager) {
+                const bankAccount = mainScene.bankNPCManager.getBankAccountData();
+                mainScene.openBankingUI(bankAccount);
+              }
+            });
+          }
         }
       }
     } else if (buildingType === 'stockmarket') {
