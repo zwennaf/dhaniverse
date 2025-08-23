@@ -1,6 +1,7 @@
 import { GameObjects } from 'phaser';
 import { MainScene } from '../../scenes/MainScene';
 import { shouldShowBankOnboarding as configShouldShowBankOnboarding } from '../../../config/onboarding';
+import { dialogueManager } from '../../../services/DialogueManager';
 
 interface BankAccount {
   accountNumber: string;
@@ -23,8 +24,11 @@ export class BankOnboardingManager {
   private scene: MainScene;
   private isOnboardingActive: boolean = false;
   private currentStep: number = 0;
+  private currentDialogueStep: number = 0;
   private playerName: string = '';
   private bankAccount: BankAccount | null = null;
+  private userDeclined: boolean = false; // Track if user declined account creation
+  private hasSpokenBefore: boolean = false; // Track if player has talked to bank manager before
   
   private onboardingSteps: OnboardingStep[] = [
     {
@@ -55,6 +59,237 @@ export class BankOnboardingManager {
 
   constructor(scene: MainScene) {
     this.scene = scene;
+    // Check if player has spoken before
+    this.hasSpokenBefore = localStorage.getItem('dhaniverse_bank_conversation_started') === 'true';
+  }
+
+  public startConversation(): void {
+    // If already completed onboarding, show simple greeting
+    if (this.hasCompletedBankOnboarding()) {
+      this.showSimpleGreeting();
+      return;
+    }
+
+    // If spoken before but not completed, show welcome back
+    if (this.hasSpokenBefore) {
+      this.showWelcomeBackDialogue();
+      return;
+    }
+
+    // First time speaking - start step-by-step introduction
+    this.startFirstTimeDialogue();
+  }
+
+  private startFirstTimeDialogue(): void {
+    this.currentDialogueStep = 0;
+    this.hasSpokenBefore = true;
+    localStorage.setItem('dhaniverse_bank_conversation_started', 'true');
+    this.showDialogueStep();
+  }
+
+  private firstTimeDialogues = [
+    "Welcome to Dhaniverse Bank!\nI'm the Bank Manager here.\nI help adventurers with digital assets.",
+    "Our bank operates on blockchain technology.\nEvery transaction is secure and transparent.\nYou can earn, trade, and invest safely.",
+    "We offer savings accounts with crypto rewards.\nYou can also trade various currencies.\nAnd learn about decentralized finance!",
+    "To get started, you'll need an account.\nWe'll guide you through wallet setup.\nAnd teach you about smart contracts.",
+    "Feel free to explore our services.\nAsk me anytime if you need help.\nWelcome to the future of banking!"
+  ];
+
+  private showDialogueStep(): void {
+    if (this.currentDialogueStep >= this.firstTimeDialogues.length) {
+      dialogueManager.closeDialogue();
+      return;
+    }
+
+    const dialogueText = this.firstTimeDialogues[this.currentDialogueStep];
+    
+    dialogueManager.showDialogue({
+      text: dialogueText,
+      characterName: 'Bank Manager',
+      showBackdrop: true,
+      allowSpaceAdvance: true
+    }, {
+      onAdvance: () => {
+        this.currentDialogueStep++;
+        this.showDialogueStep();
+      },
+      onComplete: () => {
+        // Dialogue typing completed
+      }
+    });
+  }
+
+  private showWelcomeBackDialogue(): void {
+    const welcomeBackMessages = [
+      "Welcome back to Dhaniverse Bank!\nHow can I assist you today?\nReady for some financial adventures?",
+      "Great to see you again!\nYour account is looking good.\nWhat banking service do you need?",
+      "Hello again, valued customer!\nI'm here to help with questions.\nLet's make your money work for you!"
+    ];
+
+    const randomMessage = welcomeBackMessages[Math.floor(Math.random() * welcomeBackMessages.length)];
+    
+    dialogueManager.showDialogue({
+      text: randomMessage,
+      characterName: 'Bank Manager',
+      showBackdrop: true,
+      allowSpaceAdvance: true
+    }, {
+      onAdvance: () => {
+        dialogueManager.closeDialogue();
+      },
+      onComplete: () => {
+        // Dialogue typing completed
+      }
+    });
+  }
+
+  private showSimpleGreeting(): void {
+    dialogueManager.showDialogue({
+      text: "Hello again! How can I help you with your banking needs today? You can access your account services anytime.",
+      characterName: 'Bank Manager',
+      showBackdrop: true
+    }, {
+      onAdvance: () => {
+        dialogueManager.closeDialogue();
+      }
+    });
+  }
+
+  private showContinuePrompt(): void {
+    dialogueManager.showDialogue({
+      text: "Welcome back! Would you like to continue setting up your bank account, or would you prefer to come back later?",
+      characterName: 'Bank Manager',
+      showBackdrop: true,
+      showOptions: true,
+      options: [
+        {
+          id: 'continue',
+          text: 'Yes, let\'s continue',
+          action: () => {
+            dialogueManager.closeDialogue();
+            this.startFullOnboarding();
+          }
+        },
+        {
+          id: 'later',
+          text: 'Maybe later',
+          action: () => {
+            dialogueManager.showDialogue({
+              text: "No problem! Take your time. I'll be here whenever you're ready.",
+              characterName: 'Bank Manager',
+              showBackdrop: true
+            }, {
+              onAdvance: () => {
+                dialogueManager.closeDialogue();
+              }
+            });
+          }
+        }
+      ]
+    }, {
+      onOptionSelect: (optionId: string) => {
+        const option = [
+          { id: 'continue', action: () => { dialogueManager.closeDialogue(); this.startFullOnboarding(); }},
+          { id: 'later', action: () => { 
+            dialogueManager.showDialogue({
+              text: "No problem! Take your time. I'll be here whenever you're ready.",
+              characterName: 'Bank Manager',
+              showBackdrop: true
+            }, {
+              onAdvance: () => { dialogueManager.closeDialogue(); }
+            });
+          }}
+        ].find(opt => opt.id === optionId);
+        option?.action();
+      }
+    });
+  }
+
+  private startFullOnboarding(): void {
+    // Mark that conversation has started
+    localStorage.setItem('dhaniverse_bank_conversation_started', 'true');
+    this.hasSpokenBefore = true;
+
+    dialogueManager.showDialogue({
+      text: "Welcome to Dhaniverse Bank! I'm here to help you open your first account. We offer savings accounts with interest, secure deposits & withdrawals, fixed deposits for higher returns, and real-time transaction tracking. Ready to get started with your account?",
+      characterName: 'Bank Manager',
+      showBackdrop: true,
+      showOptions: true,
+      options: [
+        {
+          id: 'yes',
+          text: 'Yes, I\'m ready!',
+          action: () => {
+            dialogueManager.closeDialogue();
+            this.requestPlayerName();
+          }
+        },
+        {
+          id: 'no',
+          text: 'Not right now',
+          action: () => {
+            this.userDeclined = true;
+            dialogueManager.showDialogue({
+              text: "No worries! Come back anytime when you're ready. I'll be here to help you start your financial journey!",
+              characterName: 'Bank Manager',
+              showBackdrop: true
+            }, {
+              onAdvance: () => {
+                dialogueManager.closeDialogue();
+              }
+            });
+          }
+        }
+      ]
+    }, {
+      onOptionSelect: (optionId: string) => {
+        const option = [
+          { id: 'yes', action: () => { dialogueManager.closeDialogue(); this.requestPlayerName(); }},
+          { id: 'no', action: () => { 
+            this.userDeclined = true;
+            dialogueManager.showDialogue({
+              text: "No worries! Come back anytime when you're ready. I'll be here to help you start your financial journey!",
+              characterName: 'Bank Manager',
+              showBackdrop: true
+            }, {
+              onAdvance: () => { dialogueManager.closeDialogue(); }
+            });
+          }}
+        ].find(opt => opt.id === optionId);
+        option?.action();
+      }
+    });
+  }
+
+  private requestPlayerName(): void {
+    dialogueManager.showDialogue({
+      text: "Perfect! To create your account, I'll need your full name. What should I put on the account?",
+      characterName: 'Bank Manager',
+      showBackdrop: true,
+      requiresTextInput: true,
+      textInputPlaceholder: 'Enter your full name'
+    }, {
+      onTextInput: (name: string) => {
+        this.playerName = name.trim();
+        if (this.playerName) {
+          this.createBankAccount();
+          this.showAccountCreated();
+        }
+      }
+    });
+  }
+
+  private showAccountCreated(): void {
+    dialogueManager.showDialogue({
+      text: `Congratulations ${this.playerName}! Your account is ready!\n\nAccount: ${this.bankAccount?.accountNumber}\nIFSC: ${this.bankAccount?.ifscCode}\nBranch: ${this.bankAccount?.branchName}\n\nYou can now use all our banking services. Welcome to Dhaniverse Bank!`,
+      characterName: 'Bank Manager',
+      showBackdrop: true
+    }, {
+      onAdvance: () => {
+        this.completeOnboarding();
+        dialogueManager.closeDialogue();
+      }
+    });
   }
 
   public shouldShowOnboarding(): boolean {
@@ -86,22 +321,18 @@ export class BankOnboardingManager {
 
   public startOnboarding(): void {
     if (this.isOnboardingActive) {
-      console.log('🏦 Onboarding already active, continuing from step:', this.currentStep);
-      this.showCurrentStep();
+      console.log('🏦 Conversation already active, ignoring');
       return;
     }
     
-    console.log('🏦 Starting bank onboarding...');
-    console.log('🏦 Debug state before starting:', this.getDebugState());
+    console.log('🏦 Starting bank conversation...');
     this.isOnboardingActive = true;
-    this.currentStep = 0;
     
-    // Remove Maya tracker when bank onboarding starts
+    // Remove Maya tracker when bank conversation starts
     this.removeMayaTracker();
     
-    // Show first onboarding dialog
-    console.log('🏦 Showing first onboarding step:', this.onboardingSteps[0]);
-    this.showCurrentStep();
+    // Start conversation based on player's history
+    this.startConversation();
   }
 
   private removeMayaTracker(): void {
@@ -114,109 +345,39 @@ export class BankOnboardingManager {
     }
   }
 
-  private showCurrentStep(): void {
-    const step = this.onboardingSteps[this.currentStep];
-    console.log('showCurrentStep called, currentStep:', this.currentStep, 'step:', step);
+  private completeOnboarding(): void {
+    console.log('🏦 Completing onboarding...');
+    this.isOnboardingActive = false;
     
-    if (!step) {
-      console.log('No step found, completing onboarding');
-      this.completeOnboarding();
-      return;
+    // Mark onboarding as completed
+    localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+    
+    // Store account data
+    if (this.bankAccount) {
+      localStorage.setItem('dhaniverse_bank_account', JSON.stringify(this.bankAccount));
     }
-
-    const dialogues = this.getDialoguesForStep(step.id);
-    console.log('Generated dialogues for step', step.id, ':', dialogues);
     
-    this.showDialogue(dialogues, () => {
-      console.log('Dialogue completed for step:', step.id);
-      if (step.id === 'identity') {
-        this.showNameInput();
-      } else {
-        this.nextStep();
-      }
-    });
+    // Save progress to backend (in a real app)
+    this.saveBankOnboardingProgress();
+    
+    // Enable normal banking interactions
+    this.enableNormalBanking();
+    
+    // Dispatch completion event
+    window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
+    
+    console.log('🏦 Onboarding completed successfully');
   }
 
-  private getDialoguesForStep(stepId: string): string[] {
-    switch (stepId) {
-      case 'welcome':
-        return [
-          "Welcome to the Central Bank of Dhaniverse! I'm delighted to see you here.",
-          "I'm here to help you open your first bank account and get started with your financial journey.",
-          "Let me explain what amazing services we offer at Dhaniverse Bank!"
-        ];
-      
-      case 'features':
-        return [
-          "At Dhaniverse Bank, we offer comprehensive banking solutions:",
-          "💰 SAVINGS ACCOUNT: Safely store your money and earn interest",
-          "🏦 DEPOSITS & WITHDRAWALS: Easy cash management anytime",
-          "📈 FIXED DEPOSITS: Lock your money for higher returns with guaranteed interest rates",
-          "📊 ACCOUNT OVERVIEW: Track your balance, transactions, and financial growth",
-          "🔒 SECURE BANKING: Your money is protected with advanced security",
-          "💳 INSTANT TRANSACTIONS: Real-time deposits and withdrawals",
-          "Ready to open your account and start your financial adventure?"
-        ];
-      
-      case 'identity':
-        return [
-          "Perfect! To create your account, I'll need some basic information.",
-          "Could you please tell me your full name for the account registration?"
-        ];
-      
-      case 'account_created':
-        return [
-          `Congratulations ${this.playerName}! Your account has been successfully created.`,
-          "Here are your banking details - please keep them safe:",
-          `Account Number: ${this.bankAccount?.accountNumber}`,
-          `IFSC Code: ${this.bankAccount?.ifscCode}`,
-          `Branch: ${this.bankAccount?.branchName}`,
-          "You can now use all our banking services! Simply talk to me anytime to access your account.",
-          "Welcome to the Dhaniverse Bank family! Your financial journey starts now!"
-        ];
-      
-      default:
-        return ["Welcome to Dhaniverse Bank!"];
-    }
-  }
-
-  private showDialogue(messages: string[], onComplete: () => void): void {
-    console.log('🏦 showDialogue called with messages:', messages);
+  private endConversation(): void {
+    console.log('🏦 Ending conversation...');
+    this.isOnboardingActive = false;
     
-    // Create dialogue event for the game
-    // Also save a pending payload so UI can consume it if it hasn't mounted yet
-    try {
-      (window as any).__pendingBankOnboardingDialogue = {
-        messages,
-        characterName: 'Bank Manager',
-        onComplete
-      };
-    } catch (err) {
-      // ignore
-    }
-
-    window.dispatchEvent(new CustomEvent('show-bank-onboarding-dialogue', {
-      detail: {
-        messages,
-        characterName: 'Bank Manager',
-        onComplete
-      }
-    }));
+    // Close any active dialogue
+    dialogueManager.closeDialogue();
     
-    console.log('🏦 Dispatched show-bank-onboarding-dialogue event');
-  }
-
-  private showNameInput(): void {
-    // Create name input event
-    window.dispatchEvent(new CustomEvent('show-bank-name-input', {
-      detail: {
-        onSubmit: (name: string) => {
-          this.playerName = name;
-          this.createBankAccount();
-          this.nextStep();
-        }
-      }
-    }));
+    // Notify the BankNPCManager that the conversation should end
+    window.dispatchEvent(new CustomEvent('bank-conversation-ended'));
   }
 
   private createBankAccount(): void {
@@ -244,33 +405,6 @@ export class BankOnboardingManager {
     const timestamp = Date.now().toString();
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     return (timestamp.slice(-8) + random).slice(0, 12);
-  }
-
-  private nextStep(): void {
-    this.onboardingSteps[this.currentStep].completed = true;
-    this.currentStep++;
-    
-    // Small delay before showing next step
-    setTimeout(() => {
-      this.showCurrentStep();
-    }, 500);
-  }
-
-  private completeOnboarding(): void {
-    console.log('Bank onboarding completed!');
-    this.isOnboardingActive = false;
-    
-    // Mark onboarding as completed
-    // localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
-    
-    // Save progress to backend (in a real app)
-    this.saveBankOnboardingProgress();
-    
-    // Enable normal banking interactions
-    this.enableNormalBanking();
-    
-    // Dispatch completion event
-    window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
   }
 
   private saveBankOnboardingProgress(): void {
@@ -322,17 +456,18 @@ export class BankOnboardingManager {
     // For testing purposes - reset onboarding
     this.isOnboardingActive = false;
     this.currentStep = 0;
+    this.currentDialogueStep = 0;
     this.playerName = '';
     this.bankAccount = null;
+    this.hasSpokenBefore = false;
     
     localStorage.removeItem('dhaniverse_bank_onboarding_completed');
     localStorage.removeItem('dhaniverse_bank_account_details');
     localStorage.removeItem('dhaniverse_bank_onboarding_progress');
+    localStorage.removeItem('dhaniverse_bank_conversation_started');
     
     // Reset step completion
     this.onboardingSteps.forEach(step => step.completed = false);
-    
-    console.log('Bank onboarding reset');
   }
 
   public getDebugState(): any {
@@ -342,10 +477,12 @@ export class BankOnboardingManager {
       playerName: this.playerName,
       hasCompletedBankOnboarding: this.hasCompletedBankOnboarding(),
       shouldShowOnboarding: this.shouldShowOnboarding(),
+      hasSpokenBefore: this.hasSpokenBefore,
       localStorage: {
         bankOnboardingCompleted: localStorage.getItem('dhaniverse_bank_onboarding_completed'),
         bankAccountDetails: localStorage.getItem('dhaniverse_bank_account_details'),
-        bankOnboardingProgress: localStorage.getItem('dhaniverse_bank_onboarding_progress')
+        bankOnboardingProgress: localStorage.getItem('dhaniverse_bank_onboarding_progress'),
+        conversationStarted: localStorage.getItem('dhaniverse_bank_conversation_started')
       }
     };
   }

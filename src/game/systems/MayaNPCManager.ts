@@ -3,6 +3,7 @@ import { locationTrackerManager } from "../../services/LocationTrackerManager";
 import { MainGameScene } from "../scenes/MainScene.ts";
 import { getTaskManager } from "../tasks/TaskManager.ts";
 import { Constants } from "../utils/Constants.ts";
+import { dialogueManager } from "../../services/DialogueManager";
 
 interface NPCSprite extends GameObjects.Sprite {
     nameText?: GameObjects.Text;
@@ -233,44 +234,23 @@ export class MayaNPCManager {
 
         this.activeDialog = true;
 
-        // Emit a UI event so the HUD DialogueBox shows the same UI as onboarding
-        window.dispatchEvent(new CustomEvent('show-dialogue', {
-            detail: {
-                text: "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!",
-                characterName: 'M.A.Y.A',
-                allowAdvance: true
+        // Use DialogueManager directly
+        dialogueManager.showDialogue({
+            text: "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!",
+            characterName: 'M.A.Y.A',
+            showBackdrop: false,
+            allowSpaceAdvance: true
+        }, {
+            onAdvance: () => {
+                // Close local dialog state and cleanup visuals
+                this.closeDialog();
+                this.handlePostInitialDialogue();
+                dialogueManager.closeDialogue();
+            },
+            onComplete: () => {
+                // Dialogue typing completed
             }
-        }));
-
-        // Create speech bubble above Maya for visual cue (keep existing visual behavior)
-        this.speechBubble = this.scene.add.sprite(
-            this.maya.x,
-            this.maya.y - 120,
-            "speech_bubble_grey"
-        );
-        this.speechBubble.setScale(2.5);
-        this.speechBubble.setDepth(2002);
-        this.speechBubble.setScrollFactor(1);
-
-        if (this.scene.anims.exists("speech-bubble-open")) {
-            this.speechBubble.play("speech-bubble-open");
-        }
-
-        // Listen for HUD advance/close events
-        const onAdvance = () => {
-            // Close local dialog state and cleanup visuals
-            this.closeDialog();
-            window.removeEventListener('dialogue-advance', onAdvance as any);
-            this.handlePostInitialDialogue();
-        };
-        window.addEventListener('dialogue-advance' as any, onAdvance as any);
-
-        // Also listen for dialogue-complete (typing finished) to queue next objective ONLY after close
-        const onComplete = () => {
-            window.removeEventListener('dialogue-complete' as any, onComplete as any);
-            // We'll rely on onAdvance to actually add follow-up to ensure player closed it
-        };
-        window.addEventListener('dialogue-complete' as any, onComplete as any);
+        });
     }
 
     private setupDialogKeyListeners(): void {
@@ -560,63 +540,84 @@ export class MayaNPCManager {
      * Start Maya's guided sequence: show initial message then move along waypoints.
      */
     private startGuidedSequence(): void {
-    // Do not start again if the guide already completed
-    if (this.guidedSequenceActive || this.guideCompleted) return;
+        console.log('🚀 Maya: startGuidedSequence called');
+        console.log('🚀 Maya: guidedSequenceActive:', this.guidedSequenceActive, 'guideCompleted:', this.guideCompleted);
+        
+        // Do not start again if the guide already completed
+        if (this.guidedSequenceActive || this.guideCompleted) {
+            console.log('🚀 Maya: Guide already active or completed, returning');
+            return;
+        }
 
         // Ensure the player is close enough to start
-        if (!this.scene.getPlayer()) return;
+        if (!this.scene.getPlayer()) {
+            console.log('🚀 Maya: No player found, returning');
+            return;
+        }
 
         const player = this.scene.getPlayer().getSprite();
         const dist = Phaser.Math.Distance.Between(player.x, player.y, this.maya.x, this.maya.y);
-        if (dist > this.interactionDistance) return; // do not start if too far
+        console.log('🚀 Maya: Distance to player:', dist, 'interaction distance:', this.interactionDistance);
+        
+        if (dist > this.interactionDistance) {
+            console.log('🚀 Maya: Player too far away, returning');
+            return; // do not start if too far
+        }
 
+        console.log('🚀 Maya: Starting guided sequence...');
         this.guidedSequenceActive = true;
 
         // Hide interaction text
         this.interactionText.setAlpha(0);
 
-    // Enable Maya tracking so HUD tracker follows her live position while she moves
-    locationTrackerManager.setTargetEnabled('maya', true);
-    // Ensure tracker has correct current position
-    locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
+        // Enable Maya tracking so HUD tracker follows her live position while she moves
+        locationTrackerManager.setTargetEnabled('maya', true);
+        // Ensure tracker has correct current position
+        locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
 
-        // Show initial guidance dialogue (advance key or click to dismiss; movement begins after close)
-        window.dispatchEvent(new CustomEvent('show-dialogue', {
-            detail: {
-                text: "Follow me. I'll guide you to the Central Bank.",
-                characterName: 'M.A.Y.A',
-                compact: true,
-                allowAdvance: true,
+        console.log('🚀 Maya: Showing dialogue with DialogueManager...');
+        
+        // Use DialogueManager directly instead of events
+        dialogueManager.showDialogue({
+            text: "Follow me. I'll guide you to the Central Bank.",
+            characterName: 'M.A.Y.A',
+            showBackdrop: false,
+            allowSpaceAdvance: true
+        }, {
+            onAdvance: () => {
+                console.log('🚀 Maya: DialogueManager onAdvance called, starting movement!');
+                
+                // Complete the "meet-maya" task when Maya starts walking towards the bank
+                this.completeMeetMayaTask();
+                
+                // Re-enable the location tracker so player can follow Maya to the bank
+                locationTrackerManager.setTargetEnabled('maya', true);
+                
+                // Set a new objective to enter the bank and speak to bank teller
+                this.setEnterBankTask();
+                
+                console.log('🚀 Maya: About to start moving to next waypoint...');
+                this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
+                
+                // Close the dialogue
+                dialogueManager.closeDialogue();
+            },
+            onComplete: () => {
+                console.log('🚀 Maya: DialogueManager onComplete called');
             }
-        }));
+        });
 
         // Prepare single waypoint for this step: user asked to keep it simple
         // Maya should move only to this coordinate and stop; further path will be defined later.
         this.waypoints = [
             { x: 8465, y: 3626 }, // first target
-            { x: 8486, y: 6378 }, // next leg towards final destination (as requested)
-            { x: 9415, y: 6368 }, // final destination
-            { x: 9411, y: 6297 },
+            { x: 8465, y: 6378 }, // next leg towards final destination (as requested)
+            { x: 9415, y: 6378 }, // final destination
+            { x: 9415, y: 6297 },
         ];
         this.currentWaypointIndex = 0;
-
-        // Start moving only after the player advances (dialogue-advance)
-        const startMove = () => {
-            window.removeEventListener('dialogue-advance' as any, startMove as any);
-            
-            // Complete the "meet-maya" task when Maya starts walking towards the bank
-            this.completeMeetMayaTask();
-            
-            // Re-enable the location tracker so player can follow Maya to the bank
-            locationTrackerManager.setTargetEnabled('maya', true);
-            
-            // Set a new objective to enter the bank and speak to bank teller
-            this.setEnterBankTask();
-            
-            this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
-        };
-        window.addEventListener('dialogue-advance' as any, startMove as any);
-        (this as any).__pendingMayaStartMove = startMove;
+        
+        console.log('🚀 Maya: Waypoints set:', this.waypoints);
     }
 
     private showTemporaryDialog(text: string, durationMs: number = 1500): void {
@@ -630,23 +631,34 @@ export class MayaNPCManager {
     }
 
     private moveToNextWaypoint(): void {
+        console.log('🚀 Maya: moveToNextWaypoint called, guidedSequenceActive:', this.guidedSequenceActive);
+        console.log('🚀 Maya: currentWaypointIndex:', this.currentWaypointIndex, 'waypoints.length:', this.waypoints.length);
+        
         if (!this.guidedSequenceActive) return;
 
         // If we've finished all waypoints, handle arrival
         if (this.currentWaypointIndex >= this.waypoints.length) {
+            console.log('🚀 Maya: All waypoints completed, arriving at destination');
             this.onArriveAtDestination();
             return;
         }
 
         const target = this.waypoints[this.currentWaypointIndex];
+        console.log('🚀 Maya: Moving to waypoint', this.currentWaypointIndex, 'target:', target);
 
         // Face the direction Maya will move
         // Compute direction vector and initialize per-frame movement to ensure straight-line travel
         const dx = target.x - this.maya.x;
         const dy = target.y - this.maya.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        console.log('🚀 Maya: Current position:', { x: this.maya.x, y: this.maya.y });
+        console.log('🚀 Maya: Target position:', target);
+        console.log('🚀 Maya: Distance to target:', distance);
+        
         if (distance < 1) {
             // Already at or extremely close to target — treat as arrived
+            console.log('🚀 Maya: Already at target, moving to next waypoint');
             this.currentWaypointIndex++;
             this.scene.time.delayedCall(this.pauseDurationMs, () => this.moveToNextWaypoint());
             return;
@@ -654,13 +666,17 @@ export class MayaNPCManager {
 
         // Normalize direction
         this.moveDir = { x: dx / distance, y: dy / distance };
-    this.moveTarget = { x: target.x, y: target.y };
-    this.movingToTarget = true;
-    // Ensure interaction hint is hidden while Maya moves
-    this.interactionText.setAlpha(0);
+        this.moveTarget = { x: target.x, y: target.y };
+        this.movingToTarget = true;
+        
+        console.log('🚀 Maya: Movement initialized - moveDir:', this.moveDir, 'movingToTarget:', this.movingToTarget);
+        
+        // Ensure interaction hint is hidden while Maya moves
+        this.interactionText.setAlpha(0);
 
         // Face movement direction and play walking animation
         this.faceDirectionTowards(target.x, target.y, /*useWalk=*/true);
+        console.log('🚀 Maya: Started walking animation');
     }
 
     private faceDirectionTowards(targetX: number, targetY: number, useWalk: boolean = false): void {

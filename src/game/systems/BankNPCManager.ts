@@ -125,6 +125,9 @@ export class BankNPCManager {
     // Listen for banking UI closure to sync any changes
     window.addEventListener('closeBankingUI', this.handleBankingClosedBound);
     
+    // Listen for bank conversation ended event
+    window.addEventListener('bank-conversation-ended', this.handleConversationEnded.bind(this));
+    
     console.log("Bank NPC created at position:", bankerX, bankerY);
   }
 
@@ -140,6 +143,14 @@ export class BankNPCManager {
     } catch (error) {
       console.error("Failed to sync banking changes with backend:", error);
     }
+  }
+
+  /**
+   * Handle bank conversation ended event from onboarding manager
+   */
+  private handleConversationEnded(): void {
+    console.log("🏦 Bank conversation ended - resetting interaction state");
+    this.endBankingInteraction();
   }
   
   private setupSpeechBubbleAnimations(): void {
@@ -393,6 +404,7 @@ export class BankNPCManager {
   public destroy(): void {
     // Remove event listeners
     window.removeEventListener('closeBankingUI', this.handleBankingClosedBound);
+    window.removeEventListener('bank-conversation-ended', this.handleConversationEnded.bind(this));
     
     if (this.banker.nameText) {
       this.banker.nameText.destroy();

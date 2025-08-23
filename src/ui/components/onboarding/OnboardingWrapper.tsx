@@ -158,7 +158,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
             showContinueHint={true}
             baseTypingSpeed={50}
             fastTypingSpeed={5}
-            allowSpaceAdvance={false}
+            allowSpaceAdvance={true}
           />
         </div>
       </div>

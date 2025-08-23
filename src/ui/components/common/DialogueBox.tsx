@@ -1,6 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 
+interface DialogueOption {
+  id: string;
+  text: string;
+  action?: () => void;
+}
+
 interface DialogueBoxProps {
   text: string;
   characterName?: string;
@@ -21,6 +27,15 @@ interface DialogueBoxProps {
   fastTypingSpeed?: number;
   allowSpaceAdvance?: boolean; // New prop to control space advancement
   compact?: boolean; // when true, use the older/smaller layout used for task dialogs
+  showBackdrop?: boolean; // Add backdrop for important dialogues like onboarding
+  // New props for input and options
+  requiresTextInput?: boolean;
+  textInputPlaceholder?: string;
+  onTextInput?: (text: string) => void;
+  options?: DialogueOption[];
+  onOptionSelect?: (optionId: string) => void;
+  showOptions?: boolean;
+  keyboardInputEnabled?: boolean; // Control whether typing input is captured
 }
 
 // Custom hook for typing animation
@@ -87,9 +102,10 @@ const useTypingAnimation = (
 
   useEffect(() => {
     if (!isComplete) {
-      startTyping(isFast ? fastSpeed : baseSpeed);
+      const newSpeed = isFast ? fastSpeed : baseSpeed;
+      startTyping(newSpeed);
     }
-  }, [isFast, isComplete]);
+  }, [isFast, isComplete, fastSpeed, baseSpeed]);
 
   const speedUp = () => setIsFast(true);
   const slowDown = () => setIsFast(false);
@@ -115,15 +131,26 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   showContinueHint = true,
   baseTypingSpeed = 50,
   fastTypingSpeed = 10,
-  allowSpaceAdvance = true
-  ,
+  allowSpaceAdvance = true,
   position = 'bottom',
   small = false,
   compact = false,
-  // removed props
+  showBackdrop = false,
+  // New props
+  requiresTextInput = false,
+  textInputPlaceholder = "Type your response...",
+  onTextInput,
+  options = [],
+  onOptionSelect,
+  showOptions = false,
+  keyboardInputEnabled = true
 }) => {
   const [lastActionTime, setLastActionTime] = useState(0);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
+  const [textInputValue, setTextInputValue] = useState('');
+  const [isTextInputFocused, setIsTextInputFocused] = useState(false);
   const mountedRef = useRef(true);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const ACTION_COOLDOWN = 150;
 
   const { displayedText, isComplete, speedUp, slowDown, complete } = useTypingAnimation(
@@ -146,6 +173,21 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     };
   }, []);
 
+  // Auto-focus text input when it becomes visible
+  useEffect(() => {
+    if (requiresTextInput && isVisible && isComplete && textInputRef.current) {
+      setTimeout(() => {
+        textInputRef.current?.focus();
+        setIsTextInputFocused(true);
+      }, 100);
+    }
+  }, [requiresTextInput, isVisible, isComplete]);
+
+  // Reset selected option index when options change
+  useEffect(() => {
+    setSelectedOptionIndex(0);
+  }, [options]);
+
   // Handle keyboard events
   useEffect(() => {
     if (!isVisible) return;
@@ -154,7 +196,52 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     let speedUpTimeout: NodeJS.Timeout | null = null;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' || event.code === 'Space') {
+      // Skip if input is focused (for text input)
+      if (isTextInputFocused && requiresTextInput) {
+        // Allow normal typing in text input, but handle special keys
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setIsTextInputFocused(false);
+          textInputRef.current?.blur();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          if (textInputValue.trim()) {
+            onTextInput?.(textInputValue.trim());
+            setTextInputValue('');
+            setIsTextInputFocused(false);
+            textInputRef.current?.blur();
+          }
+        }
+        return;
+      }
+
+      // Handle option selection
+      if (showOptions && options.length > 0 && isComplete) {
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setSelectedOptionIndex(prev => 
+            prev > 0 ? prev - 1 : options.length - 1
+          );
+          return;
+        } else if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setSelectedOptionIndex(prev => 
+            prev < options.length - 1 ? prev + 1 : 0
+          );
+          return;
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          const selectedOption = options[selectedOptionIndex];
+          if (selectedOption) {
+            onOptionSelect?.(selectedOption.id);
+            selectedOption.action?.();
+          }
+          return;
+        }
+      }
+
+      // Regular advancement controls
+      if (event.key === 'Enter' || (event.key === ' ' && allowSpaceAdvance) || (event.code === 'Space' && allowSpaceAdvance)) {
         event.preventDefault();
         
         const now = Date.now();
@@ -170,42 +257,83 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           if (!keyHeldDown) {
             keyHeldDown = true;
             setLastActionTime(now);
-            onAdvance?.();
+            
+            // Don't advance if we're showing options or text input
+            if (!showOptions && !requiresTextInput) {
+              onAdvance?.();
+            }
           }
         }
       }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-  if (event.key === 'Enter' || event.code === 'Space') {
+      if (event.key === 'Enter' || event.key === ' ' || event.code === 'Space') {
         keyHeldDown = false;
         
-  if (speedUpTimeout) { clearTimeout(speedUpTimeout); speedUpTimeout = null; }
+        if (speedUpTimeout) { clearTimeout(speedUpTimeout); speedUpTimeout = null; }
         slowDown();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    // Only listen to keyboard events if keyboard input is enabled
+    if (keyboardInputEnabled) {
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+    }
     
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      if (keyboardInputEnabled) {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+      }
       if (speedUpTimeout) clearTimeout(speedUpTimeout);
     };
-  }, [isComplete, isVisible, lastActionTime, allowSpaceAdvance, onAdvance]);
+  }, [isComplete, isVisible, lastActionTime, allowSpaceAdvance, onAdvance, 
+      showOptions, options, selectedOptionIndex, onOptionSelect, 
+      requiresTextInput, isTextInputFocused, textInputValue, onTextInput, keyboardInputEnabled,
+      speedUp, slowDown, complete]);
 
   const handleClick = () => {
     const now = Date.now();
     if (now - lastActionTime < ACTION_COOLDOWN) return;
     setLastActionTime(now);
 
-  // Got it button removed; normal click behavior
+    // Don't allow click to advance if showing options or text input
+    if (showOptions || requiresTextInput) return;
 
     if (!isComplete) {
       complete();
     } else {
       onAdvance?.();
+    }
+  };
+
+  const handleChatFocus = () => {
+    setIsTextInputFocused(true);
+    // Send typing-start event to disable game controls
+    window.dispatchEvent(new Event("typing-start"));
+  };
+
+  const handleChatBlur = () => {
+    setIsTextInputFocused(false);
+    // Send typing-end event to re-enable game controls
+    window.dispatchEvent(new Event("typing-end"));
+  };
+
+  const handleTextInputKeyDown = (e: React.KeyboardEvent) => {
+    // Allow normal typing - stop propagation to prevent game handling
+    const gameControlKeys = ["w", "a", "s", "d", "e", "W", "A", "S", "D", "E", " "];
+    if (gameControlKeys.includes(e.key)) {
+      e.stopPropagation();
+      return;
+    }
+
+    // Handle special keys
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setIsTextInputFocused(false);
+      textInputRef.current?.blur();
     }
   };
 
@@ -231,8 +359,14 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     : (compact ? 'max-w-5xl' : 'max-w-6xl');
 
   return (
-    <div className={`${containerClass} pointer-events-auto`}>
-      <div className={`relative w-full ${maxWidthClass}`}>
+    <>
+      {/* Optional backdrop */}
+      {showBackdrop && (
+        <div className="fixed inset-0 bg-black/30 z-[1100]" />
+      )}
+      
+      <div className={`${showBackdrop ? 'fixed' : containerClass} ${showBackdrop ? 'inset-0 flex items-end justify-center pb-8 z-[1200]' : ''} pointer-events-auto`}>
+        <div className={`relative w-full ${maxWidthClass} ${showBackdrop ? 'px-4' : ''}`}>
         {/* SVG Dialogue Box */}
         <img
           src="/UI/game/dialogue-box.svg"
@@ -300,18 +434,26 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-4 left-4 right-4 bottom-4 flex items-start">
+        <div className="absolute top-6 left-6 right-6 bottom-6 flex flex-col">
           <div 
-            className="w-full px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
+            className="flex-1 px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
             style={{}}
             onClick={handleClick}
           >
-            <div style={{ maxHeight: small ? (compact ? '100px' : '120px') : (compact ? '260px' : '320px'), overflowY: 'auto' }}>
+            <div 
+              style={{ 
+                maxHeight: small ? (compact ? '100px' : '120px') : (compact ? '240px' : '300px'), 
+                overflowY: 'auto',
+                scrollbarWidth: 'none', // Firefox
+                msOverflowStyle: 'none', // Internet Explorer 10+
+              }}
+              className="[&::-webkit-scrollbar]:hidden"
+            >
               <p 
-                className={`text-white text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
+                className={`text-black text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
                   fontFamily: 'VCR OSD Mono, monospace',
-                  textShadow: '1px 1px 2px rgba(255,255,255,0.5)',
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
                   lineHeight: '1.6',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word'
@@ -321,6 +463,44 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Text Input Area */}
+          {requiresTextInput && isComplete && (
+            <div className="mt-4 px-4">
+              <div className="text-xs text-black/70 text-center" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
+                Please enter your response above
+              </div>
+            </div>
+          )}
+
+          {/* Options Area */}
+          {showOptions && options.length > 0 && isComplete && (
+            <div className="mt-4 px-4 space-y-2">
+              {options.map((option, index) => (
+                <button
+                  key={option.id}
+                  onClick={() => {
+                    onOptionSelect?.(option.id);
+                    option.action?.();
+                  }}
+                  className={`w-full px-3 py-2 text-left rounded transition-colors ${
+                    index === selectedOptionIndex
+                      ? 'bg-black/20 border-2 border-black/60'
+                      : 'bg-white/10 border border-black/30 hover:bg-white/20'
+                  }`}
+                  style={{ fontFamily: 'VCR OSD Mono, monospace' }}
+                >
+                  <span className="text-black font-medium">
+                    {index === selectedOptionIndex ? '→ ' : '  '}
+                    {option.text}
+                  </span>
+                </button>
+              ))}
+              <div className="text-xs text-black/70 mt-2" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
+                Use ↑↓ arrows to select, Enter to choose
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Progress indicator */}
@@ -333,7 +513,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                   <div
                     key={index}
                     className={`w-2 h-2 rounded-full ${
-                      index === currentSlide ? 'bg-black' : 'bg-gray-400'
+                      index === currentSlide ? 'bg-black' : 'bg-gray-500'
                     }`}
                   />
                 ))}
@@ -341,7 +521,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               
               {/* Text indicator */}
               <span 
-                className="text-white text-xs ml-2"
+                className="text-black text-xs ml-2"
                 style={{ fontFamily: 'VCR OSD Mono, monospace' }}
               >
                 {currentSlide + 1} / {totalSlides}
@@ -351,10 +531,10 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Click to continue hint */}
-        {showContinueHint && (
+        {showContinueHint && !showOptions && !requiresTextInput && (
           <div className="absolute bottom-8 left-8">
             <p 
-              className="text-white text-xs opacity-70 animate-pulse"
+              className="text-black text-xs opacity-70 animate-pulse"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}
             >
               Click to continue
@@ -362,9 +542,164 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           </div>
         )}
 
-  {/* Got it button removed */}
       </div>
-    </div>
+
+      {/* Text Input Popup - Center of screen */}
+      {requiresTextInput && isComplete && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+          {/* Backdrop blur */}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+          
+          {/* Input modal */}
+          <div className="relative bg-gradient-to-br from-gray-900 to-black border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/20 p-8 max-w-md w-full mx-4 transform scale-100 animate-scale-in">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-dhani-gold/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-dhani-gold">
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <polyline
+                    points="14,2 14,8 20,8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line
+                    x1="16"
+                    y1="13"
+                    x2="8"
+                    y2="13"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line
+                    x1="16"
+                    y1="17"
+                    x2="8"
+                    y2="17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Information Required</h2>
+              <p className="text-gray-300 text-sm">
+                {textInputPlaceholder || "Please provide the requested information"}
+              </p>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="dialogueInput" className="block text-sm font-medium text-gray-300 mb-2">
+                  Your Response *
+                </label>
+                <div className="relative">
+                  <input
+                    id="dialogueInput"
+                    ref={textInputRef}
+                    type="text"
+                    value={textInputValue}
+                    onChange={(e) => setTextInputValue(e.target.value)}
+                    onFocus={handleChatFocus}
+                    onBlur={handleChatBlur}
+                    onKeyDown={handleTextInputKeyDown}
+                    placeholder="Type your response here..."
+                    className="w-full px-4 py-3 pr-12 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-dhani-gold focus:ring-1 focus:ring-dhani-gold transition-colors"
+                    autoFocus
+                    maxLength={100}
+                  />
+                  
+                  {/* Send button inside input */}
+                  <button
+                    onClick={() => {
+                      if (textInputValue.trim()) {
+                        onTextInput?.(textInputValue.trim());
+                        setTextInputValue('');
+                        setIsTextInputFocused(false);
+                        textInputRef.current?.blur();
+                      }
+                    }}
+                    disabled={!textInputValue.trim()}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                      textInputValue.trim()
+                        ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-black hover:shadow-lg hover:shadow-dhani-gold/30'
+                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    }`}
+                    aria-label="Submit"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-6 h-6 fill-black scale-[18] ml-0.5"
+                      aria-hidden
+                    >
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                  </button>
+                </div>
+                
+                {textInputValue.trim() && textInputValue.trim().length < 2 && (
+                  <p className="text-red-400 text-xs mt-2">
+                    Response must be at least 2 characters
+                  </p>
+                )}
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    if (textInputValue.trim()) {
+                      onTextInput?.(textInputValue.trim());
+                      setTextInputValue('');
+                      setIsTextInputFocused(false);
+                      textInputRef.current?.blur();
+                    }
+                  }}
+                  disabled={!textInputValue.trim() || textInputValue.trim().length < 2}
+                  className={`w-full px-4 py-3 rounded-lg font-medium transition-all ${
+                    textInputValue.trim() && textInputValue.trim().length >= 2
+                      ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-black hover:shadow-lg hover:shadow-dhani-gold/30'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Submit Response
+                </button>
+              </div>
+            </div>
+
+            {/* Security note */}
+            <div className="mt-6 p-3 bg-dhani-gold/10 border border-dhani-gold/30 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-dhani-gold mt-0.5 flex-shrink-0">
+                  <path
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <div>
+                  <p className="text-xs text-dhani-gold font-medium">Secure Input</p>
+                  <p className="text-xs text-gray-300 mt-1">Press Enter or click Submit to continue</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </>
   );
 };
 

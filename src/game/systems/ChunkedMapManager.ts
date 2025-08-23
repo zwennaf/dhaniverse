@@ -5,6 +5,7 @@ import { PreloadingManager } from "./preloading/PreloadingManager.ts";
 import { PreloadingConfig } from "./preloading/IPreloadingStrategy.ts";
 import { ErrorHandlerChain } from "./error-handling/ErrorHandlerChain.ts";
 import { getChunkDataUrl, storeChunk } from "../cache/mapChunkCache.ts";
+import { dialogueManager } from "../../services/DialogueManager.ts";
 
 interface MapCache {
     width: number;
@@ -916,7 +917,7 @@ export class ChunkedMapManager {
                 // playerSpawnX = centerX - 250; // Horizontally centered minus 200px as requested
                 // playerSpawnY = centerY + (scaledHeight / 2) - 100; // Near the bottom (gate), with some padding
                 playerSpawnX = 586; // Horizontally centered minus 200px as requested
-                playerSpawnY = 3018; // Near the bottom (gate), with some padding
+                playerSpawnY = 2918; // Near the bottom (gate), with some padding
                 console.log(`Bank spawn position: (${playerSpawnX}, ${playerSpawnY})`);
             }
 

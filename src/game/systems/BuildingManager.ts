@@ -2,13 +2,17 @@ import { GameObjects, Input } from 'phaser';
 import { Constants } from '../utils/Constants.ts';
 import { MainGameScene } from '../scenes/MainScene';
 import { shouldAutoOpenBankingUI } from '../../config/onboarding';
+import { dialogueManager } from '../../services/DialogueManager';
 
 export class BuildingManager {
   private scene: MainGameScene;
   private buildingEntrance: { x: number, y: number };
   private stockMarketEntrance: { x: number, y: number };
+  private bankExitLocation: { x: number, y: number };
   private buildingInteractionText: GameObjects.Text;
   private stockMarketInteractionText: GameObjects.Text;
+  private buildingExitText: GameObjects.Text;
+  private bankExitInteractionText: GameObjects.Text;
   private interactionKey: Input.Keyboard.Key | null = null;
   private spaceKey: Input.Keyboard.Key | null = null;
   private enterKey: Input.Keyboard.Key | null = null;
@@ -21,6 +25,7 @@ export class BuildingManager {
     this.scene = scene;
     this.buildingEntrance = { x: 9383, y: 6087 };
     this.stockMarketEntrance = { x: 2565, y: 3550 }; // Stock market building entrance
+    this.bankExitLocation = { x: 550, y: 2918 }; // Exit location inside bank building
       // Initialize buildingInteractionText with improved visual style
     this.buildingInteractionText = scene.add.text(
       this.buildingEntrance.x, 
@@ -65,6 +70,50 @@ export class BuildingManager {
       }
     ).setOrigin(0.5).setAlpha(0);
     
+    // Add building exit text (shown when player is inside building)
+    this.buildingExitText = scene.add.text(
+      this.scene.cameras.main.centerX,
+      this.scene.cameras.main.centerY + 250,
+      "Press ESC to exit building", 
+      {
+        fontFamily: Constants.UI_TEXT_FONT,
+        fontSize: Constants.UI_TEXT_SIZE,
+        color: Constants.UI_TEXT_COLOR,
+        align: 'center',
+        backgroundColor: Constants.UI_TEXT_BACKGROUND,
+        padding: Constants.UI_TEXT_PADDING,
+        shadow: {
+          offsetX: 1,
+          offsetY: 1,
+          color: '#000000',
+          blur: 3,
+          fill: true
+        }
+      }
+    ).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(2000);
+    
+    // Add bank exit interaction text (shown when near exit location inside bank)
+    this.bankExitInteractionText = scene.add.text(
+      this.bankExitLocation.x,
+      this.bankExitLocation.y - 50,
+      "Press E to exit bank", 
+      {
+        fontFamily: Constants.UI_TEXT_FONT,
+        fontSize: Constants.UI_TEXT_SIZE,
+        color: Constants.UI_TEXT_COLOR,
+        align: 'center',
+        backgroundColor: Constants.UI_TEXT_BACKGROUND,
+        padding: Constants.UI_TEXT_PADDING,
+        shadow: {
+          offsetX: 1,
+          offsetY: 1,
+          color: '#000000',
+          blur: 3,
+          fill: true
+        }
+      }
+    ).setOrigin(0.5).setAlpha(0);
+    
     // Setup keys for interaction with null checks
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
@@ -89,6 +138,8 @@ export class BuildingManager {
     if (gameContainer) {
       gameContainer.add(this.buildingInteractionText);
       gameContainer.add(this.stockMarketInteractionText);
+      gameContainer.add(this.buildingExitText);
+      gameContainer.add(this.bankExitInteractionText);
     }
   }
 
@@ -100,10 +151,45 @@ export class BuildingManager {
     // Get player position
     const playerPos = player.getPosition();
     
-    // If player is in building, check for ESC to exit
-    if (mapManager.isPlayerInBuilding() && this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
+    // If player is in building, check for ESC to exit (but not if dialogue is active)
+    if (mapManager.isPlayerInBuilding() && this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey) && !dialogueManager.isDialogueActive()) {
       this.exitBuilding();
       return;
+    }
+    
+    // If player is in building, check for proximity to bank exit location
+    if (mapManager.isPlayerInBuilding()) {
+      const exitDx = playerPos.x - this.bankExitLocation.x;
+      const exitDy = playerPos.y - this.bankExitLocation.y;
+      const exitDistance = Math.sqrt(exitDx * exitDx + exitDy * exitDy);
+      
+      const isNearExit = exitDistance <= Constants.BUILDING_INTERACTION_DISTANCE;
+      
+      // Show/hide exit interaction text based on proximity
+      if (isNearExit && this.bankExitInteractionText.alpha === 0) {
+        this.scene.tweens.add({
+          targets: this.bankExitInteractionText,
+          alpha: 1,
+          duration: 200,
+          ease: 'Power1'
+        });
+      } else if (!isNearExit && this.bankExitInteractionText.alpha === 1) {
+        this.scene.tweens.add({
+          targets: this.bankExitInteractionText,
+          alpha: 0,
+          duration: 200,
+          ease: 'Power1'
+        });
+      }
+      
+      // Check for interaction key press when near exit
+      if (isNearExit && !dialogueManager.isDialogueActive() &&
+          ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
+           (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+           (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
+        this.exitBuilding();
+        return;
+      }
     }
     
     // Calculate distance between player and building entrance
@@ -135,6 +221,29 @@ export class BuildingManager {
         });
       }
     }
+
+    // Handle building exit text visibility
+    if (mapManager.isPlayerInBuilding()) {
+      // Show exit text when inside building
+      if (this.buildingExitText) {
+        this.scene.tweens.add({
+          targets: this.buildingExitText,
+          alpha: 1,
+          duration: 200,
+          ease: 'Power1'
+        });
+      }
+    } else {
+      // Hide exit text when not in building
+      if (this.buildingExitText) {
+        this.scene.tweens.add({
+          targets: this.buildingExitText,
+          alpha: 0,
+          duration: 200,
+          ease: 'Power1'
+        });
+      }
+    }
     
     // Check for key press to enter building when near (now supports E, Space, or Enter)
     if (this.isNearBuilding && 
@@ -149,6 +258,18 @@ export class BuildingManager {
     if (this.buildingInteractionText) {
       this.buildingInteractionText.x = this.buildingEntrance.x;
       this.buildingInteractionText.y = this.buildingEntrance.y - 50;
+    }
+    
+    // Update building exit text position to follow player when inside building
+    if (this.buildingExitText && mapManager.isPlayerInBuilding()) {
+      this.buildingExitText.x = playerPos.x;
+      this.buildingExitText.y = playerPos.y - 50;
+    }
+    
+    // Update bank exit interaction text position (stays at fixed location)
+    if (this.bankExitInteractionText) {
+      this.bankExitInteractionText.x = this.bankExitLocation.x;
+      this.bankExitInteractionText.y = this.bankExitLocation.y - 50;
     }
   }
   

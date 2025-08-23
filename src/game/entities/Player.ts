@@ -2,6 +2,7 @@ import { Scene, GameObjects, Types } from "phaser";
 import { Constants } from "../utils/Constants.ts";
 import { ensureCharacterAnimations } from "../utils/CharacterAnimations.ts";
 import { FontUtils } from "../utils/FontUtils.ts";
+import { dialogueManager } from "../../services/DialogueManager";
 
 export class Player {
     private scene: Scene;

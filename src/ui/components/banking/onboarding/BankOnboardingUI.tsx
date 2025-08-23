@@ -4,7 +4,7 @@ import BankOnboardingDialogue from './BankOnboardingDialogue';
 import BankNameInput from './BankNameInput';
 
 interface BankOnboardingUIProps {
-  // Props can be added as needed
+  // This component doesn't need props - it listens to global events
 }
 
 const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
@@ -14,6 +14,8 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     messages: string[];
     characterName: string;
     onComplete: () => void;
+    onTextInput?: (text: string) => void;
+    onOptionSelect?: (optionId: string) => void;
   } | null>(null);
   const [nameInputData, setNameInputData] = useState<{
     onSubmit: (name: string) => void;
@@ -23,8 +25,8 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     // Listen for bank onboarding dialogue events
     const handleDialogue = (event: CustomEvent) => {
       console.log('🏦 BankOnboardingUI received dialogue event:', event.detail);
-      const { messages, characterName, onComplete } = event.detail;
-      setDialogueData({ messages, characterName, onComplete });
+      const { messages, characterName, onComplete, onTextInput, onOptionSelect } = event.detail;
+      setDialogueData({ messages, characterName, onComplete, onTextInput, onOptionSelect });
       setShowDialogue(true);
     };
 
@@ -45,7 +47,13 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
       const pending = (window as any).__pendingBankOnboardingDialogue;
       if (pending && pending.messages) {
         console.log('🏦 BankOnboardingUI consuming pending dialogue', pending);
-        setDialogueData({ messages: pending.messages, characterName: pending.characterName || 'Bank Manager', onComplete: pending.onComplete });
+        setDialogueData({ 
+          messages: pending.messages, 
+          characterName: pending.characterName || 'Bank Manager', 
+          onComplete: pending.onComplete,
+          onTextInput: pending.onTextInput,
+          onOptionSelect: pending.onOptionSelect
+        });
         setShowDialogue(true);
         // clear pending so it doesn't fire again
         (window as any).__pendingBankOnboardingDialogue = null;
@@ -67,6 +75,18 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
       dialogueData.onComplete();
     }
     setDialogueData(null);
+  };
+
+  const handleTextInput = (text: string) => {
+    if (dialogueData?.onTextInput) {
+      dialogueData.onTextInput(text);
+    }
+  };
+
+  const handleOptionSelect = (optionId: string) => {
+    if (dialogueData?.onOptionSelect) {
+      dialogueData.onOptionSelect(optionId);
+    }
   };
 
   const handleNameSubmit = (name: string) => {
@@ -95,6 +115,8 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
           messages={dialogueData.messages}
           characterName={dialogueData.characterName}
           onComplete={handleDialogueComplete}
+          onTextInput={handleTextInput}
+          onOptionSelect={handleOptionSelect}
         />
       )}
 

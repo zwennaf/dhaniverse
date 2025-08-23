@@ -8,6 +8,8 @@ import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
 import DialogueBox from '../common/DialogueBox';
+import DialogueRenderer from '../common/DialogueRenderer';
+import { dialogueManager } from '../../../services/DialogueManager';
 import { getTaskManager } from '../../../game/tasks/TaskManager';
 import { GameTask } from '../../../game/tasks/TaskTypes';
 
@@ -60,14 +62,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [activeTasks, setActiveTasks] = useState<GameTask[]>([]);
     const [showSmallAlertDialog, setShowSmallAlertDialog] = useState(false);
     const [smallAlertText, setSmallAlertText] = useState("");
-    const [genericDialog, setGenericDialog] = useState<{
-        text: string;
-        characterName?: string;
-        isVisible: boolean;
-        allowAdvance?: boolean;
-        showGotItButton?: boolean;
-        compact?: boolean;
-    }>({ text: "", characterName: undefined, isVisible: false });
+    const [isDialogueActive, setIsDialogueActive] = useState(false);
     const [playerPosition, setPlayerPosition] = useState({ x: 0, y: 0 });
     const [cameraPosition, setCameraPosition] = useState({ x: 0, y: 0 });
     const [screenSize, setScreenSize] = useState({
@@ -404,6 +399,14 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
     }, []);
 
+    // Track dialogue state from singleton
+    useEffect(() => {
+        const unsubscribe = dialogueManager.subscribe((dialogue) => {
+            setIsDialogueActive(dialogue !== null);
+        });
+        return unsubscribe;
+    }, []);
+
     // Listen for legacy onboarding completion event to create first task
     useEffect(() => {
         const assignFirstTaskHandler = () => {
@@ -437,13 +440,22 @@ const GameHUD: React.FC<GameHUDProps> = ({
         const showDialogueHandler = (e: any) => {
             const d = e.detail || {};
             console.debug("GameHUD: show-dialogue event received", d);
-            setGenericDialog({
+            
+            // Use singleton DialogueManager
+            dialogueManager.showDialogue({
                 text: d.text || "",
                 characterName: d.characterName || "Maya",
-                isVisible: true,
-                allowAdvance: d.allowAdvance !== false,
-                showGotItButton: d.showGotItButton || false,
-                compact: d.compact || false,
+                showBackdrop: d.showBackdrop || false,
+                allowSpaceAdvance: d.allowAdvance !== false
+            }, {
+                onAdvance: () => {
+                    dialogueManager.closeDialogue();
+                    window.dispatchEvent(new CustomEvent("dialogue-advance"));
+                },
+                onComplete: () => {
+                    dialogueManager.closeDialogue();
+                    window.dispatchEvent(new CustomEvent("dialogue-complete"));
+                }
             });
         };
 
@@ -457,7 +469,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
         };
 
         const closeDialogueHandler = () => {
-            setGenericDialog((g) => ({ ...g, isVisible: false }));
+            dialogueManager.closeDialogue();
         };
 
         window.addEventListener("show-dialogue" as any, showDialogueHandler);
@@ -504,21 +516,6 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 });
             }
             (window as any).__assignFirstTaskPending = false;
-        }
-    }, []);
-
-    // Consume a pending show-dialogue payload if it was set before HUD mounted
-    useEffect(() => {
-        const pending = (window as any).__pendingShowDialogue;
-        if (pending && pending.text) {
-            console.debug("GameHUD: consuming pending show-dialogue", pending);
-            setGenericDialog({
-                text: pending.text,
-                characterName: pending.characterName || "Maya",
-                isVisible: true,
-                allowAdvance: pending.allowAdvance !== false,
-            });
-            (window as any).__pendingShowDialogue = null;
         }
     }, []);
 
@@ -680,25 +677,6 @@ const GameHUD: React.FC<GameHUDProps> = ({
     // Mark task complete helper (future use)
     const completeTask = (id: string) => {
         getTaskManager().completeTask(id);
-    };
-
-    // Handle player advancing/closing a generic dialogue from the HUD
-    const handleGenericAdvance = () => {
-        // Tell the game that the player advanced/closed the dialogue
-        window.dispatchEvent(new CustomEvent("dialogue-advance"));
-        setGenericDialog((g) => ({ ...g, isVisible: false }));
-    };
-
-    // When user clicks 'Got it' on a dialog which requests an explicit acknowledgement
-    const handleGenericGotIt = () => {
-        // Notify game systems that user explicitly acknowledged the dialog
-        window.dispatchEvent(new CustomEvent("dialogue-gotit"));
-        // Also close the HUD dialog
-        setGenericDialog((g) => ({ ...g, isVisible: false }));
-    };
-
-    const handleGenericComplete = () => {
-        window.dispatchEvent(new CustomEvent("dialogue-complete"));
     };
 
     return (
@@ -910,7 +888,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             </div>
 
                         {/* Active Tasks Banner */}
-                        {activeTasks.length > 0 && !genericDialog.isVisible && (
+                        {activeTasks.length > 0 && !isDialogueActive && (
                             <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none">
                                 {activeTasks.slice(0,3).map(task => (
                                     <div key={task.id} className="bg-black/70 border border-white/20 text-white px-5 py-3 rounded-lg shadow-lg font-['Tickerbit',Arial,sans-serif] tracking-wider text-sm max-w-2xl pointer-events-auto">
@@ -948,20 +926,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 />
             ))}
 
-            {/* Generic HUD Dialogue (bottom) - used by Maya and other game systems */}
-            <DialogueBox
-                text={genericDialog.text}
-                characterName={genericDialog.characterName}
-                isVisible={genericDialog.isVisible}
-                onAdvance={handleGenericAdvance}
-                onComplete={handleGenericComplete}
-                // Got it button removed
-                compact={genericDialog.compact}
-                // onGotIt removed
-                showProgressIndicator={false}
-                showContinueHint={true}
-                allowSpaceAdvance={true}
-            />
+            {/* Global Dialogue Renderer - Singleton dialogue system */}
+            <DialogueRenderer />
         </div>
     );
 };
