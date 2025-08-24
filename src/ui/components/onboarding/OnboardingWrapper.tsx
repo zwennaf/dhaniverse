@@ -92,7 +92,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
       .showcase-fade.show { opacity:1; }
     `;
     document.head.appendChild(styleEl);
-    const t = setTimeout(() => mountedRef.current && setIsInitialLoad(false), 200);
+    // Short initial delay to avoid a visible black flash but keep a tiny buffer for layout
+    const t = setTimeout(() => mountedRef.current && setIsInitialLoad(false), 30);
     return () => { mountedRef.current = false; clearTimeout(t); styleEl.remove(); };
   }, []);
 
@@ -159,8 +160,9 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
           />
         </div>
       </div>
-      <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:40, opacity: isTransitioning ? 1 : 0, pointerEvents: isTransitioning ? 'auto':'none' }} />
-      <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:50, opacity: isInitialLoad ? 1 : 0, pointerEvents: isInitialLoad ? 'auto':'none' }} />
+  <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:40, opacity: isTransitioning ? 1 : 0, pointerEvents: isTransitioning ? 'auto':'none' }} />
+  {/* initial-load overlay: non-blocking and very short to avoid a full-screen blackout */}
+  <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:50, opacity: isInitialLoad ? 0.98 : 0, pointerEvents: 'none' }} />
     </div>
   );
 };

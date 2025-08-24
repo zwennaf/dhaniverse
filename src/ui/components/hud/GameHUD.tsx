@@ -717,13 +717,13 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         />
 
                         {/* Overlay the dynamic rupee amount inside the SVG */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                             <div
                                 style={{
                                     color: '#FFFFFF',
-                                    fontFamily: "'Tickerbit', 'VCR OSD Mono', Arial, sans-serif",
+                                    fontFamily: "'VCR OSD Mono', Arial, sans-serif",
                                     fontWeight: 700,
-                                    fontSize: 22,
+                                    fontSize: 26,
                                     textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -765,7 +765,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                 className="w-2 h-2 rounded-full bg-green-400"
                                 aria-hidden
                             />
-                            <span className="text-white font-['Tickerbit',Arial,sans-serif] text-xs tracking-wider">
+                            <span className="text-white font-['Tickerbit',Arial,sans-serif] text-sm tracking-wider">
                                 {typeof onlineCount === 'number' ? onlineCount.toLocaleString() : onlineCount} Online
                             </span>
                         </div>
