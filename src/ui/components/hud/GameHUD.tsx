@@ -682,7 +682,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     return (
         <div className="absolute top-2 left-2 w-full h-full z-[1000] font-['Tickerbit',Arial,sans-serif]">
             {/* Top right status area */}
-            <div className="absolute top-5 right-5 flex flex-col items-end space-y-2">
+            <div className="absolute top-5 right-9 flex flex-col items-end space-y-2">
                 {/* Blockchain status indicator */}
                 {walletManager && (
                     <div className="flex items-center space-x-2 bg-black/60 rounded-lg px-3 py-1 backdrop-blur">
@@ -705,10 +705,39 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                 )}
 
-                {/* Rupee counter */}
-                <div className="p-2 px-3 rounded-lg flex items-center text-[#FFD700] text-shadow-lg text-2xl font-bold">
-                    <span className="mr-1.5 text-3xl">₹</span>
-                    <span>{currentRupees}</span>
+                {/* Rupee counter (SVG background + overlaid text) */}
+                <div className="p-0 rounded-lg flex items-center" style={{ lineHeight: 1 }}>
+                    <div className="relative" style={{ width: 137, height: 57 }}>
+                        {/* Use the provided SVG as the background visual */}
+                        <img
+                            src="/UI/game/rupeecounter.svg"
+                            alt="Rupee counter"
+                            className="block w-full h-full"
+                            style={{ display: 'block' }}
+                        />
+
+                        {/* Overlay the dynamic rupee amount inside the SVG */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div
+                                style={{
+                                    color: '#FFFFFF',
+                                    fontFamily: "'Tickerbit', 'VCR OSD Mono', Arial, sans-serif",
+                                    fontWeight: 700,
+                                    fontSize: 22,
+                                    textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}
+                                aria-hidden
+                            >
+                                <span style={{ fontSize: 26 }}>₹</span>
+                                <span>{currentRupees.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Blockchain verified dot (kept to the right like before) */}
                     {walletStatus.connected && (
                         <div
                             className="ml-2 w-3 h-3 bg-blue-400 rounded-full"
