@@ -749,7 +749,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
             {/* Player connection display (moved to bottom-right, uses SVG background) */}
             <div className="absolute bottom-5 right-9 pointer-events-none z-[1001]">
-                <div className="relative w-[170px] h-auto">
+                <div className="relative w-[120px] h-auto">
                     {/* SVG background provided by designer */}
                     <img
                         src="/UI/game/onlinecount.svg"
@@ -760,12 +760,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
                     {/* Overlay the dynamic online count and green dot */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="flex items-center gap-2 px-4">
+                        <div className="flex items-center gap-2 px-3">
                             <span
                                 className="w-2 h-2 rounded-full bg-green-400"
                                 aria-hidden
                             />
-                            <span className="text-white font-['Tickerbit',Arial,sans-serif] text-sm tracking-wider">
+                            <span className="text-white font-['Tickerbit',Arial,sans-serif] text-xs tracking-wider">
                                 {typeof onlineCount === 'number' ? onlineCount.toLocaleString() : onlineCount} Online
                             </span>
                         </div>
