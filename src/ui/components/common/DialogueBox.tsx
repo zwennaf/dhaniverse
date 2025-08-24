@@ -135,7 +135,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   position = 'bottom',
   small = false,
   compact = false,
-  showBackdrop = false,
+  showBackdrop = true,
   // New props
   requiresTextInput = false,
   textInputPlaceholder = "Type your response...",
@@ -360,9 +360,14 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
   return (
     <>
-      {/* Optional backdrop */}
+      {/* Optional backdrop with gradient from 1/3 of screen */}
       {showBackdrop && (
-        <div className="fixed inset-0 bg-black/30 z-[1100]" />
+        <div 
+          className="fixed inset-0 z-[1100]" 
+          style={{
+            background: 'linear-gradient(to bottom, transparent 0%, transparent 66%, rgba(0, 0, 0, 0.5) 100%)'
+          }}
+        />
       )}
       
       <div className={`${showBackdrop ? 'fixed' : containerClass} ${showBackdrop ? 'inset-0 flex items-end justify-center pb-8 z-[1200]' : ''} pointer-events-auto`}>
@@ -380,6 +385,21 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
             maxHeight: small ? (compact ? '140px' : '180px') : (compact ? '300px' : '420px')
           }}
         />
+        
+        {/* Press [SPACE] to continue - below dialogue box */}
+        {showBackdrop && !showOptions && !requiresTextInput && (
+          <div className="flex justify-center mt-4">
+            <p 
+              className="text-white text-sm opacity-80 animate-pulse"
+              style={{ 
+                fontFamily: 'Tickerbit-regular, VCR OSD Mono, monospace',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+              }}
+            >
+              Press [SPACE] to continue
+            </p>
+          </div>
+        )}
         
         {/* Title (for tasks) */}
         {title && (
@@ -408,7 +428,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               <span 
                 className="absolute inset-0 flex items-center justify-center text-[#2B2621] text-base font-robert whitespace-nowrap"
                 style={{ 
-                  fontFamily: 'VCR OSD Mono, monospace',
+                  fontFamily: 'Tickerbit-regular, VCR OSD Mono, monospace',
                   fontWeight: '800',
                   whiteSpace: 'nowrap',
                 }}
@@ -420,7 +440,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         )}
 
         {/* Dialogue text area */}
-        <div className="absolute top-12 left-6 right-6 bottom-6 flex flex-col">
+        <div className="absolute top-12 left-10 right-6 bottom-6 flex flex-col">
           <div 
             className="flex-1 px-4 py-4 rounded-lg cursor-pointer overflow-auto bg-transparent"
             style={{}}
@@ -438,15 +458,19 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
               <p 
                 className={`text-[#2B2621] text-lg leading-relaxed font-medium ${!isComplete ? 'typing-cursor' : ''}`}
                 style={{ 
-                  fontFamily: 'VCR OSD Mono, monospace',
+                  fontFamily: 'Tickerbit-regular, VCR OSD Mono, monospace',
                   textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
                   lineHeight: '1.6',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word'
                 }}
-              >
-                {displayedText}
-              </p>
+                dangerouslySetInnerHTML={{
+                  __html: displayedText.replace(
+                    /₹(\d+)/g,
+                    '<span style="color: #22c55e; font-weight: bold;">₹$1</span>'
+                  )
+                }}
+              />
             </div>
           </div>
 
@@ -491,7 +515,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
         {/* Progress indicator */}
         {showProgressIndicator && (
-          <div className="absolute bottom-6 right-12">
+          <div className="absolute bottom-16 right-16">
             <div className="flex items-center space-x-2">
               {/* Slide dots */}
               <div className="flex space-x-1">
@@ -513,18 +537,6 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
                 {currentSlide + 1} / {totalSlides}
               </span>
             </div>
-          </div>
-        )}
-
-        {/* Click to continue hint */}
-        {showContinueHint && !showOptions && !requiresTextInput && (
-          <div className="absolute bottom-6 left-8">
-            <p 
-              className="text-[#2B2621] text-xs opacity-70 animate-pulse"
-              style={{ fontFamily: 'VCR OSD Mono, monospace' }}
-            >
-              Click to continue
-            </p>
           </div>
         )}
 

@@ -113,11 +113,8 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
 
   return (
     <div className="fixed inset-0 z-50 select-none" onClick={handleAdvance}>
-  <div className="absolute inset-0" style={{ background: `url('${resolveAsset(backgroundUrl)}') center / cover no-repeat` }} />
+    <div className="absolute inset-0" style={{ background: `url('${resolveAsset(backgroundUrl)}') center / cover no-repeat` }} />
       <div className="relative flex flex-col h-full w-full">
-        <div className="w-full flex justify-center pt-4 pointer-events-none" style={{ zIndex: 5 }}>
-          <p className="text-black text-lg drop-shadow font-mono bg-white/60 px-4 py-1 rounded">Press [Space] to Speed Up • Click to Continue</p>
-        </div>
         <div className="flex-1 flex items-center justify-center">
           <div className={`flex ${hasShowcase ? 'justify-between' : 'justify-center'} items-center w-full max-w-[1600px] px-16 gap-12`}>
             <div className={`flex justify-center ${hasShowcase ? 'basis-1/2' : 'basis-full'} relative`}>
