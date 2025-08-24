@@ -889,7 +889,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
                         {/* Active Tasks Banner */}
                         {activeTasks.length > 0 && !isDialogueActive && (
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none w-full max-w-4xl px-4">
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col space-y-2 z-[1002] pointer-events-none w-full max-w-3xl px-4">
                                 {activeTasks.slice(0,3).map(task => (
                                     <div key={task.id} className="relative w-full pointer-events-auto">
                                         {/* SVG Objective Box Background - Stretchable */}
@@ -906,7 +906,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                         
                                         {/* Objective Content - Forced Single Line */}
                                         <div className="absolute inset-0 flex items-center px-6 overflow-hidden">
-                                            <div className="flex items-center space-x-3 w-full min-w-0">
+                                            <div className="flex items-center space-x-3 mx-auto min-w-0">
                                                 <span 
                                                     className="font-bold uppercase text-sm whitespace-nowrap flex-shrink-0"
                                                     style={{ 
