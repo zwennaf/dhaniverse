@@ -386,8 +386,8 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           }}
         />
         
-        {/* Press [SPACE] to continue - below dialogue box */}
-        {showBackdrop && !showOptions && !requiresTextInput && (
+  {/* Press [SPACE] to continue - below dialogue box */}
+  {showContinueHint && !showOptions && !requiresTextInput && (
           <div className="flex justify-center mt-4">
             <p 
               className="text-white text-sm opacity-80 animate-pulse"
