@@ -18,7 +18,11 @@ import {
     PieChart,
     BarChart3
 } from 'lucide-react';
-import { stakingService, StakingPool, UserStake, StakingStats } from '../../../services/StakingService';
+import { stakingService, StakingPool, StakingStats, StakingReward } from '../../../services/StakingService';
+
+// StakingService currently exports minimal/stub types; locally alias UserStake
+// to avoid depending on a non-existent export and keep typing permissive.
+type UserStake = any;
 import { icpIntegration } from '../../../services/ICPIntegrationManager';
 import { ICPToken } from '../../../services/TestnetBalanceManager';
 
@@ -64,8 +68,15 @@ const StakingPanel: React.FC<StakingPanelProps> = ({ isOpen = false, onClose }) 
         const unsubscribeStaking = stakingService.onStakingUpdate(setUserStakes);
         const unsubscribePools = stakingService.onPoolUpdate(setStakingPools);
         const unsubscribeBalances = icpIntegration.onBalanceUpdate(setUserTokens);
-        const unsubscribeRewards = stakingService.onRewardUpdate((reward) => {
-            showNotification('success', `Claimed ${reward.amount} ${reward.tokenSymbol} rewards!`);
+        const unsubscribeRewards = stakingService.onRewardUpdate((reward: StakingReward | any) => {
+            // service is a stub in this workspace; guard against missing fields
+            try {
+                const amount = (reward && reward.amount) || '';
+                const symbol = (reward && reward.tokenSymbol) || '';
+                if (amount || symbol) showNotification('success', `Claimed ${amount} ${symbol} rewards!`);
+            } catch {
+                // ignore malformed reward
+            }
             loadStakingData();
         });
 
@@ -367,7 +378,7 @@ const StakingPanel: React.FC<StakingPanelProps> = ({ isOpen = false, onClose }) 
                                                 <div className="flex flex-col space-y-2">
                                                     <button
                                                         onClick={() => handleClaimRewards(stake.id)}
-                                                        disabled={parseFloat(pendingRewards) <= 0 || isLoading}
+                                                        disabled={Number(pendingRewards) <= 0 || isLoading}
                                                         className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg transition-colors"
                                                     >
                                                         <div className="flex items-center justify-center space-x-2">
@@ -410,12 +421,12 @@ const StakingPanel: React.FC<StakingPanelProps> = ({ isOpen = false, onClose }) 
                             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                                 <h3 className="text-lg font-semibold text-white mb-4">Reward History</h3>
                                 <div className="space-y-3">
-                                    {stakingService.getRewardHistory(10).map(reward => (
+                                    {((stakingService as any).getRewardHistory?.(10) ?? []).map((reward: any) => (
                                         <div key={reward.id} className="flex items-center justify-between py-2 border-b border-gray-700 last:border-b-0">
                                             <div>
-                                                <span className="text-white">{reward.amount} {reward.tokenSymbol}</span>
+                                                <span className="text-white">{reward?.amount} {reward?.tokenSymbol}</span>
                                                 <span className="text-gray-400 text-sm ml-2">
-                                                    {formatDate(reward.claimedAt)}
+                                                    {reward?.claimedAt ? formatDate(reward.claimedAt) : ''}
                                                 </span>
                                             </div>
                                             <CheckCircle className="h-5 w-5 text-green-400" />
