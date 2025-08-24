@@ -747,30 +747,36 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
             </div>
 
-            {/* Player connection display */}
-            <div className="absolute bottom-[45vh] left-5 w-[28ch] pointer-events-none">
-                {/* Online count */}
-                <div className="mb-10 text-white/80 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider">
-                    <span className="text-dhani-green">●</span> {onlineCount}{" "}
-                    online
+            {/* Player connection display (moved to bottom-right, uses SVG background) */}
+            <div className="absolute bottom-5 right-9 pointer-events-none z-[1001]">
+                <div className="relative w-[170px] h-auto">
+                    {/* SVG background provided by designer */}
+                    <img
+                        src="/UI/game/onlinecount.svg"
+                        alt="Online count"
+                        className="block w-full h-full"
+                        style={{ display: 'block' }}
+                    />
+
+                    {/* Overlay the dynamic online count and green dot */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="flex items-center gap-2 px-4">
+                            <span
+                                className="w-2 h-2 rounded-full bg-green-400"
+                                aria-hidden
+                            />
+                            <span className="text-white font-['Tickerbit',Arial,sans-serif] text-sm tracking-wider">
+                                {typeof onlineCount === 'number' ? onlineCount.toLocaleString() : onlineCount} Online
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Connected players list */}
+                {/* Optional connected players list (kept but hidden visually) */}
                 {connectedPlayers.length > 0 && (
-                    <div className="space-y-1 max-h-[15vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    <div className="sr-only">
                         {connectedPlayers.slice(-8).map((player) => (
-                            <div
-                                key={player.id}
-                                className="text-white/70 text-sm font-['Tickerbit',Arial,sans-serif] tracking-wider flex items-center animate-fade-in"
-                            >
-                                <span className="text-dhani-green mr-2">▸</span>
-                                <span className="text-white">
-                                    {player.username}
-                                </span>
-                                <span className="text-white/40 ml-2 text-xs">
-                                    joined
-                                </span>
-                            </div>
+                            <div key={player.id}>{player.username}</div>
                         ))}
                     </div>
                 )}
