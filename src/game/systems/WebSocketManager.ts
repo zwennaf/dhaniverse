@@ -261,6 +261,7 @@ export class WebSocketManager {
             this.ws.onmessage = (event) => {
                 try {
                     const data: ServerMessage = JSON.parse(event.data);
+                    console.log('[WebSocketManager] received message:', data);
                     this.handleServerMessage(data);
                 } catch (error) {
                     console.error("Error parsing message:", error);
@@ -471,6 +472,10 @@ export class WebSocketManager {
 
             case "players":
                 this.handleExistingPlayers(data.players);
+                // Keep a snapshot on window so UI mounted later can read it
+                try {
+                    (window as any).__ws_players = data.players;
+                } catch (e) {}
                 // Dispatch event for UI
                 window.dispatchEvent(
                     new CustomEvent("existingPlayers", {
@@ -481,7 +486,15 @@ export class WebSocketManager {
 
             case "playerJoined":
                 this.handlePlayerJoined(data.player);
-                // Dispatch event for UI
+                // update snapshot
+                try {
+                    const wp = (window as any).__ws_players || [];
+                    const exists = wp.find((p: any) => p.id === data.player.id);
+                    if (!exists) wp.push(data.player);
+                    (window as any).__ws_players = wp;
+                } catch (e) {}
+                // Debug log and dispatch event for UI
+                console.log('[WebSocketManager] dispatching playerJoined for', data.player?.username || data.player?.id);
                 window.dispatchEvent(
                     new CustomEvent("playerJoined", {
                         detail: { player: data.player },
@@ -495,7 +508,13 @@ export class WebSocketManager {
 
             case "playerDisconnect":
                 this.handlePlayerDisconnect(data.id, data.username);
-                // Dispatch event for UI
+                // update snapshot
+                try {
+                    const wp = (window as any).__ws_players || [];
+                    (window as any).__ws_players = wp.filter((p: any) => p.id !== data.id);
+                } catch (e) {}
+                // Debug log and dispatch event for UI
+                console.log('[WebSocketManager] dispatching playerDisconnect for', data.username || data.id);
                 window.dispatchEvent(
                     new CustomEvent("playerDisconnect", {
                         detail: { id: data.id, username: data.username },
@@ -504,7 +523,11 @@ export class WebSocketManager {
                 break;
 
             case "onlineUsersCount":
-                // Dispatch event for UI
+                // Debug log and dispatch event for UI
+                console.log('[WebSocketManager] dispatching onlineUsersCount', data.count);
+                try {
+                    (window as any).__ws_onlineCount = data.count;
+                } catch (e) {}
                 window.dispatchEvent(
                     new CustomEvent("onlineUsersCount", {
                         detail: { count: data.count },

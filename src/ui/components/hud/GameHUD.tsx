@@ -27,6 +27,13 @@ interface ConnectedPlayer {
     joinedAt: number;
 }
 
+interface NotificationItem {
+    id: string;
+    username: string;
+    createdAt: number;
+    action?: 'joined' | 'left';
+}
+
 const GameHUD: React.FC<GameHUDProps> = ({
     rupees = 0,
     username = "Player",
@@ -46,6 +53,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [connectedPlayers, setConnectedPlayers] = useState<ConnectedPlayer[]>(
         []
     );
+    // Persistent join/leave notifications (appear above the online count)
+    // Notifications persist until capacity is reached; older messages remain on top, new ones below.
+    const [joinNotifications, setJoinNotifications] = useState<NotificationItem[]>([]);
     const [onlineCount, setOnlineCount] = useState(0);
 
     // Blockchain status
@@ -156,9 +166,24 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     // Listen for player connection events
     useEffect(() => {
+        console.log('[GameHUD] mounting - registering player connection listeners');
+        // Read any existing snapshot provided by WebSocketManager (in case it fired before HUD mounted)
+        try {
+            const snapPlayers = (window as any).__ws_players;
+            if (Array.isArray(snapPlayers)) {
+                setConnectedPlayers(
+                    snapPlayers.map((p: any) => ({ id: p.id, username: p.username, joinedAt: Date.now() }))
+                );
+            }
+            const snapCount = (window as any).__ws_onlineCount;
+            if (typeof snapCount === 'number') setOnlineCount(snapCount);
+        } catch (e) {
+            // ignore
+        }
         const handlePlayerJoined = (e: any) => {
             const { player } = e.detail;
             if (player && player.username) {
+                console.log('[GameHUD] playerJoined event received:', player);
                 setConnectedPlayers((prev) => {
                     // Remove any existing entry with same id or username to avoid duplicates
                     const filtered = prev.filter(
@@ -175,21 +200,23 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     ];
                 });
 
-                // Add a system message to chat when someone joins
-                setChatMessages((prev) => {
-                    const joinMessage = {
-                        id: `join-${Date.now()}-${Math.random()
-                            .toString(36)
-                            .substring(2, 9)}`,
-                        username: "System",
-                        message: `${player.username} joined the game`,
-                        timestamp: Date.now(),
-                    };
-                    const newMessages = [...prev, joinMessage];
-                    return newMessages.length > 50
-                        ? newMessages.slice(-50)
-                        : newMessages;
+                // Join notification handled via small transient UI above the online count
+
+                // Show a small transient join notification above the online SVG
+                const notifId = `jn-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substring(2, 9)}`;
+                const MAX_VISIBLE = 4;
+
+                // Append new notification at bottom. Let the container handle overflow and fading at the top.
+                setJoinNotifications((prev) => {
+                    const newNotif: NotificationItem = { id: notifId, username: player.username, createdAt: Date.now(), action: 'joined' };
+                    const appended = [...prev, newNotif];
+                    // Trim to a reasonable history length to avoid unbounded growth
+                    return appended.length > 50 ? appended.slice(-50) : appended;
                 });
+
+                console.log('[GameHUD] join notification added:', notifId, player.username);
             }
         };
 
@@ -199,22 +226,20 @@ const GameHUD: React.FC<GameHUDProps> = ({
             // Remove player from connected list
             setConnectedPlayers((prev) => prev.filter((p) => p.id !== id));
 
-            // Add a system message to chat when someone leaves
+            // Show transient leave notification above the online SVG (do not add to chat)
             if (username) {
-                setChatMessages((prev) => {
-                    const leaveMessage = {
-                        id: `leave-${Date.now()}-${Math.random()
-                            .toString(36)
-                            .substring(2, 9)}`,
-                        username: "System",
-                        message: `${username} left the game`,
-                        timestamp: Date.now(),
-                    };
-                    const newMessages = [...prev, leaveMessage];
-                    return newMessages.length > 50
-                        ? newMessages.slice(-50)
-                        : newMessages;
+                console.log('[GameHUD] playerDisconnect event received:', { id, username });
+                const notifId = `ln-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .substring(2, 9)}`;
+                // Append leave notification at bottom; container will show the last few.
+                setJoinNotifications((prev) => {
+                    const newNotif: NotificationItem = { id: notifId, username, createdAt: Date.now(), action: 'left' };
+                    const appended = [...prev, newNotif];
+                    return appended.length > 50 ? appended.slice(-50) : appended;
                 });
+
+                console.log('[GameHUD] leave notification added:', notifId, username);
             }
         };
 
@@ -251,6 +276,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
         );
 
         return () => {
+            console.log('[GameHUD] unmounting - removing player connection listeners');
             window.removeEventListener(
                 "playerJoined" as any,
                 handlePlayerJoined
@@ -681,6 +707,18 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
     return (
         <div className="absolute top-2 left-2 w-full h-full z-[1000] font-['Tickerbit',Arial,sans-serif]">
+            {/* Inline animation styles for join notifications (small localized CSS) */}
+            <style>{`
+                @keyframes joinEnter {
+                    0% { transform: translateY(8px); opacity: 0; }
+                    60% { transform: translateY(2px); opacity: 1; }
+                    100% { transform: translateY(0px); opacity: 1; }
+                }
+                .join-notif {
+                    animation: joinEnter 420ms cubic-bezier(.2,.8,.2,1) both;
+                    will-change: transform, opacity;
+                }
+            `}</style>
             {/* Top right status area */}
             <div className="absolute top-5 right-9 flex flex-col items-end space-y-2">
                 {/* Blockchain status indicator */}
@@ -748,7 +786,30 @@ const GameHUD: React.FC<GameHUDProps> = ({
             </div>
 
             {/* Player connection display (moved to bottom-right, uses SVG background) */}
-            <div className="absolute bottom-5 right-9 pointer-events-none z-[1001]">
+            <div className="absolute bottom-5 right-9 pointer-events-none z-[1100]">
+                {/* Fixed notification stack (reliable visibility above UI) */}
+                <div className="fixed right-8 bottom-20 z-[2000] pointer-events-none">
+                    {/* Accessibility: announce join/leave notifications to screen readers */}
+                    <div className="sr-only" aria-live="polite" aria-atomic="true">
+                        {joinNotifications.map(n => `${n.username} ${n.action === 'left' ? 'left' : 'joined'}`).join(', ')}
+                    </div>
+
+                    {/* Container with fixed height; top edge softly fades older items using CSS mask */}
+                    <div style={{ width: 220, maxHeight: 110, overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, paddingTop: 6, pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 25%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 25%)' }}>
+                        {joinNotifications.slice(-4).map((n) => (
+                            <div
+                                key={n.id}
+                                className={`join-notif text-white text-sm text-right font-['Tickerbit',Arial,sans-serif]`}
+                                style={{ background: 'transparent', padding: 0, opacity: 0, transform: 'translateY(6px)', transition: 'opacity 420ms cubic-bezier(.2,.8,.2,1), transform 420ms cubic-bezier(.2,.8,.2,1)' }}
+                                aria-hidden
+                                // apply a tiny delay so newer items animate after render
+                                onAnimationStart={() => { /* noop - preserved for future hooks */ }}
+                            >
+                                {n.username} {n.action === 'left' ? 'left' : 'joined'}
+                            </div>
+                        ))}
+                    </div>
+                </div>
                 <div className="relative w-[120px] h-auto">
                     {/* SVG background provided by designer */}
                     <img
