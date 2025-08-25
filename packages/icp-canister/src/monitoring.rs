@@ -415,8 +415,32 @@ pub fn heartbeat_tasks() {
         store.borrow_mut().last_metrics_update = ic_cdk::api::time();
     });
 
-    // Placeholder for future HTTP price fetches or scheduled aggregation
-    // For now this keeps the canister active and performs safe maintenance
+    // Schedule price updates (every ~10 minutes in production)
+    let now = ic_cdk::api::time();
+    let last_update = METRICS_STORE.with(|store| store.borrow().last_metrics_update);
+    let ten_minutes = 10 * 60 * 1_000_000_000; // 10 minutes in nanoseconds
+    
+    if now - last_update > ten_minutes {
+        // Spawn price update task (fire and forget)
+        ic_cdk::spawn(async {
+            match crate::http_client::fetch_price("bitcoin,ethereum,internet-computer").await {
+                Ok(prices) => {
+                    for (token_id, price) in prices {
+                        let symbol = match token_id.as_str() {
+                            "bitcoin" => "BTC",
+                            "ethereum" => "ETH",
+                            "internet-computer" => "ICP",
+                            _ => &token_id,
+                        };
+                        crate::storage::set_price_feed(symbol, price);
+                    }
+                }
+                Err(_) => {
+                    // Silently continue on price fetch errors in heartbeat
+                }
+            }
+        });
+    }
 }
 
 // Macro for easy performance tracking

@@ -1,4 +1,5 @@
 use ic_cdk::export_candid;
+use ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
 
 mod types;
 mod auth;
@@ -332,11 +333,47 @@ fn get_current_time_formatted() -> String {
     format!("Current time: {} ns ({} ms)", now_nanos, now_millis)
 }
 
-// Future HTTP price fetching (currently stubbed)
+// Future HTTP price fetching (now with real implementation)
 #[ic_cdk::update]
 async fn fetch_external_price(symbol: String) -> Result<Option<f64>, String> {
-    let url = format!("https://api.coingecko.com/api/v3/simple/price?ids={}&vs_currencies=usd", symbol.to_lowercase());
-    http_client::fetch_price(&url).await.map_err(|e| e)
+    let prices = http_client::fetch_price(&symbol).await?;
+    Ok(prices.into_iter().find(|(s, _)| s == &symbol).map(|(_, p)| p))
+}
+
+#[ic_cdk::update]
+async fn fetch_multiple_crypto_prices(token_ids: String) -> Result<Vec<(String, f64)>, String> {
+    http_client::fetch_price(&token_ids).await
+}
+
+#[ic_cdk::update]
+async fn fetch_stock_price(symbol: String) -> Result<Option<f64>, String> {
+    let prices = http_client::fetch_stock_prices(&symbol).await?;
+    Ok(prices.into_iter().find(|(s, _)| s == &symbol).map(|(_, p)| p))
+}
+
+#[ic_cdk::update]
+async fn update_prices_from_external() -> Result<usize, String> {
+    // Fetch major crypto prices
+    let crypto_ids = "bitcoin,ethereum,internet-computer,chainlink,uniswap";
+    let crypto_prices = http_client::fetch_price(crypto_ids).await?;
+    
+    let mut updated_count = 0;
+    for (token_id, price) in crypto_prices {
+        // Map CoinGecko IDs to our token symbols
+        let symbol = match token_id.as_str() {
+            "bitcoin" => "BTC",
+            "ethereum" => "ETH", 
+            "internet-computer" => "ICP",
+            "chainlink" => "LINK",
+            "uniswap" => "UNI",
+            _ => &token_id,
+        };
+        
+        storage::set_price_feed(symbol, price);
+        updated_count += 1;
+    }
+    
+    Ok(updated_count)
 }
 
 // Test endpoint - bypasses session validation

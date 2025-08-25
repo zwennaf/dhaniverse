@@ -1,6 +1,7 @@
 import { GameObjects, Input } from 'phaser';
 import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
+import realStockService from '../../services/RealStockService';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -68,7 +69,7 @@ export class StockMarketManager {
   private isPlayerNearBroker: boolean = false;
   private activeDialog: boolean = false;
   private speechBubble: GameObjects.Sprite | null = null;
-  private stockData: Stock[];
+  private stockData: Stock[] = [];
   private newsItems: Record<string, string[]>;
   
   // New properties for enhanced stock market simulation
@@ -118,8 +119,8 @@ export class StockMarketManager {
     // Initialize market events
     this.marketEvents = this.setupMarketEvents();
     
-    // Initialize mock stock data
-    this.stockData = this.generateInitialStockData();
+    // Initialize real stock data instead of mock data
+    this.initializeRealStockData();
     
     // Initialize news database
     this.newsItems = this.setupNewsDatabase();
@@ -279,6 +280,34 @@ export class StockMarketManager {
     
     // Schedule market open/close events
     this.scheduleMarketStatusChanges();
+  }
+
+  /**
+   * Update market status - checks if market should be open/closed
+   */
+  private updateMarketStatus(): void {
+    const now = Date.now();
+    const currentHour = new Date().getHours();
+    const isMarketHours = currentHour >= this.MARKET_OPEN_HOUR && currentHour < this.MARKET_CLOSE_HOUR;
+    
+    // Update market open/closed status
+    if (this.marketStatus.isOpen !== isMarketHours) {
+      this.marketStatus.isOpen = isMarketHours;
+      console.log(`Market status changed: ${isMarketHours ? 'OPENED' : 'CLOSED'}`);
+      
+      // Trigger market status change events
+      this.scheduleMarketStatusChanges();
+    }
+    
+    // Update market trend periodically
+    if (Math.random() < 0.1) { // 10% chance to change trend
+      const trends: ('bull' | 'bear' | 'neutral')[] = ['bull', 'bear', 'neutral'];
+      const newTrend = trends[Math.floor(Math.random() * trends.length)];
+      if (newTrend !== this.marketStatus.trend) {
+        this.marketStatus.trend = newTrend;
+        console.log(`Market trend changed to: ${newTrend}`);
+      }
+    }
   }
   
   /**
@@ -567,8 +596,137 @@ export class StockMarketManager {
     }
   }
 
+  
   /**
-   * Generate initial stock data for the market
+   * Initialize real stock data from external API
+   */
+  private async initializeRealStockData(): Promise<void> {
+    try {
+      console.log('Loading real stock market data...');
+      const realStocks = await realStockService.initializeRealStocks();
+      
+      // Convert real stock data to our Stock interface format
+      this.stockData = realStocks.map((realStock, index) => ({
+        id: realStock.symbol.toLowerCase(),
+        name: realStock.name,
+        sector: realStock.sector,
+        currentPrice: realStock.price,
+        priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
+        debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
+        businessGrowth: realStock.changePercent / 10, // Convert to business growth
+        news: [],
+        volatility: Math.abs(realStock.changePercent) / 10 + 1, // Base volatility on price change
+        lastUpdate: Date.now(),
+        marketCap: realStock.marketCap,
+        peRatio: realStock.peRatio || 20, // Default P/E if not available
+        eps: realStock.price / (realStock.peRatio || 20), // Calculate EPS
+        outstandingShares: realStock.marketCap / realStock.price,
+        industryAvgPE: this.getIndustryAveragePE(realStock.sector)
+      }));
+
+      console.log(`Loaded ${this.stockData.length} real stocks:`, this.stockData.map(s => s.name));
+      
+      // Start periodic updates every 5 minutes
+      this.startRealTimeUpdates();
+      
+    } catch (error) {
+      console.error('Failed to load real stock data, falling back to mock data:', error);
+      this.stockData = this.generateInitialStockData();
+    }
+  }
+
+  /**
+   * Generate realistic price history based on current price and recent change
+   */
+  private generateRealisticPriceHistory(currentPrice: number, changePercent: number): number[] {
+    const history: number[] = [];
+    let price = currentPrice * (1 - changePercent / 100); // Start from previous price
+    
+    for (let i = 0; i < 15; i++) {
+      // Add small random variations
+      const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+      price = price * (1 + variation);
+      history.push(Math.round(price * 100) / 100); // Round to 2 decimal places
+    }
+    
+    // Ensure the last price matches current price
+    history[history.length - 1] = currentPrice;
+    return history;
+  }
+
+  /**
+   * Get industry average P/E ratio
+   */
+  private getIndustryAveragePE(sector: string): number {
+    const industryPE: { [key: string]: number } = {
+      'Technology': 25,
+      'Healthcare': 22,
+      'Financial Services': 15,
+      'Consumer Discretionary': 20,
+      'Energy': 12,
+      'Industrials': 18,
+      'Consumer Staples': 16,
+      'Utilities': 14,
+      'Real Estate': 13,
+      'Materials': 17
+    };
+    
+    return industryPE[sector] || 20; // Default to 20 if sector not found
+  }
+
+  /**
+   * Start real-time stock price updates
+   */
+  private startRealTimeUpdates(): void {
+    // Update every 5 minutes during market hours
+    setInterval(async () => {
+      await this.updateRealStockPrices();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    // Also update when market status changes
+    setInterval(() => {
+      this.updateMarketStatus();
+    }, 60 * 1000); // 1 minute
+  }
+
+  /**
+   * Update real stock prices from API
+   */
+  private async updateRealStockPrices(): Promise<void> {
+    try {
+      if (!this.marketStatus.isOpen) {
+        return; // Don't update during market close
+      }
+
+      const symbols = this.stockData.map(stock => stock.id.toUpperCase());
+      const updatedStocks = await realStockService.getMultipleStocks(symbols);
+
+      for (const updatedStock of updatedStocks) {
+        const existingStock = this.stockData.find(s => s.id === updatedStock.symbol.toLowerCase());
+        if (existingStock) {
+          // Update price history
+          existingStock.priceHistory.push(updatedStock.price);
+          if (existingStock.priceHistory.length > 15) {
+            existingStock.priceHistory.shift(); // Keep only last 15 prices
+          }
+
+          // Update current price and metrics
+          existingStock.currentPrice = updatedStock.price;
+          existingStock.marketCap = updatedStock.marketCap;
+          existingStock.peRatio = updatedStock.peRatio || existingStock.peRatio;
+          existingStock.lastUpdate = Date.now();
+          existingStock.volatility = Math.abs(updatedStock.changePercent) / 10 + 1;
+        }
+      }
+
+      console.log('Updated real stock prices');
+    } catch (error) {
+      console.error('Failed to update stock prices:', error);
+    }
+  }
+
+  /**
+   * Generate initial stock data for the market (fallback for when real API fails)
    */
   private generateInitialStockData(): Stock[] {
     return [

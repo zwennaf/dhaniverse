@@ -15,6 +15,7 @@ import { ICP_CONFIG } from "../../../services/config";
 import { BankingPolish } from "../polish/FinalPolish";
 import { balanceManager } from "../../../services/BalanceManager";
 import { icpBalanceManager, ICPToken } from "../../../services/TestnetBalanceManager";
+import { canisterService } from "../../../services/CanisterService";
 
 interface FixedDeposit {
     _id?: string;
@@ -65,7 +66,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             try {
                 console.log("Initializing Web3 services...");
                 
-                // Initialize ICP integration first
+                // Initialize canister service first
+                await canisterService.initialize();
+                if (!mounted) return;
+                
+                // Initialize ICP integration
                 await icpIntegration.initialize();
                 if (!mounted) return;
                 
@@ -74,8 +79,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 // Initialize ICP balance manager
                 await icpBalanceManager.initialize();
                 setIcpTokens(icpBalanceManager.getAllTokens());
-                
-                // Initialize Web3 services
                 
                 // Set up listeners
                 icpIntegration.walletManager.onConnectionChange((status) => {
@@ -94,10 +97,24 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 });
                 
                 console.log("Web3 services initialized successfully");
-                // Fetch USD prices for tokens to show market value
+                
+                // Fetch USD prices from canister instead of client-side
                 try {
-                    (async () => {
-                        // Map symbols to CoinGecko ids (extend as needed)
+                    await canisterService.updatePricesFromExternal();
+                    const priceFeeds = await canisterService.getAllPriceFeeds();
+                    const prices: Record<string, number> = {};
+                    
+                    priceFeeds.forEach(([symbol, price]) => {
+                        prices[symbol] = price;
+                    });
+                    
+                    setUsdPrices(prices);
+                    console.log('Loaded prices from canister:', prices);
+                } catch (e) {
+                    console.warn('Failed to fetch prices from canister, falling back to client-side:', e);
+                    
+                    // Fallback to client-side pricing
+                    try {
                         const mapping: Record<string, string> = { ICP: 'internet-computer' };
                         const ids = Object.values(mapping).join(',');
                         if (ids) {
@@ -109,9 +126,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                             });
                             setUsdPrices(prices);
                         }
-                    })();
-                } catch (e) {
-                    console.warn('Failed to fetch USD prices:', e);
+                    } catch (fallbackError) {
+                        console.warn('Client-side price fetch also failed:', fallbackError);
+                    }
                 }
                 
             } catch (e) {
@@ -128,12 +145,38 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         };
     }, []);
 
-    // Load banking data from backend
+    // Load banking data from backend and canister
     useEffect(() => {
         const loadBankingData = async () => {
             try {
                 setError(null);
 
+                // Try canister-based authentication and balance first
+                try {
+                    const initialized = await canisterService.initialize();
+                    if (initialized) {
+                        console.log("Canister service initialized");
+                        
+                        // Check if already authenticated
+                        if (await canisterService.isAuthenticated()) {
+                            console.log("User already authenticated with Internet Identity");
+                            
+                            // Try to get balance with a test wallet address
+                            const testAddress = "test-wallet-address";
+                            const canisterBalance = await canisterService.getBalanceNoAuth(testAddress);
+                            if (canisterBalance && canisterBalance.rupees_balance) {
+                                setBankBalance(Number(canisterBalance.rupees_balance));
+                                console.log("Loaded bank balance from canister:", canisterBalance.rupees_balance);
+                            }
+                        } else {
+                            console.log("User not authenticated with Internet Identity");
+                        }
+                    }
+                } catch (canisterError) {
+                    console.warn("Canister initialization failed, falling back to traditional backend:", canisterError);
+                }
+
+                // Fallback to traditional backend
                 const bankData = await bankingApi.getAccount();
                 if (bankData.success) {
                     setBankBalance(bankData.data.balance || 0);
@@ -208,6 +251,39 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             setError(null);
             console.log("Attempting to connect wallet:", preferredWallet);
 
+            // Try canister-based Internet Identity authentication first for ICP
+            if (!preferredWallet) {
+                try {
+                    const initialized = await canisterService.initialize();
+                    if (initialized) {
+                        const authenticated = await canisterService.authenticateWithII();
+                        if (authenticated) {
+                            showSuccessNotification(
+                                "🔐 Internet Identity Connected!",
+                                "Authenticated with Internet Identity. On-chain features unlocked!"
+                            );
+                            
+                            // Refresh balance from canister
+                            try {
+                                const principal = canisterService.getPrincipal();
+                                if (principal) {
+                                    const principalStr = principal.toString();
+                                    const balance = await canisterService.getBalanceNoAuth(principalStr);
+                                    setBankBalance(Number(balance.rupees_balance || 0));
+                                }
+                            } catch (balanceError) {
+                                console.warn("Failed to refresh balance after auth:", balanceError);
+                            }
+                            
+                            return;
+                        }
+                    }
+                } catch (canisterError) {
+                    console.warn("Canister authentication failed, falling back to traditional wallet:", canisterError);
+                }
+            }
+
+            // Fallback to traditional wallet connection for Web3 wallets
             const result = preferredWallet
                 ? await icpIntegration.walletManager.connectWallet(preferredWallet)
                 : await icpIntegration.walletManager.connectWallet();
@@ -258,20 +334,67 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     // ICP-specific handlers
     const handleIcpAuthentication = async () => {
         try {
-            const success = await icpBalanceManager.authenticateWithII();
+            console.log('Starting ICP authentication...');
+            
+            // Initialize and authenticate with canister service
+            console.log('Initializing canister service...');
+            const initialized = await canisterService.initialize();
+            if (!initialized) {
+                throw new Error("Failed to initialize canister service - check network connection");
+            }
+            
+            console.log('Canister service initialized, attempting authentication...');
+            const success = await canisterService.authenticateWithII();
             if (success) {
                 showSuccessNotification(
                     "🔐 ICP Authentication Successful",
                     "Internet Identity connected successfully"
                 );
-                await icpBalanceManager.refreshAllBalances();
-                setIcpTokens(icpBalanceManager.getAllTokens());
+                
+                console.log('Authentication successful, refreshing balance...');
+                // Refresh balance from canister
+                try {
+                    const principal = canisterService.getPrincipal();
+                    if (principal) {
+                        const principalStr = principal.toString();
+                        const balance = await canisterService.getBalanceNoAuth(principalStr);
+                        setBankBalance(Number(balance.rupees_balance || 0));
+                        
+                        // Also try to get multiple token balances
+                        const tokenBalance = await canisterService.getDualBalance(principalStr);
+                        console.log("Token balance from canister:", tokenBalance);
+                    }
+                } catch (balanceError) {
+                    console.warn("Failed to refresh balance:", balanceError);
+                }
             } else {
                 setError("Failed to authenticate with Internet Identity");
+                showErrorNotification(
+                    "❌ Authentication Failed",
+                    "Could not connect to Internet Identity"
+                );
             }
         } catch (error) {
             console.error("ICP authentication error:", error);
-            setError(`Authentication failed: ${error}`);
+            let errorMessage = "Unknown authentication error";
+            
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            console.error("Full error details:", {
+                error,
+                type: typeof error,
+                message: errorMessage
+            });
+            
+            setError(`Authentication failed: ${errorMessage}`);
+            showErrorNotification(
+                "❌ Connection Failed",
+                `Failed to connect to ICP canister: ${errorMessage}`
+            );
         }
     };
 
@@ -470,6 +593,40 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         }
     };
 
+    const showErrorNotification = (title: string, message: string) => {
+        try {
+            const notification = document.createElement("div");
+            notification.className =
+                "fixed top-4 right-4 bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300";
+            notification.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="text-xl">❌</div>
+                    <div>
+                        <div class="font-bold">${title}</div>
+                        <div class="text-sm opacity-90">${message}</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.transform = "translateX(0)";
+            });
+
+            setTimeout(() => {
+                notification.style.transform = "translateX(full)";
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3500);
+        } catch (error) {
+            console.log(`${title}: ${message}`);
+        }
+    };
+
     // Define tabs
     const tabs = [
         {
@@ -623,20 +780,29 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 return (
                     <div className="space-y-6">
                         {/* ICP Authentication */}
-                        {!icpBalanceManager.isAuthenticated() && (
+                        {!canisterService.isAuthenticated() && (
                             <div className="bg-blue-500/20 border border-blue-500/50 p-6 rounded-xl">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-blue-300 font-bold">🔐 ICP Authentication Required</h3>
-                                        <p className="text-blue-200 text-sm">Connect with Internet Identity to access ICP features</p>
+                                        <p className="text-blue-200 text-sm">Connect with Internet Identity to access on-chain ICP features</p>
                                     </div>
-                                    <button
-                                        onClick={handleIcpAuthentication}
-                                        disabled={loading}
-                                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold transition-colors"
-                                    >
-                                        {loading ? "Connecting..." : "Connect Internet Identity"}
-                                    </button>
+                                    <div className="flex items-center space-x-3">
+                                        <button
+                                            onClick={handleIcpAuthentication}
+                                            disabled={loading}
+                                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold transition-colors"
+                                        >
+                                            {loading ? "Connecting..." : "Internet Identity"}
+                                        </button>
+                                        <button
+                                            onClick={() => handleConnectWallet()}
+                                            disabled={loading}
+                                            className="bg-dhani-gold hover:bg-dhani-gold/80 disabled:opacity-50 text-black px-6 py-2 rounded-lg font-bold transition-colors"
+                                        >
+                                            {loading ? "Connecting..." : "Web3 Wallet"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}

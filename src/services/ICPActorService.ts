@@ -1,6 +1,7 @@
 import { Web3BankingService, DualBalance, ExchangeResult, Achievement } from './Web3BankingService';
 import { Web3WalletService } from './Web3WalletService';
 import { ICPService } from './icp';
+import canisterService from './CanisterService';
 
 // ICP Canister Types
 export interface StockPrice {
@@ -252,16 +253,27 @@ export class ICPActorService {
     // Get canister health status
     async getCanisterHealth(): Promise<{ status: string; stats: any }> {
         try {
-            const healthCheck = await this.icpService.healthCheck();
-            const metrics = await this.icpService.getCanisterMetrics();
+            // Use CanisterService to check if we can connect to the actual canister
+            const initialized = await canisterService.initialize();
+            
+            if (!initialized) {
+                return {
+                    status: 'error',
+                    stats: { error: 'Failed to initialize canister connection' }
+                };
+            }
+
+            // Try to make a simple call to verify the connection
+            const connectionStatus = canisterService.getConnectionStatus();
             
             return {
-                status: healthCheck === 'OK' ? 'healthy' : 'error',
+                status: connectionStatus.connected ? 'healthy' : 'error',
                 stats: {
-                    ...metrics,
                     canisterId: this.canisterId,
                     connected: this.connected,
-                    walletConnected: !!this.connectedWallet
+                    walletConnected: !!this.connectedWallet,
+                    host: connectionStatus.host,
+                    canisterConnected: connectionStatus.connected
                 }
             };
         } catch (error) {
