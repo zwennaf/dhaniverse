@@ -706,7 +706,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     };
 
     return (
-        <div className="absolute top-2 left-2 w-full h-full z-[1000] font-['Tickerbit',Arial,sans-serif]">
+        <div className="absolute top-2 left-2 w-full h-full z-[1000] font-['Tickerbit',Arial,sans-serif] select-none">
             {/* Inline animation styles for join notifications (small localized CSS) */}
             <style>{`
                 @keyframes joinEnter {
@@ -720,7 +720,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 }
             `}</style>
             {/* Top right status area */}
-            <div className="absolute top-5 right-9 flex flex-col items-end space-y-2">
+            <div className="absolute top-5 right-9 flex flex-col items-end space-y-2" style={{ lineHeight: 1 }}>
                 {/* Blockchain status indicator */}
                 {walletManager && (
                     <div className="flex items-center space-x-2 bg-black/60 rounded-lg px-3 py-1 backdrop-blur">
@@ -743,42 +743,44 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                 )}
 
-                {/* Rupee counter (SVG background + overlaid text) */}
-                <div className="p-0 rounded-lg flex items-center" style={{ lineHeight: 1 }}>
-                    <div className="relative" style={{ width: 137, height: 57 }}>
-                        {/* Use the provided SVG as the background visual */}
-                        <img
-                            src="/UI/game/rupeecounter.svg"
-                            alt="Rupee counter"
-                            className="block w-full h-full"
-                            style={{ display: 'block' }}
-                        />
+                {/* Rupee counter (fixed height, stretchable width) */}
+                <div className="relative inline-flex items-center h-[57px] px-3" style={{ overflow: 'hidden' }}>
+                    <img
+                        src="/UI/game/rupeecounter.svg"
+                        alt="Rupee counter"
+                        className="block"
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', display: 'block', zIndex: 0 }}
+                    />
 
-                        {/* Overlay the dynamic rupee amount inside the SVG */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                    <div
+                        className="relative inline-flex items-center z-10"
+                        style={{ padding: '0 12px', height: '100%' }}
+                    >
+                        <div className="relative z-10 flex items-center justify-center pointer-events-none select-none" style={{ textAlign: 'center', height: '100%' }}>
                             <div
                                 style={{
                                     color: '#FFFFFF',
                                     fontFamily: "'VCR OSD Mono', Arial, sans-serif",
                                     fontWeight: 700,
-                                    fontSize: 26,
+                                    fontSize: '1.2rem',
+                                    lineHeight: '1',
                                     textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px',
+                                    gap: '0.25rem',
+                                    whiteSpace: 'nowrap'
                                 }}
                                 aria-hidden
                             >
-                                <span style={{ fontSize: 26 }}>₹</span>
+                                <span style={{ fontSize: '1.2rem' }}>₹</span>
                                 <span>{currentRupees.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Blockchain verified dot (kept to the right like before) */}
                     {walletStatus.connected && (
                         <div
-                            className="ml-2 w-3 h-3 bg-blue-400 rounded-full"
+                            className="ml-2 w-3 h-3 bg-blue-400 rounded-full z-10"
                             title="Blockchain verified"
                         ></div>
                     )}
@@ -881,15 +883,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                               </div>
                                               <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
                                                   {msg.timestamp
-                                                      ? new Date(
-                                                            msg.timestamp
-                                                        ).toLocaleTimeString(
-                                                            [],
-                                                            {
-                                                                hour: "2-digit",
-                                                                minute: "2-digit",
-                                                            }
-                                                        )
+                                                      ? new Date(msg.timestamp).toLocaleTimeString([], {
+                                                            hour: "2-digit",
+                                                            minute: "2-digit",
+                                                        })
                                                       : ""}
                                               </div>
                                           </div>
