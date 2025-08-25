@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize the ATM interface
   initializeATMInterface();
+
+  // Listen for game initialization errors (e.g., WebGL unsupported) and show overlay
+  setupGameErrorOverlay();
 });
 
 // Function to initialize banking UI
@@ -95,6 +98,56 @@ function initializeATMInterface() {
   (window as any).atmInterface = atmInterface;
   
   console.log("ATM Interface initialized");
+}
+
+// Error overlay for game initialization failures (WebGL unsupported, etc.)
+function setupGameErrorOverlay() {
+  const existing = document.getElementById('game-error-overlay');
+  if (existing) return; // avoid duplicates
+
+  const overlay = document.createElement('div');
+  overlay.id = 'game-error-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:2000;display:none;
+    background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);
+    align-items:center;justify-content:center;font-family:Arial,system-ui,sans-serif;`;
+
+  overlay.innerHTML = `
+    <div style="max-width:460px;padding:28px 30px;background:#111;border:1px solid rgba(255,215,0,0.25);border-radius:14px;box-shadow:0 4px 28px -4px rgba(0,0,0,.6),0 0 0 1px rgba(255,215,0,.05);color:#eee;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#3a3010,#735f12);display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:22px;">⚠️</span>
+        </div>
+        <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:.5px;color:#ffd700;">Game Could Not Start</h2>
+      </div>
+      <p id="game-error-message" style="margin:0 0 14px;font-size:14px;line-height:1.45;color:#d4d4d4;">An unexpected error occurred while initializing the game.</p>
+      <div style="background:#181818;border:1px solid #242424;padding:10px 12px;border-radius:8px;margin-bottom:16px;font-size:12px;color:#bbb;line-height:1.4;">
+        <strong>Tips:</strong> Enable hardware acceleration, update your browser / GPU drivers, or try another browser (Chrome / Firefox). Some private/incognito modes or remote desktops disable WebGL.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="retry-game-btn" style="flex:1;min-width:140px;background:#ffd700;color:#111;font-weight:600;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:14px;">Reload Page</button>
+        <button id="dismiss-game-error-btn" style="background:transparent;color:#aaa;border:1px solid #333;padding:10px 14px;border-radius:8px;cursor:pointer;font-size:14px;">Dismiss</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  const reloadBtn = overlay.querySelector('#retry-game-btn') as HTMLButtonElement | null;
+  const dismissBtn = overlay.querySelector('#dismiss-game-error-btn') as HTMLButtonElement | null;
+  if (reloadBtn) reloadBtn.onclick = () => window.location.reload();
+  if (dismissBtn) dismissBtn.onclick = () => { overlay.style.display = 'none'; };
+
+  window.addEventListener('gameAssetLoadingError', (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    const msgEl = document.getElementById('game-error-message');
+    if (msgEl && detail?.error) {
+      // Special-case WebGL unsupported text to provide friendlier wording
+      const errText = detail.error.toLowerCase().includes('webgl') ?
+        'Your browser reported WebGL is unavailable (needed for accelerated graphics). The game can\'t start without it.' : detail.error;
+      msgEl.textContent = errText;
+    }
+    overlay.style.display = 'flex';
+  });
 }
 
 // Function to initialize HUD - will be called from game.ts when game starts

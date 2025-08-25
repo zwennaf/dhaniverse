@@ -20,6 +20,8 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   const mapChunksPreloadedRef = useRef(false);
   const [bgUrl, setBgUrl] = useState<string>('/UI/game/loaderbg.png');
   const [bgReady, setBgReady] = useState(false);
+  const realChunkProgressRef = useRef(0); // 0..1 of chunks loaded (subset we care about)
+  const forcedSlowIncrementRef = useRef(0);
 
   const loadingSteps = [
     { progress: 10, status: 'Loading Game Assets...' },
@@ -122,6 +124,21 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   }, []);
 
   useEffect(() => {
+    // Listen for real chunk load progress to unstick bar >45%
+    const onChunkProgress = (e: any) => {
+      const { loaded, total } = e.detail || {};
+      if (typeof loaded === 'number' && typeof total === 'number' && total > 0) {
+        // Only account for first 120 chunks (or total) to map to 45..80% range.
+        const cap = Math.min(total, 120);
+        const effectiveLoaded = Math.min(loaded, cap);
+        realChunkProgressRef.current = effectiveLoaded / cap; // 0..1
+      }
+    };
+    window.addEventListener('chunkLoadProgress', onChunkProgress as any);
+    return () => window.removeEventListener('chunkLoadProgress', onChunkProgress as any);
+  }, []);
+
+  useEffect(() => {
     // Set random tip on component mount
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
     setCurrentTip(randomTip);
@@ -145,10 +162,24 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       
       currentProgress += speed;
 
-      // Gate finishing at 45% until map chunks preloaded
-      if (currentProgress >= 45 && !mapChunksPreloadedRef.current) {
-        currentProgress = Math.min(currentProgress, 45);
-        if (currentStatus !== 'Caching Map Chunks...') setCurrentStatus('Caching Map Chunks...');
+      // Integrate real chunk progress once we reach 30%
+      if (!mapChunksPreloadedRef.current) {
+        if (currentProgress >= 30) {
+          // Map real chunk progress (0..1) into 35..55% band to show life
+          const base = 35;
+          const span = 20; // 35 to 55
+          const realPortion = realChunkProgressRef.current * span;
+          const target = base + realPortion;
+          // Ensure forward motion in tiny increments if network is very slow
+          if (target <= currentProgress) {
+            forcedSlowIncrementRef.current += 0.03; // accumulate tiny fallback
+          }
+          const slowBonus = Math.min(forcedSlowIncrementRef.current, 8); // cap fallback influence
+          currentProgress = Math.max(currentProgress, Math.min(target + slowBonus, 55));
+          if (currentStatus !== 'Caching Map Chunks...') setCurrentStatus('Caching Map Chunks...');
+        }
+        // Hard stop at 55 until map chunk preload callback flips
+        if (currentProgress > 55) currentProgress = 55;
       }
 
       // Gate finishing at 95% until tutorial assets (if required) are loaded

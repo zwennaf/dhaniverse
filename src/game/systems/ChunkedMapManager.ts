@@ -5,7 +5,12 @@ import { PreloadingManager } from "./preloading/PreloadingManager.ts";
 import { PreloadingConfig } from "./preloading/IPreloadingStrategy.ts";
 import { ErrorHandlerChain } from "./error-handling/ErrorHandlerChain.ts";
 import { getChunkDataUrl, storeChunk } from "../cache/mapChunkCache.ts";
+import { getPersistentChunkBlob, storePersistentChunk } from "../cache/persistentChunkStore.ts";
 import { dialogueManager } from "../../services/DialogueManager.ts";
+
+// Global flag to persist all loaded chunks in memory & storage without eviction.
+// Set true per user requirement to "store forever". Can be toggled for debugging.
+const ALWAYS_KEEP_CHUNKS = true;
 
 interface MapCache {
     width: number;
@@ -72,11 +77,15 @@ export class ChunkedMapManager {
     private playerMovementDirection: { x: number; y: number } = { x: 0, y: 0 };
 
     // Memory management - reduce to prevent overwhelming the system
-    private maxLoadedChunks: number = 40; // Reduced from 50
+    private maxLoadedChunks: number = 40; // Reduced from 50 (ignored when ALWAYS_KEEP_CHUNKS)
     private maxConcurrentLoads: number = 2; // Reduced from 4 to prevent stuttering
     private chunkAccessTimes: Map<string, number> = new Map(); // LRU tracking
     private inFlightLoads: Map<string, Promise<void>> = new Map(); // de-dupe simultaneous requests
     private lastRequestTimes: Map<string, number> = new Map(); // throttle rapid re-requests
+    private minConcurrentLoads: number = 1;
+    private maxAdaptiveConcurrentLoads: number = 4; // upper bound when network is good
+    private recentLoadDurations: number[] = []; // ms durations for adaptive tuning
+    private adaptiveTuningInterval: number | null = null;
 
     // Error handling
     private failedChunks: Map<string, number> = new Map(); // Track failed chunks and retry count
@@ -90,6 +99,9 @@ export class ChunkedMapManager {
 
     constructor(scene: MainGameScene) {
         this.scene = scene;
+    // Global flag to keep every chunk permanently in this session as soon as loaded.
+    // For now always true per requirement.
+        
 
         // Create specialized container for map chunks with smooth transitions
         this.mapContainer = new PhaserChunkContainer(scene, 0, 0);
@@ -136,6 +148,70 @@ export class ChunkedMapManager {
         
         // Start continuous loading system
         this.startContinuousLoading();
+
+        // Apply initial network-based tuning
+        this.applyNetworkHeuristics();
+        // Start periodic adaptive tuning
+        this.startAdaptiveTuning();
+    }
+
+    /**
+     * Use browser network information (if available) to set conservative defaults
+     * for slow connections and more aggressive ones for fast networks.
+     */
+    private applyNetworkHeuristics(): void {
+        const navAny = navigator as any;
+        const connection: any = navAny?.connection || navAny?.mozConnection || navAny?.webkitConnection;
+        const type: string | undefined = connection?.effectiveType;
+        if (type) {
+            if (type === 'slow-2g' || type === '2g') {
+                this.viewDistance = 1;
+                this.maxConcurrentLoads = 1;
+            } else if (type === '3g') {
+                this.viewDistance = 2;
+                this.maxConcurrentLoads = 2;
+            } else if (type === '4g') {
+                this.viewDistance = 2;
+                this.maxConcurrentLoads = 3;
+            }
+        }
+    }
+
+    /** Adaptive tuning based on recent average load duration. */
+    private startAdaptiveTuning(): void {
+        if (this.adaptiveTuningInterval) return;
+        this.adaptiveTuningInterval = window.setInterval(() => {
+            this.adjustLoadingStrategy();
+        }, 4000); // adjust every 4s
+    }
+
+    private stopAdaptiveTuning(): void {
+        if (this.adaptiveTuningInterval) {
+            clearInterval(this.adaptiveTuningInterval);
+            this.adaptiveTuningInterval = null;
+        }
+    }
+
+    private recordLoadDuration(ms: number): void {
+        this.recentLoadDurations.push(ms);
+        if (this.recentLoadDurations.length > 20) {
+            this.recentLoadDurations.shift();
+        }
+    }
+
+    private adjustLoadingStrategy(): void {
+        if (!this.recentLoadDurations.length) return;
+        const avg = this.recentLoadDurations.reduce((a,b)=>a+b,0)/this.recentLoadDurations.length;
+        // If loads are very fast, cautiously increase concurrency
+        if (avg < 250 && this.maxConcurrentLoads < this.maxAdaptiveConcurrentLoads) {
+            this.maxConcurrentLoads++;
+            // console.log(`[ChunkedMapManager] Increasing concurrency -> ${this.maxConcurrentLoads} (avg ${avg.toFixed(0)}ms)`);
+        } else if (avg > 900 && this.maxConcurrentLoads > this.minConcurrentLoads) {
+            this.maxConcurrentLoads--;
+            // console.log(`[ChunkedMapManager] Decreasing concurrency -> ${this.maxConcurrentLoads} (avg ${avg.toFixed(0)}ms)`);
+        }
+        // Clear durations so next window is fresh
+        this.recentLoadDurations = [];
     }
 
     private async initializeChunks(): Promise<void> {
@@ -250,6 +326,31 @@ export class ChunkedMapManager {
 
         try {
             const textureKey = `chunk_${chunk.id}`;
+            const startTime = performance.now();
+
+            // 1. Try persistent IndexedDB blob first
+            const persistent = await getPersistentChunkBlob(chunk.id);
+            if (persistent) {
+                await new Promise<void>((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            if (!this.scene.textures.exists(textureKey)) {
+                                this.scene.textures.addImage(textureKey, img);
+                            }
+                            this.createChunkImage(chunk, textureKey);
+                            resolve();
+                        } catch (e) { reject(e); }
+                    };
+                    img.onerror = () => reject(new Error(`Failed to decode persistent chunk ${chunk.id}`));
+                    img.src = URL.createObjectURL(persistent);
+                });
+                this.failedChunks.delete(chunk.id);
+                const duration = performance.now() - startTime;
+                this.recordLoadDuration(duration);
+                this.dispatchChunkProgressEvent();
+                return;
+            }
 
             // If already an in-flight load for this chunk, await it
             const existing = this.inFlightLoads.get(chunk.id);
@@ -294,6 +395,8 @@ export class ChunkedMapManager {
                             clearTimeout(timeout);
                             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                             const blob = await resp.blob();
+                            // Persist original binary blob for future sessions
+                            storePersistentChunk(chunk.id, blob);
                             const dataUrl = await new Promise<string>((res, rej) => {
                                 const reader = new FileReader();
                                 reader.onload = () => res(reader.result as string);
@@ -325,6 +428,11 @@ export class ChunkedMapManager {
 
             // Clear any previous failure record on success
             this.failedChunks.delete(chunk.id);
+
+            // Record duration & dispatch progress event
+            const duration = performance.now() - startTime;
+            this.recordLoadDuration(duration);
+            this.dispatchChunkProgressEvent();
         } catch (error) {
             await this.handleChunkLoadError(
                 chunk.id,
@@ -332,6 +440,20 @@ export class ChunkedMapManager {
                 retryCount
             );
         }
+    }
+
+    /** Dispatch a lightweight global event so UI (loader/profilers) can reflect chunk progress */
+    private dispatchChunkProgressEvent(): void {
+        try {
+            const total = this.chunkMetadata?.chunks.length || 0;
+            window.dispatchEvent(new CustomEvent('chunkLoadProgress', {
+                detail: {
+                    loaded: this.loadedChunks.size,
+                    total,
+                    loading: this.loadingChunks.size
+                }
+            }));
+        } catch {}
     }
 
     private async handleChunkLoadError(
@@ -579,6 +701,7 @@ export class ChunkedMapManager {
 
     // Unload chunks when memory limits are exceeded
     private unloadChunk(chunkId: string): void {
+    if (ALWAYS_KEEP_CHUNKS) return; // no unloading in permanent mode
         const chunk = this.loadedChunks.get(chunkId);
         if (chunk) {
             // Remove from all tracking
@@ -593,6 +716,7 @@ export class ChunkedMapManager {
     }
 
     private enforceMemoryLimits(): void {
+    if (ALWAYS_KEEP_CHUNKS) return; // skip memory pruning
         // Only enforce hard limits when we have way too many chunks
         const hardLimit = this.maxLoadedChunks * 1.5; // 50% more than normal limit
         
@@ -1100,6 +1224,7 @@ export class ChunkedMapManager {
     }
 
     private cleanupUnusedTextures(): void {
+    if (ALWAYS_KEEP_CHUNKS) return; // keep all textures resident
         // Defer texture cleanup to prevent WebGL errors
         setTimeout(() => {
             try {
@@ -1236,20 +1361,23 @@ export class ChunkedMapManager {
         // Clear preload queue to reduce memory pressure
         this.clearPreloadQueue();
 
-        // Aggressively clean up non-visible chunks
-        const chunksToRemove = Array.from(this.loadedChunks.keys()).filter(
-            (chunkId) => !this.visibleChunks.has(chunkId)
-        );
-
-        chunksToRemove.forEach((chunkId) => {
-            this.unloadChunk(chunkId);
-        });
+        if (!ALWAYS_KEEP_CHUNKS) {
+            // Aggressively clean up non-visible chunks
+            const chunksToRemove = Array.from(this.loadedChunks.keys()).filter(
+                (chunkId) => !this.visibleChunks.has(chunkId)
+            );
+            chunksToRemove.forEach((chunkId) => {
+                this.unloadChunk(chunkId);
+            });
+        }
 
         // Force texture cleanup immediately
         this.cleanupUnusedTextures();
 
         // Reduce max loaded chunks temporarily
-        this.maxLoadedChunks = Math.max(8, this.maxLoadedChunks - 4);
+        if (!ALWAYS_KEEP_CHUNKS) {
+            this.maxLoadedChunks = Math.max(8, this.maxLoadedChunks - 4);
+        }
 
         console.log(
             `Cleanup complete. Loaded chunks: ${this.loadedChunks.size}, Max: ${this.maxLoadedChunks}`
@@ -1263,15 +1391,20 @@ export class ChunkedMapManager {
         // Stop continuous loading
         this.stopContinuousLoading();
         
-        // Clear all chunks
-        this.loadedChunks.clear();
-        this.loadingChunks.clear();
-        this.visibleChunks.clear();
-        this.chunkAccessTimes.clear();
-        this.failedChunks.clear();
+        // In permanent mode keep runtime chunk references (let browser reclaim on tab close)
+        if (!ALWAYS_KEEP_CHUNKS) {
+            this.loadedChunks.clear();
+            this.loadingChunks.clear();
+            this.visibleChunks.clear();
+            this.chunkAccessTimes.clear();
+            this.failedChunks.clear();
+        }
         
         // Clear preload queue
         this.clearPreloadQueue();
+
+    // Stop adaptive tuning
+    this.stopAdaptiveTuning();
         
         // Clean up container
         if (this.mapContainer) {

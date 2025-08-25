@@ -12,6 +12,12 @@ let game: Phaser.Game | null = null;
 let gameContainer: HTMLElement | null = null;
 let loadingText: HTMLElement | null = null;
 let assetLoader: AssetLoader | null = null;
+let assetsReady = false; // Whether core assets are fully preloaded
+let pendingStart: { username: string; selectedCharacter: string; roomCode: string } | null = null;
+
+interface StartAssetLoadingOptions {
+    preloadOnly?: boolean; // If true, do not start Phaser yet (no WebSocket connections)
+}
 
 /**
  * Asset loader class to handle background loading
@@ -221,14 +227,29 @@ export function startGame(username: string, selectedCharacter: string = 'C2'): v
 
     console.log(`Starting game with username: ${username}, room code: ${roomCode}`);
 
-    // Start loading assets in background while showing custom loader
-    startAssetLoading(username, selectedCharacter, roomCode);
+    // If assets already preloaded, go straight to Phaser init
+    if (assetsReady) {
+        initializePhaserGame(username, selectedCharacter, roomCode);
+        return;
+    }
+
+    // If a preload is in-flight, remember the desired start
+    if (assetLoader && !assetsReady) {
+        pendingStart = { username, selectedCharacter, roomCode };
+        return;
+    }
+
+    // Begin full asset loading which will auto-start the game on completion
+    startAssetLoading(username, selectedCharacter, roomCode, { preloadOnly: false });
 }
 
 /**
  * Start asset loading in background and update custom loader
  */
-function startAssetLoading(username: string, selectedCharacter: string, roomCode: string): void {
+function startAssetLoading(username: string, selectedCharacter: string, roomCode: string, options?: StartAssetLoadingOptions): void {
+    // Prevent duplicate loaders
+    if (assetLoader && !assetsReady) return;
+    if (assetsReady && options?.preloadOnly) return; // No-op if already done
     // Notify the custom loader to start
     window.dispatchEvent(new CustomEvent('gameAssetLoadingStart'));
 
@@ -241,13 +262,31 @@ function startAssetLoading(username: string, selectedCharacter: string, roomCode
             }));
         },
         () => {
-            // Assets loaded, now initialize Phaser game
+            assetsReady = true;
+            window.dispatchEvent(new CustomEvent('gameAssetLoadingComplete'));
+            if (options?.preloadOnly) {
+                // If user already asked to start during preload, start now
+                if (pendingStart) {
+                    const ps = pendingStart; pendingStart = null;
+                    initializePhaserGame(ps.username, ps.selectedCharacter, ps.roomCode);
+                }
+                return; // Do not auto-start game in preload mode
+            }
             initializePhaserGame(username, selectedCharacter, roomCode);
         }
     );
 
     // Start loading assets
     assetLoader.loadAssets();
+}
+
+/**
+ * Preload game assets WITHOUT starting the Phaser game or opening WebSocket connections.
+ * Safe to call multiple times; it will no-op if already loading or completed.
+ */
+export function preloadGameAssets(username: string = 'preload', selectedCharacter: string = 'C1'): void {
+    const roomCode = localStorage.getItem('dhaniverse_room_code') || '';
+    startAssetLoading(username, selectedCharacter, roomCode, { preloadOnly: true });
 }
 
 /**
