@@ -441,6 +441,10 @@ export class MayaNPCManager {
             Phaser.Input.Keyboard.JustDown(this.interactionKey) &&
             !this.activeDialog
         ) {
+            // Skip onboarding dialogue entirely if player already completed onboarding
+            let completed = false;
+            (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); if (progressionManager.getState().hasClaimedMoney) completed = true; } catch(e) {/* ignore */} })();
+            if (completed) return;
             // If the guide already completed and player presses E at destination,
             // show the final arrival interaction. Otherwise start the guided sequence.
             if (this.guideCompleted) {

@@ -143,14 +143,27 @@ gameRouter.get("/game/player-state", async (ctx) => {
         }
 
         // Backfill onboarding defaults if missing (for legacy players)
+        let needsUpdate = false;
+    const claimedLegacy = (playerState as (PlayerStateDocument & { starterClaimed?: boolean })).starterClaimed === true || playerState.progress?.completedTutorials?.includes('starter-claimed');
         if (!playerState.onboarding) {
             playerState.onboarding = {
-                hasMetMaya: false,
-                hasFollowedMaya: false,
-                hasClaimedMoney: false,
-                onboardingStep: 'not_started',
-                unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+                hasMetMaya: claimedLegacy, // if legacy claimed, treat as completed
+                hasFollowedMaya: claimedLegacy,
+                hasClaimedMoney: claimedLegacy,
+                onboardingStep: claimedLegacy ? 'claimed_money' : 'not_started',
+                unlockedBuildings: { bank: claimedLegacy, atm: false, stockmarket: false }
             };
+            needsUpdate = true;
+        } else if (claimedLegacy && !playerState.onboarding.hasClaimedMoney) {
+            // Upgrade partially existing onboarding state to claimed completion
+            playerState.onboarding.hasMetMaya = true;
+            playerState.onboarding.hasFollowedMaya = true;
+            playerState.onboarding.hasClaimedMoney = true;
+            playerState.onboarding.onboardingStep = 'claimed_money';
+            playerState.onboarding.unlockedBuildings = { ...playerState.onboarding.unlockedBuildings, bank: true };
+            needsUpdate = true;
+        }
+        if (needsUpdate) {
             await playerStates.updateOne({ userId }, { $set: { onboarding: playerState.onboarding, lastUpdated: new Date() } });
         }
 

@@ -65,6 +65,10 @@ class ProgressionManager {
 
   canEnterBuilding(buildingId: string): { allowed: boolean; message?: string } {
     const s = this.state;
+    // If onboarding fully completed (claimed money), always allow bank access
+    if (s.hasClaimedMoney && buildingId === 'bank') {
+      return { allowed: true };
+    }
     if (!s.hasMetMaya) return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
     if (!s.hasFollowedMaya) return { allowed: false, message: 'Access Denied — Go to the bank area with Maya and speak to her there.' };
     if (!s.hasClaimedMoney) return { allowed: false, message: 'Access Denied — Talk to Maya outside the bank to claim your ₹1000 and begin.' };
@@ -73,6 +77,8 @@ class ProgressionManager {
   }
 
   showAccessDenied(message: string) {
+  // Silently ignore if player has completed onboarding (avoid showing legacy denials)
+  if (this.state.hasClaimedMoney) return;
     dialogueManager.showDialogue({ text: message, characterName: 'System', allowSpaceAdvance: true, showBackdrop: false }, { onAdvance: () => dialogueManager.closeDialogue() });
   }
 }
