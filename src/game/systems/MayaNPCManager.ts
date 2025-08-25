@@ -1,5 +1,6 @@
 import { GameObjects, Input } from "phaser";
 import { locationTrackerManager } from "../../services/LocationTrackerManager";
+import { balanceManager } from "../../services/BalanceManager";
 import { MainGameScene } from "../scenes/MainScene.ts";
 import { getTaskManager } from "../tasks/TaskManager.ts";
 import { Constants } from "../utils/Constants.ts";
@@ -866,8 +867,19 @@ export class MayaNPCManager {
 
     // Handles the claim money logic after dialogue
     private handleClaimMoney(): void {
-        // TODO: Implement actual claim logic here (e.g., update player balance, show confirmation)
+        // Update player balance in real time
+        const STARTER_AMOUNT = 1000; // Set your starter amount here
+
+        // Add starter money to current cash balance
+        if (typeof balanceManager?.updateCash === 'function') {
+            const current = balanceManager.getBalance().cash;
+            balanceManager.updateCash(current + STARTER_AMOUNT);
+        }
+
+        // Show confirmation and close dialogue
         this.showTemporaryDialog("You have claimed your starter money!", 2000);
+        dialogueManager.closeDialogue();
+        this.closeDialog();
         // Optionally, update tasks/objectives here
         // ...existing code...
     }
