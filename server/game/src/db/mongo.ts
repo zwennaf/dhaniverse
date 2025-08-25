@@ -301,6 +301,14 @@ class MongoDatabase {
                 unlockedBuildings: ["bank", "stockmarket"],
                 completedTutorials: [],
             },
+            onboarding: {
+                hasMetMaya: false,
+                hasFollowedMaya: false,
+                hasClaimedMoney: false,
+                onboardingStep: 'not_started',
+                // Only bank becomes true after claim; all start false.
+                unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+            },
             settings: {
                 soundEnabled: true,
                 musicEnabled: true,

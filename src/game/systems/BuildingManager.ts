@@ -3,6 +3,7 @@ import { Constants } from '../utils/Constants.ts';
 import { MainGameScene } from '../scenes/MainScene';
 import { shouldAutoOpenBankingUI } from '../../config/onboarding';
 import { dialogueManager } from '../../services/DialogueManager';
+import { progressionManager } from '../../services/ProgressionManager';
 
 export class BuildingManager {
   private scene: MainGameScene;
@@ -339,6 +340,15 @@ export class BuildingManager {
     const player = this.scene.getPlayer();
     const mapManager = this.scene.mapManager;
     if (!player || !mapManager || this.transitionInProgress) return;
+
+    // Centralized progression gating
+    try {
+      const check = progressionManager.canEnterBuilding(buildingType === 'bank' ? 'bank' : 'stockmarket');
+      if (!check.allowed) {
+        progressionManager.showAccessDenied(check.message!);
+        return;
+      }
+    } catch (e) { console.warn('Progression gating unavailable', e); }
     
     // Set transition in progress to prevent multiple transitions
     this.transitionInProgress = true;

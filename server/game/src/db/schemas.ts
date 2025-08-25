@@ -57,6 +57,14 @@ export interface PlayerStateDocument extends Document {
     unlockedBuildings: string[];
     completedTutorials: string[];
   };
+  // Onboarding & progression lock flags (Maya sequence)
+  onboarding?: {
+    hasMetMaya: boolean;
+    hasFollowedMaya: boolean;
+    hasClaimedMoney: boolean;
+    onboardingStep: 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money';
+    unlockedBuildings: Record<string, boolean>; // granular per-building unlocks
+  };
   settings: {
     soundEnabled: boolean;
     musicEnabled: boolean;

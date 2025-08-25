@@ -436,6 +436,12 @@ async function loadPlayerStateAndInitializeHUD(): Promise<void> {
             const playerState = response.data;
             const rupees = playerState.financial?.rupees || 0;
 
+            // Initialize onboarding progression
+            try {
+                const { progressionManager } = await import('../services/ProgressionManager');
+                progressionManager.initializeFromPlayerState(playerState);
+            } catch (e) { console.warn('Failed to init progression manager', e); }
+
             console.log("Player state loaded successfully:", {
                 rupees,
                 totalWealth: playerState.financial?.totalWealth,

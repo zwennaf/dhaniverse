@@ -550,6 +550,9 @@ export class MayaNPCManager {
         console.log('🚀 Maya: Starting guided sequence...');
         this.guidedSequenceActive = true;
 
+        // Progression: mark hasMetMaya
+    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markMetMaya(); } catch(e) { console.warn('Could not mark hasMetMaya', e); } })();
+
         // Hide interaction text
         this.interactionText.setAlpha(0);
 
@@ -731,6 +734,9 @@ export class MayaNPCManager {
 
         // Show final dialogue message
         this.showTemporaryDialog("We have arrived at the Bank. Let's go inside.", 3000);
+
+        // Progression: player has followed Maya to bank (will still need interaction to claim)
+    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markFollowedMaya(); } catch(e) { console.warn('Could not mark hasFollowedMaya', e); } })();
 
         // Update tracker final position and disable tracker since we've arrived at destination
         locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
@@ -951,6 +957,8 @@ export class MayaNPCManager {
                     const newlyClaimed = (data.newlyClaimed === true) || ((data.amount ?? 0) > 0);
                     const creditedAmount = data.amount ?? (newlyClaimed ? 1000 : 0);
                     if (newlyClaimed) {
+                        // Progression: mark claimed money, unlock bank
+                        (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markClaimedMoney(); } catch(e) { console.warn('Could not mark claimed money', e); } })();
                         // Show persistent dialogue requiring user advance instead of auto-dismiss alert
                         dialogueManager.showDialogue({
                             text: `Congrats! ₹${creditedAmount} credited to your current balance.`,

@@ -123,6 +123,13 @@ gameRouter.get("/game/player-state", async (ctx) => {
                     unlockedBuildings: ["bank", "stockmarket"],
                     completedTutorials: [],
                 },
+                onboarding: {
+                    hasMetMaya: false,
+                    hasFollowedMaya: false,
+                    hasClaimedMoney: false,
+                    onboardingStep: 'not_started',
+                    unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+                },
                 settings: {
                     soundEnabled: true,
                     musicEnabled: true,
@@ -133,6 +140,18 @@ gameRouter.get("/game/player-state", async (ctx) => {
 
             const result = await playerStates.insertOne(newPlayerState);
             playerState = { ...newPlayerState, _id: result.insertedId };
+        }
+
+        // Backfill onboarding defaults if missing (for legacy players)
+        if (!playerState.onboarding) {
+            playerState.onboarding = {
+                hasMetMaya: false,
+                hasFollowedMaya: false,
+                hasClaimedMoney: false,
+                onboardingStep: 'not_started',
+                unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+            };
+            await playerStates.updateOne({ userId }, { $set: { onboarding: playerState.onboarding, lastUpdated: new Date() } });
         }
 
         ctx.response.body = {
@@ -278,6 +297,7 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
                 financial: { rupees: 0, totalWealth: 0, bankBalance: 0, stockPortfolioValue: 0 },
                 inventory: { items: [], capacity: 20 },
                 progress: { level: 1, experience: 0, unlockedBuildings: ["bank", "stockmarket"], completedTutorials: [] },
+                onboarding: { hasMetMaya: false, hasFollowedMaya: false, hasClaimedMoney: false, onboardingStep: 'not_started', unlockedBuildings: { bank: false, atm: false, stockmarket: false } },
                 settings: { soundEnabled: true, musicEnabled: true, autoSave: true },
                 lastUpdated: new Date()
             };
