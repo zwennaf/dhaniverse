@@ -1,7 +1,7 @@
 // ICP Canister Configuration
 export const ICP_CONFIG = {
     // Mainnet Canister Configuration
-    CANISTER_ID: "dzbzg-eqaaa-aaaap-an3rq-cai",
+    CANISTER_ID: "2v55c-vaaaa-aaaas-qbrpq-cai",
 
     // Network URLs
     IC_HOST:
@@ -11,9 +11,9 @@ export const ICP_CONFIG = {
     LOCAL_HOST: "http://127.0.0.1:4943",
 
     // Canister URLs
-    CANISTER_URL: "https://dzbzg-eqaaa-aaaap-an3rq-cai.icp0.io/",
+    CANISTER_URL: "https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/",
     CANDID_UI_URL:
-        "https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=dzbzg-eqaaa-aaaap-an3rq-cai",
+        "https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai",
 
     // Network Detection
     NETWORK: process.env.NODE_ENV === "production" ? "ic" : "ic", // Always use mainnet for now

@@ -65,12 +65,12 @@ dfx canister --network ic status dhaniverse_backend
 ## 🌐 Network Configuration
 
 ### Mainnet Canister IDs
-- **Backend**: `dzbzg-eqaaa-aaaap-an3rq-cai`
+- **Backend**: `2v55c-vaaaa-aaaas-qbrpq-cai`
 - **Frontend**: TBD (will be assigned on first frontend deploy)
 
 ### URLs
-- **Backend API**: https://dzbzg-eqaaa-aaaap-an3rq-cai.icp0.io/
-- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=dzbzg-eqaaa-aaaap-an3rq-cai
+- **Backend API**: https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/
+- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai
 
 ## 👥 Team Setup
 

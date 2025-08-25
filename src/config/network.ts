@@ -14,7 +14,7 @@ export const NetworkConfig = {
 
   // Get the canister ID
   getCanisterId(): string {
-    return import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND || 'dzbzg-eqaaa-aaaap-an3rq-cai';
+    return import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND || '2v55c-vaaaa-aaaas-qbrpq-cai';
   },
 
   // Check if we're running locally (always false now since we force IC)

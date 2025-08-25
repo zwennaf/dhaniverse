@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   define: {
-    'process.env.CANISTER_ID_DHANIVERSE_BACKEND': JSON.stringify('dzbzg-eqaaa-aaaap-an3rq-cai'),
+    'process.env.CANISTER_ID_DHANIVERSE_BACKEND': JSON.stringify('2v55c-vaaaa-aaaas-qbrpq-cai'),
     'process.env.DFX_NETWORK': JSON.stringify('ic'),
   },
 });

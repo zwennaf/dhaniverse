@@ -4,42 +4,14 @@
     "dhaniverse_backend": {
       "type": "rust",
       "package": "rust-icp-canister",
-      "candid": "packages/icp-canister/rust_icp_canister.did",
-      "wasm": "target/wasm32-unknown-unknown/release/rust_icp_canister.wasm",
-      "gzip": true,
-      "metadata": [
-        {
-          "name": "candid:service"
-        }
-      ],
-      "declarations": {
-        "output": "src/declarations/dhaniverse_backend",
-        "node_compatibility": true
-      }
-    },
-    "dhaniverse_frontend": {
-      "type": "assets",
-      "source": ["dist/"],
-      "dependencies": ["dhaniverse_backend"]
+      "package_path": "packages/icp-canister",
+      "candid": "packages/icp-canister/rust_icp_canister.did"
     }
   },
   "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943",
-      "type": "ephemeral",
-      "replica": {
-        "subnet_type": "system"
-      }
-    },
     "ic": {
       "providers": ["https://ic0.app"],
       "type": "persistent"
-    }
-  },
-  "defaults": {
-    "build": {
-      "args": "",
-      "packtool": ""
     }
   }
 }

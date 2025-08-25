@@ -1,7 +1,7 @@
 // Canister configuration for dhaniverse
 export const CANISTER_CONFIG = {
   // Main network canister IDs
-  DHANIVERSE_BACKEND: 'dzbzg-eqaaa-aaaap-an3rq-cai',
+  DHANIVERSE_BACKEND: '2v55c-vaaaa-aaaas-qbrpq-cai',
   
   // Network configuration
   NETWORK: 'ic', // 'local' for development, 'ic' for mainnet

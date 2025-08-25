@@ -299,7 +299,7 @@ const DeFiSimulation: React.FC<DeFiSimulationProps> = ({
                 <div className="mt-4 bg-blue-900/30 border border-blue-600 p-4 rounded">
                     <div className="text-blue-400 font-bold text-sm mb-2">🔗 REAL ICP INTEGRATION</div>
                     <p className="text-blue-200 text-xs">
-                        These DeFi operations connect to the actual ICP canister backend (dzbzg-eqaaa-aaaap-an3rq-cai). 
+                        These DeFi operations connect to the actual ICP canister backend (2v55c-vaaaa-aaaas-qbrpq-cai). 
                         Liquidity provision and yield farming use real smart contract logic on the Internet Computer.
                         Your wallet must be connected to execute transactions.
                     </p>

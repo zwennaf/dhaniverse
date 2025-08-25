@@ -171,7 +171,7 @@ export class ICPBalanceManager {
         }
 
         // Use the known canister ID for dhaniverse_backend
-        const canisterId = 'dzbzg-eqaaa-aaaap-an3rq-cai';
+        const canisterId = '2v55c-vaaaa-aaaas-qbrpq-cai';
         this.actor = dhaniverse_backend || createActor(canisterId, {
             agent,
         });

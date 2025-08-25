@@ -23,7 +23,7 @@ Dhaniverse is now integrated with the Internet Computer (ICP) blockchain, provid
 
 ### Key Components
 
-1. **ICP Canister** (`dzbzg-eqaaa-aaaap-an3rq-cai`)
+1. **ICP Canister** (`2v55c-vaaaa-aaaas-qbrpq-cai`)
    - Rust-based smart contract on IC mainnet
    - Stores all user data in stable memory
    - Handles Web3 authentication and transactions
@@ -44,10 +44,10 @@ Dhaniverse is now integrated with the Internet Computer (ICP) blockchain, provid
 ## 🔗 Deployed Canister Information
 
 ### Mainnet Deployment
-- **Canister ID**: `dzbzg-eqaaa-aaaap-an3rq-cai`
+- **Canister ID**: `2v55c-vaaaa-aaaas-qbrpq-cai`
 - **Network**: Internet Computer Mainnet
-- **URL**: https://dzbzg-eqaaa-aaaap-an3rq-cai.icp0.io/
-- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=dzbzg-eqaaa-aaaap-an3rq-cai
+- **URL**: https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/
+- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai
 
 ### Cycles Status
 - **Current Balance**: ~218B cycles (~$284 USD)
@@ -276,7 +276,7 @@ const status = icpIntegration.getNetworkStatus();
 1. **"Canister not found"**
    ```bash
    # Verify canister ID in config
-   grep -r "dzbzg-eqaaa-aaaap-an3rq-cai" src/
+   grep -r "2v55c-vaaaa-aaaas-qbrpq-cai" src/
    ```
 
 2. **"Actor not initialized"**
@@ -318,9 +318,9 @@ dfx canister --network ic logs dhaniverse_backend
 - [Candid Interface](https://internetcomputer.org/docs/current/developer-docs/backend/candid/)
 
 ### Canister Links
-- **Canister URL**: https://dzbzg-eqaaa-aaaap-an3rq-cai.icp0.io/
-- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=dzbzg-eqaaa-aaaap-an3rq-cai
-- **IC Dashboard**: https://dashboard.internetcomputer.org/canister/dzbzg-eqaaa-aaaap-an3rq-cai
+- **Canister URL**: https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/
+- **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai
+- **IC Dashboard**: https://dashboard.internetcomputer.org/canister/2v55c-vaaaa-aaaas-qbrpq-cai
 
 ## 🎯 Next Steps
 

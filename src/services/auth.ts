@@ -66,7 +66,7 @@ export class AuthService {
         // You'll need to import your canister's IDL here
         // this.actor = Actor.createActor(idlFactory, {
         //   agent,
-        //   canisterId: 'dzbzg-eqaaa-aaaap-an3rq-cai',
+        //   canisterId: '2v55c-vaaaa-aaaas-qbrpq-cai',
         // });
     }
 

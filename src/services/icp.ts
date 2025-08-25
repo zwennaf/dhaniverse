@@ -5,7 +5,7 @@ import { AuthClient } from '@dfinity/auth-client';
 // Note: Run 'dfx generate --network ic dhaniverse_backend' first in packages/icp-canister directory
 
 // Canister configuration
-const CANISTER_ID = 'dzbzg-eqaaa-aaaap-an3rq-cai';
+const CANISTER_ID = '2v55c-vaaaa-aaaas-qbrpq-cai';
 const HOST = process.env.NODE_ENV === 'production' ? 'https://ic0.app' : 'https://ic0.app';
 
 // Store the canister URL for reference

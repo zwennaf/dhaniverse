@@ -67,7 +67,7 @@ if [ ! -f .env ]; then
     print_status "Creating .env file..."
     cat > .env << EOF
 # Dhaniverse ICP Canister Environment Variables
-CANISTER_ID_DHANIVERSE_BACKEND=dzbzg-eqaaa-aaaap-an3rq-cai
+CANISTER_ID_DHANIVERSE_BACKEND=2v55c-vaaaa-aaaas-qbrpq-cai
 NETWORK=ic
 DFX_VERSION=$(dfx --version | cut -d' ' -f2)
 EOF
