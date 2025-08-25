@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { resolveAsset } from '../../utils/assetCache';
+import { cacheAssets, resolveAsset } from '../../utils/assetCache';
 import DialogueBox from '../common/DialogueBox';
 
 interface OnboardingWrapperProps {
@@ -71,6 +71,28 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
     return '/game/first-tutorial/w1-dull.png';
   }, [currentSlide]);
 
+  const [bgUrl, setBgUrl] = useState<string>(resolveAsset(backgroundUrl));
+  const [bgReady, setBgReady] = useState(false);
+
+  // Ensure the current background image is cached and use the resolved blob URL when ready.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await cacheAssets([backgroundUrl]);
+        if (cancelled) return;
+        setBgUrl(resolveAsset(backgroundUrl));
+        setBgReady(true);
+      } catch (e) {
+        if (!cancelled) {
+          setBgUrl(backgroundUrl);
+          setBgReady(true);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [backgroundUrl]);
+
   // Showcase images including new final slide image
   const showcaseImages = useMemo<Record<number,string>>(() => ({
     1:'/game/first-tutorial/controls.png',
@@ -82,7 +104,7 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
   }), []);
 
   useEffect(() => {
-    const styleEl = document.createElement('style');
+  const styleEl = document.createElement('style');
     styleEl.id = 'onboarding-wrapper-styles';
     styleEl.innerHTML = `
       @keyframes floaty-move { 0%{transform:translateY(0)}50%{transform:translateY(-12px)}100%{transform:translateY(0)} }
@@ -92,7 +114,25 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
       .showcase-fade.show { opacity:1; }
     `;
     document.head.appendChild(styleEl);
-    const t = setTimeout(() => mountedRef.current && setIsInitialLoad(false), 200);
+    // Short initial delay to avoid a visible black flash but keep a tiny buffer for layout
+    const t = setTimeout(() => mountedRef.current && setIsInitialLoad(false), 30);
+    // Preload the background and showcase images so the backdrop resolves quickly without
+    // causing additional network fetches while the onboarding mounts.
+    const assetsToCache: string[] = [
+      '/game/first-tutorial/w1.png',
+      '/game/first-tutorial/w1-dull.png',
+      '/game/first-tutorial/w2.png',
+      '/game/first-tutorial/w3.png',
+      '/game/first-tutorial/w4.png',
+      '/game/first-tutorial/controls.png',
+      '/game/first-tutorial/gui-intro.png',
+      '/game/first-tutorial/bank-intro.png',
+      '/game/first-tutorial/atm-intro.png',
+      '/game/first-tutorial/stock-intro.png',
+      '/game/first-tutorial/maya-waiting.png'
+    ];
+    // Fire-and-forget preload; resolved URLs will be returned by resolveAsset when used.
+    cacheAssets(assetsToCache).catch(() => {});
     return () => { mountedRef.current = false; clearTimeout(t); styleEl.remove(); };
   }, []);
 
@@ -113,7 +153,12 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
 
   return (
     <div className="fixed inset-0 z-50 select-none" onClick={handleAdvance}>
-    <div className="absolute inset-0" style={{ background: `url('${resolveAsset(backgroundUrl)}') center / cover no-repeat` }} />
+      {/* Solid fallback while backdrop resolves to cached blob URL */}
+      <div className="absolute inset-0 bg-black" />
+      <div
+        className={`absolute inset-0 transition-opacity duration-500 ${bgReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        style={{ background: `url('${bgUrl}') center / cover no-repeat` }}
+      />
       <div className="relative flex flex-col h-full w-full">
         <div className="flex-1 flex items-center justify-center">
           <div className={`flex ${hasShowcase ? 'justify-between' : 'justify-center'} items-center w-full max-w-[1600px] px-16 gap-12`}>
@@ -159,8 +204,9 @@ const OnboardingWrapper: React.FC<OnboardingWrapperProps> = ({ onContinueToGame 
           />
         </div>
       </div>
-      <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:40, opacity: isTransitioning ? 1 : 0, pointerEvents: isTransitioning ? 'auto':'none' }} />
-      <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:50, opacity: isInitialLoad ? 1 : 0, pointerEvents: isInitialLoad ? 'auto':'none' }} />
+  <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:40, opacity: isTransitioning ? 1 : 0, pointerEvents: isTransitioning ? 'auto':'none' }} />
+  {/* initial-load overlay: non-blocking and very short to avoid a full-screen blackout */}
+  <div className="absolute inset-0 bg-black fade-layer" style={{ zIndex:50, opacity: isInitialLoad ? 0.98 : 0, pointerEvents: 'none' }} />
     </div>
   );
 };

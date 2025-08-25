@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { cacheAssets } from '../../utils/assetCache';
+import { cacheAssets, resolveAsset } from '../../utils/assetCache';
 import { initChunkCache, preloadAndCacheChunks } from '../../../game/cache/mapChunkCache.ts';
 import { NumberCounter } from '../common';
 
@@ -18,6 +18,8 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   const [mapChunksPreloaded, setMapChunksPreloaded] = useState(false);
   const tutorialAssetsLoadedRef = useRef(false);
   const mapChunksPreloadedRef = useRef(false);
+  const [bgUrl, setBgUrl] = useState<string>('/UI/game/loaderbg.png');
+  const [bgReady, setBgReady] = useState(false);
 
   const loadingSteps = [
     { progress: 10, status: 'Loading Game Assets...' },
@@ -46,10 +48,9 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   useEffect(() => {
     // Assumption: localStorage flag 'dhaniverse_onboarding_done' === 'true' means skip tutorial
     const needsTutorial = localStorage.getItem('dhaniverse_onboarding_done') !== 'true';
-    setShouldPreloadTutorial(needsTutorial);
-    if (!needsTutorial) return;
+  setShouldPreloadTutorial(needsTutorial);
 
-    const tutorialImages: string[] = [
+  const tutorialImages: string[] = [
       '/game/first-tutorial/w1.png',
       '/game/first-tutorial/w1-dull.png',
       '/game/first-tutorial/w2.png',
@@ -67,10 +68,26 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       '/game/first-tutorial/stock-intro.png'
     ];
     let cancelled = false;
-    cacheAssets(tutorialImages).then(() => {
-      if (cancelled) return; 
-      tutorialAssetsLoadedRef.current = true;
-      setTutorialAssetsLoaded(true);
+    if (needsTutorial) {
+      cacheAssets(tutorialImages).then(() => {
+        if (cancelled) return; 
+        tutorialAssetsLoadedRef.current = true;
+        setTutorialAssetsLoaded(true);
+      }).catch(() => {});
+    }
+
+    // Always cache the loader background early (regardless of tutorial) so the
+    // CSS background doesn't trigger a separate fetch and cause a visual flash.
+    cacheAssets(['/UI/game/loaderbg.png']).then(() => {
+      if (cancelled) return;
+      const resolved = resolveAsset('/UI/game/loaderbg.png');
+      setBgUrl(resolved);
+      setBgReady(true);
+    }).catch(() => {
+      if (!cancelled) {
+        // still mark ready so UI can render with the original url
+        setBgReady(true);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -190,12 +207,25 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
         isComplete ? 'opacity-0' : 'opacity-100'
       }`}
       style={{
-        backgroundImage: "url('/UI/game/loaderbg.png')",
+        backgroundColor: '#000000', // fallback while background loads
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
       }}
     >
+      {/* Background image layer: kept as a separate absolutely positioned element so
+          we can avoid the browser requesting the image before we've converted it to a
+          blob URL in our cache. It fades in when bgReady is true. */}
+      <div
+        aria-hidden
+        className={`absolute inset-0 transition-opacity duration-700 ${bgReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        style={{
+          backgroundImage: `url('${bgUrl}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      />
       {/* Subtle dark overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-40" />
       
