@@ -47,7 +47,7 @@ pub async fn exchange_currency(
             return Err(CanisterError::InsufficientBalance);
         }
         
-        let to_amount = utils::calculate_exchange(amount, exchange_rate)?;
+        let to_amount = utils::safe_multiply(amount, exchange_rate)?;
         user_data.dual_balance.rupees_balance = utils::safe_subtract(user_data.dual_balance.rupees_balance, amount)?;
         user_data.dual_balance.token_balance = utils::safe_add(user_data.dual_balance.token_balance, to_amount)?;
         

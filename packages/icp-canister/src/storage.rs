@@ -9,7 +9,7 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 // Thread-local storage for the canister state
 thread_local! {
-    static STATE: RefCell<CanisterState> = RefCell::new(CanisterState::default());
+    pub(crate) static STATE: RefCell<CanisterState> = RefCell::new(CanisterState::default());
     
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = 
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
@@ -29,6 +29,13 @@ thread_local! {
     static WALLET_STORAGE: RefCell<StableBTreeMap<String, WalletConnection, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))
+        )
+    );
+
+    // Price feed storage (symbol -> price USD)
+    static PRICE_FEED_STORAGE: RefCell<StableBTreeMap<String, f64, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
         )
     );
 }
@@ -300,6 +307,22 @@ pub fn get_users_count() -> usize {
     STATE.with(|state| {
         state.borrow().users.len()
     })
+}
+
+// Price feed operations
+pub fn set_price_feed(symbol: &str, price: f64) {
+    PRICE_FEED_STORAGE.with(|storage| {
+        storage.borrow_mut().insert(symbol.to_string(), price);
+    });
+}
+
+pub fn get_price_feed(symbol: &str) -> Option<f64> {
+    let key = symbol.to_string();
+    PRICE_FEED_STORAGE.with(|storage| storage.borrow().get(&key))
+}
+
+pub fn get_all_price_feeds() -> Vec<(String, f64)> {
+    PRICE_FEED_STORAGE.with(|storage| storage.borrow().iter().map(|(k, v)| (k.clone(), v)).collect())
 }
 
 // Get active sessions count (for monitoring)

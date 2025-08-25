@@ -27,6 +27,7 @@ type DualBalance = record {
   last_updated: nat64;
 };
 
+// Staking types removed
 
 type ExchangeResult = record {
   success: bool;
@@ -40,7 +41,6 @@ type ExchangeResult = record {
 type AchievementCategory = variant {
   Trading;
   Saving;
-  # Staking types removed
   Learning;
 };
 
@@ -71,7 +71,6 @@ type TransactionType = variant {
   Deposit;
   Withdraw;
   Exchange;
-  Stake;
 };
 
 type TransactionStatus = variant {
@@ -147,7 +146,7 @@ type Result_5 = variant {
   Err: text;
 };
 
-// Staking types removed
+// Result_6 (staking) removed
 
 type Result_7 = variant {
   Ok: float64;
@@ -180,7 +179,6 @@ service : {
   // Banking Methods
   get_dual_balance: (text) -> (Result_4) query;
   exchange_currency: (text, text, text, float64) -> (Result_5);
-  // Staking methods removed
   get_achievements: (text) -> (vec Achievement) query;
   claim_achievement_reward: (text, text) -> (Result_8);
 

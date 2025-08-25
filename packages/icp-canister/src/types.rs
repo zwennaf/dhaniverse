@@ -167,6 +167,7 @@ pub struct CanisterState {
     pub sessions: HashMap<String, Web3Session>,
     pub wallet_connections: HashMap<String, WalletConnection>,
     pub global_settings: GlobalSettings,
+    pub price_feeds: HashMap<String, f64>,
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]

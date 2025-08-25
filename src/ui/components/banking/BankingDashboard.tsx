@@ -43,7 +43,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [currentCash, setCurrentCash] = useState(playerRupees);
     const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([]);
     const [totalRupeesChange, setTotalRupeesChange] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const [loading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Web3 Integration State
@@ -51,6 +51,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [icpTokens, setIcpTokens] = useState<ICPToken[]>([]);
     const [syncInProgress, setSyncInProgress] = useState(false);
     const [showWeb3Integration, setShowWeb3Integration] = useState(false);
+    const [showExchangeModal, setShowExchangeModal] = useState(false);
+    const [exchangeFrom, setExchangeFrom] = useState<string | null>(null);
+    const [exchangeTo, setExchangeTo] = useState<string>("DHANI");
+    const [exchangeAmount, setExchangeAmount] = useState<number | null>(null);
+    const [usdPrices, setUsdPrices] = useState<Record<string, number>>({});
 
     // Initialize all Web3 services
     useEffect(() => {
@@ -89,6 +94,25 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 });
                 
                 console.log("Web3 services initialized successfully");
+                // Fetch USD prices for tokens to show market value
+                try {
+                    (async () => {
+                        // Map symbols to CoinGecko ids (extend as needed)
+                        const mapping: Record<string, string> = { ICP: 'internet-computer' };
+                        const ids = Object.values(mapping).join(',');
+                        if (ids) {
+                            const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+                            const data = await res.json();
+                            const prices: Record<string, number> = {};
+                            Object.entries(mapping).forEach(([symbol, id]) => {
+                                prices[symbol] = data[id]?.usd || 0;
+                            });
+                            setUsdPrices(prices);
+                        }
+                    })();
+                } catch (e) {
+                    console.warn('Failed to fetch USD prices:', e);
+                }
                 
             } catch (e) {
                 console.warn("Web3 services initialization failed:", e);
@@ -108,7 +132,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     useEffect(() => {
         const loadBankingData = async () => {
             try {
-                setLoading(true);
                 setError(null);
 
                 const bankData = await bankingApi.getAccount();
@@ -138,8 +161,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 } catch (fallbackError) {
                     console.error("Fallback data load failed:", fallbackError);
                 }
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -185,7 +206,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const handleConnectWallet = async (preferredWallet?: WalletType) => {
         try {
             setError(null);
-            setLoading(true);
             console.log("Attempting to connect wallet:", preferredWallet);
 
             const result = preferredWallet
@@ -212,8 +232,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         } catch (error) {
             console.error("Wallet connection error:", error);
             setError(`Wallet connection error: ${error instanceof Error ? error.message : String(error)}`);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -240,7 +258,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     // ICP-specific handlers
     const handleIcpAuthentication = async () => {
         try {
-            setLoading(true);
             const success = await icpBalanceManager.authenticateWithII();
             if (success) {
                 showSuccessNotification(
@@ -255,22 +272,61 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         } catch (error) {
             console.error("ICP authentication error:", error);
             setError(`Authentication failed: ${error}`);
-        } finally {
-            setLoading(false);
         }
     };
 
     const handleRefreshBalances = async () => {
         try {
-            setLoading(true);
             await icpBalanceManager.refreshAllBalances();
             setIcpTokens(icpBalanceManager.getAllTokens());
             showSuccessNotification("🔄 Balances Updated", "Token balances refreshed from blockchain");
         } catch (error) {
             console.error("Balance refresh error:", error);
             setError(`Failed to refresh balances: ${error}`);
-        } finally {
-            setLoading(false);
+        }
+    };
+
+    // Request tokens from a test faucet (UI helper)
+    const handleRequestFaucet = async (tokenSymbol: string, amount = '100') => {
+        try {
+            const ok = await icpBalanceManager.requestFromFaucet(tokenSymbol, amount);
+            if (ok) {
+                setIcpTokens(icpBalanceManager.getAllTokens());
+                showSuccessNotification('🧪 Faucet', `Added ${amount} ${tokenSymbol} (test)`);
+            } else {
+                setError('Faucet request failed');
+            }
+        } catch (e) {
+            console.error('Faucet UI error:', e);
+            setError(`Faucet request failed: ${e}`);
+        }
+    };
+
+    // Quick exchange UI helper (very small demo flow)
+    const handleQuickExchange = async (fromSymbol: string) => {
+        // Open modal with prefilled from token
+        setExchangeFrom(fromSymbol);
+        setExchangeTo("DHANI");
+        setExchangeAmount(null);
+        setShowExchangeModal(true);
+    };
+
+    const performExchange = async () => {
+        try {
+            if (!exchangeFrom || !exchangeTo || !exchangeAmount || exchangeAmount <= 0) return;
+
+            const ok = await icpBalanceManager.exchangeCurrency(exchangeFrom, exchangeTo, exchangeAmount);
+            if (ok) {
+                await icpBalanceManager.refreshAllBalances();
+                setIcpTokens(icpBalanceManager.getAllTokens());
+                setShowExchangeModal(false);
+                showSuccessNotification('🔁 Exchange', `Swapped ${exchangeAmount} ${exchangeFrom} → ${exchangeTo}`);
+            } else {
+                setError('Exchange failed');
+            }
+        } catch (e) {
+            console.error('Exchange error:', e);
+            setError(`Exchange failed: ${e}`);
         }
     };
 
@@ -589,30 +645,64 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         <div className="bg-white/5 border border-white/10 p-6 rounded-xl">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-white font-bold text-lg">ICP Token Balances</h3>
-                                <button
-                                    onClick={handleRefreshBalances}
-                                    disabled={loading}
-                                    className="bg-dhani-gold/20 hover:bg-dhani-gold/30 disabled:opacity-50 text-dhani-gold px-4 py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    {loading ? "Refreshing..." : "Refresh"}
-                                </button>
+                                <div className="flex items-center space-x-3">
+                                    <button
+                                        onClick={async () => { await handleRefreshBalances(); setIcpTokens(icpBalanceManager.getAllTokens()); }}
+                                        disabled={loading}
+                                        className="bg-dhani-gold/20 hover:bg-dhani-gold/30 disabled:opacity-50 text-dhani-gold px-4 py-2 rounded-lg font-medium transition-colors"
+                                    >
+                                        {loading ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                    <button
+                                        onClick={() => window.open('https://ic0.app/?canisterId=dzbzg-eqaaa-aaaap-an3rq-cai', '_blank')}
+                                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm"
+                                    >
+                                        Candid UI
+                                    </button>
+                                    {icpBalanceManager.isAuthenticated() ? (
+                                        <button
+                                            onClick={async () => { await icpBalanceManager.logout(); setIcpTokens(icpBalanceManager.getAllTokens()); setWalletStatus({ connected: false }); showSuccessNotification('🔓 Logged out', 'Internet Identity disconnected'); }}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium"
+                                        >
+                                            Logout
+                                        </button>
+                                    ) : null}
+                                </div>
                             </div>
                             
                             <div className="space-y-4">
                                 {icpTokens.map((token) => (
-                                    <div key={token.symbol} className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                                        <div className="flex items-center justify-between">
+                                    <div key={token.symbol} className="bg-white/5 border border-white/10 p-4 rounded-lg flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-10 h-10 rounded-md bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white font-bold">{token.symbol[0]}</div>
                                             <div>
                                                 <h4 className="text-white font-bold">{token.name}</h4>
                                                 <p className="text-gray-300 text-sm">{token.symbol}</p>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-white font-bold">{parseFloat(token.balance).toFixed(4)}</p>
-                                                {token.usdValue && (
-                                                    <p className="text-gray-300 text-sm">
-                                                        ${(parseFloat(token.balance) * token.usdValue).toFixed(2)}
-                                                    </p>
+                                        </div>
+
+                                        <div className="flex items-center space-x-4">
+                                            <div className="text-right mr-4">
+                                                <p className="text-white font-bold">{parseFloat(token.balance).toLocaleString()}</p>
+                                                {token.usdValue ? (
+                                                    <p className="text-gray-300 text-sm">${(parseFloat(token.balance) * token.usdValue).toFixed(2)}</p>
+                                                ) : (
+                                                    <p className="text-gray-400 text-xs">USD value unavailable</p>
                                                 )}
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => handleRequestFaucet(token.symbol)}
+                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm"
+                                                >
+                                                    Faucet
+                                                </button>
+                                                <button
+                                                    onClick={() => handleQuickExchange(token.symbol)}
+                                                    className="bg-dhani-gold hover:bg-dhani-gold/80 text-black px-3 py-2 rounded-md text-sm"
+                                                >
+                                                    Exchange
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -621,6 +711,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                 {icpTokens.length === 0 && (
                                     <div className="text-center py-8">
                                         <p className="text-gray-400">No tokens found. Authenticate to view your balances.</p>
+                                        <div className="mt-4">
+                                            <button onClick={handleIcpAuthentication} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">Connect Internet Identity</button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -644,12 +737,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 flex bg-black items-center justify-center z-50 p-4">
-            {/* Backdrop */}
-            <div className="absolute inset-0 backdrop-blur-md" onClick={handleClose} />
-
+        <div className="fixed inset-0 bg-black">
             {/* Main container */}
-            <BankingPolish className="relative w-full max-w-6xl h-full max-h-[95vh] bg-black/95 backdrop-blur-modern border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden modern-scale-in">
+            <BankingPolish className="w-full h-full bg-black/95 backdrop-blur-modern border-0 rounded-none shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden">
                 
                 {/* Header */}
                 <div className="relative flex items-center justify-between p-6 border-b border-dhani-gold/20 flex-shrink-0">
@@ -715,13 +805,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="animate-spin rounded-full h-12 w-12 border-2 border-dhani-gold border-t-transparent"></div>
-                        </div>
-                    ) : (
-                        renderTabContent()
-                    )}
+                    {renderTabContent()}
                 </div>
             </BankingPolish>
 
@@ -730,6 +814,32 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 <Web3Integration
                     position="bottom-right"
                 />
+            )}
+            {/* Exchange Modal */}
+            {showExchangeModal && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-60">
+                    <div className="bg-black/95 border border-dhani-gold/20 rounded-xl p-6 w-full max-w-md">
+                        <h3 className="text-white text-lg font-bold mb-4">Exchange {exchangeFrom}</h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-sm text-gray-300">From</label>
+                                <input value={exchangeFrom || ''} disabled className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-300">To</label>
+                                <input value={exchangeTo} onChange={(e) => setExchangeTo(e.target.value.toUpperCase())} className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-300">Amount</label>
+                                <input type="number" value={exchangeAmount ?? ''} onChange={(e) => setExchangeAmount(parseFloat(e.target.value))} className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div className="flex justify-end space-x-2 mt-4">
+                                <button onClick={() => setShowExchangeModal(false)} className="px-4 py-2 rounded-md bg-gray-700 text-white">Cancel</button>
+                                <button onClick={performExchange} className="px-4 py-2 rounded-md bg-dhani-gold text-black">Exchange</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

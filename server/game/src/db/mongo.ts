@@ -286,8 +286,8 @@ class MongoDatabase {
             userId,
             position: { x: 400, y: 300, scene: "main" },
             financial: {
-                rupees: 1000,
-                totalWealth: 1000,
+                rupees: 0,
+                totalWealth: 0,
                 bankBalance: 0,
                 stockPortfolioValue: 0,
             },
@@ -316,7 +316,7 @@ class MongoDatabase {
         // Create initial bank account
         const bankAccount: BankAccountDocument = {
             userId,
-            balance: 1000,
+            balance: 0,
             transactions: [],
             createdAt: new Date(),
             lastUpdated: new Date(),
