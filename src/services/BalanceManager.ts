@@ -31,10 +31,10 @@ export interface BalanceState {
 
 class BalanceManager {
     private currentBalance: BalanceState = {
-        cash: 1000,
+        cash: 0,
         bankBalance: 0,
         stockValue: 0,
-        totalValue: 1000,
+        totalValue: 0,
     };
 
     private transactions: Transaction[] = [];

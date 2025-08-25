@@ -830,7 +830,29 @@ export class MayaNPCManager {
         if (this.activeDialog) return;
         this.activeDialog = true;
 
-        // Step 1: Show Central Bank intro dialogue
+        // Get userId from localStorage or cookie (adjust as needed for your auth system)
+        const userId = window.localStorage.getItem('user_id');
+        const claimKey = userId ? `claimed_starter_money_${userId}` : null;
+        const hasClaimed = claimKey ? window.localStorage.getItem(claimKey) === 'true' : false;
+
+        if (hasClaimed) {
+            // Already claimed, show only the intro dialogue
+            dialogueManager.showDialogue({
+                text: "This is our Central Bank! Here you can manage your finances and learn about money.",
+                characterName: 'M.A.Y.A',
+                allowSpaceAdvance: true,
+                showBackdrop: false
+            }, {
+                onAdvance: () => {
+                    dialogueManager.closeDialogue();
+                    this.closeDialog();
+                },
+                onComplete: () => {}
+            });
+            return;
+        }
+
+        // Not claimed yet, show both dialogues
         dialogueManager.showDialogue({
             text: "This is our Central Bank! Here you can manage your finances and learn about money.",
             characterName: 'M.A.Y.A',
@@ -867,21 +889,46 @@ export class MayaNPCManager {
 
     // Handles the claim money logic after dialogue
     private handleClaimMoney(): void {
-        // Update player balance in real time
-        const STARTER_AMOUNT = 1000; // Set your starter amount here
+        (async () => {
+            try {
+                const userId = window.localStorage.getItem('user_id');
+                const token = window.localStorage.getItem('auth_token');
+                const claimKey = userId ? `claimed_starter_money_${userId}` : null;
+                if (!token) {
+                    console.warn('Claim money: missing auth token');
+                }
 
-        // Add starter money to current cash balance
-        if (typeof balanceManager?.updateCash === 'function') {
-            const current = balanceManager.getBalance().cash;
-            balanceManager.updateCash(current + STARTER_AMOUNT);
-        }
+                const baseUrl = (window as any).__API_BASE_URL || '/api';
+                const resp = await fetch(`${baseUrl}/game/player-state/claim-starter`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    }
+                });
 
-        // Show confirmation and close dialogue
-        this.showTemporaryDialog("You have claimed your starter money!", 2000);
-        dialogueManager.closeDialogue();
-        this.closeDialog();
-        // Optionally, update tasks/objectives here
-        // ...existing code...
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    console.warn('Starter claim failed', err);
+                    this.showTemporaryDialog(err.error || 'Already claimed or failed', 1500);
+                } else {
+                    const data = await resp.json();
+                    // Mark claimed locally to skip future UI
+                    if (claimKey) window.localStorage.setItem(claimKey, 'true');
+                    // Sync frontend balance with backend value
+                    if (typeof balanceManager?.updateCash === 'function') {
+                        balanceManager.updateCash(data.rupees ?? balanceManager.getBalance().cash);
+                    }
+                    this.showTemporaryDialog(`You have claimed ₹${data.amount}!`, 1200);
+                }
+            } catch (e) {
+                console.error('Error claiming starter money', e);
+                this.showTemporaryDialog('Error claiming starter money', 1500);
+            } finally {
+                dialogueManager.closeDialogue();
+                this.closeDialog();
+            }
+        })();
     }
 
     private ensureTextAlignment(): void {
