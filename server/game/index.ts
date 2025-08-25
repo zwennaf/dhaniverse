@@ -2,7 +2,7 @@ if (!Deno.env.get("NODE_ENV")) {
     Deno.env.set("NODE_ENV", "production");
 }
 
-import { Application } from "oak";
+import { Application, Router } from "oak";
 import { oakCors } from "cors";
 import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
@@ -109,9 +109,15 @@ app.use(apiRouter.allowedMethods());
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
 
-// Game routes - mounted directly for game API endpoints
+// Game routes - mounted directly AND under /api prefix for backward compatibility
 app.use(gameRouter.routes());
 app.use(gameRouter.allowedMethods());
+
+// Backward compatibility: some clients still call /api/game/... so mount prefixed
+const prefixedGameRouter = new Router();
+prefixedGameRouter.use("/api", gameRouter.routes(), gameRouter.allowedMethods());
+app.use(prefixedGameRouter.routes());
+app.use(prefixedGameRouter.allowedMethods());
 
 // Start the server with database initialization
 async function startServer() {

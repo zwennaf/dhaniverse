@@ -242,37 +242,71 @@ gameRouter.put("/game/player-state/rupees", async (ctx) => {
 });
 
 // One-time starter money claim
+// Get starter claim status (idempotent, used by client to decide dialogue flow)
+gameRouter.get("/game/player-state/starter-status", async (ctx) => {
+    try {
+        const userId = ctx.state.userId;
+        const playerStates = mongodb.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
+        const playerState = await playerStates.findOne({ userId });
+        if (!playerState) {
+            ctx.response.status = 200; // Treat as new user; client will show claim path
+            ctx.response.body = { success: true, claimed: false, rupees: 0 };
+            return;
+        }
+        const ps = playerState as PlayerStateDocument & { starterClaimed?: boolean };
+        const claimed = ps.starterClaimed === true || ps.progress?.completedTutorials?.includes("starter-claimed");
+        ctx.response.body = { success: true, claimed, rupees: playerState.financial?.rupees ?? 0 };
+    } catch (error) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Failed to get starter status" };
+        console.error("Starter status error:", error);
+    }
+});
+
+// One-time starter money claim (idempotent): returns current balance and whether newly claimed
 gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
     try {
         const userId = ctx.state.userId;
         const playerStates = mongodb.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
-
-        const playerState = await playerStates.findOne({ userId });
+        let playerState = await playerStates.findOne({ userId });
         if (!playerState) {
-            ctx.response.status = 404;
-            ctx.response.body = { error: "Player state not found" };
-            return;
+            // Auto-create minimal player state (all zero) if somehow missing
+            const newPlayerState: PlayerStateDocument = {
+                userId,
+                position: { x: 400, y: 300, scene: "main" },
+                financial: { rupees: 0, totalWealth: 0, bankBalance: 0, stockPortfolioValue: 0 },
+                inventory: { items: [], capacity: 20 },
+                progress: { level: 1, experience: 0, unlockedBuildings: ["bank", "stockmarket"], completedTutorials: [] },
+                settings: { soundEnabled: true, musicEnabled: true, autoSave: true },
+                lastUpdated: new Date()
+            };
+            const insertRes = await playerStates.insertOne(newPlayerState);
+            playerState = { ...newPlayerState, _id: insertRes.insertedId } as PlayerStateDocument & { _id: ObjectId };
         }
 
-        // Use a flag in progress.completedTutorials or create one-time field
-    const alreadyClaimed = (playerState as PlayerStateDocument & { starterClaimed?: boolean }).starterClaimed === true || playerState.progress?.completedTutorials?.includes("starter-claimed");
-        if (alreadyClaimed) {
-            ctx.response.status = 400;
-            ctx.response.body = { error: "Starter money already claimed" };
-            return;
-        }
-
+        const ps = playerState as PlayerStateDocument & { starterClaimed?: boolean };
+        const alreadyClaimed = ps.starterClaimed === true || ps.progress?.completedTutorials?.includes("starter-claimed");
         const STARTER_AMOUNT = 1000;
-
-        const updateOp: Record<string, unknown> = {
-            $inc: { "financial.rupees": STARTER_AMOUNT, "financial.totalWealth": STARTER_AMOUNT },
-            $addToSet: { "progress.completedTutorials": "starter-claimed" },
-            $set: { starterClaimed: true, lastUpdated: new Date() }
-        };
-        await playerStates.updateOne({ userId }, updateOp);
+        let newlyClaimed = false;
+        if (!alreadyClaimed) {
+            const updateOp: Record<string, unknown> = {
+                $inc: { "financial.rupees": STARTER_AMOUNT, "financial.totalWealth": STARTER_AMOUNT },
+                $addToSet: { "progress.completedTutorials": "starter-claimed" },
+                $set: { starterClaimed: true, lastUpdated: new Date() }
+            };
+            await playerStates.updateOne({ userId }, updateOp);
+            newlyClaimed = true;
+        }
 
         const updated = await playerStates.findOne({ userId });
-        ctx.response.body = { success: true, amount: STARTER_AMOUNT, rupees: updated?.financial.rupees ?? 0 };
+        const finalRupees = updated?.financial.rupees ?? (playerState ? playerState.financial?.rupees : 0) ?? 0;
+        ctx.response.body = {
+            success: true,
+            amount: newlyClaimed ? STARTER_AMOUNT : 0,
+            newlyClaimed,
+            claimed: true,
+            rupees: finalRupees
+        };
     } catch (error) {
         ctx.response.status = 500;
         ctx.response.body = { error: "Failed to claim starter money" };

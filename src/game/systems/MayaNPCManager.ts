@@ -830,80 +830,107 @@ export class MayaNPCManager {
         if (this.activeDialog) return;
         this.activeDialog = true;
 
-        // Get userId from localStorage or cookie (adjust as needed for your auth system)
-        const userId = window.localStorage.getItem('user_id');
-        const claimKey = userId ? `claimed_starter_money_${userId}` : null;
-        const hasClaimed = claimKey ? window.localStorage.getItem(claimKey) === 'true' : false;
+        (async () => {
+            // Use unified auth token key used across app (see AuthContext & api utils)
+            const token = window.localStorage.getItem('dhaniverse_token');
+            // Backend game routes are mounted at root (e.g. /game/...), NOT under /api
+            const baseUrl = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+                ? 'http://localhost:8000'
+                : 'https://api.dhaniverse.in';
+            let claimed = false;
+            try {
+                if (!token) {
+                    // Without a token the request would 401; skip fetch & force claimed=false so we can prompt login
+                    throw new Error('unauthenticated');
+                }
+                const resp = await fetch(`${baseUrl}/game/player-state/starter-status`, {
+                    headers: {
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    claimed = !!data.claimed;
+                }
+            } catch (e) {
+                console.warn('Starter status check failed or unauthenticated, defaulting to claimed=false', e);
+            }
 
-        if (hasClaimed) {
-            // Already claimed, show only the intro dialogue
-            dialogueManager.showDialogue({
-                text: "This is our Central Bank! Here you can manage your finances and learn about money.",
-                characterName: 'M.A.Y.A',
-                allowSpaceAdvance: true,
-                showBackdrop: false
-            }, {
-                onAdvance: () => {
-                    dialogueManager.closeDialogue();
-                    this.closeDialog();
-                },
-                onComplete: () => {}
-            });
-            return;
-        }
-
-        // Not claimed yet, show both dialogues
-        dialogueManager.showDialogue({
-            text: "This is our Central Bank! Here you can manage your finances and learn about money.",
-            characterName: 'M.A.Y.A',
-            allowSpaceAdvance: true,
-            showBackdrop: false
-        }, {
-            onAdvance: () => {
-                dialogueManager.closeDialogue();
-                // Step 2: Show claim money dialogue
+            if (claimed) {
                 dialogueManager.showDialogue({
-                    text: "You can claim your starter money here. Press the button below to claim your funds and begin your journey!",
+                    text: "This is our Central Bank! Here you can manage your finances and learn about money.",
                     characterName: 'M.A.Y.A',
                     allowSpaceAdvance: true,
-                    showBackdrop: false,
-                    options: [
-                        { id: 'claim', text: 'Claim Money', action: () => this.handleClaimMoney() }
-                    ],
-                    showOptions: true
+                    showBackdrop: false
                 }, {
                     onAdvance: () => {
                         dialogueManager.closeDialogue();
                         this.closeDialog();
-                    },
-                    onOptionSelect: (optionId: string) => {
-                        if (optionId === 'claim') {
-                            this.handleClaimMoney();
-                        }
                     }
                 });
-            },
-            onComplete: () => {}
-        });
+                return;
+            }
+
+            // If no token, prompt user to sign in instead of showing claim button
+            if (!token) {
+                dialogueManager.showDialogue({
+                    text: "This is our Central Bank! Sign in to claim your starter money and begin your journey.",
+                    characterName: 'M.A.Y.A',
+                    allowSpaceAdvance: true,
+                    showBackdrop: false
+                }, {
+                    onAdvance: () => {
+                        dialogueManager.closeDialogue();
+                        this.closeDialog();
+                    }
+                });
+            } else {
+                dialogueManager.showDialogue({
+                    text: "This is our Central Bank! Here you can manage your finances and learn about money.",
+                    characterName: 'M.A.Y.A',
+                    allowSpaceAdvance: true,
+                    showBackdrop: false
+                }, {
+                    onAdvance: () => {
+                        dialogueManager.closeDialogue();
+                        dialogueManager.showDialogue({
+                            text: "You can claim your starter money here. Press the button below to claim your funds and begin your journey!",
+                            characterName: 'M.A.Y.A',
+                            allowSpaceAdvance: true,
+                            showBackdrop: false,
+                            options: [ { id: 'claim', text: 'Claim Money', action: () => this.handleClaimMoney() } ],
+                            showOptions: true
+                        }, {
+                            onAdvance: () => { dialogueManager.closeDialogue(); this.closeDialog(); },
+                            onOptionSelect: (optionId: string) => { if (optionId === 'claim') this.handleClaimMoney(); }
+                        });
+                    }
+                });
+            }
+        })();
     }
 
     // Handles the claim money logic after dialogue
     private handleClaimMoney(): void {
         (async () => {
             try {
-                const userId = window.localStorage.getItem('user_id');
-                const token = window.localStorage.getItem('auth_token');
-                const claimKey = userId ? `claimed_starter_money_${userId}` : null;
+                const token = window.localStorage.getItem('dhaniverse_token');
                 if (!token) {
                     console.warn('Claim money: missing auth token');
+                    this.showTemporaryDialog('Please sign in first to claim.', 1500);
+                    dialogueManager.closeDialogue();
+                    this.closeDialog();
+                    return;
                 }
 
-                const baseUrl = (window as any).__API_BASE_URL || '/api';
+                const baseUrl = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+                    ? 'http://localhost:8000'
+                    : 'https://api.dhaniverse.in';
                 const resp = await fetch(`${baseUrl}/game/player-state/claim-starter`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                        'Authorization': `Bearer ${token}`
                     }
                 });
 
@@ -913,13 +940,11 @@ export class MayaNPCManager {
                     this.showTemporaryDialog(err.error || 'Already claimed or failed', 1500);
                 } else {
                     const data = await resp.json();
-                    // Mark claimed locally to skip future UI
-                    if (claimKey) window.localStorage.setItem(claimKey, 'true');
-                    // Sync frontend balance with backend value
                     if (typeof balanceManager?.updateCash === 'function') {
                         balanceManager.updateCash(data.rupees ?? balanceManager.getBalance().cash);
                     }
-                    this.showTemporaryDialog(`You have claimed ₹${data.amount}!`, 1200);
+                    const amount = data.amount ?? 0;
+                    this.showTemporaryDialog(amount > 0 ? `You have claimed ₹${amount}!` : 'Already claimed.', 1500);
                 }
             } catch (e) {
                 console.error('Error claiming starter money', e);
