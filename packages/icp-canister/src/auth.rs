@@ -11,35 +11,42 @@ pub async fn authenticate_with_signature(address: String, signature: String) -> 
     // Validate wallet address
     utils::validate_wallet_address(&address, "1")?; // Default to Ethereum mainnet for validation
     
+    // Sanitize the address input
+    let clean_address = utils::sanitize_string(&address);
+    
     // Generate authentication message
     let timestamp = ic_cdk::api::time();
-    let message = utils::generate_auth_message(&address, timestamp);
+    
+    // Verify timestamp is reasonable
+    utils::verify_message_timestamp(timestamp)?;
+    
+    let message = utils::generate_auth_message(&clean_address, timestamp);
     
     // Verify signature
-    verify_ethereum_signature(&address, &message, &signature)?;
+    verify_ethereum_signature(&clean_address, &message, &signature)?;
     
     // Get or create user data
-    let user_data = storage::get_or_create_user_data(&address);
+    let user_data = storage::get_or_create_user_data(&clean_address);
     let is_new_user = user_data.created_at == user_data.last_activity;
     
     // Create user object
     let user = User {
-        id: address.clone(),
+        id: clean_address.clone(),
         email: None,
-        game_username: format!("Player_{}", &address[2..8]), // Use first 6 chars of address
-        wallet_address: Some(address.clone()),
+        game_username: format!("Player_{}", &clean_address[2..8]), // Use first 6 chars of address
+        wallet_address: Some(clean_address.clone()),
         auth_method: "web3".to_string(),
         created_at: user_data.created_at,
         updated_at: ic_cdk::api::time(),
     };
     
     // Generate session token (simplified)
-    let token = generate_session_token(&address);
+    let token = generate_session_token(&clean_address);
     
     // Update user activity
     let mut updated_user_data = user_data;
     updated_user_data.last_activity = ic_cdk::api::time();
-    storage::update_user_data(&address, updated_user_data)?;
+    storage::update_user_data(&clean_address, updated_user_data)?;
     
     Ok(AuthResult {
         success: true,

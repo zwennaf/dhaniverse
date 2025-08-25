@@ -21,7 +21,6 @@ export const idlFactory = ({ IDL }) => {
     'amount' : IDL.Float64,
   });
   const Result_8 = IDL.Variant({ 'Ok' : AchievementReward, 'Err' : IDL.Text });
-  const Result_7 = IDL.Variant({ 'Ok' : IDL.Float64, 'Err' : IDL.Text });
   const Result_2 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const WalletType = IDL.Variant({
     'MetaMask' : IDL.Null,
@@ -109,7 +108,7 @@ export const idlFactory = ({ IDL }) => {
     'token_balance' : IDL.Float64,
   });
   const Result_4 = IDL.Variant({ 'Ok' : DualBalance, 'Err' : IDL.Text });
-  // (staking types removed)
+  const Result_7 = IDL.Variant({ 'Ok' : IDL.Float64, 'Err' : IDL.Text });
   return IDL.Service({
     'authenticate_with_signature' : IDL.Func(
         [IDL.Text, IDL.Text],
@@ -164,7 +163,6 @@ export const idlFactory = ({ IDL }) => {
         [Result_7],
         [],
       ),
-  // (staking methods removed)
   });
 };
 export const init = ({ IDL }) => { return []; };

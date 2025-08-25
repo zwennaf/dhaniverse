@@ -15,6 +15,7 @@ import { ICP_CONFIG } from "../../../services/config";
 import { BankingPolish } from "../polish/FinalPolish";
 import { balanceManager } from "../../../services/BalanceManager";
 import { icpBalanceManager, ICPToken } from "../../../services/TestnetBalanceManager";
+import { canisterService } from "../../../services/CanisterService";
 
 interface FixedDeposit {
     _id?: string;
@@ -43,7 +44,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [currentCash, setCurrentCash] = useState(playerRupees);
     const [fixedDeposits, setFixedDeposits] = useState<FixedDeposit[]>([]);
     const [totalRupeesChange, setTotalRupeesChange] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const [loading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Web3 Integration State
@@ -51,6 +52,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [icpTokens, setIcpTokens] = useState<ICPToken[]>([]);
     const [syncInProgress, setSyncInProgress] = useState(false);
     const [showWeb3Integration, setShowWeb3Integration] = useState(false);
+    const [showExchangeModal, setShowExchangeModal] = useState(false);
+    const [exchangeFrom, setExchangeFrom] = useState<string | null>(null);
+    const [exchangeTo, setExchangeTo] = useState<string>("DHANI");
+    const [exchangeAmount, setExchangeAmount] = useState<number | null>(null);
+    const [usdPrices, setUsdPrices] = useState<Record<string, number>>({});
 
     // Initialize all Web3 services
     useEffect(() => {
@@ -60,7 +66,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             try {
                 console.log("Initializing Web3 services...");
                 
-                // Initialize ICP integration first
+                // Initialize canister service first
+                await canisterService.initialize();
+                if (!mounted) return;
+                
+                // Initialize ICP integration
                 await icpIntegration.initialize();
                 if (!mounted) return;
                 
@@ -69,8 +79,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 // Initialize ICP balance manager
                 await icpBalanceManager.initialize();
                 setIcpTokens(icpBalanceManager.getAllTokens());
-                
-                // Initialize Web3 services
                 
                 // Set up listeners
                 icpIntegration.walletManager.onConnectionChange((status) => {
@@ -90,6 +98,39 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 
                 console.log("Web3 services initialized successfully");
                 
+                // Fetch USD prices from canister instead of client-side
+                try {
+                    await canisterService.updatePricesFromExternal();
+                    const priceFeeds = await canisterService.getAllPriceFeeds();
+                    const prices: Record<string, number> = {};
+                    
+                    priceFeeds.forEach(([symbol, price]) => {
+                        prices[symbol] = price;
+                    });
+                    
+                    setUsdPrices(prices);
+                    console.log('Loaded prices from canister:', prices);
+                } catch (e) {
+                    console.warn('Failed to fetch prices from canister, falling back to client-side:', e);
+                    
+                    // Fallback to client-side pricing
+                    try {
+                        const mapping: Record<string, string> = { ICP: 'internet-computer' };
+                        const ids = Object.values(mapping).join(',');
+                        if (ids) {
+                            const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+                            const data = await res.json();
+                            const prices: Record<string, number> = {};
+                            Object.entries(mapping).forEach(([symbol, id]) => {
+                                prices[symbol] = data[id]?.usd || 0;
+                            });
+                            setUsdPrices(prices);
+                        }
+                    } catch (fallbackError) {
+                        console.warn('Client-side price fetch also failed:', fallbackError);
+                    }
+                }
+                
             } catch (e) {
                 console.warn("Web3 services initialization failed:", e);
                 if (mounted) {
@@ -104,13 +145,38 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         };
     }, []);
 
-    // Load banking data from backend
+    // Load banking data from backend and canister
     useEffect(() => {
         const loadBankingData = async () => {
             try {
-                setLoading(true);
                 setError(null);
 
+                // Try canister-based authentication and balance first
+                try {
+                    const initialized = await canisterService.initialize();
+                    if (initialized) {
+                        console.log("Canister service initialized");
+                        
+                        // Check if already authenticated
+                        if (await canisterService.isAuthenticated()) {
+                            console.log("User already authenticated with Internet Identity");
+                            
+                            // Try to get balance with a test wallet address
+                            const testAddress = "test-wallet-address";
+                            const canisterBalance = await canisterService.getBalanceNoAuth(testAddress);
+                            if (canisterBalance && canisterBalance.rupees_balance) {
+                                setBankBalance(Number(canisterBalance.rupees_balance));
+                                console.log("Loaded bank balance from canister:", canisterBalance.rupees_balance);
+                            }
+                        } else {
+                            console.log("User not authenticated with Internet Identity");
+                        }
+                    }
+                } catch (canisterError) {
+                    console.warn("Canister initialization failed, falling back to traditional backend:", canisterError);
+                }
+
+                // Fallback to traditional backend
                 const bankData = await bankingApi.getAccount();
                 if (bankData.success) {
                     setBankBalance(bankData.data.balance || 0);
@@ -138,8 +204,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 } catch (fallbackError) {
                     console.error("Fallback data load failed:", fallbackError);
                 }
-            } finally {
-                setLoading(false);
             }
         };
 
@@ -185,9 +249,41 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const handleConnectWallet = async (preferredWallet?: WalletType) => {
         try {
             setError(null);
-            setLoading(true);
             console.log("Attempting to connect wallet:", preferredWallet);
 
+            // Try canister-based Internet Identity authentication first for ICP
+            if (!preferredWallet) {
+                try {
+                    const initialized = await canisterService.initialize();
+                    if (initialized) {
+                        const authenticated = await canisterService.authenticateWithII();
+                        if (authenticated) {
+                            showSuccessNotification(
+                                "🔐 Internet Identity Connected!",
+                                "Authenticated with Internet Identity. On-chain features unlocked!"
+                            );
+                            
+                            // Refresh balance from canister
+                            try {
+                                const principal = canisterService.getPrincipal();
+                                if (principal) {
+                                    const principalStr = principal.toString();
+                                    const balance = await canisterService.getBalanceNoAuth(principalStr);
+                                    setBankBalance(Number(balance.rupees_balance || 0));
+                                }
+                            } catch (balanceError) {
+                                console.warn("Failed to refresh balance after auth:", balanceError);
+                            }
+                            
+                            return;
+                        }
+                    }
+                } catch (canisterError) {
+                    console.warn("Canister authentication failed, falling back to traditional wallet:", canisterError);
+                }
+            }
+
+            // Fallback to traditional wallet connection for Web3 wallets
             const result = preferredWallet
                 ? await icpIntegration.walletManager.connectWallet(preferredWallet)
                 : await icpIntegration.walletManager.connectWallet();
@@ -212,8 +308,6 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
         } catch (error) {
             console.error("Wallet connection error:", error);
             setError(`Wallet connection error: ${error instanceof Error ? error.message : String(error)}`);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -240,37 +334,122 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     // ICP-specific handlers
     const handleIcpAuthentication = async () => {
         try {
-            setLoading(true);
-            const success = await icpBalanceManager.authenticateWithII();
+            console.log('Starting ICP authentication...');
+            
+            // Initialize and authenticate with canister service
+            console.log('Initializing canister service...');
+            const initialized = await canisterService.initialize();
+            if (!initialized) {
+                throw new Error("Failed to initialize canister service - check network connection");
+            }
+            
+            console.log('Canister service initialized, attempting authentication...');
+            const success = await canisterService.authenticateWithII();
             if (success) {
                 showSuccessNotification(
                     "🔐 ICP Authentication Successful",
                     "Internet Identity connected successfully"
                 );
-                await icpBalanceManager.refreshAllBalances();
-                setIcpTokens(icpBalanceManager.getAllTokens());
+                
+                console.log('Authentication successful, refreshing balance...');
+                // Refresh balance from canister
+                try {
+                    const principal = canisterService.getPrincipal();
+                    if (principal) {
+                        const principalStr = principal.toString();
+                        const balance = await canisterService.getBalanceNoAuth(principalStr);
+                        setBankBalance(Number(balance.rupees_balance || 0));
+                        
+                        // Also try to get multiple token balances
+                        const tokenBalance = await canisterService.getDualBalance(principalStr);
+                        console.log("Token balance from canister:", tokenBalance);
+                    }
+                } catch (balanceError) {
+                    console.warn("Failed to refresh balance:", balanceError);
+                }
             } else {
                 setError("Failed to authenticate with Internet Identity");
+                showErrorNotification(
+                    "❌ Authentication Failed",
+                    "Could not connect to Internet Identity"
+                );
             }
         } catch (error) {
             console.error("ICP authentication error:", error);
-            setError(`Authentication failed: ${error}`);
-        } finally {
-            setLoading(false);
+            let errorMessage = "Unknown authentication error";
+            
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            console.error("Full error details:", {
+                error,
+                type: typeof error,
+                message: errorMessage
+            });
+            
+            setError(`Authentication failed: ${errorMessage}`);
+            showErrorNotification(
+                "❌ Connection Failed",
+                `Failed to connect to ICP canister: ${errorMessage}`
+            );
         }
     };
 
     const handleRefreshBalances = async () => {
         try {
-            setLoading(true);
             await icpBalanceManager.refreshAllBalances();
             setIcpTokens(icpBalanceManager.getAllTokens());
             showSuccessNotification("🔄 Balances Updated", "Token balances refreshed from blockchain");
         } catch (error) {
             console.error("Balance refresh error:", error);
             setError(`Failed to refresh balances: ${error}`);
-        } finally {
-            setLoading(false);
+        }
+    };
+
+    // Request tokens from a test faucet (UI helper)
+    const handleRequestFaucet = async (tokenSymbol: string, amount = '100') => {
+        try {
+            const ok = await icpBalanceManager.requestFromFaucet(tokenSymbol, amount);
+            if (ok) {
+                setIcpTokens(icpBalanceManager.getAllTokens());
+                showSuccessNotification('🧪 Faucet', `Added ${amount} ${tokenSymbol} (test)`);
+            } else {
+                setError('Faucet request failed');
+            }
+        } catch (e) {
+            console.error('Faucet UI error:', e);
+            setError(`Faucet request failed: ${e}`);
+        }
+    };
+
+    // Quick exchange UI helper (very small demo flow)
+    const handleQuickExchange = async (fromSymbol: string) => {
+        // Open modal with prefilled from token
+        setExchangeFrom(fromSymbol);
+        setExchangeTo("DHANI");
+        setExchangeAmount(null);
+        setShowExchangeModal(true);
+    };
+
+    const performExchange = async () => {
+        try {
+            if (!exchangeFrom || !exchangeTo || !exchangeAmount || exchangeAmount <= 0) return;
+
+            const ok = await icpBalanceManager.exchangeCurrency(exchangeFrom, exchangeTo, exchangeAmount);
+            if (ok) {
+                await icpBalanceManager.refreshAllBalances();
+                setIcpTokens(icpBalanceManager.getAllTokens());
+                setShowExchangeModal(false);
+                showSuccessNotification('🔁 Exchange', `Swapped ${exchangeAmount} ${exchangeFrom} → ${exchangeTo}`);
+            } else {
+                setError('Exchange failed');
+            }
+        } catch (e) {
+            console.error('Exchange error:', e);
+            setError(`Exchange failed: ${e}`);
         }
     };
 
@@ -398,6 +577,40 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             document.body.appendChild(notification);
 
             requestAnimationFrame(() => {
+                notification.style.transform = "translateX(0)";
+            });
+
+            setTimeout(() => {
+                notification.style.transform = "translateX(full)";
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3500);
+        } catch (error) {
+            console.log(`${title}: ${message}`);
+        }
+    };
+
+    const showErrorNotification = (title: string, message: string) => {
+        try {
+            const notification = document.createElement("div");
+            notification.className =
+                "fixed top-4 right-4 bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300";
+            notification.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="text-xl">❌</div>
+                    <div>
+                        <div class="font-bold">${title}</div>
+                        <div class="text-sm opacity-90">${message}</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
                 notification.style.transform = "translateX(0)";
             });
 
@@ -567,20 +780,29 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 return (
                     <div className="space-y-6">
                         {/* ICP Authentication */}
-                        {!icpBalanceManager.isAuthenticated() && (
+                        {!canisterService.isAuthenticated() && (
                             <div className="bg-blue-500/20 border border-blue-500/50 p-6 rounded-xl">
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-blue-300 font-bold">🔐 ICP Authentication Required</h3>
-                                        <p className="text-blue-200 text-sm">Connect with Internet Identity to access ICP features</p>
+                                        <p className="text-blue-200 text-sm">Connect with Internet Identity to access on-chain ICP features</p>
                                     </div>
-                                    <button
-                                        onClick={handleIcpAuthentication}
-                                        disabled={loading}
-                                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold transition-colors"
-                                    >
-                                        {loading ? "Connecting..." : "Connect Internet Identity"}
-                                    </button>
+                                    <div className="flex items-center space-x-3">
+                                        <button
+                                            onClick={handleIcpAuthentication}
+                                            disabled={loading}
+                                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold transition-colors"
+                                        >
+                                            {loading ? "Connecting..." : "Internet Identity"}
+                                        </button>
+                                        <button
+                                            onClick={() => handleConnectWallet()}
+                                            disabled={loading}
+                                            className="bg-dhani-gold hover:bg-dhani-gold/80 disabled:opacity-50 text-black px-6 py-2 rounded-lg font-bold transition-colors"
+                                        >
+                                            {loading ? "Connecting..." : "Web3 Wallet"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -589,30 +811,64 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         <div className="bg-white/5 border border-white/10 p-6 rounded-xl">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-white font-bold text-lg">ICP Token Balances</h3>
-                                <button
-                                    onClick={handleRefreshBalances}
-                                    disabled={loading}
-                                    className="bg-dhani-gold/20 hover:bg-dhani-gold/30 disabled:opacity-50 text-dhani-gold px-4 py-2 rounded-lg font-medium transition-colors"
-                                >
-                                    {loading ? "Refreshing..." : "Refresh"}
-                                </button>
+                                <div className="flex items-center space-x-3">
+                                    <button
+                                        onClick={async () => { await handleRefreshBalances(); setIcpTokens(icpBalanceManager.getAllTokens()); }}
+                                        disabled={loading}
+                                        className="bg-dhani-gold/20 hover:bg-dhani-gold/30 disabled:opacity-50 text-dhani-gold px-4 py-2 rounded-lg font-medium transition-colors"
+                                    >
+                                        {loading ? "Refreshing..." : "Refresh"}
+                                    </button>
+                                    <button
+                                        onClick={() => window.open('https://ic0.app/?canisterId=dzbzg-eqaaa-aaaap-an3rq-cai', '_blank')}
+                                        className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm"
+                                    >
+                                        Candid UI
+                                    </button>
+                                    {icpBalanceManager.isAuthenticated() ? (
+                                        <button
+                                            onClick={async () => { await icpBalanceManager.logout(); setIcpTokens(icpBalanceManager.getAllTokens()); setWalletStatus({ connected: false }); showSuccessNotification('🔓 Logged out', 'Internet Identity disconnected'); }}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium"
+                                        >
+                                            Logout
+                                        </button>
+                                    ) : null}
+                                </div>
                             </div>
                             
                             <div className="space-y-4">
                                 {icpTokens.map((token) => (
-                                    <div key={token.symbol} className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                                        <div className="flex items-center justify-between">
+                                    <div key={token.symbol} className="bg-white/5 border border-white/10 p-4 rounded-lg flex items-center justify-between">
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-10 h-10 rounded-md bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-white font-bold">{token.symbol[0]}</div>
                                             <div>
                                                 <h4 className="text-white font-bold">{token.name}</h4>
                                                 <p className="text-gray-300 text-sm">{token.symbol}</p>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-white font-bold">{parseFloat(token.balance).toFixed(4)}</p>
-                                                {token.usdValue && (
-                                                    <p className="text-gray-300 text-sm">
-                                                        ${(parseFloat(token.balance) * token.usdValue).toFixed(2)}
-                                                    </p>
+                                        </div>
+
+                                        <div className="flex items-center space-x-4">
+                                            <div className="text-right mr-4">
+                                                <p className="text-white font-bold">{parseFloat(token.balance).toLocaleString()}</p>
+                                                {token.usdValue ? (
+                                                    <p className="text-gray-300 text-sm">${(parseFloat(token.balance) * token.usdValue).toFixed(2)}</p>
+                                                ) : (
+                                                    <p className="text-gray-400 text-xs">USD value unavailable</p>
                                                 )}
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => handleRequestFaucet(token.symbol)}
+                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm"
+                                                >
+                                                    Faucet
+                                                </button>
+                                                <button
+                                                    onClick={() => handleQuickExchange(token.symbol)}
+                                                    className="bg-dhani-gold hover:bg-dhani-gold/80 text-black px-3 py-2 rounded-md text-sm"
+                                                >
+                                                    Exchange
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -621,6 +877,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                 {icpTokens.length === 0 && (
                                     <div className="text-center py-8">
                                         <p className="text-gray-400">No tokens found. Authenticate to view your balances.</p>
+                                        <div className="mt-4">
+                                            <button onClick={handleIcpAuthentication} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">Connect Internet Identity</button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -644,12 +903,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 flex bg-black items-center justify-center z-50 p-4">
-            {/* Backdrop */}
-            <div className="absolute inset-0 backdrop-blur-md" onClick={handleClose} />
-
+        <div className="fixed inset-0 bg-black">
             {/* Main container */}
-            <BankingPolish className="relative w-full max-w-6xl h-full max-h-[95vh] bg-black/95 backdrop-blur-modern border border-dhani-gold/30 rounded-2xl shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden modern-scale-in">
+            <BankingPolish className="w-full h-full bg-black/95 backdrop-blur-modern border-0 rounded-none shadow-2xl shadow-dhani-gold/10 flex flex-col overflow-hidden">
                 
                 {/* Header */}
                 <div className="relative flex items-center justify-between p-6 border-b border-dhani-gold/20 flex-shrink-0">
@@ -715,13 +971,7 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="animate-spin rounded-full h-12 w-12 border-2 border-dhani-gold border-t-transparent"></div>
-                        </div>
-                    ) : (
-                        renderTabContent()
-                    )}
+                    {renderTabContent()}
                 </div>
             </BankingPolish>
 
@@ -730,6 +980,32 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                 <Web3Integration
                     position="bottom-right"
                 />
+            )}
+            {/* Exchange Modal */}
+            {showExchangeModal && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-60">
+                    <div className="bg-black/95 border border-dhani-gold/20 rounded-xl p-6 w-full max-w-md">
+                        <h3 className="text-white text-lg font-bold mb-4">Exchange {exchangeFrom}</h3>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-sm text-gray-300">From</label>
+                                <input value={exchangeFrom || ''} disabled className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-300">To</label>
+                                <input value={exchangeTo} onChange={(e) => setExchangeTo(e.target.value.toUpperCase())} className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-300">Amount</label>
+                                <input type="number" value={exchangeAmount ?? ''} onChange={(e) => setExchangeAmount(parseFloat(e.target.value))} className="w-full mt-1 p-2 bg-white/5 rounded-md text-white" />
+                            </div>
+                            <div className="flex justify-end space-x-2 mt-4">
+                                <button onClick={() => setShowExchangeModal(false)} className="px-4 py-2 rounded-md bg-gray-700 text-white">Cancel</button>
+                                <button onClick={performExchange} className="px-4 py-2 rounded-md bg-dhani-gold text-black">Exchange</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

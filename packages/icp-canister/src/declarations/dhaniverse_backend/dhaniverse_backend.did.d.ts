@@ -52,14 +52,12 @@ export type Result_4 = { 'Ok' : DualBalance } |
   { 'Err' : string };
 export type Result_5 = { 'Ok' : ExchangeResult } |
   { 'Err' : string };
-// (staking result removed)
 export type Result_7 = { 'Ok' : number } |
   { 'Err' : string };
 export type Result_8 = { 'Ok' : AchievementReward } |
   { 'Err' : string };
 export type Result_9 = { 'Ok' : Web3Transaction } |
   { 'Err' : string };
-// (staking types removed)
 export type TransactionStatus = { 'Failed' : null } |
   { 'Confirmed' : null } |
   { 'Pending' : null };
@@ -113,7 +111,6 @@ export interface Web3Transaction {
 export interface _SERVICE {
   'authenticate_with_signature' : ActorMethod<[string, string], Result>,
   'claim_achievement_reward' : ActorMethod<[string, string], Result_8>,
-  // (staking methods removed)
   'clear_session' : ActorMethod<[string], Result_2>,
   'connect_wallet' : ActorMethod<[WalletType, string, string], Result_3>,
   'create_session' : ActorMethod<[WalletConnection], Result_1>,
@@ -127,13 +124,11 @@ export interface _SERVICE {
   'get_available_wallets' : ActorMethod<[], Array<WalletInfo>>,
   'get_dual_balance' : ActorMethod<[string], Result_4>,
   'get_session' : ActorMethod<[string], [] | [Web3Session]>,
-  // Staking methods removed
   'get_transaction_history' : ActorMethod<[string], Array<Web3Transaction>>,
   'get_wallet_status' : ActorMethod<[string], [] | [WalletConnection]>,
   'health_check' : ActorMethod<[], string>,
   'simulate_liquidity_pool' : ActorMethod<[string, number], Result_7>,
   'simulate_yield_farming' : ActorMethod<[string, number], Result_7>,
-  // Staking methods removed
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

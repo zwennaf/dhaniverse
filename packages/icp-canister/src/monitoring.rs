@@ -183,31 +183,52 @@ pub fn get_user_activity_metrics() -> UserActivityMetrics {
 }
 
 pub fn get_transaction_metrics() -> TransactionMetrics {
-    // Calculate from all user transactions
-    let total_volume_rupees = 0.0;
-    let total_volume_tokens = 0.0;
-    // staking removed: return metrics without staking-specific counters
+    // Iterate user data to build metrics (lightweight estimation if large user base)
+    let mut total_volume_rupees = 0.0;
+    let mut total_volume_tokens = 0.0;
+    let mut exchange_count = 0usize;
+    let mut total_transactions = 0usize;
+    let mut successful_transactions = 0usize;
+
+    crate::storage::STATE.with(|state| {
+        let state = state.borrow();
+        for (_addr, user) in state.users.iter() {
+            for tx in &user.transactions {
+                total_transactions += 1;
+                if tx.status == crate::types::TransactionStatus::Confirmed {
+                    successful_transactions += 1;
+                }
+                match tx.transaction_type {
+                    crate::types::TransactionType::Exchange => {
+                        exchange_count += 1;
+                        // treat amount as rupees if from is user and to None? simplified
+                        total_volume_rupees += tx.amount; // approximation
+                    },
+                    crate::types::TransactionType::Deposit => {
+                        total_volume_rupees += tx.amount;
+                    },
+                    crate::types::TransactionType::Withdraw => {
+                        total_volume_tokens += tx.amount;
+                    },
+                }
+            }
+        }
+    });
+
+    let average_transaction_size = if total_transactions > 0 {
+        (total_volume_rupees + total_volume_tokens) / total_transactions as f64
+    } else { 0.0 };
+
+    let transaction_success_rate = if total_transactions > 0 {
+        (successful_transactions as f64 / total_transactions as f64) * 100.0
+    } else { 100.0 };
+
     TransactionMetrics {
         total_volume_rupees,
         total_volume_tokens,
         exchange_count,
-        staking_count: 0,
-        average_transaction_size: if total_transactions > 0 {
-            (total_volume_rupees + total_volume_tokens) / total_transactions as f64
-        } else {
-            0.0
-        },
-        transaction_success_rate: if total_transactions > 0 {
-            (successful_transactions as f64 / total_transactions as f64) * 100.0
-        } else {
-            100.0
-        },
-    }
-        transaction_success_rate: if total_transactions > 0 {
-            (successful_transactions as f64 / total_transactions as f64) * 100.0
-        } else {
-            100.0
-        },
+        average_transaction_size,
+        transaction_success_rate,
     }
 }
 
@@ -380,6 +401,46 @@ pub fn get_optimization_suggestions() -> Vec<String> {
     }
     
     suggestions
+}
+
+// Heartbeat tasks executed periodically by the canister
+pub fn heartbeat_tasks() {
+    // Lightweight maintenance: cleanup expired sessions and optimize memory
+    crate::storage::cleanup_expired_sessions();
+    crate::auth::cleanup_expired_sessions(); // Also cleanup auth-specific expired sessions
+    crate::monitoring::optimize_memory();
+
+    // Update metrics timestamp
+    METRICS_STORE.with(|store| {
+        store.borrow_mut().last_metrics_update = ic_cdk::api::time();
+    });
+
+    // Schedule price updates (every ~10 minutes in production)
+    let now = ic_cdk::api::time();
+    let last_update = METRICS_STORE.with(|store| store.borrow().last_metrics_update);
+    let ten_minutes = 10 * 60 * 1_000_000_000; // 10 minutes in nanoseconds
+    
+    if now - last_update > ten_minutes {
+        // Spawn price update task (fire and forget)
+        ic_cdk::spawn(async {
+            match crate::http_client::fetch_price("bitcoin,ethereum,internet-computer").await {
+                Ok(prices) => {
+                    for (token_id, price) in prices {
+                        let symbol = match token_id.as_str() {
+                            "bitcoin" => "BTC",
+                            "ethereum" => "ETH",
+                            "internet-computer" => "ICP",
+                            _ => &token_id,
+                        };
+                        crate::storage::set_price_feed(symbol, price);
+                    }
+                }
+                Err(_) => {
+                    // Silently continue on price fetch errors in heartbeat
+                }
+            }
+        });
+    }
 }
 
 // Macro for easy performance tracking

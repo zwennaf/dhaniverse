@@ -163,10 +163,9 @@ impl CanisterError {
             CanisterError::InsufficientBalance => 1201,
             CanisterError::InvalidAmount => 1202,
             CanisterError::ExchangeRateFailed => 1203,
-            CanisterError::StakingPoolNotFound => 1204,
-            CanisterError::StakingNotMatured => 1205,
-            CanisterError::InvalidCurrency => 1206,
-            CanisterError::NegativeAmount => 1207,
+            // Staking error codes removed (1204, 1205)
+            CanisterError::InvalidCurrency => 1204,
+            CanisterError::NegativeAmount => 1205,
             
             // Achievement Errors (1300-1399)
             CanisterError::AchievementNotFound => 1301,

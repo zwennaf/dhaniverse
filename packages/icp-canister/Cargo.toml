@@ -19,6 +19,8 @@ hex = "0.4"
 k256 = { version = "0.13", features = ["ecdsa", "std"] }
 ic-stable-structures = "0.6"
 getrandom = { version = "0.2", features = ["custom"] }
+ic-http-certification = "2.5"
+num-traits = "0.2"
 
 [dev-dependencies]
 pocket-ic = "4.0"
