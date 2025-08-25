@@ -405,28 +405,10 @@ export class MayaNPCManager {
         const wasNearNPC = this.isPlayerNearNPC;
         this.isPlayerNearNPC = distance < this.interactionDistance;
 
-        // Show/hide interaction text with smooth fade only when dialog is not active
-        // and Maya is not currently moving in the guided sequence
-        if (!this.movingToTarget) {
-            if (this.isPlayerNearNPC && !wasNearNPC && !this.activeDialog) {
-                this.scene.tweens.add({
-                    targets: this.interactionText,
-                    alpha: 1,
-                    duration: 200,
-                    ease: "Power1",
-                });
-            } else if (!this.isPlayerNearNPC && wasNearNPC) {
-                this.scene.tweens.add({
-                    targets: this.interactionText,
-                    alpha: 0,
-                    duration: 200,
-                    ease: "Power1",
-                });
-            }
-        }
-
-        // Hide interaction text when dialog is active
-        if (this.activeDialog) {
+        // Always show interaction text if player is near Maya and no dialog is active
+        if (this.isPlayerNearNPC && !this.activeDialog) {
+            this.interactionText.setAlpha(1);
+        } else {
             this.interactionText.setAlpha(0);
         }
 
@@ -754,6 +736,16 @@ export class MayaNPCManager {
         // Disable the tracker since Maya has completed guiding the player to the bank
         locationTrackerManager.setTargetEnabled('maya', false);
         console.log("MayaNPCManager: Disabled Maya tracker as she arrived at the bank");
+
+        // Restore interaction text if player is near Maya and no dialog is active
+        const player = this.scene.getPlayer && this.scene.getPlayer();
+        if (player) {
+            const playerSprite = player.getSprite();
+            const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
+            if (distance < this.interactionDistance && !this.activeDialog) {
+                this.interactionText.setAlpha(1);
+            }
+        }
     }
 
     private checkFollowDistance(playerSprite: GameObjects.Sprite): void {
@@ -837,21 +829,47 @@ export class MayaNPCManager {
         if (this.activeDialog) return;
         this.activeDialog = true;
 
-        window.dispatchEvent(new CustomEvent('show-dialogue', {
-            detail: {
-                text: "This is our Central Bank!\nGo inside and meet the bank manager.",
-                characterName: 'M.A.Y.A',
-                allowAdvance: true
-            }
-        }));
+        // Step 1: Show Central Bank intro dialogue
+        dialogueManager.showDialogue({
+            text: "This is our Central Bank! Here you can manage your finances and learn about money.",
+            characterName: 'M.A.Y.A',
+            allowSpaceAdvance: true,
+            showBackdrop: false
+        }, {
+            onAdvance: () => {
+                dialogueManager.closeDialogue();
+                // Step 2: Show claim money dialogue
+                dialogueManager.showDialogue({
+                    text: "You can claim your starter money here. Press the button below to claim your funds and begin your journey!",
+                    characterName: 'M.A.Y.A',
+                    allowSpaceAdvance: true,
+                    showBackdrop: false,
+                    options: [
+                        { id: 'claim', text: 'Claim Money', action: () => this.handleClaimMoney() }
+                    ],
+                    showOptions: true
+                }, {
+                    onAdvance: () => {
+                        dialogueManager.closeDialogue();
+                        this.closeDialog();
+                    },
+                    onOptionSelect: (optionId: string) => {
+                        if (optionId === 'claim') {
+                            this.handleClaimMoney();
+                        }
+                    }
+                });
+            },
+            onComplete: () => {}
+        });
+    }
 
-        // When HUD advances/closes, cleanup locally
-        const onAdvance = () => {
-            this.closeDialog();
-            window.removeEventListener('dialogue-advance' as any, onAdvance as any);
-            // Potential place for future objective updates after arrival
-        };
-        window.addEventListener('dialogue-advance' as any, onAdvance as any);
+    // Handles the claim money logic after dialogue
+    private handleClaimMoney(): void {
+        // TODO: Implement actual claim logic here (e.g., update player balance, show confirmation)
+        this.showTemporaryDialog("You have claimed your starter money!", 2000);
+        // Optionally, update tasks/objectives here
+        // ...existing code...
     }
 
     private ensureTextAlignment(): void {
