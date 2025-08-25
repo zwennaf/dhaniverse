@@ -268,9 +268,10 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
     try {
         const userId = ctx.state.userId;
         const playerStates = mongodb.getCollection<PlayerStateDocument>(COLLECTIONS.PLAYER_STATES);
+
+        // Ensure player state exists
         let playerState = await playerStates.findOne({ userId });
         if (!playerState) {
-            // Auto-create minimal player state (all zero) if somehow missing
             const newPlayerState: PlayerStateDocument = {
                 userId,
                 position: { x: 400, y: 300, scene: "main" },
@@ -284,22 +285,28 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
             playerState = { ...newPlayerState, _id: insertRes.insertedId } as PlayerStateDocument & { _id: ObjectId };
         }
 
-        const ps = playerState as PlayerStateDocument & { starterClaimed?: boolean };
-        const alreadyClaimed = ps.starterClaimed === true || ps.progress?.completedTutorials?.includes("starter-claimed");
         const STARTER_AMOUNT = 1000;
-        let newlyClaimed = false;
-        if (!alreadyClaimed) {
-            const updateOp: Record<string, unknown> = {
-                $inc: { "financial.rupees": STARTER_AMOUNT, "financial.totalWealth": STARTER_AMOUNT },
-                $addToSet: { "progress.completedTutorials": "starter-claimed" },
-                $set: { starterClaimed: true, lastUpdated: new Date() }
-            };
-            await playerStates.updateOne({ userId }, updateOp);
-            newlyClaimed = true;
-        }
+        // Atomic conditional update to prevent race double-increment
+        const filter: Record<string, unknown> = {
+            userId,
+            $or: [
+                { starterClaimed: { $exists: false } },
+                { starterClaimed: false }
+            ],
+            "progress.completedTutorials": { $ne: "starter-claimed" }
+        };
+        const updateOp: Record<string, unknown> = {
+            $inc: { "financial.rupees": STARTER_AMOUNT, "financial.totalWealth": STARTER_AMOUNT },
+            $addToSet: { "progress.completedTutorials": "starter-claimed" },
+            $set: { starterClaimed: true, lastUpdated: new Date() }
+        };
 
+        const updateResult = await playerStates.updateOne(filter, updateOp);
+        const newlyClaimed = updateResult.modifiedCount === 1;
+
+        // Fetch latest state
         const updated = await playerStates.findOne({ userId });
-        const finalRupees = updated?.financial.rupees ?? (playerState ? playerState.financial?.rupees : 0) ?? 0;
+        const finalRupees = updated?.financial.rupees ?? 0;
         ctx.response.body = {
             success: true,
             amount: newlyClaimed ? STARTER_AMOUNT : 0,

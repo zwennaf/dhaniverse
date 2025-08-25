@@ -912,7 +912,11 @@ export class MayaNPCManager {
 
     // Handles the claim money logic after dialogue
     private handleClaimMoney(): void {
-        (async () => {
+    // Prevent multiple rapid clicks triggering duplicate requests
+    if ((this as any).__claimInFlight) return;
+    (this as any).__claimInFlight = true;
+    (async () => {
+            let persistentClaimDialogueShown = false;
             try {
                 const token = window.localStorage.getItem('dhaniverse_token');
                 if (!token) {
@@ -920,6 +924,7 @@ export class MayaNPCManager {
                     this.showTemporaryDialog('Please sign in first to claim.', 1500);
                     dialogueManager.closeDialogue();
                     this.closeDialog();
+            (this as any).__claimInFlight = false;
                     return;
                 }
 
@@ -943,15 +948,33 @@ export class MayaNPCManager {
                     if (typeof balanceManager?.updateCash === 'function') {
                         balanceManager.updateCash(data.rupees ?? balanceManager.getBalance().cash);
                     }
-                    const amount = data.amount ?? 0;
-                    this.showTemporaryDialog(amount > 0 ? `You have claimed ₹${amount}!` : 'Already claimed.', 1500);
+                    const newlyClaimed = (data.newlyClaimed === true) || ((data.amount ?? 0) > 0);
+                    const creditedAmount = data.amount ?? (newlyClaimed ? 1000 : 0);
+                    if (newlyClaimed) {
+                        // Show persistent dialogue requiring user advance instead of auto-dismiss alert
+                        dialogueManager.showDialogue({
+                            text: `Congrats! ₹${creditedAmount} credited to your current balance.`,
+                            characterName: 'M.A.Y.A',
+                            allowSpaceAdvance: true,
+                            showBackdrop: false
+                        }, {
+                            onAdvance: () => { dialogueManager.closeDialogue(); this.closeDialog(); }
+                        });
+                        persistentClaimDialogueShown = true;
+                    } else {
+                        this.showTemporaryDialog('Already claimed.', 1500);
+                    }
                 }
             } catch (e) {
                 console.error('Error claiming starter money', e);
                 this.showTemporaryDialog('Error claiming starter money', 1500);
             } finally {
-                dialogueManager.closeDialogue();
-                this.closeDialog();
+                // Only auto-close if we did NOT show the persistent congrats dialogue
+                if (!persistentClaimDialogueShown) {
+                    try { dialogueManager.closeDialogue(); } catch {}
+                    this.closeDialog();
+                }
+                (this as any).__claimInFlight = false;
             }
         })();
     }
