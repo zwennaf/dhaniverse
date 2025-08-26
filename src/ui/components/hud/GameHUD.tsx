@@ -468,6 +468,129 @@ const GameHUD: React.FC<GameHUDProps> = ({
             setShowSmallAlertDialog(false);
         };
 
+        // Listen for progression state changes to update objectives dynamically
+        const handleProgressionUpdate = async () => {
+            try {
+                const { progressionManager } = await import('../../../services/ProgressionManager');
+                const state = progressionManager.getState();
+                updateObjectivesBasedOnProgression(state);
+            } catch (e) {
+                console.warn('Failed to get progression state for objective update:', e);
+            }
+        };
+
+        // Function to update objectives based on current progression state
+        const updateObjectivesBasedOnProgression = (state: any) => {
+            const tm = getTaskManager();
+            const activeTasks = tm.getActiveTasks();
+
+            // Remove completed or outdated tasks
+            const tasksToRemove: string[] = [];
+            
+            // 1. Initial state: Show "Meet Maya" objective
+            if (!state.hasMetMaya && !activeTasks.some(t => t.id === 'meet-maya')) {
+                tm.addTask({
+                    id: 'meet-maya',
+                    title: 'Meet Maya',
+                    description: 'Proceed to Maya\'s home. Follow the tracker to initiate your journey.',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // 2. After meeting Maya: Show "Follow Maya to Central Bank"
+            if (state.hasMetMaya && !state.hasFollowedMaya && !activeTasks.some(t => t.id === 'follow-maya-to-bank')) {
+                // Remove meet maya task if still present
+                if (activeTasks.some(t => t.id === 'meet-maya')) {
+                    tasksToRemove.push('meet-maya');
+                }
+                
+                tm.addTask({
+                    id: 'follow-maya-to-bank',
+                    title: 'Follow Maya',
+                    description: 'Follow Maya to reach the Central Bank',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // 3. After reaching bank: Show "Claim your joining bonus"
+            if (state.hasFollowedMaya && !state.hasClaimedMoney && !activeTasks.some(t => t.id === 'claim-joining-bonus')) {
+                // Remove follow maya task if still present
+                if (activeTasks.some(t => t.id === 'follow-maya-to-bank')) {
+                    tasksToRemove.push('follow-maya-to-bank');
+                }
+                
+                tm.addTask({
+                    id: 'claim-joining-bonus',
+                    title: 'Claim Joining Bonus',
+                    description: 'Claim your joining bonus from Maya',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // 4. After claiming money: Show "Go inside the bank and interact with bank manager"
+            if (state.hasClaimedMoney && !state.hasCompletedBankOnboarding && !activeTasks.some(t => t.id === 'enter-bank-speak-manager')) {
+                // Remove claim bonus task if still present
+                if (activeTasks.some(t => t.id === 'claim-joining-bonus')) {
+                    tasksToRemove.push('claim-joining-bonus');
+                }
+                
+                tm.addTask({
+                    id: 'enter-bank-speak-manager',
+                    title: 'Enter Bank',
+                    description: 'Go inside the bank and interact with the bank manager',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // 5. After bank onboarding: Show "Go back to Maya and follow her to stock market"
+            if (state.hasCompletedBankOnboarding && !state.hasReachedStockMarket && !activeTasks.some(t => t.id === 'return-to-maya-stock-market')) {
+                // Remove bank task if still present
+                if (activeTasks.some(t => t.id === 'enter-bank-speak-manager')) {
+                    tasksToRemove.push('enter-bank-speak-manager');
+                }
+                
+                tm.addTask({
+                    id: 'return-to-maya-stock-market',
+                    title: 'Return to Maya',
+                    description: 'Go back to Maya and follow her to the Dhaniverse Stock Market',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // 6. After reaching stock market: Show "Go inside and explore Dhani stocks"
+            if (state.hasReachedStockMarket && !activeTasks.some(t => t.id === 'explore-dhani-stocks')) {
+                // Remove return to maya task if still present
+                if (activeTasks.some(t => t.id === 'return-to-maya-stock-market')) {
+                    tasksToRemove.push('return-to-maya-stock-market');
+                }
+                
+                tm.addTask({
+                    id: 'explore-dhani-stocks',
+                    title: 'Explore Stock Market',
+                    description: 'Go inside and explore Dhani stocks',
+                    active: true,
+                    completed: false
+                });
+            }
+
+            // Clean up outdated tasks
+            tasksToRemove.forEach(taskId => {
+                tm.completeTask(taskId);
+                setTimeout(() => tm.removeTask(taskId), 1000);
+            });
+        };
+
+        // Set up periodic progression checking
+        const progressionCheckInterval = setInterval(handleProgressionUpdate, 2000);
+
+        // Initial progression check
+        handleProgressionUpdate();
+
         window.addEventListener(
             "assign-first-task" as any,
             assignFirstTaskHandler
@@ -521,6 +644,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
         window.addEventListener("close-dialogue" as any, closeDialogueHandler);
 
         return () => {
+            // Clean up progression check interval
+            clearInterval(progressionCheckInterval);
+            
             window.removeEventListener(
                 "assign-first-task" as any,
                 assignFirstTaskHandler

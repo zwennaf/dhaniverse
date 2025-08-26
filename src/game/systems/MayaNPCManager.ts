@@ -237,6 +237,29 @@ export class MayaNPCManager {
         scene.time.delayedCall(100, () => {
             this.initializeMayaPosition();
         });
+
+        // Set up event listeners for dynamic objective updates
+        this.setupObjectiveListeners();
+    }
+
+    /**
+     * Set up event listeners for dynamic objective updates based on progression
+     */
+    private setupObjectiveListeners(): void {
+        // Listen for bank onboarding completion to trigger stock market guidance
+        const handleBankOnboardingComplete = () => {
+            console.log('MayaNPCManager: Bank onboarding completed, updating objective for stock market guidance');
+            this.updateObjectiveFollowMayaToStockMarket();
+        };
+
+        // Listen for stock market arrival
+        const handleStockMarketArrival = () => {
+            console.log('MayaNPCManager: Stock market arrival, updating objective to explore stocks');
+            this.updateObjectiveExploreStockMarket();
+        };
+
+        window.addEventListener('bank-onboarding-complete' as any, handleBankOnboardingComplete);
+        window.addEventListener('stock-market-arrival' as any, handleStockMarketArrival);
     }
 
     private createMayaAnimations(): void {
@@ -721,14 +744,8 @@ export class MayaNPCManager {
             onAdvance: () => {
                 console.log('🚀 Maya: DialogueManager onAdvance called, starting movement!');
                 
-                // Complete the "meet-maya" task when Maya starts walking towards the bank
-                this.completeMeetMayaTask();
-                
-                // Re-enable the location tracker so player can follow Maya to the bank
-                locationTrackerManager.setTargetEnabled('maya', true);
-                
-                // Set a new objective to enter the bank and speak to bank teller
-                this.setEnterBankTask();
+                // Complete the "meet-maya" task and set new objective to follow Maya
+                this.updateObjectiveToFollowMaya();
                 
                 console.log('🚀 Maya: About to start moving to next waypoint...');
                 this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
@@ -921,8 +938,8 @@ export class MayaNPCManager {
         // Progression: player has followed Maya to bank (will still need interaction to claim)
     (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markFollowedMaya(); } catch(e) { console.warn('Could not mark hasFollowedMaya', e); } })();
 
-        // Update Maya position in progression state
-        this.updateMayaPositionInState();
+        // Update objective to claim joining bonus now that destination is reached
+        this.updateObjectiveClaimBonus();
 
         // Update Maya position in progression state
         this.updateMayaPositionInState();
@@ -1027,6 +1044,9 @@ export class MayaNPCManager {
             } else {
                 this.maya.anims.play('maya-idle-down', true);
             }
+            
+            // Update objective to explore stock market
+            this.updateObjectiveExploreStockMarket();
             
             // Show completion dialogue
             dialogueManager.showDialogue({
@@ -1269,6 +1289,10 @@ export class MayaNPCManager {
                     if (newlyClaimed) {
                         // Progression: mark claimed money, unlock bank
                         (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markClaimedMoney(); } catch(e) { console.warn('Could not mark claimed money', e); } })();
+                        
+                        // Update objective to enter bank after claiming money
+                        this.updateObjectiveEnterBank();
+                        
                         // Show persistent dialogue requiring user advance instead of auto-dismiss alert
                         dialogueManager.showDialogue({
                             text: `Congrats! ₹${creditedAmount} credited to your current balance.`,
@@ -1358,6 +1382,167 @@ export class MayaNPCManager {
         }
     }
 
+    /**
+     * Update objective when player has met Maya and she starts moving to bank
+     */
+    private updateObjectiveToFollowMaya(): void {
+        const tm = getTaskManager();
+        
+        // Complete the "meet-maya" task
+        const meetTask = tm.getActiveTasks().find(t => t.id === 'meet-maya');
+        if (meetTask) {
+            console.log("MayaNPCManager: Completing 'meet-maya' task as Maya starts walking to bank");
+            tm.completeTask('meet-maya');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('meet-maya');
+            }, 1000);
+        }
+        
+        // Add new objective to follow Maya to the bank
+        if (!tm.getActiveTasks().some(t => t.id === 'follow-maya-to-bank')) {
+            console.log("MayaNPCManager: Setting new objective to follow Maya to Central Bank");
+            tm.addTask({
+                id: 'follow-maya-to-bank',
+                title: 'Follow Maya',
+                description: 'Follow Maya to reach the Central Bank',
+                active: true,
+                completed: false
+            });
+        }
+        
+        // Re-enable the location tracker so player can follow Maya to the bank
+        locationTrackerManager.setTargetEnabled('maya', true);
+    }
+
+    /**
+     * Update objective when Maya and player reach the bank destination
+     */
+    private updateObjectiveClaimBonus(): void {
+        const tm = getTaskManager();
+        
+        // Complete the follow Maya task
+        const followTask = tm.getActiveTasks().find(t => t.id === 'follow-maya-to-bank');
+        if (followTask) {
+            console.log("MayaNPCManager: Completing 'follow-maya-to-bank' task as destination reached");
+            tm.completeTask('follow-maya-to-bank');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('follow-maya-to-bank');
+            }, 1000);
+        }
+        
+        // Add new objective to claim joining bonus
+        if (!tm.getActiveTasks().some(t => t.id === 'claim-joining-bonus')) {
+            console.log("MayaNPCManager: Setting new objective to claim joining bonus");
+            tm.addTask({
+                id: 'claim-joining-bonus',
+                title: 'Claim Joining Bonus',
+                description: 'Claim your joining bonus from Maya',
+                active: true,
+                completed: false
+            });
+        }
+    }
+
+    /**
+     * Update objective after player claims money to enter bank
+     */
+    private updateObjectiveEnterBank(): void {
+        const tm = getTaskManager();
+        
+        // Complete the claim bonus task
+        const claimTask = tm.getActiveTasks().find(t => t.id === 'claim-joining-bonus');
+        if (claimTask) {
+            console.log("MayaNPCManager: Completing 'claim-joining-bonus' task as money claimed");
+            tm.completeTask('claim-joining-bonus');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('claim-joining-bonus');
+            }, 1000);
+        }
+        
+        // Add new objective to enter bank and interact with bank manager
+        if (!tm.getActiveTasks().some(t => t.id === 'enter-bank-speak-manager')) {
+            console.log("MayaNPCManager: Setting new objective to enter bank and speak to manager");
+            tm.addTask({
+                id: 'enter-bank-speak-manager',
+                title: 'Enter Bank',
+                description: 'Go inside the bank and interact with the bank manager',
+                active: true,
+                completed: false
+            });
+            
+            // Start monitoring player location for dynamic task updates
+            this.startBankTaskLocationMonitoring();
+        }
+    }
+
+    /**
+     * Update objective after bank onboarding to follow Maya to stock market
+     */
+    private updateObjectiveFollowMayaToStockMarket(): void {
+        const tm = getTaskManager();
+        
+        // Complete the bank task
+        const bankTask = tm.getActiveTasks().find(t => t.id === 'enter-bank-speak-manager');
+        if (bankTask) {
+            console.log("MayaNPCManager: Completing 'enter-bank-speak-manager' task as bank onboarding completed");
+            tm.completeTask('enter-bank-speak-manager');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('enter-bank-speak-manager');
+            }, 1000);
+        }
+        
+        // Add new objective to go back to Maya for stock market guidance
+        if (!tm.getActiveTasks().some(t => t.id === 'return-to-maya-stock-market')) {
+            console.log("MayaNPCManager: Setting new objective to return to Maya for stock market guidance");
+            tm.addTask({
+                id: 'return-to-maya-stock-market',
+                title: 'Return to Maya',
+                description: 'Go back to Maya and follow her to the Dhaniverse Stock Market',
+                active: true,
+                completed: false
+            });
+        }
+    }
+
+    /**
+     * Update objective when Maya and player reach stock market
+     */
+    private updateObjectiveExploreStockMarket(): void {
+        const tm = getTaskManager();
+        
+        // Complete the return to Maya task
+        const returnTask = tm.getActiveTasks().find(t => t.id === 'return-to-maya-stock-market');
+        if (returnTask) {
+            console.log("MayaNPCManager: Completing 'return-to-maya-stock-market' task as stock market reached");
+            tm.completeTask('return-to-maya-stock-market');
+            
+            // Clean up the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('return-to-maya-stock-market');
+            }, 1000);
+        }
+        
+        // Add new objective to explore stock market
+        if (!tm.getActiveTasks().some(t => t.id === 'explore-dhani-stocks')) {
+            console.log("MayaNPCManager: Setting new objective to explore Dhani stocks");
+            tm.addTask({
+                id: 'explore-dhani-stocks',
+                title: 'Explore Stock Market',
+                description: 'Go inside and explore Dhani stocks',
+                active: true,
+                completed: false
+            });
+        }
+    }
+
     // Handle adding the next objective after the initial Maya intro dialogue is fully closed
     private handlePostInitialDialogue(): void {
         if (this.initialDialogueTaskResolved) return;
@@ -1420,7 +1605,7 @@ export class MayaNPCManager {
         // Check location every second
         const checkLocation = () => {
             const tm = getTaskManager();
-            const bankTask = tm.getTasks().find(t => t.id === 'enter-bank-speak-teller');
+            const bankTask = tm.getTasks().find(t => t.id === 'enter-bank-speak-manager');
             
             // If task no longer exists or is completed, stop monitoring
             if (!bankTask || bankTask.completed || !bankTask.active) {
@@ -1437,14 +1622,14 @@ export class MayaNPCManager {
                 newDescription = 'Speak to the bank manager to learn about financial services.';
             } else {
                 // Player is outside the bank
-                newDescription = 'Go inside the Central Bank building to continue your journey.';
+                newDescription = 'Go inside the bank and interact with the bank manager';
             }
             
             // Only update if description has changed
             if (bankTask.description !== newDescription) {
                 console.log(`MayaNPCManager: Updating bank task description based on location - inside bank: ${currentBuilding === 'bank'}`);
                 tm.updateTask({
-                    id: 'enter-bank-speak-teller',
+                    id: 'enter-bank-speak-manager',
                     changes: { description: newDescription }
                 });
             }

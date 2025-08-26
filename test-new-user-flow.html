@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test New User Bank Account Flow</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .output { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+        .error { background: #ffe6e6; border: 1px solid #ff0000; }
+        .success { background: #e6ffe6; border: 1px solid #00ff00; }
+    </style>
+</head>
+<body>
+    <h1>Test New User Bank Account Flow</h1>
+    
+    <button onclick="clearLocalStorage()">1. Clear All User Data (Simulate New User)</button>
+    <button onclick="checkProgressionState()">2. Check Progression State</button>
+    <button onclick="testBankAccountCheck()">3. Test Bank Account Check</button>
+    <button onclick="simulateBankManagerInteraction()">4. Simulate Bank Manager Interaction</button>
+    
+    <div id="output" class="output"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const className = type === 'error' ? 'output error' : 
+                              type === 'success' ? 'output success' : 'output';
+            output.className = className;
+            output.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
+        }
+
+        function clearLocalStorage() {
+            // Clear all dhaniverse related localStorage entries
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.includes('dhaniverse')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            log('✅ Cleared all localStorage entries (simulating new user)', 'success');
+        }
+
+        function checkProgressionState() {
+            // Simulate checking progression state
+            const hasMetMaya = localStorage.getItem('dhaniverse_has_met_maya') === 'true';
+            const hasClaimedMoney = localStorage.getItem('dhaniverse_has_claimed_money') === 'true';
+            const onboardingStep = localStorage.getItem('dhaniverse_onboarding_step') || 'not_started';
+            const hasCompletedBankOnboarding = localStorage.getItem('dhaniverse_bank_onboarding_completed') === 'true';
+            
+            log(`📊 Progression State:
+                - hasMetMaya: ${hasMetMaya}
+                - hasClaimedMoney: ${hasClaimedMoney}
+                - onboardingStep: ${onboardingStep}
+                - hasCompletedBankOnboarding: ${hasCompletedBankOnboarding}
+                - isNewUser: ${!hasMetMaya && !hasClaimedMoney && onboardingStep === 'not_started'}`);
+        }
+
+        async function testBankAccountCheck() {
+            try {
+                log('🔍 Testing bank account API call...');
+                const response = await fetch('http://localhost:8080/api/game/bank-account', {
+                    headers: {
+                        'Authorization': 'Bearer test-token',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.status === 404) {
+                    log('✅ Correct! Bank account API returned 404 (no account exists)', 'success');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    log('⚠️ Warning! Bank account API returned existing account: ' + JSON.stringify(data), 'error');
+                } else {
+                    log('❌ Error! Bank account API returned status: ' + response.status, 'error');
+                }
+            } catch (error) {
+                log('🔌 Could not connect to backend API: ' + error.message);
+            }
+        }
+
+        function simulateBankManagerInteraction() {
+            log('🏦 Simulating bank manager interaction...');
+            
+            // Check if the form should appear for new users
+            const hasMetMaya = localStorage.getItem('dhaniverse_has_met_maya') === 'true';
+            const hasClaimedMoney = localStorage.getItem('dhaniverse_has_claimed_money') === 'true';
+            const onboardingStep = localStorage.getItem('dhaniverse_onboarding_step') || 'not_started';
+            const hasCompletedBankOnboarding = localStorage.getItem('dhaniverse_bank_onboarding_completed') === 'true';
+            
+            const isNewUser = !hasMetMaya && !hasClaimedMoney && onboardingStep === 'not_started';
+            
+            if (hasCompletedBankOnboarding) {
+                log('➡️ User has completed bank onboarding → Should show "Welcome back" dialogue', 'success');
+            } else if (isNewUser) {
+                log('✅ NEW USER DETECTED → Should show BankAccountCreationFlow.tsx form', 'success');
+                log('🎯 Expected flow: Bank Manager dialogue → Form with name/deposit fields → Account creation');
+            } else {
+                log('🔄 User with progression but no completed onboarding → Should check for existing account first');
+            }
+        }
+    </script>
+</body>
+</html>
