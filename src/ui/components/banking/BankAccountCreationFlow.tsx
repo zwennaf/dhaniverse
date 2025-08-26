@@ -106,30 +106,30 @@ const BankAccountCreationFlow: React.FC = () => {
     };
   }, []);
 
-  // Animate panel entry and morphing
+  // Animate panel entry and morphing with fast rupee counter style animation
   useEffect(() => {
     if (step === 'HIDDEN') return;
     if (!containerRef.current) return;
     const panel = containerRef.current.querySelector('[data-flow-panel]');
     if (panel) {
       if (step === 'FORM') {
-        // Initial entry animation
+        // Initial entry animation - fast slot machine style
         animate(panel as any, { 
-          opacity: [0, 1], 
-          transform: ['translateY(20px)', 'translateY(0)'] 
-        } as any, { duration: 0.4 });
+          y: [20, -5, 5, 0],
+          opacity: [0, 0.7, 0.7, 1]
+        } as any, { duration: 0.6 });
       } else if (step === 'PROCESSING') {
-        // Morph to processing state
+        // Morph to processing state - fast slot machine style
         animate(panel as any, { 
-          opacity: [1, 0.8, 1],
-          transform: ['scale(1)', 'scale(0.98)', 'scale(1)']
+          y: [0, -10, 10, 0],
+          opacity: [1, 0.7, 0.7, 1]
         } as any, { duration: 0.6 });
       } else {
-        // Smooth transition for other steps
+        // Fast transition for other steps
         animate(panel as any, { 
-          opacity: [0.8, 1],
-          transform: ['scale(0.98)', 'scale(1)']
-        } as any, { duration: 0.3 });
+          y: [0, -5, 5, 0],
+          opacity: [0.8, 0.7, 0.7, 1]
+        } as any, { duration: 0.6 });
       }
     }
   }, [step]);
@@ -175,23 +175,25 @@ const BankAccountCreationFlow: React.FC = () => {
     if (!validate()) return;
     const initialDeposit = Number(deposit);
     
-    // Smooth transition to processing
+    // Fast transition to processing with rupee counter style
     if (containerRef.current) {
       const content = containerRef.current.querySelector('[data-content]');
       if (content) {
         animate(content as any, {
-          opacity: [1, 0]
+          y: [0, -10, 10, 0],
+          opacity: [1, 0.7, 0.7, 0]
         } as any, { 
-          duration: 0.2,
+          duration: 0.6,
           onComplete: () => {
             setStep('PROCESSING');
-            // Fade in processing content
+            // Fast fade in processing content
             setTimeout(() => {
               const newContent = containerRef.current?.querySelector('[data-content]');
               if (newContent) {
                 animate(newContent as any, {
-                  opacity: [0, 1]
-                } as any, { duration: 0.3 });
+                  y: [10, -5, 5, 0],
+                  opacity: [0, 0.7, 0.7, 1]
+                } as any, { duration: 0.6 });
               }
             }, 50);
           }
@@ -252,23 +254,25 @@ const BankAccountCreationFlow: React.FC = () => {
         }));
         localStorage.setItem('dhaniverse_bank_account_holder_name', name.trim());
         
-        // Smooth transition to details after brief processing
+        // Fast transition to details after brief processing
         setTimeout(() => {
           if (containerRef.current) {
             const content = containerRef.current.querySelector('[data-content]');
             if (content) {
               animate(content as any, {
-                opacity: [1, 0]
+                y: [0, -10, 10, 0],
+                opacity: [1, 0.7, 0.7, 0]
               } as any, { 
-                duration: 0.2,
+                duration: 0.6,
                 onComplete: () => {
                   setStep('DETAILS');
                   setTimeout(() => {
                     const newContent = containerRef.current?.querySelector('[data-content]');
                     if (newContent) {
                       animate(newContent as any, {
-                        opacity: [0, 1]
-                      } as any, { duration: 0.3 });
+                        y: [10, -5, 5, 0],
+                        opacity: [0, 0.7, 0.7, 1]
+                      } as any, { duration: 0.6 });
                     }
                   }, 50);
                 }
@@ -283,14 +287,15 @@ const BankAccountCreationFlow: React.FC = () => {
     } catch (error) {
       console.error('Bank account creation failed:', error);
       
-      // Smooth transition back to form
+      // Fast transition back to form with rupee counter style
       if (containerRef.current) {
         const content = containerRef.current.querySelector('[data-content]');
         if (content) {
           animate(content as any, {
-            opacity: [1, 0]
+            y: [0, -10, 10, 0],
+            opacity: [1, 0.7, 0.7, 0]
           } as any, { 
-            duration: 0.2,
+            duration: 0.6,
             onComplete: () => {
               // Extract error message and set errors
               let errorMessage = 'Account creation failed';
@@ -304,13 +309,14 @@ const BankAccountCreationFlow: React.FC = () => {
               setErrors([errorMessage]);
               setStep('FORM');
               
-              // Fade in form content
+              // Fast fade in form content
               setTimeout(() => {
                 const newContent = containerRef.current?.querySelector('[data-content]');
                 if (newContent) {
                   animate(newContent as any, {
-                    opacity: [0, 1]
-                  } as any, { duration: 0.3 });
+                    y: [10, -5, 5, 0],
+                    opacity: [0, 0.7, 0.7, 1]
+                  } as any, { duration: 0.6 });
                 }
               }, 50);
             }
