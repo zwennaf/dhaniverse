@@ -74,6 +74,14 @@ export const idlFactory = ({ IDL }) => {
     'success' : IDL.Bool,
   });
   const Result_5 = IDL.Variant({ 'Ok' : ExchangeResult, 'Err' : IDL.Text });
+  const Result_10 = IDL.Variant({
+    'Ok' : IDL.Opt(IDL.Float64),
+    'Err' : IDL.Text,
+  });
+  const Result_11 = IDL.Variant({
+    'Ok' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+    'Err' : IDL.Text,
+  });
   const AchievementCategory = IDL.Variant({
     'Learning' : IDL.Null,
     'Trading' : IDL.Null,
@@ -109,6 +117,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result_4 = IDL.Variant({ 'Ok' : DualBalance, 'Err' : IDL.Text });
   const Result_7 = IDL.Variant({ 'Ok' : IDL.Float64, 'Err' : IDL.Text });
+  const Result_12 = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
   return IDL.Service({
     'authenticate_with_signature' : IDL.Func(
         [IDL.Text, IDL.Text],
@@ -134,6 +143,9 @@ export const idlFactory = ({ IDL }) => {
         [Result_5],
         [],
       ),
+    'fetch_external_price' : IDL.Func([IDL.Text], [Result_10], []),
+    'fetch_multiple_crypto_prices' : IDL.Func([IDL.Text], [Result_11], []),
+    'fetch_stock_price' : IDL.Func([IDL.Text], [Result_10], []),
     'get_achievements' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Achievement)],
@@ -163,6 +175,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_7],
         [],
       ),
+    'update_prices_from_external' : IDL.Func([], [Result_12], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

@@ -44,6 +44,12 @@ export type Result = { 'Ok' : AuthResult } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : Web3Session } |
   { 'Err' : string };
+export type Result_10 = { 'Ok' : [] | [number] } |
+  { 'Err' : string };
+export type Result_11 = { 'Ok' : Array<[string, number]> } |
+  { 'Err' : string };
+export type Result_12 = { 'Ok' : bigint } |
+  { 'Err' : string };
 export type Result_2 = { 'Ok' : null } |
   { 'Err' : string };
 export type Result_3 = { 'Ok' : WalletConnection } |
@@ -120,6 +126,9 @@ export interface _SERVICE {
   >,
   'disconnect_wallet' : ActorMethod<[string], Result_2>,
   'exchange_currency' : ActorMethod<[string, string, string, number], Result_5>,
+  'fetch_external_price' : ActorMethod<[string], Result_10>,
+  'fetch_multiple_crypto_prices' : ActorMethod<[string], Result_11>,
+  'fetch_stock_price' : ActorMethod<[string], Result_10>,
   'get_achievements' : ActorMethod<[string], Array<Achievement>>,
   'get_available_wallets' : ActorMethod<[], Array<WalletInfo>>,
   'get_dual_balance' : ActorMethod<[string], Result_4>,
@@ -129,6 +138,7 @@ export interface _SERVICE {
   'health_check' : ActorMethod<[], string>,
   'simulate_liquidity_pool' : ActorMethod<[string, number], Result_7>,
   'simulate_yield_farming' : ActorMethod<[string, number], Result_7>,
+  'update_prices_from_external' : ActorMethod<[], Result_12>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];
