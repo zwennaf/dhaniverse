@@ -471,12 +471,30 @@ export class MayaNPCManager {
                                 }
                                 // Stock market guidance branch
                                 if (ps.hasCompletedBankOnboarding && !ps.hasReachedStockMarket) {
+                                    console.log('🚀 Maya: Bank onboarding completed, checking stock market guidance...');
+                                    console.log('🚀 Maya: stockMarketGuideCompleted:', this.stockMarketGuideCompleted, 'stockMarketGuideActive:', this.stockMarketGuideActive);
+                                    console.log('🚀 Maya: Current Maya position:', { x: this.maya.x, y: this.maya.y });
+                                    
                                     if (!this.stockMarketGuideCompleted && !this.stockMarketGuideActive) {
+                                        console.log('🚀 Maya: Starting stock market guidance...');
                                         this.startStockMarketGuidance();
+                                    } else {
+                                        console.log('🚀 Maya: Stock market guidance already completed or active');
                                     }
                                     return;
                                 }
-                                // After everything: silent
+                                // After everything is complete - provide a friendly message
+                                if (ps.hasCompletedBankOnboarding && ps.hasReachedStockMarket) {
+                                    console.log('🚀 Maya: All guidance completed, showing completion message');
+                                    dialogueManager.showDialogue({
+                                        text: 'Great job! You\'ve completed the financial onboarding. You now have access to both the bank and stock market. Continue exploring Dhaniverse!',
+                                        characterName: 'M.A.Y.A',
+                                        allowSpaceAdvance: true,
+                                        showBackdrop: false
+                                    }, { onAdvance: () => dialogueManager.closeDialogue() });
+                                    return;
+                                }
+                                // Fallback: silent
                             } catch(e) { console.warn('Maya interaction error', e); }
                         })();
         }
@@ -791,7 +809,24 @@ export class MayaNPCManager {
         private startStockMarketGuidance(): void {
             if (this.stockMarketGuideActive || this.stockMarketGuideCompleted) return;
             if (!this.scene.getPlayer()) return;
+            
+            // Ensure the player is close enough to start
+            const player = this.scene.getPlayer().getSprite();
+            const dist = Phaser.Math.Distance.Between(player.x, player.y, this.maya.x, this.maya.y);
+            
+            if (dist > this.interactionDistance) {
+                console.log('🚀 Maya: Player too far away for stock market guidance, returning');
+                return; // do not start if too far
+            }
+            
             this.stockMarketGuideActive = true;
+            this.guidedSequenceActive = true; // Reuse the guided sequence system
+            
+            console.log('🚀 Maya: Starting stock market guidance from bank to stock market');
+            
+            // Hide interaction text
+            this.interactionText.setAlpha(0);
+            
             // Dialogue prompt
             dialogueManager.showDialogue({
                 text: 'Follow me, we\'ll now go to the stock market and explore Dhani Stocks.',
@@ -801,14 +836,18 @@ export class MayaNPCManager {
             }, {
                 onAdvance: () => {
                     dialogueManager.closeDialogue();
-                    // Path per spec
+                    // Path from bank (x: 9415, y: 6297) to stock market as specified by user
                     this.waypoints = [
-                        { x: 8488, y: 6400 },
-                        { x: 8487, y: 3740 },
-                        { x: 2598, y: 3736 },
-                        { x: 2578, y: 3596 }
+                        { x: 9415, y: 6378 },  // First move down from bank entrance
+                        { x: 8465, y: 6378 },  // Then move left
+                        { x: 8465, y: 3626 },  // Then move up
+                        { x: 2598, y: 3736 }   // Finally to stock market entrance
                     ];
                     this.currentWaypointIndex = 0;
+                    
+                    console.log('🚀 Maya: Stock market waypoints set:', this.waypoints);
+                    console.log('🚀 Maya: Current Maya position:', { x: this.maya.x, y: this.maya.y });
+                    
                     // Reuse movement system
                     locationTrackerManager.setTargetEnabled('maya', true);
                     locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
@@ -819,16 +858,69 @@ export class MayaNPCManager {
 
         // Hook into existing arrival logic by checking if stock market guidance active & last waypoint reached
         private completeStockMarketGuidance(): void {
+            console.log('🚀 Maya: Completing stock market guidance');
+            
+            // Stop the guided sequence
+            this.guidedSequenceActive = false;
             this.stockMarketGuideActive = false;
             this.stockMarketGuideCompleted = true;
-                dialogueManager.showDialogue({
-                    text: 'We have reached Dhani Stocks.',
-                    characterName: 'M.A.Y.A',
-                    allowSpaceAdvance: true,
-                    showBackdrop: false
-                }, { onAdvance: () => dialogueManager.closeDialogue() });
-            (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markReachedStockMarket(); } catch(e) { console.warn('Could not mark stock market reached', e);} })();
+            
+            // Stop any movement
+            this.movingToTarget = false;
+            this.moveDir = null;
+            this.moveTarget = null;
+            
+            // Stop any alert timer
+            if (this.alertTimerEvent) {
+                this.alertTimerEvent.remove(false);
+                this.alertTimerEvent = null;
+            }
+            
+            // Remove follow reminder if present
+            if (this.followReminderText) {
+                this.followReminderText.destroy();
+                this.followReminderText = null;
+            }
+            
+            // Face the player
+            if (this.scene.getPlayer()) {
+                this.updateMayaDirectionToPlayer(this.scene.getPlayer().getSprite());
+            } else {
+                this.maya.anims.play('maya-idle-down', true);
+            }
+            
+            // Show completion dialogue
+            dialogueManager.showDialogue({
+                text: 'We have reached Dhani Stocks. This is where you can learn about investing and trading!',
+                characterName: 'M.A.Y.A',
+                allowSpaceAdvance: true,
+                showBackdrop: false
+            }, { onAdvance: () => dialogueManager.closeDialogue() });
+            
+            // Mark in progression manager
+            (async () => { 
+                try { 
+                    const { progressionManager } = await import('../../services/ProgressionManager'); 
+                    progressionManager.markReachedStockMarket();
+                    console.log('🚀 Maya: Marked reached stock market in progression');
+                } catch(e) { 
+                    console.warn('Could not mark stock market reached', e);
+                } 
+            })();
+            
+            // Disable the tracker since Maya has completed guiding the player to the stock market
             locationTrackerManager.setTargetEnabled('maya', false);
+            console.log("🚀 Maya: Disabled Maya tracker as she arrived at the stock market");
+            
+            // Restore interaction text if player is near Maya and no dialog is active
+            const player = this.scene.getPlayer && this.scene.getPlayer();
+            if (player) {
+                const playerSprite = player.getSprite();
+                const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
+                if (distance < this.interactionDistance && !this.activeDialog) {
+                    this.interactionText.setAlpha(1);
+                }
+            }
         }
 
     private checkFollowDistance(playerSprite: GameObjects.Sprite): void {
