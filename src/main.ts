@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './ui/App.tsx';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
+import { initializeBankAccountCreationFlow } from './ui/components/banking/BankAccountCreationFlow.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 
 import { ATMInterface } from './ui/ATMInterface.ts';
@@ -37,6 +38,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize the banking UI separately
   initializeBankingUI();
+  // Mount the bank account creation flow root (hidden until event)
+  initializeBankAccountCreationFlow();
   
   // Initialize the stock market UI separately
   initializeStockMarketUI();

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import BankOnboardingDialogue from './BankOnboardingDialogue';
-import BankNameInput from './BankNameInput';
 
 interface BankOnboardingUIProps {
   // This component doesn't need props - it listens to global events
@@ -9,7 +8,6 @@ interface BankOnboardingUIProps {
 
 const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
   const [showDialogue, setShowDialogue] = useState(false);
-  const [showNameInput, setShowNameInput] = useState(false);
   const [dialogueData, setDialogueData] = useState<{
     messages: string[];
     characterName: string;
@@ -17,9 +15,7 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     onTextInput?: (text: string) => void;
     onOptionSelect?: (optionId: string) => void;
   } | null>(null);
-  const [nameInputData, setNameInputData] = useState<{
-    onSubmit: (name: string) => void;
-  } | null>(null);
+  // Name input removed; handled inside BankAccountCreationFlow
 
   useEffect(() => {
     // Listen for bank onboarding dialogue events
@@ -31,16 +27,10 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     };
 
     // Listen for bank name input events
-    const handleNameInput = (event: CustomEvent) => {
-      console.log('🏦 BankOnboardingUI received name input event:', event.detail);
-      const { onSubmit } = event.detail;
-      setNameInputData({ onSubmit });
-      setShowNameInput(true);
-    };
 
     console.log('🏦 BankOnboardingUI: Adding event listeners');
     window.addEventListener('show-bank-onboarding-dialogue', handleDialogue as EventListener);
-    window.addEventListener('show-bank-name-input', handleNameInput as EventListener);
+  // Removed show-bank-name-input listener after consolidation
 
     // Consume any pending dialogue that may have been dispatched before this UI mounted
     try {
@@ -65,7 +55,7 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     return () => {
       console.log('🏦 BankOnboardingUI: Removing event listeners');
       window.removeEventListener('show-bank-onboarding-dialogue', handleDialogue as EventListener);
-      window.removeEventListener('show-bank-name-input', handleNameInput as EventListener);
+  // removed listener cleanup
     };
   }, []);
 
@@ -89,18 +79,7 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
     }
   };
 
-  const handleNameSubmit = (name: string) => {
-    setShowNameInput(false);
-    if (nameInputData?.onSubmit) {
-      nameInputData.onSubmit(name);
-    }
-    setNameInputData(null);
-  };
-
-  const handleNameCancel = () => {
-    setShowNameInput(false);
-    setNameInputData(null);
-  };
+  // Removed name submit/cancel handlers
 
   // Render dialogues into a portal attached to document.body so they escape the
   // #root stacking context which uses z-index:100 in index.html.
@@ -120,12 +99,7 @@ const BankOnboardingUI: React.FC<BankOnboardingUIProps> = () => {
         />
       )}
 
-      {showNameInput && nameInputData && (
-        <BankNameInput
-          onSubmit={handleNameSubmit}
-          onCancel={handleNameCancel}
-        />
-      )}
+  {/* Name input removed */}
     </>,
     mountNode
   );

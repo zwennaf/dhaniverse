@@ -79,6 +79,8 @@ export interface PlayerStateDocument extends Document {
 export interface BankAccountDocument extends Document {
   _id?: ObjectId;
   userId: string;
+  accountNumber?: string; // DIN-XXXXXX format
+  accountHolder?: string; // Account holder name
   balance: number;
   transactions: Array<{
     id: string;

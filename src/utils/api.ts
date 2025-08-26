@@ -150,6 +150,16 @@ export const playerStateApi = {
 // ======================
 
 export const bankingApi = {
+    // Create bank account
+    createAccount: async (accountHolder: string, initialDeposit: number = 0) => {
+        const response = await fetch(`${API_BASE}/game/bank-account/create`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ accountHolder, initialDeposit }),
+        });
+        return handleApiResponse(response);
+    },
+
     // Get bank account
     getAccount: async () => {
         const response = await fetch(`${API_BASE}/game/bank-account`, {

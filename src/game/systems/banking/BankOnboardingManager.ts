@@ -26,14 +26,17 @@ export class BankOnboardingManager {
   private currentStep: number = 0;
   private currentDialogueStep: number = 0;
   private playerName: string = '';
+  private initialDeposit: number = 0;
   private bankAccount: BankAccount | null = null;
   private userDeclined: boolean = false; // Track if user declined account creation
   private hasSpokenBefore: boolean = false; // Track if player has talked to bank manager before
   private conversationStage: 'IDLE' | 'INTRO' | 'ASK_NAME' | 'PROCESSING_1' | 'PROCESSING_2' | 'ACCOUNT_CREATED' | 'FINISHED' = 'IDLE';
+  private processingStarted: boolean = false; // guard against duplicate processing advance
+  private accountProvisioned: boolean = false; // guard against duplicate account creation
   private introSegments: string[] = [
-    "Hey there! Welcome to Dhaniverse Bank. I'm the manager who helps new adventurers get their first financial foothold.",
-    "Here you'll safely store earnings, earn interest, and later unlock deposits, withdrawals, fixed returns and real‑time tracking.",
-    "We keep things simple now and unlock depth as you progress. Let's set up your account so future systems can recognize you."
+    "Welcome to Dhaniverse Bank. I'm here to help you establish a secure in‑game account that underpins future financial systems.",
+    "Your account lets you hold earnings safely today and later unlock deposits, withdrawals, fixed returns and performance tracking.",
+    "We'll capture essentials now and expand capabilities as you advance. Let's register you properly."
   ];
   
   private onboardingSteps: OnboardingStep[] = [
@@ -100,7 +103,7 @@ export class BankOnboardingManager {
     const idx = this.currentDialogueStep;
     // Safety: if past last, move to name
     if (idx >= this.introSegments.length) {
-      this.promptForName();
+          this.startAccountForm();
       return;
     }
 
@@ -117,75 +120,68 @@ export class BankOnboardingManager {
         if (this.currentDialogueStep < this.introSegments.length) {
           this.showIntroSegment();
         } else {
-          this.promptForName();
+              this.startAccountForm();
         }
       }
     });
   }
 
-  private promptForName(): void {
+  private startAccountForm(): void {
     this.conversationStage = 'ASK_NAME';
+    // Show requirement dialogue first, then open form
     dialogueManager.showDialogue({
-      text: "First things first—I need your full name exactly as you'd like it on the account. Type it below and press Enter to continue.",
-      characterName: 'Bank Manager',
-      showBackdrop: true,
-      requiresTextInput: true,
-      textInputPlaceholder: 'Enter your full name'
-    }, {
-      onTextInput: (name: string) => {
-        const trimmed = name.trim();
-        if (!trimmed) {
-          // Re-prompt
-          this.promptForName();
-          return;
-        }
-        this.playerName = trimmed;
-        localStorage.setItem('dhaniverse_bank_account_holder_name', this.playerName);
-        this.showProcessingStep1();
-      }
-    });
-  }
-
-  private showProcessingStep1(): void {
-    this.conversationStage = 'PROCESSING_1';
-    dialogueManager.showDialogue({
-      text: `Alright ${this.playerName}, let me pull up the onboarding terminal... *taps keyboard* Accessing ledger... verifying network sync...`,
-      characterName: 'Bank Manager',
-      showBackdrop: true,
-      allowSpaceAdvance: true
-    }, {
-      onAdvance: () => this.showProcessingStep2()
-    });
-  }
-
-  private showProcessingStep2(): void {
-    this.conversationStage = 'PROCESSING_2';
-    dialogueManager.showDialogue({
-      text: "Hmm... one second... umm wait a second... compiling KYC... hashing identity... generating secure wallet credentials... almost there...",
+      text: "Great! To open your account, I'll need your full name and a minimum deposit of ₹500 to get started.",
       characterName: 'Bank Manager',
       showBackdrop: true,
       allowSpaceAdvance: true
     }, {
       onAdvance: () => {
-        this.createBankAccount();
-        this.showAccountCreatedDialogue();
+        // Open the account creation form UI
+        window.dispatchEvent(new CustomEvent('open-bank-account-creation-flow'));
+        
+        // Listen for completion
+        const finishHandler = (e: Event) => {
+          window.removeEventListener('bank-account-creation-finished', finishHandler as EventListener);
+          this.handleAccountCreationFinished();
+        };
+        window.addEventListener('bank-account-creation-finished', finishHandler as EventListener);
       }
     });
   }
 
-  private showAccountCreatedDialogue(): void {
-    this.conversationStage = 'ACCOUNT_CREATED';
-    const acc = this.bankAccount!;
-    const masked = acc.accountNumber.slice(0, 4) + ' **** ' + acc.accountNumber.slice(-4);
-    dialogueManager.showDialogue({
-      text: `All done! Your account is officially created. Details below:\n\nAccount Holder: ${this.playerName}\nAccount No: ${acc.accountNumber}\nIFSC: ${acc.ifscCode}\nBranch: ${acc.branchName}\nType: ${acc.accountType}\n\nUse this for deposits, earnings & future features.`,
-      characterName: 'Bank Manager',
-      showBackdrop: true,
-      allowSpaceAdvance: true
-    }, {
-      onAdvance: () => this.finishConversation()
-    });
+  private handleAccountCreationFinished(): void {
+    // Get account data from localStorage
+    const accountData = localStorage.getItem('dhaniverse_bank_account_details');
+    const holderName = localStorage.getItem('dhaniverse_bank_account_holder_name');
+    
+    if (accountData && holderName) {
+      this.playerName = holderName;
+      this.bankAccount = JSON.parse(accountData);
+      this.conversationStage = 'ACCOUNT_CREATED';
+      
+      // Show completion dialogue
+      dialogueManager.showDialogue({
+        text: `Perfect! Your account has been created successfully, ${this.playerName}. Welcome to Dhaniverse Bank!`,
+        characterName: 'Bank Manager',
+        showBackdrop: true,
+        allowSpaceAdvance: true
+      }, {
+        onAdvance: () => this.finishConversation()
+      });
+    }
   }
+
+  private showProcessingStep1(): void {
+    // Processing is now handled entirely in the UI component
+    // This method is no longer needed but kept for compatibility
+  }
+
+  private showProcessingStep2(): void {
+    // Processing is now handled entirely in the UI component  
+    // This method is no longer needed but kept for compatibility
+  }
+
+  // Removed legacy showAccountCreatedDialogue / launchAccountCreationFlowUI (flow handled inline)
 
   private finishConversation(): void {
     this.conversationStage = 'FINISHED';
@@ -199,13 +195,13 @@ export class BankOnboardingManager {
     const acc = this.getBankAccount();
     const shortAcc = acc ? acc.accountNumber.slice(-4) : '----';
     dialogueManager.showDialogue({
-      text: `Welcome back${storedName ? ' ' + storedName : ''}! Your account${acc ? ' ending •••' + shortAcc : ''} is active. Want to check your banking dashboard now?`,
+      text: `Welcome back${storedName ? ' ' + storedName : ''}. Your account${acc ? ' ending •••' + shortAcc : ''} is active. Open the banking dashboard?`,
       characterName: 'Bank Manager',
       showBackdrop: true,
       showOptions: true,
       options: [
-        { id: 'open', text: 'Yes, open dashboard' },
-        { id: 'later', text: 'No, maybe later' }
+        { id: 'open', text: 'Open dashboard' },
+        { id: 'later', text: 'Maybe later' }
       ]
     }, {
       onOptionSelect: (optionId: string) => {
@@ -285,7 +281,7 @@ export class BankOnboardingManager {
     this.hasSpokenBefore = true;
 
     dialogueManager.showDialogue({
-      text: "Welcome to Dhaniverse Bank! I'm here to help you open your first account. We offer savings accounts with interest, secure deposits & withdrawals, fixed deposits for higher returns, and real-time transaction tracking. Ready to get started with your account?",
+  text: "Welcome to Dhaniverse Bank. This first account provides a secure balance store and unlocks future financial features like deposits, withdrawals, fixed returns and tracking. Proceed with setup now?",
       characterName: 'Bank Manager',
       showBackdrop: true,
       showOptions: true,
@@ -304,7 +300,7 @@ export class BankOnboardingManager {
           action: () => {
             this.userDeclined = true;
             dialogueManager.showDialogue({
-              text: "No worries! Come back anytime when you're ready. I'll be here to help you start your financial journey!",
+              text: "Understood. Return anytime; onboarding will resume from this point.",
               characterName: 'Bank Manager',
               showBackdrop: true
             }, {
@@ -322,7 +318,7 @@ export class BankOnboardingManager {
           { id: 'no', action: () => { 
             this.userDeclined = true;
             dialogueManager.showDialogue({
-              text: "No worries! Come back anytime when you're ready. I'll be here to help you start your financial journey!",
+              text: "Understood. Return anytime; onboarding will resume from this point.",
               characterName: 'Bank Manager',
               showBackdrop: true
             }, {
@@ -335,15 +331,9 @@ export class BankOnboardingManager {
     });
   }
 
-  private requestPlayerName(): void {
-  // Legacy path not used anymore in new streamlined flow
-  this.promptForName();
-  }
+  private requestPlayerName(): void { this.startAccountForm(); }
 
-  private showAccountCreated(): void {
-  // Legacy path replaced by showAccountCreatedDialogue
-  this.showAccountCreatedDialogue();
-  }
+  private showAccountCreated(): void { /* deprecated */ }
 
   public shouldShowOnboarding(): boolean {
     // Check configuration first - if disabled globally, don't show onboarding
@@ -459,6 +449,13 @@ export class BankOnboardingManager {
     // Save to localStorage
     localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify(this.bankAccount));
     console.log('Bank account created:', this.bankAccount);
+    // Apply initial deposit if provided and valid
+    if (this.initialDeposit && this.initialDeposit > 0) {
+      try {
+        this.bankAccount.balance = this.initialDeposit;
+        localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify(this.bankAccount));
+      } catch {}
+    }
   }
 
   private generateAccountNumber(): string {

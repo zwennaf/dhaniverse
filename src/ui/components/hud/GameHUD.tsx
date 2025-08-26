@@ -15,6 +15,7 @@ import DialogueRenderer from '../common/DialogueRenderer';
 import { dialogueManager } from '../../../services/DialogueManager';
 import { getTaskManager } from '../../../game/tasks/TaskManager';
 import { GameTask } from '../../../game/tasks/TaskTypes';
+import AnimatedRupeeCounter from '../common/AnimatedRupeeCounter';
 
 interface GameHUDProps {
     rupees?: number;
@@ -45,6 +46,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     voiceEnabled = true,
 }) => {
     const [currentRupees, setCurrentRupees] = useState(rupees);
+    const [previousRupees, setPreviousRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
         { id: string; username: string; message: string; timestamp?: number }[]
     >([]);
@@ -154,10 +156,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         // Set initial balance from balance manager
         const currentBalance = balanceManager.getBalance();
+        setPreviousRupees(currentRupees);
         setCurrentRupees(currentBalance.cash);
 
         // Subscribe to balance changes
         const unsubscribe = balanceManager.onBalanceChange((balance) => {
+            setPreviousRupees(currentRupees);
             setCurrentRupees(balance.cash);
         });
 
@@ -751,48 +755,19 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                 )}
 
-                {/* Rupee counter (fixed height, stretchable width) */}
-                <div className="relative inline-flex items-center h-[57px] px-3" style={{ overflow: 'hidden' }}>
-                    <img
-                        src="/UI/game/rupeecounter.svg"
-                        alt="Rupee counter"
-                        className="block"
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', display: 'block', zIndex: 0 }}
-                    />
+                {/* Animated Rupee counter */}
+                <AnimatedRupeeCounter 
+                    value={currentRupees}
+                    previousValue={previousRupees}
+                    showTransaction={true}
+                />
 
+                {walletStatus.connected && (
                     <div
-                        className="relative inline-flex items-center z-10"
-                        style={{ padding: '0 12px', height: '100%' }}
-                    >
-                        <div className="relative z-10 flex items-center justify-center pointer-events-none select-none" style={{ textAlign: 'center', height: '100%' }}>
-                            <div
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontFamily: "'VCR OSD Mono', Arial, sans-serif",
-                                    fontWeight: 700,
-                                    fontSize: '1.2rem',
-                                    lineHeight: '1',
-                                    textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    whiteSpace: 'nowrap'
-                                }}
-                                aria-hidden
-                            >
-                                <span style={{ fontSize: '1.2rem' }}>₹</span>
-                                <span>{currentRupees.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {walletStatus.connected && (
-                        <div
-                            className="ml-2 w-3 h-3 bg-blue-400 rounded-full z-10"
-                            title="Blockchain verified"
-                        ></div>
-                    )}
-                </div>
+                        className="ml-2 w-3 h-3 bg-blue-400 rounded-full z-10"
+                        title="Blockchain verified"
+                    ></div>
+                )}
             </div>
 
             {/* Player connection display (moved to bottom-right, uses SVG background) */}

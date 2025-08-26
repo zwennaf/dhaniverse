@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 
 interface BankNameInputProps {
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, deposit?: number) => void;
   onCancel?: () => void;
 }
 
 const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => {
   const [name, setName] = useState('');
   const [isValid, setIsValid] = useState(false);
+  const [deposit, setDeposit] = useState('');
+  const [depositValid, setDepositValid] = useState(false);
+  const minDeposit = 500;
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -15,14 +18,25 @@ const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => 
     setIsValid(value.trim().length >= 2 && /^[a-zA-Z\s]+$/.test(value.trim()));
   };
 
+  const handleDepositChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    setDeposit(value);
+    const num = Number(value);
+    setDepositValid(!isNaN(num) && num >= minDeposit);
+  };
+
   const handleSubmit = () => {
-    if (isValid) {
-      onSubmit(name.trim());
+    if (isValid && depositValid) {
+      const cleanName = name.trim();
+      const num = Number(deposit);
+      // Fire unified event for onboarding manager (if listening)
+      window.dispatchEvent(new CustomEvent('bank-name-submitted', { detail: { name: cleanName, deposit: num } }));
+      onSubmit(cleanName, num);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && isValid) {
+  if (e.key === 'Enter' && isValid && depositValid) {
       handleSubmit();
     }
   };
@@ -49,7 +63,7 @@ const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => 
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Account Registration</h2>
-          <p className="text-gray-300 text-sm">Please enter your full name to create your bank account</p>
+          <p className="text-gray-300 text-sm">Enter your full name and starting deposit to create your bank account</p>
         </div>
 
         {/* Form */}
@@ -75,6 +89,24 @@ const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => 
               </p>
             )}
           </div>
+          <div>
+            <label htmlFor="initialDeposit" className="block text-sm font-medium text-gray-300 mb-2">
+              Initial Deposit (min {minDeposit}) *
+            </label>
+            <input
+              id="initialDeposit"
+              type="text"
+              value={deposit}
+              onChange={handleDepositChange}
+              onKeyPress={handleKeyPress}
+              placeholder={`Enter amount (>= ${minDeposit})`}
+              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-dhani-gold focus:ring-1 focus:ring-dhani-gold transition-colors"
+              maxLength={10}
+            />
+            {deposit && !depositValid && (
+              <p className="text-red-400 text-xs mt-2">Minimum deposit is ₹{minDeposit}</p>
+            )}
+          </div>
 
           <div className="flex space-x-3 mt-6">
             {onCancel && (
@@ -87,9 +119,9 @@ const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => 
             )}
             <button
               onClick={handleSubmit}
-              disabled={!isValid}
+              disabled={!isValid || !depositValid}
               className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                isValid
+                (isValid && depositValid)
                   ? 'bg-dhani-gold hover:bg-dhani-gold/90 text-black hover:shadow-lg hover:shadow-dhani-gold/30'
                   : 'bg-gray-600 text-gray-400 cursor-not-allowed'
               }`}
@@ -113,7 +145,7 @@ const BankNameInput: React.FC<BankNameInputProps> = ({ onSubmit, onCancel }) => 
             </svg>
             <div>
               <p className="text-xs text-dhani-gold font-medium">Secure Registration</p>
-              <p className="text-xs text-gray-300 mt-1">Your information is encrypted and stored securely</p>
+              <p className="text-xs text-gray-300 mt-1">Information encrypted & stored securely</p>
             </div>
           </div>
         </div>

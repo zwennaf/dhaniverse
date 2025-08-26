@@ -37,9 +37,14 @@ class DialogueManager {
   private static instance: DialogueManager;
   private currentDialogue: (DialogueConfig & DialogueCallbacks) | null = null;
   private isActive = false;
+  private isFrozen = false; // Add frozen state
   private subscribers: Array<(dialogue: (DialogueConfig & DialogueCallbacks) | null) => void> = [];
 
-  private constructor() {}
+  private constructor() {
+    // Listen for freeze/unfreeze events
+    window.addEventListener('freeze-dialogue', () => this.freeze());
+    window.addEventListener('unfreeze-dialogue', () => this.unfreeze());
+  }
 
   static getInstance(): DialogueManager {
     if (!DialogueManager.instance) {
@@ -169,8 +174,32 @@ class DialogueManager {
   forceCloseAll(): void {
     this.currentDialogue = null;
     this.isActive = false;
+    this.isFrozen = false;
     this.notifySubscribers();
     window.dispatchEvent(new Event("typing-end"));
+  }
+
+  /**
+   * Freeze dialogue (hide but don't close)
+   */
+  freeze(): void {
+    this.isFrozen = true;
+    this.notifySubscribers();
+  }
+
+  /**
+   * Unfreeze dialogue (show again)
+   */
+  unfreeze(): void {
+    this.isFrozen = false;
+    this.notifySubscribers();
+  }
+
+  /**
+   * Check if dialogue is frozen
+   */
+  isFrozenState(): boolean {
+    return this.isFrozen;
   }
 }
 

@@ -18,8 +18,8 @@ const DialogueRenderer: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Don't render anything if no dialogue is active
-  if (!currentDialogue) {
+  // Don't render anything if no dialogue is active or if dialogue is frozen
+  if (!currentDialogue || dialogueManager.isFrozenState()) {
     return null;
   }
 

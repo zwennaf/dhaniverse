@@ -363,6 +363,102 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
 // BANKING ENDPOINTS
 // ======================
 
+// Create bank account with initial deposit
+gameRouter.post("/game/bank-account/create", async (ctx) => {
+    try {
+        const userId = ctx.state.userId;
+        const body = await ctx.request.body.json();
+        const { accountHolder, initialDeposit } = body;
+
+        if (!accountHolder || typeof accountHolder !== "string") {
+            ctx.response.status = 400;
+            ctx.response.body = { error: "Account holder name is required" };
+            return;
+        }
+
+        if (typeof initialDeposit !== "number" || initialDeposit < 0) {
+            ctx.response.status = 400;
+            ctx.response.body = { error: "Invalid initial deposit amount" };
+            return;
+        }
+
+        // Check if account already exists
+        const bankAccounts = mongodb.getCollection<BankAccountDocument>(
+            COLLECTIONS.BANK_ACCOUNTS
+        );
+        const existingAccount = await bankAccounts.findOne({ userId });
+        
+        if (existingAccount) {
+            ctx.response.status = 400;
+            ctx.response.body = { error: "Bank account already exists" };
+            return;
+        }
+
+        // Generate account number with DIN- prefix
+        const randomSix = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const accountNumber = `DIN-${randomSix}`;
+
+        // If there's an initial deposit, verify player has enough rupees
+        if (initialDeposit > 0) {
+            const playerStates = mongodb.getCollection<PlayerStateDocument>(
+                COLLECTIONS.PLAYER_STATES
+            );
+            const playerState = await playerStates.findOne({ userId });
+
+            if (!playerState || playerState.financial.rupees < initialDeposit) {
+                ctx.response.status = 400;
+                ctx.response.body = { error: "Insufficient rupees for initial deposit" };
+                return;
+            }
+        }
+
+        // Create the bank account
+        const newBankAccount: BankAccountDocument = {
+            userId,
+            accountNumber,
+            accountHolder,
+            balance: initialDeposit,
+            transactions: initialDeposit > 0 ? [{
+                id: new ObjectId().toString(),
+                type: "deposit" as const,
+                amount: initialDeposit,
+                timestamp: new Date(),
+                description: `Initial deposit of ₹${initialDeposit}`,
+            }] : [],
+            createdAt: new Date(),
+            lastUpdated: new Date(),
+        };
+
+        const result = await bankAccounts.insertOne(newBankAccount);
+
+        // Deduct rupees from player if initial deposit
+        if (initialDeposit > 0) {
+            const playerStates = mongodb.getCollection<PlayerStateDocument>(
+                COLLECTIONS.PLAYER_STATES
+            );
+            await playerStates.updateOne(
+                { userId },
+                {
+                    $inc: { "financial.rupees": -initialDeposit },
+                    $set: { lastUpdated: new Date() },
+                }
+            );
+        }
+
+        const createdAccount = { ...newBankAccount, _id: result.insertedId };
+
+        ctx.response.body = {
+            success: true,
+            data: createdAccount,
+            message: `Bank account created successfully${initialDeposit > 0 ? ` with initial deposit of ₹${initialDeposit}` : ''}`
+        };
+    } catch (error) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Failed to create bank account" };
+        console.error("Create bank account error:", error);
+    }
+});
+
 // Get bank account
 gameRouter.get("/game/bank-account", async (ctx) => {
     try {
