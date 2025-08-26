@@ -157,32 +157,100 @@ export class ICPActorService {
         return this.web3BankingService.claimAchievementReward(achievementId);
     }
 
-    // Advanced ICP Features - HTTP Outcalls for Real-time Data
+    // Advanced ICP Features - HTTP Outcalls for Real-time Data via CoinGecko
     async fetchRealTimeStockPrices(): Promise<StockPrice[]> {
         try {
-            // In a real implementation, this would call the canister's fetchStockPrice method
-            // For now, simulate the HTTP outcall response
+            // If ICP is ready, call the actual canister method
+            if (this.icpReady && this.connectedWallet) {
+                console.log('Fetching real stock prices from ICP canister via CoinGecko...');
+                
+                // Popular crypto tokens that represent "stocks" in our game
+                const cryptoMappings = [
+                    { coinId: 'bitcoin', symbol: 'BTC', name: 'Bitcoin Corp' },
+                    { coinId: 'ethereum', symbol: 'ETH', name: 'Ethereum Inc' },
+                    { coinId: 'binancecoin', symbol: 'BNB', name: 'Binance Ltd' },
+                    { coinId: 'cardano', symbol: 'ADA', name: 'Cardano Systems' },
+                    { coinId: 'solana', symbol: 'SOL', name: 'Solana Labs' },
+                    { coinId: 'chainlink', symbol: 'LINK', name: 'ChainLink Corp' },
+                    { coinId: 'polygon', symbol: 'MATIC', name: 'Polygon Tech' },
+                    { coinId: 'uniswap', symbol: 'UNI', name: 'Uniswap Labs' }
+                ];
+                
+                const stockPrices: StockPrice[] = [];
+                
+                // Fetch each crypto price from canister via CoinGecko
+                for (const mapping of cryptoMappings) {
+                    try {
+                        // Call canister's get_crypto_price method
+                        if (!canisterService.isConnected()) {
+                            await canisterService.initialize();
+                        }
+                        
+                        // Access the actor directly from canister service
+                        const actor = (canisterService as any).actor;
+                        if (actor && actor.fetch_external_price) {
+                            const result = await actor.fetch_external_price(mapping.coinId);
+                            if (result && 'Ok' in result && result.Ok !== null) {
+                                // Convert USD to INR (approximate)
+                                const priceInINR = result.Ok * 83;
+                                
+                                stockPrices.push({
+                                    symbol: mapping.symbol,
+                                    price: Math.round(priceInINR * 100) / 100,
+                                    change: '+0.0%', // Would need additional calculation for change
+                                    lastUpdated: Date.now(),
+                                    source: 'ICP CoinGecko HTTP Outcall'
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.warn(`Failed to fetch ${mapping.coinId} from canister:`, error);
+                    }
+                }
+                
+                if (stockPrices.length > 0) {
+                    console.log(`Successfully fetched ${stockPrices.length} stock prices from ICP CoinGecko integration`);
+                    return stockPrices;
+                }
+            }
+            
+            // Fallback to mock data if ICP is not available
+            console.log('Using mock stock data (ICP canister not available)');
             const mockPrices: StockPrice[] = [
                 {
-                    symbol: 'AAPL',
-                    price: 17500,
+                    symbol: 'BTC',
+                    price: 4150000, // ~50k USD in INR
                     change: '+2.1%',
                     lastUpdated: Date.now(),
-                    source: 'polygon.io'
+                    source: 'mock-fallback'
                 },
                 {
-                    symbol: 'GOOGL',
-                    price: 14200,
+                    symbol: 'ETH',
+                    price: 270000, // ~3.2k USD in INR
                     change: '-0.5%',
                     lastUpdated: Date.now(),
-                    source: 'polygon.io'
+                    source: 'mock-fallback'
                 },
                 {
-                    symbol: 'MSFT',
-                    price: 41000,
+                    symbol: 'BNB',
+                    price: 35000, // ~420 USD in INR
                     change: '+1.8%',
                     lastUpdated: Date.now(),
-                    source: 'polygon.io'
+                    source: 'mock-fallback'
+                },
+                {
+                    symbol: 'ADA',
+                    price: 45, // ~0.54 USD in INR
+                    change: '+3.2%',
+                    lastUpdated: Date.now(),
+                    source: 'mock-fallback'
+                },
+                {
+                    symbol: 'SOL',
+                    price: 12500, // ~150 USD in INR
+                    change: '+1.5%',
+                    lastUpdated: Date.now(),
+                    source: 'mock-fallback'
                 }
             ];
             return mockPrices;

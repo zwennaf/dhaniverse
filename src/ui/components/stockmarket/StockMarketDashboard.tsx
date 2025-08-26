@@ -125,26 +125,51 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         loadPortfolio();
     }, []);
 
-    // Real stock data load & merge
+    // Real stock data load & merge using ICP canister CoinGecko integration
     useEffect(() => {
         let mounted = true;
         const load = async () => {
             try {
                 const initialized = await canisterService.initialize().catch(() => false);
-                const real = await realStockService.initializeRealStocks();
+                if (!initialized) {
+                    console.warn("Canister not initialized, using fallback stock data");
+                    setFilteredStocks(stocks);
+                    return;
+                }
+
+                // Use updated RealStockService with ICP canister CoinGecko integration
+                const realStocks = await realStockService.initializeRealStocks();
                 if (!mounted) return;
-                if (real.length) {
+                
+                if (realStocks && realStocks.length > 0) {
                     const updated = stocks.map(s => {
-                        const r = real.find(rs => rs.symbol === s.id.toUpperCase() || rs.name.toLowerCase().includes(s.name.toLowerCase()));
-                        return r ? { ...s, currentPrice: r.price, marketCap: r.marketCap, peRatio: r.peRatio || s.peRatio, priceHistory: [...s.priceHistory.slice(1), r.price], sector: r.sector } : s;
+                        const realStock = realStocks.find(rs => 
+                            rs.symbol === s.id.toUpperCase() || 
+                            rs.symbol.toLowerCase() === s.id.toLowerCase()
+                        );
+                        if (realStock) {
+                            return {
+                                ...s,
+                                currentPrice: realStock.price,
+                                marketCap: realStock.marketCap,
+                                peRatio: realStock.peRatio || s.peRatio,
+                                priceHistory: [...s.priceHistory.slice(1), realStock.price],
+                                sector: realStock.sector,
+                                lastUpdate: Date.now()
+                            };
+                        }
+                        return s;
                     });
                     setFilteredStocks(updated);
-                    if (initialized) {
-                        console.log("(TODO) store merged real stock data in canister");
-                    }
+                    console.log("Successfully loaded real stock data from ICP canister CoinGecko integration");
+                } else {
+                    // Fallback to original stocks if no real data available
+                    setFilteredStocks(stocks);
+                    console.log("No real stock data available, using fallback");
                 }
             } catch (e) {
-                console.warn("Real stock load failed", e);
+                console.warn("Real stock load failed, using fallback:", e);
+                setFilteredStocks(stocks);
             }
         };
         load();
@@ -414,9 +439,9 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [loadingStage, setLoadingStage] = useState("Initializing Market Data");
     useEffect(() => {
         const run = async () => {
-            setLoadingStage("Connecting to Exchange"); await new Promise(r=>setTimeout(r,900));
-            setLoadingStage("Loading Stock Prices"); await new Promise(r=>setTimeout(r,1100));
-            setLoadingStage("Verifying Account Details"); await new Promise(r=>setTimeout(r,800));
+            setLoadingStage("Connecting to ICP Canister"); await new Promise(r=>setTimeout(r,900));
+            setLoadingStage("Loading CoinGecko Prices"); await new Promise(r=>setTimeout(r,1100));
+            setLoadingStage("Converting to Stock Data"); await new Promise(r=>setTimeout(r,800));
             setIsLoading(false);
         }; run();
     }, []);
