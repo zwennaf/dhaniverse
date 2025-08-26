@@ -370,9 +370,18 @@ gameRouter.post("/game/bank-account/create", async (ctx) => {
         const body = await ctx.request.body.json();
         const { accountHolder, initialDeposit } = body;
 
-        if (!accountHolder || typeof accountHolder !== "string") {
+        console.log('🏦 Bank account creation attempt:', { 
+            userId, 
+            accountHolder: accountHolder || 'UNDEFINED/NULL', 
+            accountHolderType: typeof accountHolder,
+            accountHolderLength: accountHolder?.length || 0,
+            initialDeposit 
+        });
+
+        if (!accountHolder || typeof accountHolder !== "string" || accountHolder.trim().length < 2) {
+            console.warn('🚫 Rejected bank account creation - invalid account holder name');
             ctx.response.status = 400;
-            ctx.response.body = { error: "Account holder name is required" };
+            ctx.response.body = { error: "Account holder name is required and must be at least 2 characters" };
             return;
         }
 
@@ -389,9 +398,17 @@ gameRouter.post("/game/bank-account/create", async (ctx) => {
         const existingAccount = await bankAccounts.findOne({ userId });
         
         if (existingAccount) {
-            ctx.response.status = 400;
-            ctx.response.body = { error: "Bank account already exists" };
-            return;
+            // Check if the existing account has a valid accountHolder
+            if (existingAccount.accountHolder && existingAccount.accountHolder.trim().length >= 2) {
+                // Valid existing account
+                ctx.response.status = 400;
+                ctx.response.body = { error: "Bank account already exists" };
+                return;
+            } else {
+                // Invalid auto-created account without proper account holder - replace it
+                console.log('🏦 Found invalid auto-created account, replacing with proper account');
+                await bankAccounts.deleteOne({ userId });
+            }
         }
 
         // Generate account number with DIN- prefix
@@ -467,19 +484,29 @@ gameRouter.get("/game/bank-account", async (ctx) => {
             COLLECTIONS.BANK_ACCOUNTS
         );
 
-        let bankAccount = await bankAccounts.findOne({ userId });
-        // Create initial bank account if doesn't exist
+        const bankAccount = await bankAccounts.findOne({ userId });
+        
+        // DO NOT auto-create accounts - let the frontend handle account creation flow
         if (!bankAccount) {
-            const newBankAccount: BankAccountDocument = {
-                userId,
-                balance: 0,
-                transactions: [],
-                createdAt: new Date(),
-                lastUpdated: new Date(),
+            ctx.response.status = 404;
+            ctx.response.body = { 
+                success: false,
+                error: "No bank account found",
+                data: null 
             };
-
-            const result = await bankAccounts.insertOne(newBankAccount);
-            bankAccount = { ...newBankAccount, _id: result.insertedId };
+            return;
+        }
+        
+        // Check if the account has a valid accountHolder (handle legacy auto-created accounts)
+        if (!bankAccount.accountHolder || bankAccount.accountHolder.trim().length < 2) {
+            console.log('🏦 Found invalid auto-created account, treating as no account');
+            ctx.response.status = 404;
+            ctx.response.body = { 
+                success: false,
+                error: "No valid bank account found",
+                data: null 
+            };
+            return;
         }
 
         ctx.response.body = {

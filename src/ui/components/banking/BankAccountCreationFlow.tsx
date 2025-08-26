@@ -25,6 +25,7 @@ const BankAccountCreationFlow: React.FC = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const [createdAccount, setCreatedAccount] = useState<CreatedAccountDetails | null>(null);
   const [currentBalance, setCurrentBalance] = useState(0);
+  const [isExistingAccount, setIsExistingAccount] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Update current balance when component mounts or balance changes
@@ -60,10 +61,118 @@ const BankAccountCreationFlow: React.FC = () => {
   // Open flow when event dispatched
   useEffect(() => {
     const openHandler = async () => {
+      try {
+        // Step 1: Check progression manager state to understand if user is new/existing
+        const { progressionManager } = await import('../../../services/ProgressionManager');
+        const progressionState = progressionManager.getState();
+        
+        console.log('🏦 Bank Account Creation: Checking user state', {
+          hasCompletedBankOnboarding: progressionState.hasCompletedBankOnboarding,
+          hasMetMaya: progressionState.hasMetMaya,
+          hasClaimedMoney: progressionState.hasClaimedMoney,
+          onboardingStep: progressionState.onboardingStep
+        });
+        
+        // Step 2: Check if bank onboarding is already completed in progression
+        if (progressionState.hasCompletedBankOnboarding) {
+          console.log('🏦 Bank onboarding already completed in progression, skipping UI');
+          
+          // Mark localStorage flag as well for consistency
+          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+          
+          // Directly trigger completion since onboarding is done
+          window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
+            detail: { 
+              name: 'Existing User', 
+              account: null // Will be handled by the onboarding manager
+            } 
+          }));
+          return;
+        }
+        
+        // Step 3: Brand new users (who haven't met Maya or claimed money) should ALWAYS see the creation form
+        // Only skip the form for users who already completed onboarding
+        const isNewUser = !progressionState.hasMetMaya && !progressionState.hasClaimedMoney && progressionState.onboardingStep === 'not_started';
+        
+        console.log('🏦 User type analysis:', {
+          isNewUser,
+          hasMetMaya: progressionState.hasMetMaya,
+          hasClaimedMoney: progressionState.hasClaimedMoney,
+          onboardingStep: progressionState.onboardingStep
+        });
+        
+        if (isNewUser) {
+          console.log('🏦 BRAND NEW USER: Always showing account creation form regardless of any existing accounts');
+          // For brand new users, ALWAYS show the form - don't check for existing accounts
+          // This ensures new players get the proper onboarding experience
+        } else {
+          // For users with some progression, check if they have an account but didn't complete the flow
+          console.log('🏦 USER WITH PROGRESSION: Checking for existing accounts...');
+          try {
+            const existingAccount = await bankingApi.getAccount();
+            if (existingAccount.success && existingAccount.data) {
+              // Check if the existing account has a valid account holder name
+              const accountHolder = existingAccount.data.accountHolder;
+              
+              if (!accountHolder || accountHolder.trim().length < 2) {
+                console.log('🏦 Found existing account with invalid/missing account holder name - treating as new user');
+                console.log('🏦 Invalid account data:', existingAccount.data);
+                // Treat this as a new user since the account was auto-created without proper onboarding
+                // The user should go through the proper account creation flow
+              } else {
+                console.log('🏦 User has valid bank account but onboarding not marked complete. Completing onboarding...');
+                
+                // Mark onboarding as completed since they have a valid account
+                progressionManager.markBankOnboardingCompleted();
+                localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+                
+                // Store account details for consistency
+                localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify({
+                  accountNumber: existingAccount.data.accountNumber || existingAccount.data._id,
+                  accountHolder: existingAccount.data.accountHolder,
+                  balance: existingAccount.data.balance,
+                  openingDate: existingAccount.data.createdAt
+                }));
+                localStorage.setItem('dhaniverse_bank_account_holder_name', existingAccount.data.accountHolder);
+                
+                // Trigger completion
+                window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
+                  detail: { 
+                    name: existingAccount.data.accountHolder, 
+                    account: {
+                      accountNumber: existingAccount.data.accountNumber || existingAccount.data._id,
+                      accountHolder: existingAccount.data.accountHolder,
+                      balance: existingAccount.data.balance,
+                      openingDate: existingAccount.data.createdAt,
+                      branchName: 'Dhaniverse Central Branch',
+                      accountType: 'Savings Account',
+                      ifscCode: ''
+                    }
+                  } 
+                }));
+                return;
+              }
+            }
+          } catch (error) {
+            // No existing account found, continue with creation flow
+            console.log('🏦 No existing bank account found for user with progression, proceeding with creation flow');
+          }
+        }
+        
+        // Step 4: Show creation form for new users or users without accounts
+        console.log('🏦 Starting bank account creation flow');
+        
+      } catch (error) {
+        console.error('🏦 Error checking progression state:', error);
+        // Fallback to showing creation form for any error
+      }
+      
+      // Show creation form for new users
       setStep('FORM');
       setErrors([]);
       setName('');
       setDeposit('');
+      setIsExistingAccount(false);
       
       // Force refresh current balance when form opens to prevent race conditions
       try {
@@ -172,8 +281,22 @@ const BankAccountCreationFlow: React.FC = () => {
       console.warn('Failed to refresh balance from backend, using current balance:', error);
     }
     
+    // Critical validation: prevent account creation with empty names
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      console.error('🏦 CRITICAL: Attempted to create account with invalid name:', { name, trimmedName });
+      setErrors(['Please enter your full name before creating the account']);
+      return;
+    }
+    
     if (!validate()) return;
     const initialDeposit = Number(deposit);
+    
+    console.log('🏦 Creating account with validated data:', { 
+      name: trimmedName, 
+      initialDeposit,
+      currentBalance 
+    });
     
     // Fast transition to processing with rupee counter style
     if (containerRef.current) {
@@ -202,8 +325,9 @@ const BankAccountCreationFlow: React.FC = () => {
     }
     
     try {
-      // Call actual API to create bank account with initial deposit
-      const response = await bankingApi.createAccount(name.trim(), initialDeposit);
+      // Proceed with account creation - we've already checked for existing accounts in openHandler
+      console.log('🏦 Creating new account for user:', trimmedName);
+      const response = await bankingApi.createAccount(trimmedName, initialDeposit);
       
       if (response.success) {
         const accountData = response.data;
@@ -245,6 +369,8 @@ const BankAccountCreationFlow: React.FC = () => {
           ifscCode: ''
         });
         
+        setIsExistingAccount(false); // This is a newly created account
+        
         // Save to localStorage for local persistence
         localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify({
           accountNumber: accountData.accountNumber || accountData._id,
@@ -252,7 +378,7 @@ const BankAccountCreationFlow: React.FC = () => {
           balance: accountData.balance,
           openingDate: accountData.createdAt
         }));
-        localStorage.setItem('dhaniverse_bank_account_holder_name', name.trim());
+        localStorage.setItem('dhaniverse_bank_account_holder_name', trimmedName);
         
         // Fast transition to details after brief processing
         setTimeout(() => {
@@ -287,6 +413,79 @@ const BankAccountCreationFlow: React.FC = () => {
     } catch (error) {
       console.error('Bank account creation failed:', error);
       
+      // Handle specific case where account already exists (fallback check)
+      if (error instanceof Error && error.message.includes('Bank account already exists')) {
+        console.log('🏦 Account already exists error during creation, fetching existing account...');
+        try {
+          const existingAccount = await bankingApi.getAccount();
+          if (existingAccount.success && existingAccount.data) {
+            const accountData = existingAccount.data;
+            
+            setCreatedAccount({
+              accountNumber: accountData.accountNumber || accountData._id,
+              accountHolder: accountData.accountHolder,
+              balance: accountData.balance,
+              openingDate: accountData.createdAt,
+              branchName: 'Dhaniverse Central Branch',
+              accountType: 'Savings Account',
+              ifscCode: ''
+            });
+            
+            setIsExistingAccount(true);
+            
+            // Mark onboarding as completed
+            try {
+              const { progressionManager } = await import('../../../services/ProgressionManager');
+              progressionManager.markBankOnboardingCompleted();
+              localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+            } catch (error) {
+              console.warn('Could not update progression manager:', error);
+              localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+            }
+            
+            // Save account details for consistency
+            localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify({
+              accountNumber: accountData.accountNumber || accountData._id,
+              accountHolder: accountData.accountHolder,
+              balance: accountData.balance,
+              openingDate: accountData.createdAt
+            }));
+            localStorage.setItem('dhaniverse_bank_account_holder_name', accountData.accountHolder);
+            
+            // Fast transition to success for existing account
+            setTimeout(() => {
+              if (containerRef.current) {
+                const content = containerRef.current.querySelector('[data-content]');
+                if (content) {
+                  animate(content as any, {
+                    y: [0, -10, 10, 0],
+                    opacity: [1, 0.7, 0.7, 0]
+                  } as any, { 
+                    duration: 0.6,
+                    onComplete: () => {
+                      setStep('SUCCESS'); // Go directly to success for existing accounts
+                      setTimeout(() => {
+                        const newContent = containerRef.current?.querySelector('[data-content]');
+                        if (newContent) {
+                          animate(newContent as any, {
+                            y: [10, -5, 5, 0],
+                            opacity: [0, 0.7, 0.7, 1]
+                          } as any, { duration: 0.6 });
+                        }
+                      }, 50);
+                    }
+                  });
+                }
+              }
+            }, 1500);
+            return;
+          }
+        } catch (getError) {
+          console.error('Failed to get existing account after creation error:', getError);
+        }
+      }
+      
+      // Handle other errors - show error form
       // Fast transition back to form with rupee counter style
       if (containerRef.current) {
         const content = containerRef.current.querySelector('[data-content]');
@@ -302,6 +501,8 @@ const BankAccountCreationFlow: React.FC = () => {
               if (error instanceof Error) {
                 if (error.message.includes('Insufficient')) {
                   errorMessage = error.message;
+                } else if (error.message.includes('Bank account already exists')) {
+                  errorMessage = 'Unable to retrieve your existing account details. Please try again or contact support.';
                 } else {
                   errorMessage = `Account creation failed: ${error.message}`;
                 }
@@ -328,6 +529,8 @@ const BankAccountCreationFlow: React.FC = () => {
         if (error instanceof Error) {
           if (error.message.includes('Insufficient')) {
             errorMessage = error.message;
+          } else if (error.message.includes('Bank account already exists')) {
+            errorMessage = 'Unable to retrieve your existing account details. Please try again or contact support.';
           } else {
             errorMessage = `Account creation failed: ${error.message}`;
           }
@@ -340,11 +543,23 @@ const BankAccountCreationFlow: React.FC = () => {
 
   const handleNextFromDetails = () => setStep('SUCCESS');
   
-  const handleConfirmSuccess = () => {
+  const handleConfirmSuccess = async () => {
+    try {
+      // Mark bank onboarding as completed in progression manager for all cases
+      const { progressionManager } = await import('../../../services/ProgressionManager');
+      progressionManager.markBankOnboardingCompleted();
+      localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+      console.log('🏦 Bank onboarding marked as completed in both progression manager and localStorage');
+    } catch (error) {
+      console.error('🏦 Error marking bank onboarding complete:', error);
+      // Fallback to just localStorage
+      localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+    }
+    
     // Unfreeze dialogue and notify completion
     window.dispatchEvent(new CustomEvent('unfreeze-dialogue'));
     window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
-      detail: { name, account: createdAccount } 
+      detail: { name: createdAccount?.accountHolder || name, account: createdAccount } 
     }));
     setStep('HIDDEN');
   };
@@ -501,10 +716,13 @@ const BankAccountCreationFlow: React.FC = () => {
           {step === 'SUCCESS' && (
             <div className="text-center py-12 flex flex-col gap-6">
               <h2 className="text-2xl font-bold tracking-wide text-[#EFC94C]" style={{ fontFamily: 'VCR OSD Mono, monospace' }}>
-                Welcome to Dhaniverse Bank!
+                {isExistingAccount ? 'Welcome Back!' : 'Welcome to Dhaniverse Bank!'}
               </h2>
               <p className="text-lg leading-relaxed text-white/90 px-4">
-                Your account is now active and ready to use. All details have been saved to your profile.
+                {isExistingAccount 
+                  ? 'Your existing account is active and ready to use.'
+                  : 'Your account has been created successfully and is now active!'
+                }
               </p>
               <button
                 onClick={handleConfirmSuccess}

@@ -323,18 +323,9 @@ class MongoDatabase {
         );
         await playerStates.insertOne(playerState);
 
-        // Create initial bank account
-        const bankAccount: BankAccountDocument = {
-            userId,
-            balance: 0,
-            transactions: [],
-            createdAt: new Date(),
-            lastUpdated: new Date(),
-        };
-        const bankAccounts = this.getCollection<BankAccountDocument>(
-            COLLECTIONS.BANK_ACCOUNTS
-        );
-        await bankAccounts.insertOne(bankAccount);
+        // DO NOT auto-create bank accounts here - let the frontend handle the bank account creation flow
+        // Users will create their bank accounts through the proper onboarding process
+        console.log('✅ User created without auto-creating bank account - user will create account through onboarding flow');
     }
 
     // Health check with automatic reconnection attempt
