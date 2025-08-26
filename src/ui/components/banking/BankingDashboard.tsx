@@ -3,6 +3,7 @@ import DepositWithdrawPanel from "./DepositWithdrawPanel";
 import FixedDepositPanel from "./FixedDepositPanel";
 import Web3BankingFeatures from "./Web3BankingFeatures";
 import Web3Integration from "../Web3Integration";
+import DeFiBankingVault from "./DeFiBankingVault";
 import {
     bankingApi,
     fixedDepositApi,
@@ -57,6 +58,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     const [exchangeTo, setExchangeTo] = useState<string>("DHANI");
     const [exchangeAmount, setExchangeAmount] = useState<number | null>(null);
     const [usdPrices, setUsdPrices] = useState<Record<string, number>>({});
+    
+    // DeFi Vault State
+    const [showDeFiVault, setShowDeFiVault] = useState(false);
 
     // Initialize all Web3 services
     useEffect(() => {
@@ -650,6 +654,11 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
             icon: "💰",
         },
         {
+            id: "defi",
+            name: "DeFi Vault",
+            icon: "🚀",
+        },
+        {
             id: "icp",
             name: "ICP Tokens",
             icon: "🪙",
@@ -725,17 +734,24 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("fd")}
-                                    className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 text-white p-4 rounded-lg transition-colors text-center"
+                                    className="bg-black border border-yellow-600/30 text-white p-6 rounded transition-colors duration-200 text-center hover:border-yellow-500"
                                 >
-                                    <div className="text-2xl mb-2">📈</div>
-                                    <div className="text-sm font-medium">Fixed Deposits</div>
+                                    <div className="text-lg font-light text-yellow-500 mb-2">FIXED DEPOSITS</div>
+                                    <div className="text-sm text-gray-400">Secure investments</div>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("defi")}
+                                    className="bg-black border border-yellow-600/30 text-white p-6 rounded transition-colors duration-200 text-center hover:border-yellow-500"
+                                >
+                                    <div className="text-lg font-light text-yellow-500 mb-2">DEFI VAULT</div>
+                                    <div className="text-sm text-gray-400">Decentralized finance</div>
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("icp")}
-                                    className="bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-white p-4 rounded-lg transition-colors text-center"
+                                    className="bg-black border border-yellow-600/30 text-white p-6 rounded transition-colors duration-200 text-center hover:border-yellow-500"
                                 >
-                                    <div className="text-2xl mb-2">🪙</div>
-                                    <div className="text-sm font-medium">ICP Tokens</div>
+                                    <div className="text-lg font-light text-yellow-500 mb-2">ICP TOKENS</div>
+                                    <div className="text-sm text-gray-400">Internet Computer Protocol</div>
                                 </button>
                                 {/* feature button removed */}
                             </div>
@@ -778,6 +794,15 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
                         fixedDeposits={fixedDeposits}
                         onCreateFD={handleCreateFD}
                         onClaimFD={handleClaimFD}
+                    />
+                );
+
+            case "defi":
+                return (
+                    <DeFiBankingVault
+                        isOpen={true}
+                        onClose={() => setActiveTab("overview")}
+                        walletAddress={walletStatus.address || "demo_user"}
                     />
                 );
 

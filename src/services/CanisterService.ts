@@ -21,6 +21,17 @@ export interface PriceData {
     price: number;
 }
 
+export interface Achievement {
+    id: string;
+    title: string;
+    description: string;
+    category: 'Trading' | 'Saving' | 'Learning';
+    rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+    unlocked: boolean;
+    unlocked_at?: number;
+    reward?: { reward_type: string; amount: number };
+}
+
 class CanisterService {
     private agent: HttpAgent | null = null;
     private actor: any = null;
@@ -598,6 +609,102 @@ class CanisterService {
         return () => {
             isSubscribed = false;
         };
+    }
+
+    // Achievement methods
+    async getAchievements(walletAddress: string): Promise<Achievement[]> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const achievements = await this.actor.get_achievements(walletAddress);
+            return achievements || [];
+        } catch (error) {
+            console.error('Get achievements failed:', error);
+            return [];
+        }
+    }
+
+    async claimAchievementReward(walletAddress: string, achievementId: string): Promise<any> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const result = await this.actor.claim_achievement_reward(walletAddress, achievementId);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('Claim achievement reward failed:', error);
+            throw error;
+        }
+    }
+
+    // Transaction methods
+    async getTransactionHistory(walletAddress: string): Promise<any[]> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const transactions = await this.actor.get_transaction_history(walletAddress);
+            return transactions || [];
+        } catch (error) {
+            console.error('Get transaction history failed:', error);
+            return [];
+        }
+    }
+
+    async createTransaction(walletAddress: string, transactionType: string, amount: number, to?: string): Promise<any> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const result = await this.actor.create_transaction(
+                walletAddress,
+                { [transactionType]: null }, // Convert string to variant
+                amount,
+                to ? [to] : []
+            );
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('Create transaction failed:', error);
+            throw error;
+        }
+    }
+
+    // DeFi simulation methods
+    async simulateLiquidityPool(walletAddress: string, amount: number): Promise<number> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const result = await this.actor.simulate_liquidity_pool(walletAddress, amount);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('Simulate liquidity pool failed:', error);
+            return amount * 1.05; // 5% fallback return
+        }
+    }
+
+    async simulateYieldFarming(walletAddress: string, amount: number): Promise<number> {
+        if (!this.actor) throw new Error('Actor not initialized');
+        
+        try {
+            const result = await this.actor.simulate_yield_farming(walletAddress, amount);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('Simulate yield farming failed:', error);
+            return amount * 1.15; // 15% fallback return
+        }
     }
 }
 
