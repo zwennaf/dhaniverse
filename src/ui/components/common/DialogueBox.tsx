@@ -1,5 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+
+// Backdrop fade-in animation (scoped once)
+const backdropStyleId = 'dialogue-backdrop-fade-style';
+if (typeof document !== 'undefined' && !document.getElementById(backdropStyleId)) {
+  const styleEl = document.createElement('style');
+  styleEl.id = backdropStyleId;
+  styleEl.textContent = `@keyframes dialogueBackdropFadeIn {0% {opacity: 0; transform: scale(1.02);} 100% {opacity: 1; transform: scale(1);}} @keyframes dialogueBackdropFadeOut {0% {opacity:1; transform: scale(1);} 100% {opacity:0; transform: scale(1.02);} } .backdrop-fade-in {animation: dialogueBackdropFadeIn 220ms ease-out forwards;} .backdrop-fade-out {animation: dialogueBackdropFadeOut 180ms ease-in forwards;}`;
+  document.head.appendChild(styleEl);
+}
 
 interface DialogueOption {
   id: string;
@@ -146,6 +154,24 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
   keyboardInputEnabled = true
 }) => {
   const [lastActionTime, setLastActionTime] = useState(0);
+  // Mount control for exit animation
+  const [shouldRender, setShouldRender] = useState(isVisible);
+  const [exiting, setExiting] = useState(false);
+  useEffect(() => {
+    let timeout: NodeJS.Timeout | undefined;
+    if (isVisible) {
+      setShouldRender(true);
+      setExiting(false);
+    } else if (shouldRender) {
+      // trigger exit animation
+      setExiting(true);
+      timeout = setTimeout(() => {
+        setShouldRender(false);
+        setExiting(false);
+      }, 190); // a bit longer than fade-out to ensure completion
+    }
+    return () => { if (timeout) clearTimeout(timeout); };
+  }, [isVisible, shouldRender]);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
   const [textInputValue, setTextInputValue] = useState('');
   const [isTextInputFocused, setIsTextInputFocused] = useState(false);
@@ -195,7 +221,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     let keyHeldDown = false;
     let speedUpTimeout: NodeJS.Timeout | null = null;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+  const handleKeyDown = (event: KeyboardEvent) => {
       // Skip if input is focused (for text input)
       if (isTextInputFocused && requiresTextInput) {
         // Allow normal typing in text input, but handle special keys
@@ -240,29 +266,33 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
         }
       }
 
-      // Regular advancement controls
-      if (event.key === 'Enter' || (event.key === ' ' && allowSpaceAdvance) || (event.code === 'Space' && allowSpaceAdvance)) {
+      // Speed / advance handling (Space / Enter)
+      if (event.key === 'Enter' || (allowSpaceAdvance && (event.key === ' ' || event.code === 'Space'))) {
         event.preventDefault();
-        
         const now = Date.now();
-        if (now - lastActionTime < ACTION_COOLDOWN) return;
 
+        // If text not complete -> entering speed mode
         if (!isComplete) {
           if (!keyHeldDown) {
             keyHeldDown = true;
-            speedUp(); // speed up instantly on first press
+            speedUp();
           }
-        } else {
-          // If text is complete, only advance on a fresh key press
-          if (!keyHeldDown) {
-            keyHeldDown = true;
-            setLastActionTime(now);
-            
-            // Don't advance if we're showing options or text input
-            if (!showOptions && !requiresTextInput) {
-              onAdvance?.();
-            }
-          }
+          return; // never advance while still typing
+        }
+
+        // Text is complete at this point
+        // Block advancement while key is held (require key release + fresh press)
+        if (keyHeldDown) return;
+
+        // Mark key as held now
+        keyHeldDown = true;
+
+        // Don't advance if options or input are showing
+        if (showOptions || requiresTextInput) return;
+
+        if (now - lastActionTime >= ACTION_COOLDOWN) {
+          setLastActionTime(now);
+          onAdvance?.();
         }
       }
     };
@@ -343,7 +373,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
     }
   }, [isComplete, onComplete]);
 
-  if (!isVisible) return null;
+  if (!shouldRender) return null;
 
   // container positioning
   // Ensure the dialogue sits above other HUD elements (trackers, overlays).
@@ -360,17 +390,15 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
 
   return (
     <>
-      {/* Optional backdrop with gradient from 1/3 of screen */}
-      {showBackdrop && (
-        <div 
-          className="fixed inset-0 z-[1100]" 
-          style={{
-            background: 'linear-gradient(to bottom, transparent 0%, transparent 66%, rgba(0, 0, 0, 0.5) 100%)'
-          }}
-        />
-      )}
-      
-      <div className={`${showBackdrop ? 'fixed' : containerClass} ${showBackdrop ? 'inset-0 flex items-end justify-center pb-8 z-[1200]' : ''} pointer-events-auto`}>
+      {/* Backdrop is now always shown */}
+      <div 
+        className={`fixed inset-0 z-[1100] ${exiting ? 'backdrop-fade-out' : 'backdrop-fade-in'}`}
+        style={{
+          background: 'linear-gradient(to bottom, transparent 0%, transparent 66%, rgba(0, 0, 0, 0.5) 100%)'
+        }}
+      />
+
+      <div className={`fixed inset-0 flex items-end justify-center pb-8 z-[1200] pointer-events-auto`}>
         <div className={`relative w-full ${maxWidthClass} ${showBackdrop ? 'px-4' : ''}`}>
         {/* SVG Dialogue Box */}
         <img
@@ -386,20 +414,18 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({
           }}
         />
         
-  {/* Press [SPACE] to continue - below dialogue box */}
-  {showContinueHint && !showOptions && !requiresTextInput && (
-          <div className="flex justify-center mt-4">
-            <p 
-              className="text-white text-sm opacity-80 animate-pulse"
-              style={{ 
-                fontFamily: 'Tickerbit-regular, VCR OSD Mono, monospace',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
-              }}
-            >
-              Press [SPACE] to continue
-            </p>
-          </div>
-        )}
+        {/* Press [SPACE] to continue - always shown now */}
+        <div className="flex justify-center mt-4">
+          <p 
+            className="text-white text-sm opacity-80 animate-pulse"
+            style={{ 
+              fontFamily: 'Tickerbit-regular, VCR OSD Mono, monospace',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+            }}
+          >
+            Press [SPACE] to continue
+          </p>
+        </div>
         
         {/* Title (for tasks) */}
         {title && (
