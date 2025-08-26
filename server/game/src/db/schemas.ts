@@ -62,7 +62,10 @@ export interface PlayerStateDocument extends Document {
     hasMetMaya: boolean;
     hasFollowedMaya: boolean;
     hasClaimedMoney: boolean;
-    onboardingStep: 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money';
+  // New extended progression flags (Aug 2025)
+  hasCompletedBankOnboarding?: boolean; // set true only after full bank manager flow & account confirmation
+  hasReachedStockMarket?: boolean; // set true after Maya guides player to stock market
+  onboardingStep: 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_completed' | 'reached_stock_market';
     unlockedBuildings: Record<string, boolean>; // granular per-building unlocks
   };
   settings: {

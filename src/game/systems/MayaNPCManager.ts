@@ -41,6 +41,9 @@ export class MayaNPCManager {
     private alertTimerEvent: Phaser.Time.TimerEvent | null = null;
     private alertIntervalMs: number = 60000; // 60 seconds
     private guideCompleted: boolean = false;
+    // Secondary guidance to stock market
+    private stockMarketGuideActive: boolean = false;
+    private stockMarketGuideCompleted: boolean = false;
     private initialDialogueTaskResolved: boolean = false; // ensures tasks update once
 
     // Track player's initial position and whether they have started moving
@@ -441,17 +444,41 @@ export class MayaNPCManager {
             Phaser.Input.Keyboard.JustDown(this.interactionKey) &&
             !this.activeDialog
         ) {
-            // Skip onboarding dialogue entirely if player already completed onboarding
-            let completed = false;
-            (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); if (progressionManager.getState().hasClaimedMoney) completed = true; } catch(e) {/* ignore */} })();
-            if (completed) return;
-            // If the guide already completed and player presses E at destination,
-            // show the final arrival interaction. Otherwise start the guided sequence.
-            if (this.guideCompleted) {
-                this.showArrivalInteraction();
-            } else {
-                this.startGuidedSequence();
-            }
+                        (async () => {
+                            try {
+                                const { progressionManager } = await import('../../services/ProgressionManager');
+                                const ps = progressionManager.getState();
+                                // ORIGINAL CHAIN (unchanged behavior): until claimed money
+                                if (!ps.hasClaimedMoney) {
+                                    let completed = ps.hasClaimedMoney; // immediate state
+                                    if (completed) return; // safety
+                                    if (this.guideCompleted) {
+                                        this.showArrivalInteraction();
+                                    } else {
+                                        this.startGuidedSequence();
+                                    }
+                                    return;
+                                }
+                                // Failure case: claimed money but bank onboarding not completed
+                                if (ps.hasClaimedMoney && !ps.hasCompletedBankOnboarding) {
+                                    dialogueManager.showDialogue({
+                                        text: 'You need to complete your bank onboarding and create your account before we continue.',
+                                        characterName: 'M.A.Y.A',
+                                        allowSpaceAdvance: true,
+                                        showBackdrop: false
+                                    }, { onAdvance: () => dialogueManager.closeDialogue() });
+                                    return;
+                                }
+                                // Stock market guidance branch
+                                if (ps.hasCompletedBankOnboarding && !ps.hasReachedStockMarket) {
+                                    if (!this.stockMarketGuideCompleted && !this.stockMarketGuideActive) {
+                                        this.startStockMarketGuidance();
+                                    }
+                                    return;
+                                }
+                                // After everything: silent
+                            } catch(e) { console.warn('Maya interaction error', e); }
+                        })();
         }
 
         // Per-frame straight-line movement handling
@@ -629,7 +656,8 @@ export class MayaNPCManager {
         // If we've finished all waypoints, handle arrival
         if (this.currentWaypointIndex >= this.waypoints.length) {
             console.log('🚀 Maya: All waypoints completed, arriving at destination');
-            this.onArriveAtDestination();
+            if (this.stockMarketGuideActive) this.completeStockMarketGuidance();
+            else this.onArriveAtDestination();
             return;
         }
 
@@ -758,6 +786,50 @@ export class MayaNPCManager {
             }
         }
     }
+
+        // --- Stock Market Guidance ---
+        private startStockMarketGuidance(): void {
+            if (this.stockMarketGuideActive || this.stockMarketGuideCompleted) return;
+            if (!this.scene.getPlayer()) return;
+            this.stockMarketGuideActive = true;
+            // Dialogue prompt
+            dialogueManager.showDialogue({
+                text: 'Follow me, we\'ll now go to the stock market and explore Dhani Stocks.',
+                characterName: 'M.A.Y.A',
+                allowSpaceAdvance: true,
+                showBackdrop: false
+            }, {
+                onAdvance: () => {
+                    dialogueManager.closeDialogue();
+                    // Path per spec
+                    this.waypoints = [
+                        { x: 8488, y: 6400 },
+                        { x: 8487, y: 3740 },
+                        { x: 2598, y: 3736 },
+                        { x: 2578, y: 3596 }
+                    ];
+                    this.currentWaypointIndex = 0;
+                    // Reuse movement system
+                    locationTrackerManager.setTargetEnabled('maya', true);
+                    locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
+                    this.scene.time.delayedCall(40, () => this.moveToNextWaypoint());
+                }
+            });
+        }
+
+        // Hook into existing arrival logic by checking if stock market guidance active & last waypoint reached
+        private completeStockMarketGuidance(): void {
+            this.stockMarketGuideActive = false;
+            this.stockMarketGuideCompleted = true;
+                dialogueManager.showDialogue({
+                    text: 'We have reached Dhani Stocks.',
+                    characterName: 'M.A.Y.A',
+                    allowSpaceAdvance: true,
+                    showBackdrop: false
+                }, { onAdvance: () => dialogueManager.closeDialogue() });
+            (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markReachedStockMarket(); } catch(e) { console.warn('Could not mark stock market reached', e);} })();
+            locationTrackerManager.setTargetEnabled('maya', false);
+        }
 
     private checkFollowDistance(playerSprite: GameObjects.Sprite): void {
         if (!this.guidedSequenceActive) return;

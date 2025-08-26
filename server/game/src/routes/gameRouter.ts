@@ -127,6 +127,8 @@ gameRouter.get("/game/player-state", async (ctx) => {
                     hasMetMaya: false,
                     hasFollowedMaya: false,
                     hasClaimedMoney: false,
+                    hasCompletedBankOnboarding: false,
+                    hasReachedStockMarket: false,
                     onboardingStep: 'not_started',
                     unlockedBuildings: { bank: false, atm: false, stockmarket: false }
                 },
@@ -150,6 +152,8 @@ gameRouter.get("/game/player-state", async (ctx) => {
                 hasMetMaya: claimedLegacy, // if legacy claimed, treat as completed
                 hasFollowedMaya: claimedLegacy,
                 hasClaimedMoney: claimedLegacy,
+                hasCompletedBankOnboarding: false,
+                hasReachedStockMarket: false,
                 onboardingStep: claimedLegacy ? 'claimed_money' : 'not_started',
                 unlockedBuildings: { bank: claimedLegacy, atm: false, stockmarket: false }
             };
@@ -311,6 +315,7 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
                 inventory: { items: [], capacity: 20 },
                 progress: { level: 1, experience: 0, unlockedBuildings: ["bank", "stockmarket"], completedTutorials: [] },
                 onboarding: { hasMetMaya: false, hasFollowedMaya: false, hasClaimedMoney: false, onboardingStep: 'not_started', unlockedBuildings: { bank: false, atm: false, stockmarket: false } },
+                // extended flags will be added lazily later if missing
                 settings: { soundEnabled: true, musicEnabled: true, autoSave: true },
                 lastUpdated: new Date()
             };

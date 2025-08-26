@@ -305,6 +305,8 @@ class MongoDatabase {
                 hasMetMaya: false,
                 hasFollowedMaya: false,
                 hasClaimedMoney: false,
+                hasCompletedBankOnboarding: false,
+                hasReachedStockMarket: false,
                 onboardingStep: 'not_started',
                 // Only bank becomes true after claim; all start false.
                 unlockedBuildings: { bank: false, atm: false, stockmarket: false }

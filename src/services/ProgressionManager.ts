@@ -2,12 +2,14 @@
 import { playerStateApi } from '../utils/api';
 import { dialogueManager } from './DialogueManager';
 
-export type OnboardingStep = 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money';
+export type OnboardingStep = 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_completed' | 'reached_stock_market';
 
 export interface OnboardingState {
   hasMetMaya: boolean;
   hasFollowedMaya: boolean;
   hasClaimedMoney: boolean;
+  hasCompletedBankOnboarding?: boolean;
+  hasReachedStockMarket?: boolean;
   onboardingStep: OnboardingStep;
   unlockedBuildings: Record<string, boolean>;
 }
@@ -16,6 +18,8 @@ const DEFAULT_STATE: OnboardingState = {
   hasMetMaya: false,
   hasFollowedMaya: false,
   hasClaimedMoney: false,
+  hasCompletedBankOnboarding: false,
+  hasReachedStockMarket: false,
   onboardingStep: 'not_started',
   unlockedBuildings: { bank: false, atm: false, stockmarket: false }
 };
@@ -61,6 +65,35 @@ class ProgressionManager {
       this.state.unlockedBuildings.bank = true;
       this.persist();
     }
+  }
+
+  markBankOnboardingCompleted() {
+    if (!this.state.hasCompletedBankOnboarding) {
+      this.state.hasCompletedBankOnboarding = true;
+      if (this.state.onboardingStep === 'claimed_money') this.state.onboardingStep = 'bank_onboarding_completed';
+      this.persist();
+    }
+  }
+
+  markReachedStockMarket() {
+    if (!this.state.hasReachedStockMarket) {
+      this.state.hasReachedStockMarket = true;
+      this.state.onboardingStep = 'reached_stock_market';
+      // Unlock stockmarket building now
+      this.state.unlockedBuildings.stockmarket = true;
+      this.persist();
+    }
+  }
+
+  // Centralized validation chain used by Maya before starting next guidance step
+  validateSequenceForNext(target: 'claim_money' | 'bank_onboarding' | 'stock_market'): { ok: boolean; message?: string } {
+    const s = this.state;
+    if (!s.hasMetMaya) return { ok: false, message: 'You need to meet Maya first.' };
+    if (!s.hasFollowedMaya) return { ok: false, message: 'Follow Maya to the bank area first.' };
+    if (target !== 'claim_money' && !s.hasClaimedMoney) return { ok: false, message: 'Claim your starter money outside the bank first.' };
+    if (target === 'bank_onboarding' && !s.hasClaimedMoney) return { ok: false, message: 'Claim your starter money first.' };
+    if (target === 'stock_market' && !s.hasCompletedBankOnboarding) return { ok: false, message: 'Complete your bank onboarding and create your account before continuing.' };
+    return { ok: true };
   }
 
   canEnterBuilding(buildingId: string): { allowed: boolean; message?: string } {

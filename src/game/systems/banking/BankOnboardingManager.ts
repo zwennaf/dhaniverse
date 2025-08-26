@@ -420,6 +420,14 @@ export class BankOnboardingManager {
     window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
     
     console.log('🏦 Onboarding completed successfully');
+  // Update progression manager (async import to avoid circular)
+    (async () => { 
+      try { 
+        const { progressionManager } = await import('../../../services/ProgressionManager'); 
+        progressionManager.markBankOnboardingCompleted(); 
+        console.log('[Progression] Bank onboarding completion persisted:', progressionManager.getState());
+      } catch(e) { console.warn('Could not mark bank onboarding completion', e);} 
+    })();
   }
 
   private endConversation(): void {
