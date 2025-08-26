@@ -43,6 +43,8 @@ export interface VoiceParticipant {
 export class VoiceChatService {
     private room: Room | null = null;
     private config: VoiceChatConfig | null = null;
+    private preferredDeviceId: string | null = null;
+    private preferredOutputDeviceId: string | null = null;
     private voiceState: VoiceState = {
         isConnected: false,
         isSpeaking: false,
@@ -57,6 +59,7 @@ export class VoiceChatService {
     private analyser: AnalyserNode | null = null;
     private dataArray: Uint8Array | null = null;
     private animationFrame: number | null = null;
+    private remoteAudioElements: HTMLMediaElement[] = [];
 
     constructor() {
         this.setupAudioContext();
@@ -222,7 +225,11 @@ export class VoiceChatService {
 
         try {
             if (!this.localAudioTrack) {
-                this.localAudioTrack = await createLocalAudioTrack();
+                const constraints: MediaTrackConstraints = {};
+                if (this.preferredDeviceId) {
+                    constraints.deviceId = { exact: this.preferredDeviceId } as any;
+                }
+                this.localAudioTrack = await createLocalAudioTrack(constraints);
                 this.setupVoiceActivityDetection();
             }
 
@@ -330,7 +337,11 @@ export class VoiceChatService {
     private analyzeAudio(): void {
         if (!this.analyser || !this.dataArray) return;
 
-        this.analyser.getByteFrequencyData(this.dataArray);
+    // Allocate a temp buffer with plain ArrayBuffer to satisfy TS typing
+    const tmp = new Uint8Array(this.dataArray.length);
+    this.analyser.getByteFrequencyData(tmp);
+    // Copy back into original array reference used elsewhere
+    this.dataArray.set(tmp);
         
         // Calculate average volume
         let sum = 0;
@@ -417,6 +428,11 @@ export class VoiceChatService {
             
             // Attach to audio element for playback
             const audioElement = audioTrack.attach();
+            // Apply preferred output device if available
+            if (this.preferredOutputDeviceId && (audioElement as any).setSinkId) {
+                (audioElement as any).setSinkId(this.preferredOutputDeviceId).catch(() => {});
+            }
+            this.remoteAudioElements.push(audioElement);
             document.body.appendChild(audioElement);
         }
     }
@@ -428,6 +444,7 @@ export class VoiceChatService {
                 if (element.parentNode) {
                     element.parentNode.removeChild(element);
                 }
+                this.remoteAudioElements = this.remoteAudioElements.filter(el => el !== element);
             });
         }
     }
@@ -463,6 +480,72 @@ export class VoiceChatService {
         }
     }
 
+    // List available audio input devices
+    public async listAudioInputDevices(): Promise<MediaDeviceInfo[]> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter(d => d.kind === 'audioinput');
+        } catch (e) {
+            console.warn('[Voice] enumerateDevices failed', e);
+            return [];
+        }
+    }
+
+    // Set preferred input device; if currently speaking, seamlessly switch
+    public async setInputDevice(deviceId: string): Promise<void> {
+        this.preferredDeviceId = deviceId;
+        if (!this.room) return; // will apply on next speak
+        if (!this.voiceState.isSpeaking) return; // only need to republish if already speaking
+        // Replace current track
+        try {
+            if (this.localAudioTrack) {
+                try {
+                    await this.room!.localParticipant.unpublishTrack(this.localAudioTrack);
+                } catch {}
+                this.localAudioTrack.stop();
+                this.localAudioTrack = null;
+            }
+            const constraints: MediaTrackConstraints = { deviceId: { exact: deviceId } as any };
+            this.localAudioTrack = await createLocalAudioTrack(constraints);
+            this.setupVoiceActivityDetection();
+            await this.room!.localParticipant.publishTrack(this.localAudioTrack);
+        } catch (e) {
+            console.error('[Voice] failed to switch microphone', e);
+            // Fallback: clear preferred id so future attempts use default
+        }
+    }
+
+    public getPreferredInputDevice(): string | null {
+        return this.preferredDeviceId;
+    }
+
+    // Output devices
+    public async listAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter(d => d.kind === 'audiooutput');
+        } catch (e) {
+            console.warn('[Voice] enumerateDevices output failed', e);
+            return [];
+        }
+    }
+
+    public async setOutputDevice(deviceId: string): Promise<void> {
+        this.preferredOutputDeviceId = deviceId;
+        // Apply to existing elements if browser supports setSinkId
+        await Promise.all(this.remoteAudioElements.map(async el => {
+            if ((el as any).setSinkId) {
+                try { await (el as any).setSinkId(deviceId); } catch (e) { /* ignore */ }
+            }
+        }));
+    }
+
+    public getPreferredOutputDevice(): string | null {
+        return this.preferredOutputDeviceId;
+    }
+
     // Getters
     public getVoiceState(): VoiceState {
         return { ...this.voiceState };
@@ -492,14 +575,27 @@ export class VoiceChatService {
     public destroy(): void {
         if (this.animationFrame) {
             cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
         }
-        
-        this.disconnect();
-        
+        // Prevent re-entrancy
+        try {
+            this.disconnect();
+        } catch (err) {
+            console.warn('[Voice] disconnect during destroy ignored:', err);
+        }
         if (this.audioContext) {
-            this.audioContext.close();
+            try {
+                // Only close if not already closed (state property not standard everywhere; try/catch)
+                if ((this.audioContext as any).state !== 'closed') {
+                    this.audioContext.close().catch(() => {});
+                }
+            } catch (err) {
+                // swallow invalid state errors
+            } finally {
+                this.audioContext = null;
+                this.analyser = null;
+            }
         }
-        
         this.listeners = [];
     }
 }

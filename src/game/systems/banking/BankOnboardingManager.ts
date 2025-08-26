@@ -178,7 +178,7 @@ export class BankOnboardingManager {
     const acc = this.bankAccount!;
     const masked = acc.accountNumber.slice(0, 4) + ' **** ' + acc.accountNumber.slice(-4);
     dialogueManager.showDialogue({
-      text: `All done! Your account is officially created. Details below:\n\nAccount Holder: ${this.playerName}\nAccount No: ${acc.accountNumber}\nIFSC: ${acc.ifscCode}\nBranch: ${acc.branchName}\nType: ${acc.accountType}\n\nUse this for deposits, earnings & future features. Press SPACE to continue.`,
+      text: `All done! Your account is officially created. Details below:\n\nAccount Holder: ${this.playerName}\nAccount No: ${acc.accountNumber}\nIFSC: ${acc.ifscCode}\nBranch: ${acc.branchName}\nType: ${acc.accountType}\n\nUse this for deposits, earnings & future features.`,
       characterName: 'Bank Manager',
       showBackdrop: true,
       allowSpaceAdvance: true

@@ -232,6 +232,22 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     };
   }, [onLoadingComplete, shouldPreloadTutorial]);
 
+  // Allow SPACE key to continue on welcome screen
+  useEffect(() => {
+    if (!showWelcome) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        setIsComplete(true);
+        setTimeout(() => {
+          onLoadingComplete();
+        }, 300);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showWelcome, onLoadingComplete]);
+
   return (
     <div 
       className={`fixed inset-0 z-50 transition-opacity duration-300 ${
@@ -374,14 +390,14 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
               className="text-lg text-gray-300 tracking-wide opacity-80"
               style={{ fontFamily: 'VCR OSD Mono, monospace' }}
             >
-              Click anywhere to continue
+              Press SPACE to continue
             </p>
           </div>
         </div>
       </div>
       
       {/* Click to continue overlay */}
-      {showWelcome && (
+  {showWelcome && (
         <div 
           className="absolute inset-0 cursor-pointer z-20"
           onClick={() => {

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
+import { useVoiceChat } from '../../hooks/useVoiceChat';
+import VoiceChat from '../../components/voice/VoiceChat';
 // ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
@@ -83,6 +86,14 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const chatContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // Minimal voice state for command handler initialization only (component handles UI)
+    const { isInitialized: voiceInitialized } = useVoiceChat({
+        serverUrl: (import.meta as any).env?.VITE_LIVEKIT_SERVER_URL || 'wss://voice.dhaniverse.in',
+        roomName: 'dhaniverse-main',
+        participantName: selfPlayerId || username,
+        autoConnect: false
+    });
 
     // Ensure initial state is correct
     useEffect(() => {
@@ -545,10 +556,17 @@ const GameHUD: React.FC<GameHUDProps> = ({
         }
     }, []);
 
-    // Auto-scroll chat messages
+    // Auto-scroll chat messages (smooth if user is already near bottom)
     useEffect(() => {
-        if (messagesRef.current) {
-            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        const el = messagesRef.current;
+        if (!el) return;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const behavior: ScrollBehavior = distanceFromBottom < 120 ? 'smooth' : 'auto';
+        try {
+            el.scrollTo({ top: el.scrollHeight, behavior });
+        } catch {
+            // Fallback for older browsers
+            el.scrollTop = el.scrollHeight;
         }
     }, [chatMessages]);
 
@@ -638,17 +656,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const handleChatKeyDown = (e: React.KeyboardEvent) => {
         // Explicitly handle WASD, E, and Space keys to ensure they can be typed in chat
         const gameControlKeys = [
-            "w",
-            "a",
-            "s",
-            "d",
-            "e",
-            "W",
-            "A",
-            "S",
-            "D",
-            "E",
-            " ",
+            "w","a","s","d","e","t","W","A","S","D","E","T"," "
         ];
         if (gameControlKeys.includes(e.key)) {
             // Stop propagation to prevent the game from handling these keys
@@ -848,125 +856,100 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-4 left-4 w-[35ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                className={`absolute bottom-4 w-[40ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
                     isChatFocused ? "opacity-100" : "opacity-95"
                 }`}
             >
                 {/* Chat messages area */}
                 <div
-                    className="h-[36vh] overflow-y-auto mb-3 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+                    className="h-[36vh] relative overflow-y-scroll  break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent flex flex-col justify-end scroll-smooth pr-1"
                     ref={messagesRef}
+                    style={{
+                        scrollbarGutter: 'stable both-edges' as any,
+                        WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 8%, #000 18%, #000 100%)',
+                        maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 8%, #000 18%, #000 100%)'
+                    }}
                 >
-                    {chatMessages.length === 0
-                        ? null
-                        : chatMessages.map((msg) => (
-                              <div
-                                  key={msg.id}
-                                  className="flex items-start gap-3 mb-4"
-                              >
-                                  {/* avatar */}
-                                  <div className="w-8 h-8 rounded-full flex-shrink-0">
-                                      <div
-                                          className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
-                                          style={{
-                                              backgroundImage: `url('/characters/C1.png')`,
-                                          }}
-                                      />
-                                  </div>
-
-                                  {/* bubble */}
-                                  <div className="relative">
-                                      <div className="bg-[rgba(12,28,12,0.78)] text-white rounded-2xl px-3 py-3 max-w-[22ch] inline-block border border-black/30 backdrop-blur-sm shadow-md">
-                                          <div className="flex items-start justify-between gap-2">
-                                              <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
-                                                  {msg.username}
-                                              </div>
-                                              <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
-                                                  {msg.timestamp
-                                                      ? new Date(msg.timestamp).toLocaleTimeString([], {
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })
-                                                      : ""}
-                                              </div>
-                                          </div>
-                                          <div
-                                              className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] overflow-hidden"
-                                              style={{
-                                                  display: "-webkit-box",
-                                                  WebkitLineClamp: 3 as any,
-                                                  WebkitBoxOrient: "vertical",
-                                              }}
-                                          >
-                                              {msg.message}
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                          ))}
+                    <AnimatePresence initial={false}>
+                        {chatMessages.map((msg) => (
+                            <motion.div
+                                key={msg.id}
+                                layout="position"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.6 }}
+                                className="flex items-start gap-3 mb-3 will-change-transform w-full"
+                            >
+                                {/* avatar */}
+                                <div className="w-8 h-8 rounded-full flex-shrink-0">
+                                    <div
+                                        className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
+                                        style={{
+                                            backgroundImage: `url('/characters/C1.png')`,
+                                        }}
+                                    />
+                                </div>
+                                {/* bubble */}
+                                <div className="relative">
+                                    <div className="bg-black/75 text-white rounded-2xl px-4 py-3 w-full border border-black/30 backdrop-blur-sm shadow-md">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                                {msg.username}
+                                            </div>
+                                            <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                                {msg.timestamp
+                                                    ? new Date(msg.timestamp).toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })
+                                                    : ''}
+                                            </div>
+                                        </div>
+                                        <div
+                                            className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] whitespace-pre-wrap break-words break-all"
+                                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                                        >
+                                            {msg.message}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
                 </div>
 
-                {/* Voice controls over the chat input */}
-                {/* Headphone icon left + input + send button right (minimal controls) */}
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        className="w-10 h-10 rounded-full bg-black/90 flex items-center justify-center shadow-sm"
-                        aria-label="Headphone"
-                    >
-                        {/* headphone icon larger */}
-                        <svg
-                            className="w-9 h-9 scale-[4]"
-                            viewBox="0 0 19 19"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M9.77218 3.30326C6.50045 3.30326 3.84819 5.95553 3.84819 9.22726H6.06968C6.88762 9.22726 7.55068 9.8903 7.55068 10.7083V14.4108C7.55068 15.2287 6.88762 15.8918 6.06968 15.8918H3.84819C3.03025 15.8918 2.36719 15.2287 2.36719 14.4108V9.22726C2.36719 5.13759 5.68251 1.82227 9.77218 1.82227C13.8618 1.82227 17.1772 5.13759 17.1772 9.22726V14.4108C17.1772 15.2287 16.5141 15.8918 15.6962 15.8918H13.4747C12.6567 15.8918 11.9937 15.2287 11.9937 14.4108V10.7083C11.9937 9.8903 12.6567 9.22726 13.4747 9.22726H15.6962C15.6962 5.95553 13.0439 3.30326 9.77218 3.30326ZM3.84819 10.7083V14.4108H6.06968V10.7083H3.84819ZM13.4747 10.7083V14.4108H15.6962V10.7083H13.4747Z"
-                                fill="white"
-                            />
-                        </svg>
-                    </button>
-
+                {/* Voice headphone + mic controls extracted to component */}
+                <div className="flex items-center m-2 gap-2">
+                    <VoiceChat
+                        participantName={selfPlayerId || username}
+                        roomName="dhaniverse-main"
+                        enabled={voiceEnabled}
+                    />
                     <div className="relative flex-1">
                         <input
                             ref={chatInputRef}
-                            className={`w-full pr-14 pl-5 h-10 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${
-                                isChatFocused
-                                    ? "ring-1 ring-white/20"
-                                    : "opacity-95"
-                            }`}
+                            className={`w-full pr-14 pl-5  h-10 rounded-full bg-black text-white text-sm placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${isChatFocused ? '' : 'opacity-95'}`}
+                            style={{ outline: 'none', boxShadow: 'none' }}
                             type="text"
-                            placeholder={
-                                isChatFocused
-                                    ? "Type a message..."
-                                    : "Press / to chat"
-                            }
+                            placeholder={isChatFocused ? 'Type a message...' : 'Press / to chat'}
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onFocus={handleChatFocus}
                             onBlur={handleChatBlur}
                             onKeyDown={handleChatKeyDown}
                         />
-
-                        {/* forward button inside input, right */}
                         <button
                             onClick={() => {
                                 const message = chatInput.trim();
                                 if (!message) return;
-                                window.dispatchEvent(
-                                    new CustomEvent("send-chat", {
-                                        detail: { message },
-                                    })
-                                );
-                                setChatInput("");
-                                setTimeout(
-                                    () => chatInputRef.current?.focus(),
-                                    0
-                                );
+                                window.dispatchEvent(new CustomEvent('send-chat', { detail: { message } }));
+                                setChatInput('');
+                                setTimeout(() => chatInputRef.current?.focus(), 0);
                             }}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center border-2"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center border-2 outline-none focus:outline-none"
                             aria-label="Send message"
+                            style={{ outline: 'none', boxShadow: 'none' }}
                         >
                             <svg
                                 viewBox="0 0 24 24"

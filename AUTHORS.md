@@ -7,6 +7,5 @@ This file recognizes the people behind Dhaniverse. See LICENSE for legal ownersh
 - Jashanjot Singh — Co-founder & COO
 - Aagam Jain — Co-founder & CPO
 - Ekaspreet Singh — CTO
-- Jagjeevan Kashid — Engineer
 
 Note: This list is for recognition. Copyright ownership is defined in LICENSE.

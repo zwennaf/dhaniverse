@@ -159,11 +159,6 @@ const SEO: React.FC<SEOProps> = ({
                                 name: "Ekaspreet Singh",
                                 jobTitle: "Co-Founder",
                             },
-                            {
-                                "@type": "Person",
-                                name: "Jagjeevan Kashid",
-                                jobTitle: "Co-Founder",
-                            },
                         ],
                     },
                     audience: {
@@ -215,11 +210,6 @@ const SEO: React.FC<SEOProps> = ({
                                 "@type": "Person",
                                 name: "Ekaspreet Singh",
                                 jobTitle: "CTO",
-                            },
-                            {
-                                "@type": "Person",
-                                name: "Jagjeevan Kashid",
-                                jobTitle: "Engineer",
                             },
                         ],
                     },

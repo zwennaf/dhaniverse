@@ -5,6 +5,8 @@ export interface UseVoiceChatOptions {
     serverUrl?: string;
     roomName?: string;
     participantName?: string;
+    apiKey?: string;
+    apiSecret?: string;
     autoConnect?: boolean;
 }
 
@@ -19,6 +21,14 @@ export const useVoiceChat = (options: UseVoiceChatOptions = {}) => {
     });
     const [isInitialized, setIsInitialized] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const lastConfigRef = (typeof window !== 'undefined') ? (window as any).__voice_last_cfg_ref || { current: null as VoiceChatConfig | null } : { current: null as VoiceChatConfig | null };
+    if (typeof window !== 'undefined' && !(window as any).__voice_last_cfg_ref) {
+        (window as any).__voice_last_cfg_ref = lastConfigRef;
+    }
+    const initPromiseRef = (typeof window !== 'undefined') ? (window as any).__voice_init_prom_ref || { current: null as Promise<void> | null } : { current: null as Promise<void> | null };
+    if (typeof window !== 'undefined' && !(window as any).__voice_init_prom_ref) {
+        (window as any).__voice_init_prom_ref = initPromiseRef;
+    }
 
     // Initialize voice chat service
     const initialize = useCallback(async (config: VoiceChatConfig) => {
@@ -26,6 +36,7 @@ export const useVoiceChat = (options: UseVoiceChatOptions = {}) => {
             setError(null);
             await voiceChatService.initialize(config);
             setIsInitialized(true);
+            lastConfigRef.current = config;
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to initialize voice chat';
             setError(errorMessage);
@@ -33,14 +44,42 @@ export const useVoiceChat = (options: UseVoiceChatOptions = {}) => {
         }
     }, []);
 
-    // Connect to voice chat
-    const connect = useCallback(async () => {
-        if (!isInitialized) {
-            setError('Voice chat not initialized');
+    // Internal ensure initialization helper (idempotent)
+    const ensureInitialized = useCallback(async () => {
+        if (isInitialized) return;
+        if (initPromiseRef.current) {
+            await initPromiseRef.current; // wait on in-flight init
             return;
         }
-
+        // Build config from last known or options
+        const cfg: VoiceChatConfig | null = lastConfigRef.current || ((options.serverUrl && options.roomName && options.participantName) ? {
+            serverUrl: options.serverUrl!,
+            apiKey: options.apiKey || 'dev-key',
+            apiSecret: options.apiSecret || 'dev-secret',
+            roomName: options.roomName!,
+            participantName: options.participantName!
+        } : null);
+        if (!cfg) {
+            setError('Voice chat config missing');
+            return;
+        }
+        initPromiseRef.current = (async () => {
+            await initialize(cfg);
+        })();
         try {
+            await initPromiseRef.current;
+        } finally {
+            initPromiseRef.current = null;
+        }
+    }, [initialize, isInitialized, options.apiKey, options.apiSecret, options.participantName, options.roomName, options.serverUrl, lastConfigRef, initPromiseRef]);
+
+    // Connect to voice chat
+    const connect = useCallback(async () => {
+        try {
+            if (!isInitialized) {
+                await ensureInitialized();
+            }
+            if (!isInitialized && !lastConfigRef.current) return; // initialization failed
             setError(null);
             await voiceChatService.connect();
         } catch (err) {
@@ -48,7 +87,7 @@ export const useVoiceChat = (options: UseVoiceChatOptions = {}) => {
             setError(errorMessage);
             console.error('Voice chat connection error:', err);
         }
-    }, [isInitialized]);
+    }, [isInitialized, ensureInitialized, lastConfigRef]);
 
     // Disconnect from voice chat
     const disconnect = useCallback(async () => {
@@ -156,6 +195,16 @@ export const useVoiceChat = (options: UseVoiceChatOptions = {}) => {
         isListening: voiceState.isListening,
         isDeaf: voiceState.isDeaf,
         participants: voiceState.participants,
-        connectionState: voiceState.connectionState
+    connectionState: voiceState.connectionState,
+    // internal util (optional export for advanced usage)
+    ensureInitialized,
+    // device helpers
+    listAudioInputDevices: voiceChatService.listAudioInputDevices.bind(voiceChatService),
+    setInputDevice: voiceChatService.setInputDevice.bind(voiceChatService),
+    preferredDeviceId: voiceChatService.getPreferredInputDevice(),
+    // output device helpers
+    listAudioOutputDevices: voiceChatService.listAudioOutputDevices.bind(voiceChatService),
+    setOutputDevice: voiceChatService.setOutputDevice.bind(voiceChatService),
+    preferredOutputDeviceId: voiceChatService.getPreferredOutputDevice()
     };
 };
