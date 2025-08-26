@@ -75,7 +75,6 @@ export class StockMarketManager {
   // New properties for enhanced stock market simulation
   private marketStatus: MarketStatus;
   private playerPortfolio: PlayerPortfolio;
-  private marketTimerText: GameObjects.Text;
   private sectorInfluence: Record<string, number> = {}; // Sector-wide influences
   private marketEvents: string[]; // Global market events
   private lastRandomEvent: number = 0; // Timestamp of last random event
@@ -152,14 +151,7 @@ export class StockMarketManager {
     }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
     
     // Add market timer text
-    this.marketTimerText = scene.add.text(this.broker.x, this.broker.y + 30, "", {
-      fontFamily: Constants.UI_TEXT_FONT,
-      fontSize: '14px',
-      color: Constants.UI_TEXT_COLOR,
-      align: 'center',
-      backgroundColor: Constants.UI_TEXT_BACKGROUND,
-      padding: { x: 6, y: 3 }
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+    
     
     // Add to game container
     const gameContainer = scene.getGameContainer();
@@ -167,7 +159,6 @@ export class StockMarketManager {
       gameContainer.add(this.broker);
       gameContainer.add(brokerNameText);
       gameContainer.add(this.interactionText);
-      gameContainer.add(this.marketTimerText);
       this.broker.nameText = brokerNameText;
     }
     
@@ -391,7 +382,6 @@ export class StockMarketManager {
     this.scene.time.delayedCall(timeToClose, this.closeMarket, [], this);
     
     // Update market timer text
-    this.updateMarketTimerText();
     
     // Update sector influences for the day
     this.updateSectorInfluences();
@@ -423,7 +413,6 @@ export class StockMarketManager {
     this.scene.time.delayedCall(realTimeToNextOpen, this.openMarket, [], this);
     
     // Update market timer text
-    this.updateMarketTimerText();
     
     // Occasionally change market trend overnight (25% chance)
     if (Math.random() < 0.25) {
@@ -439,45 +428,7 @@ export class StockMarketManager {
   /**
    * Update the market timer text
    */
-  private updateMarketTimerText(): void {
-    if (!this.marketTimerText) return;
-    
-    const now = Date.now();
-    let timeString: string;
-    let color: string;
-    
-    if (this.marketStatus.isOpen) {
-      const timeToClose = Math.max(0, this.marketStatus.nextCloseTime - now);
-      const minutesToClose = Math.ceil(timeToClose / 60000);
-      timeString = `Market: OPEN (Closes in ${minutesToClose} mins)`;
-      color = '#4ade80'; // Green
-    } else {
-      const timeToOpen = Math.max(0, this.marketStatus.nextOpenTime - now);
-      const minutesToOpen = Math.ceil(timeToOpen / 60000);
-      timeString = `Market: CLOSED (Opens in ${minutesToOpen} mins)`;
-      color = '#f87171'; // Red
-    }
-    
-    // Add trend indicator
-    const trendIndicator = this.marketStatus.trend === 'bull' ? '↑' : 
-                          this.marketStatus.trend === 'bear' ? '↓' : '→';
-    
-    const trendColor = this.marketStatus.trend === 'bull' ? '#4ade80' : 
-                      this.marketStatus.trend === 'bear' ? '#f87171' : '#94a3b8';
-                      
-    timeString += ` | Trend: ${trendIndicator}`;
-    
-    this.marketTimerText.setText(timeString);
-    this.marketTimerText.setColor(color);
-    
-    // Make sure timer text is visible when broker is visible
-    if (this.broker.visible) {
-      this.marketTimerText.setAlpha(1);
-      this.marketTimerText.setPosition(this.broker.x, this.broker.y + 30);
-    } else {
-      this.marketTimerText.setAlpha(0);
-    }
-  }
+  
   
   /**
    * Update sector influences (internal economic factors)
@@ -1111,7 +1062,6 @@ export class StockMarketManager {
     
     this.broker.destroy();
     this.interactionText.destroy();
-    this.marketTimerText.destroy();
   }
 
   /**
@@ -1119,7 +1069,6 @@ export class StockMarketManager {
    */
   public getMarketStatus(): MarketStatus {
     // Update the market timer before returning to ensure values are current
-    this.updateMarketTimerText();
     return this.marketStatus;
   }
 

@@ -4,6 +4,8 @@ import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
 import { balanceManager } from "../../../services/BalanceManager";
 import { voiceCommandHandler } from "../../../services/VoiceCommandHandler";
+import { useVoiceChat } from '../../hooks/useVoiceChat';
+import VoiceChat from '../../components/voice/VoiceChat';
 // ChatVoiceControls replaced by minimal inline mic/send UI in the HUD to match design
 import LocationTracker from "./LocationTracker";
 import { locationTrackerManager, TrackingTarget } from "../../../services/LocationTrackerManager";
@@ -83,6 +85,14 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const chatContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // Minimal voice state for command handler initialization only (component handles UI)
+    const { isInitialized: voiceInitialized } = useVoiceChat({
+        serverUrl: (import.meta as any).env?.VITE_LIVEKIT_SERVER_URL || 'wss://voice.dhaniverse.in',
+        roomName: 'dhaniverse-main',
+        participantName: selfPlayerId || username,
+        autoConnect: false
+    });
 
     // Ensure initial state is correct
     useEffect(() => {
@@ -848,7 +858,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-4 left-4 w-[35ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                className={`absolute bottom-4 w-[40ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
                     isChatFocused ? "opacity-100" : "opacity-95"
                 }`}
             >
@@ -906,67 +916,37 @@ const GameHUD: React.FC<GameHUDProps> = ({
                           ))}
                 </div>
 
-                {/* Voice controls over the chat input */}
-                {/* Headphone icon left + input + send button right (minimal controls) */}
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        className="w-10 h-10 rounded-full bg-black/90 flex items-center justify-center shadow-sm"
-                        aria-label="Headphone"
-                    >
-                        {/* headphone icon larger */}
-                        <svg
-                            className="w-9 h-9 scale-[4]"
-                            viewBox="0 0 19 19"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M9.77218 3.30326C6.50045 3.30326 3.84819 5.95553 3.84819 9.22726H6.06968C6.88762 9.22726 7.55068 9.8903 7.55068 10.7083V14.4108C7.55068 15.2287 6.88762 15.8918 6.06968 15.8918H3.84819C3.03025 15.8918 2.36719 15.2287 2.36719 14.4108V9.22726C2.36719 5.13759 5.68251 1.82227 9.77218 1.82227C13.8618 1.82227 17.1772 5.13759 17.1772 9.22726V14.4108C17.1772 15.2287 16.5141 15.8918 15.6962 15.8918H13.4747C12.6567 15.8918 11.9937 15.2287 11.9937 14.4108V10.7083C11.9937 9.8903 12.6567 9.22726 13.4747 9.22726H15.6962C15.6962 5.95553 13.0439 3.30326 9.77218 3.30326ZM3.84819 10.7083V14.4108H6.06968V10.7083H3.84819ZM13.4747 10.7083V14.4108H15.6962V10.7083H13.4747Z"
-                                fill="white"
-                            />
-                        </svg>
-                    </button>
-
+                {/* Voice headphone + mic controls extracted to component */}
+                <div className="flex items-center m-2 gap-2">
+                    <VoiceChat
+                        participantName={selfPlayerId || username}
+                        roomName="dhaniverse-main"
+                        enabled={voiceEnabled}
+                    />
                     <div className="relative flex-1">
                         <input
                             ref={chatInputRef}
-                            className={`w-full pr-14 pl-5 h-10 rounded-full bg-black text-white text-sm outline-none placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${
-                                isChatFocused
-                                    ? "ring-1 ring-white/20"
-                                    : "opacity-95"
-                            }`}
+                            className={`w-full pr-14 pl-5  h-10 rounded-full bg-black text-white text-sm placeholder-white/50 font-['Tickerbit',Arial,sans-serif] tracking-wider ${isChatFocused ? '' : 'opacity-95'}`}
+                            style={{ outline: 'none', boxShadow: 'none' }}
                             type="text"
-                            placeholder={
-                                isChatFocused
-                                    ? "Type a message..."
-                                    : "Press / to chat"
-                            }
+                            placeholder={isChatFocused ? 'Type a message...' : 'Press / to chat'}
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onFocus={handleChatFocus}
                             onBlur={handleChatBlur}
                             onKeyDown={handleChatKeyDown}
                         />
-
-                        {/* forward button inside input, right */}
                         <button
                             onClick={() => {
                                 const message = chatInput.trim();
                                 if (!message) return;
-                                window.dispatchEvent(
-                                    new CustomEvent("send-chat", {
-                                        detail: { message },
-                                    })
-                                );
-                                setChatInput("");
-                                setTimeout(
-                                    () => chatInputRef.current?.focus(),
-                                    0
-                                );
+                                window.dispatchEvent(new CustomEvent('send-chat', { detail: { message } }));
+                                setChatInput('');
+                                setTimeout(() => chatInputRef.current?.focus(), 0);
                             }}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center border-2"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 scale-[0.9] rounded-full bg-[#F1CD36] flex items-center justify-center border-2 outline-none focus:outline-none"
                             aria-label="Send message"
+                            style={{ outline: 'none', boxShadow: 'none' }}
                         >
                             <svg
                                 viewBox="0 0 24 24"
