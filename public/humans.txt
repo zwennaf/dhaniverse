@@ -3,7 +3,6 @@ Founder & CEO: Gursimran Singh
 Co-Founder & COO: Jashanjot Singh  
 Co-Founder & CPO: Aagam Jain
 CTO: Ekaspreet Singh
-Founding Engineer: Jagjeevan Kashid
 
 /* ABOUT DHANIVERSE */
 Mission: Making financial literacy accessible through gamified learning
