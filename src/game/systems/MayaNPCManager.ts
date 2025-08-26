@@ -53,9 +53,99 @@ export class MayaNPCManager {
     // Fixed initial tracker start point (points A-D as requested)
     private readonly initialTrackerPoint = { x: 1043, y: 669 };
 
-    // Maya's position (starting condition specified)
-    public readonly x: number = 7779;
-    public readonly y: number = 3581;
+    // Maya's position (determined by player progression state)
+    public x: number = 7779; // Default position
+    public y: number = 3581; // Default position
+
+    private async initializeMayaPosition(): Promise<void> {
+        try {
+            // Import and get position from progression manager
+            const { progressionManager } = await import('../../services/ProgressionManager');
+            
+            // Check if progression manager has been initialized with player state
+            // If not, retry after a short delay
+            const state = progressionManager.getState();
+            if (!state || (state.onboardingStep === 'not_started' && !state.hasMetMaya && !state.hasFollowedMaya && !state.hasClaimedMoney)) {
+                // Progression manager hasn't been initialized with player state yet
+                // Retry after a delay
+                console.log('🚀 Maya: Progression manager not ready, retrying in 500ms...');
+                this.scene.time.delayedCall(500, () => {
+                    this.initializeMayaPosition();
+                });
+                return;
+            }
+            
+            const position = progressionManager.getMayaPosition();
+            
+            // Only update position if it's different from default
+            if (position.x !== 7779 || position.y !== 3581) {
+                // Update Maya's position properties
+                this.x = position.x;
+                this.y = position.y;
+                
+                // Update Maya sprite position
+                if (this.maya) {
+                    this.maya.x = this.x;
+                    this.maya.y = this.y;
+                    this.updateInteractionTextPosition();
+                    if (this.maya.nameText) {
+                        this.maya.nameText.x = this.maya.x;
+                        this.maya.nameText.y = this.maya.y - 50;
+                    }
+                }
+                
+                console.log('🚀 Maya: Updated position from progression state:', { x: this.x, y: this.y });
+            } else {
+                console.log('🚀 Maya: Using default position for new player');
+            }
+            
+            // Set Maya's state flags based on progression
+            if (state.hasFollowedMaya) {
+                this.guideCompleted = true;
+            }
+            if (state.hasReachedStockMarket) {
+                this.stockMarketGuideCompleted = true;
+            }
+            
+            // For mid-journey restoration, determine if Maya should be in active guidance mode
+            this.restoreJourneyState(state);
+            
+            // Update location tracker for existing players
+            this.updateLocationTrackerForProgress();
+            
+            console.log('🚀 Maya: Initialized from progression state:', {
+                position: { x: this.x, y: this.y },
+                guideCompleted: this.guideCompleted,
+                stockMarketGuideCompleted: this.stockMarketGuideCompleted,
+                state: state
+            });
+        } catch (e) {
+            console.log('🚀 Maya: Error accessing progression, retrying in 500ms:', e);
+            // Retry after a delay if there's an error
+            this.scene.time.delayedCall(500, () => {
+                this.initializeMayaPosition();
+            });
+        }
+    }
+
+    private restoreJourneyState(state: any): void {
+        // If player has met Maya but not yet reached certain checkpoints,
+        // Maya should be ready to continue guiding from her current position
+        
+        if (state.hasMetMaya && !state.hasFollowedMaya) {
+            // Player met Maya but hasn't completed the bank journey yet
+            // Maya should be ready to guide to bank
+            console.log('🚀 Maya: Player met Maya but hasn\'t completed bank journey - ready to guide');
+        }
+        
+        if (state.hasCompletedBankOnboarding && !state.hasReachedStockMarket) {
+            // Player completed bank onboarding but hasn't reached stock market
+            // Maya should be ready for stock market guidance
+            console.log('🚀 Maya: Player completed bank onboarding - ready for stock market guidance');
+        }
+        
+        // Don't restart any active sequences - let the normal interaction flow handle it
+    }
 
     constructor(scene: MainGameScene) {
         this.scene = scene;
@@ -65,7 +155,7 @@ export class MayaNPCManager {
             this.interactionKey = scene.input.keyboard.addKey("E");
         }
 
-        // Create Maya at specified position
+        // Create Maya at default position first (will be updated once progression loads)
         this.maya = scene.add.sprite(this.x, this.y, "maya") as NPCSprite;
         this.maya.setScale(3);
         
@@ -138,10 +228,15 @@ export class MayaNPCManager {
             this.playerInitialPosition = { x: ps.x, y: ps.y };
         }
 
-        // Initially set the location tracker target to the fixed start point so the
-        // HUD arrow begins at the requested coordinate and will later lead toward Maya.
+        // Initialize location tracker with default target - will be updated when progression loads
         locationTrackerManager.setTargetEnabled('maya', true);
         locationTrackerManager.updateTargetPosition('maya', { x: this.initialTrackerPoint.x, y: this.initialTrackerPoint.y });
+
+        // Delay Maya position initialization to allow progression manager to be ready
+        // This ensures player state is loaded before Maya tries to access it
+        scene.time.delayedCall(100, () => {
+            this.initializeMayaPosition();
+        });
     }
 
     private createMayaAnimations(): void {
@@ -561,6 +656,10 @@ export class MayaNPCManager {
 
                 // Increment waypoint index and schedule next move
                 this.currentWaypointIndex++;
+                
+                // Update Maya's position in state at each waypoint for mid-journey persistence
+                this.updateMayaPositionInState();
+                
                 this.scene.time.delayedCall(this.pauseDurationMs, () => {
                     this.moveToNextWaypoint();
                 });
@@ -751,6 +850,40 @@ export class MayaNPCManager {
         }
     }
 
+    private updateMayaPositionInState(): void {
+        // Update Maya's position in progression state for persistence
+        (async () => {
+            try {
+                const { progressionManager } = await import('../../services/ProgressionManager');
+                progressionManager.updateMayaPosition(this.maya.x, this.maya.y);
+                console.log('🚀 Maya: Updated position in state:', { x: this.maya.x, y: this.maya.y });
+            } catch (e) {
+                console.warn('Could not update Maya position in state', e);
+            }
+        })();
+    }
+
+    private async updateLocationTrackerForProgress(): Promise<void> {
+        try {
+            const { progressionManager } = await import('../../services/ProgressionManager');
+            const state = progressionManager.getState();
+            
+            // For existing players who have already met Maya, point directly to her
+            if (state.hasMetMaya) {
+                locationTrackerManager.updateTargetPosition('maya', { x: this.x, y: this.y });
+                console.log('🚀 Maya: Updated tracker to point to Maya for existing player at:', { x: this.x, y: this.y });
+            }
+            
+            // If all guidance is complete, disable the tracker
+            if (state.hasReachedStockMarket) {
+                locationTrackerManager.setTargetEnabled('maya', false);
+                console.log('🚀 Maya: Disabled tracker for completed player');
+            }
+        } catch (e) {
+            console.warn('Could not update location tracker for progress', e);
+        }
+    }
+
     private onArriveAtDestination(): void {
         // Ensure movement stopped
         this.guidedSequenceActive = false;
@@ -787,6 +920,12 @@ export class MayaNPCManager {
 
         // Progression: player has followed Maya to bank (will still need interaction to claim)
     (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markFollowedMaya(); } catch(e) { console.warn('Could not mark hasFollowedMaya', e); } })();
+
+        // Update Maya position in progression state
+        this.updateMayaPositionInState();
+
+        // Update Maya position in progression state
+        this.updateMayaPositionInState();
 
         // Update tracker final position and disable tracker since we've arrived at destination
         locationTrackerManager.updateTargetPosition('maya', { x: this.maya.x, y: this.maya.y });
@@ -907,6 +1046,9 @@ export class MayaNPCManager {
                     console.warn('Could not mark stock market reached', e);
                 } 
             })();
+            
+            // Update Maya position in progression state
+            this.updateMayaPositionInState();
             
             // Disable the tracker since Maya has completed guiding the player to the stock market
             locationTrackerManager.setTargetEnabled('maya', false);
