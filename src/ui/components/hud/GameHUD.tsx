@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { WalletManager, WalletStatus } from "../../../services/WalletManager";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { NetworkHealthMonitor } from "../../../services/ICPErrorHandler";
@@ -555,10 +556,17 @@ const GameHUD: React.FC<GameHUDProps> = ({
         }
     }, []);
 
-    // Auto-scroll chat messages
+    // Auto-scroll chat messages (smooth if user is already near bottom)
     useEffect(() => {
-        if (messagesRef.current) {
-            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+        const el = messagesRef.current;
+        if (!el) return;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const behavior: ScrollBehavior = distanceFromBottom < 120 ? 'smooth' : 'auto';
+        try {
+            el.scrollTo({ top: el.scrollHeight, behavior });
+        } catch {
+            // Fallback for older browsers
+            el.scrollTop = el.scrollHeight;
         }
     }, [chatMessages]);
 
@@ -648,17 +656,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const handleChatKeyDown = (e: React.KeyboardEvent) => {
         // Explicitly handle WASD, E, and Space keys to ensure they can be typed in chat
         const gameControlKeys = [
-            "w",
-            "a",
-            "s",
-            "d",
-            "e",
-            "W",
-            "A",
-            "S",
-            "D",
-            "E",
-            " ",
+            "w","a","s","d","e","t","W","A","S","D","E","T"," "
         ];
         if (gameControlKeys.includes(e.key)) {
             // Stop propagation to prevent the game from handling these keys
@@ -864,56 +862,61 @@ const GameHUD: React.FC<GameHUDProps> = ({
             >
                 {/* Chat messages area */}
                 <div
-                    className="h-[36vh] overflow-y-auto mb-3 break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+                    className="h-[36vh] relative overflow-y-scroll  break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent flex flex-col justify-end scroll-smooth pr-1"
                     ref={messagesRef}
+                    style={{
+                        scrollbarGutter: 'stable both-edges' as any,
+                        WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 8%, #000 18%, #000 100%)',
+                        maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 8%, #000 18%, #000 100%)'
+                    }}
                 >
-                    {chatMessages.length === 0
-                        ? null
-                        : chatMessages.map((msg) => (
-                              <div
-                                  key={msg.id}
-                                  className="flex items-start gap-3 mb-4"
-                              >
-                                  {/* avatar */}
-                                  <div className="w-8 h-8 rounded-full flex-shrink-0">
-                                      <div
-                                          className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
-                                          style={{
-                                              backgroundImage: `url('/characters/C1.png')`,
-                                          }}
-                                      />
-                                  </div>
-
-                                  {/* bubble */}
-                                  <div className="relative">
-                                      <div className="bg-[rgba(12,28,12,0.78)] text-white rounded-2xl px-3 py-3 max-w-[22ch] inline-block border border-black/30 backdrop-blur-sm shadow-md">
-                                          <div className="flex items-start justify-between gap-2">
-                                              <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
-                                                  {msg.username}
-                                              </div>
-                                              <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
-                                                  {msg.timestamp
-                                                      ? new Date(msg.timestamp).toLocaleTimeString([], {
-                                                            hour: "2-digit",
-                                                            minute: "2-digit",
-                                                        })
-                                                      : ""}
-                                              </div>
-                                          </div>
-                                          <div
-                                              className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] overflow-hidden"
-                                              style={{
-                                                  display: "-webkit-box",
-                                                  WebkitLineClamp: 3 as any,
-                                                  WebkitBoxOrient: "vertical",
-                                              }}
-                                          >
-                                              {msg.message}
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                          ))}
+                    <AnimatePresence initial={false}>
+                        {chatMessages.map((msg) => (
+                            <motion.div
+                                key={msg.id}
+                                layout="position"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.6 }}
+                                className="flex items-start gap-3 mb-3 will-change-transform w-full"
+                            >
+                                {/* avatar */}
+                                <div className="w-8 h-8 rounded-full flex-shrink-0">
+                                    <div
+                                        className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
+                                        style={{
+                                            backgroundImage: `url('/characters/C1.png')`,
+                                        }}
+                                    />
+                                </div>
+                                {/* bubble */}
+                                <div className="relative">
+                                    <div className="bg-black/75 text-white rounded-2xl px-4 py-3 w-full border border-black/30 backdrop-blur-sm shadow-md">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                                {msg.username}
+                                            </div>
+                                            <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                                {msg.timestamp
+                                                    ? new Date(msg.timestamp).toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })
+                                                    : ''}
+                                            </div>
+                                        </div>
+                                        <div
+                                            className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] whitespace-pre-wrap break-words break-all"
+                                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                                        >
+                                            {msg.message}
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
                 </div>
 
                 {/* Voice headphone + mic controls extracted to component */}
