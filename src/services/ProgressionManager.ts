@@ -12,6 +12,7 @@ export interface OnboardingState {
   hasReachedStockMarket?: boolean;
   onboardingStep: OnboardingStep;
   unlockedBuildings: Record<string, boolean>;
+  mayaPosition?: { x: number; y: number };
 }
 
 const DEFAULT_STATE: OnboardingState = {
@@ -21,7 +22,8 @@ const DEFAULT_STATE: OnboardingState = {
   hasCompletedBankOnboarding: false,
   hasReachedStockMarket: false,
   onboardingStep: 'not_started',
-  unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+  unlockedBuildings: { bank: false, atm: false, stockmarket: false },
+  mayaPosition: { x: 7779, y: 3581 } // Default Maya starting position
 };
 
 class ProgressionManager {
@@ -53,6 +55,8 @@ class ProgressionManager {
     if (!this.state.hasFollowedMaya) {
       this.state.hasFollowedMaya = true;
       if (!this.state.hasClaimedMoney) this.state.onboardingStep = 'at_bank_with_maya';
+      // Update Maya position to bank area where she arrives after guiding
+      this.state.mayaPosition = { x: 9415, y: 6297 };
       this.persist();
     }
   }
@@ -71,6 +75,8 @@ class ProgressionManager {
     if (!this.state.hasCompletedBankOnboarding) {
       this.state.hasCompletedBankOnboarding = true;
       if (this.state.onboardingStep === 'claimed_money') this.state.onboardingStep = 'bank_onboarding_completed';
+      // Maya remains at bank entrance ready for stock market guidance
+      this.state.mayaPosition = { x: 9415, y: 6297 };
       this.persist();
     }
   }
@@ -81,8 +87,32 @@ class ProgressionManager {
       this.state.onboardingStep = 'reached_stock_market';
       // Unlock stockmarket building now
       this.state.unlockedBuildings.stockmarket = true;
+      // Update Maya position to stock market entrance
+      this.state.mayaPosition = { x: 2598, y: 3736 };
       this.persist();
     }
+  }
+
+  updateMayaPosition(x: number, y: number) {
+    this.state.mayaPosition = { x, y };
+    this.persist();
+  }
+
+  getMayaPosition(): { x: number; y: number } {
+    // Return position based on current progression state, with fallback to stored position
+    const storedPosition = this.state.mayaPosition || { x: 7779, y: 3581 };
+    
+    // Override with state-specific positions if stored position is default
+    if (storedPosition.x === 7779 && storedPosition.y === 3581) {
+      // Use state-specific positioning for better player experience
+      if (this.state.hasReachedStockMarket) {
+        return { x: 2598, y: 3736 }; // Stock market entrance
+      } else if (this.state.hasFollowedMaya || this.state.hasClaimedMoney || this.state.hasCompletedBankOnboarding) {
+        return { x: 9415, y: 6297 }; // Bank entrance
+      }
+    }
+    
+    return storedPosition;
   }
 
   // Centralized validation chain used by Maya before starting next guidance step
