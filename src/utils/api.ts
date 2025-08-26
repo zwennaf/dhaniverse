@@ -150,6 +150,23 @@ export const playerStateApi = {
 // ======================
 
 export const bankingApi = {
+    // Check bank onboarding status  
+    getOnboardingStatus: async () => {
+        try {
+            const response = await fetch(`${API_BASE}/game/bank-onboarding/status`, {
+                headers: getAuthHeaders(),
+            });
+            return handleApiResponse(response);
+        } catch (error) {
+            console.error("Error checking bank onboarding status:", error);
+            return { 
+                success: false, 
+                error: error instanceof Error ? error.message : String(error),
+                data: { hasCompletedOnboarding: false, hasBankAccount: false, bankAccount: null }
+            };
+        }
+    },
+
     // Create bank account
     createAccount: async (accountHolder: string, initialDeposit: number = 0) => {
         const response = await fetch(`${API_BASE}/game/bank-account/create`, {
@@ -162,10 +179,28 @@ export const bankingApi = {
 
     // Get bank account
     getAccount: async () => {
-        const response = await fetch(`${API_BASE}/game/bank-account`, {
-            headers: getAuthHeaders(),
-        });
-        return handleApiResponse(response);
+        try {
+            const response = await fetch(`${API_BASE}/game/bank-account`, {
+                headers: getAuthHeaders(),
+            });
+            
+            if (response.status === 404) {
+                return {
+                    success: false,
+                    error: "No bank account found",
+                    data: null
+                };
+            }
+            
+            return handleApiResponse(response);
+        } catch (error) {
+            console.error("Error getting bank account:", error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+                data: null
+            };
+        }
     },
 
     // Deposit to bank account

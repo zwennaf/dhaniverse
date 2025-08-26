@@ -178,10 +178,15 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
 
                 // Fallback to traditional backend
                 const bankData = await bankingApi.getAccount();
-                if (bankData.success) {
+                if (bankData.success && bankData.data) {
                     setBankBalance(bankData.data.balance || 0);
+                } else if (bankData.error === "No bank account found") {
+                    // No bank account exists yet - this is normal for new users
+                    console.log("No bank account found - user needs to create one first");
+                    setBankBalance(0);
                 } else {
                     console.warn("Failed to load bank data:", bankData.error);
+                    setBankBalance(0);
                 }
 
                 const fdData = await fixedDepositApi.getAll();

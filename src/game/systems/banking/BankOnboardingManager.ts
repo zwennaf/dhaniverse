@@ -342,6 +342,10 @@ export class BankOnboardingManager {
       return false;
     }
     
+    // We'll check database status asynchronously
+    this.checkOnboardingStatusFromDatabase();
+    
+    // For now, fall back to localStorage check (will be updated by async call)
     const bankOnboardingCompleted = this.hasCompletedBankOnboarding();
     
     console.log("Bank onboarding check:", {
@@ -351,6 +355,31 @@ export class BankOnboardingManager {
     
     // Show onboarding if it hasn't been completed yet
     return !bankOnboardingCompleted;
+  }
+
+  private async checkOnboardingStatusFromDatabase(): Promise<void> {
+    try {
+      const { bankingApi } = await import('../../../utils/api');
+      const response = await bankingApi.getOnboardingStatus();
+      
+      if (response.success && response.data) {
+        const { hasCompletedOnboarding, hasBankAccount } = response.data;
+        
+        // Update localStorage to match database state
+        if (hasCompletedOnboarding) {
+          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+        } else {
+          localStorage.removeItem('dhaniverse_bank_onboarding_completed');
+        }
+        
+        console.log("Bank onboarding status from database:", {
+          hasCompletedOnboarding,
+          hasBankAccount
+        });
+      }
+    } catch (error) {
+      console.warn("Failed to check bank onboarding status from database:", error);
+    }
   }
 
   public isOnboardingActiveNow(): boolean {
@@ -392,7 +421,7 @@ export class BankOnboardingManager {
     console.log('🏦 Completing onboarding...');
     this.isOnboardingActive = false;
     
-    // Mark onboarding as completed
+    // Mark onboarding as completed in localStorage for immediate UI updates
     localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
     
     // Store account data
@@ -410,13 +439,17 @@ export class BankOnboardingManager {
     window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
     
     console.log('🏦 Onboarding completed successfully');
-  // Update progression manager (async import to avoid circular)
+    
+    // Update progression manager (async import to avoid circular)
+    // Note: The database update happens in the bank account creation API
     (async () => { 
       try { 
         const { progressionManager } = await import('../../../services/ProgressionManager'); 
         progressionManager.markBankOnboardingCompleted(); 
         console.log('[Progression] Bank onboarding completion persisted:', progressionManager.getState());
-      } catch(e) { console.warn('Could not mark bank onboarding completion', e);} 
+      } catch(e) { 
+        console.warn('Could not mark bank onboarding completion', e);
+      } 
     })();
   }
 

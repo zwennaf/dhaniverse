@@ -31,6 +31,7 @@ const BankAccountCreationFlow: React.FC = () => {
   useEffect(() => {
     const updateBalance = () => {
       const balance = balanceManager.getBalance();
+      console.log('Bank Account Creation: Balance update', balance);
       setCurrentBalance(balance.cash);
     };
     
@@ -46,6 +47,7 @@ const BankAccountCreationFlow: React.FC = () => {
   useEffect(() => {
     if (step === 'FORM' && deposit) {
       const num = Number(deposit);
+      console.log('Bank Account Creation: Validating deposit', { deposit, num, currentBalance, step });
       if (num > 0 && currentBalance < num) {
         setErrors([`Insufficient balance. You have ₹${currentBalance.toLocaleString()}, but need ₹${num.toLocaleString()}`]);
       } else if (errors.some(err => err.includes('Insufficient balance'))) {
@@ -53,15 +55,38 @@ const BankAccountCreationFlow: React.FC = () => {
         setErrors(errors.filter(err => !err.includes('Insufficient balance')));
       }
     }
-  }, [deposit, currentBalance, step]);
+  }, [deposit, currentBalance, step, errors]);
 
   // Open flow when event dispatched
   useEffect(() => {
-    const openHandler = () => {
+    const openHandler = async () => {
       setStep('FORM');
       setErrors([]);
       setName('');
       setDeposit('');
+      
+      // Force refresh current balance when form opens to prevent race conditions
+      try {
+        const { playerStateApi } = await import('../../../utils/api');
+        const response = await playerStateApi.get();
+        if (response.success && response.data) {
+          const backendCash = response.data.financial?.rupees || response.data.rupees || 0;
+          console.log('Bank Account Creation: Opening form with refreshed balance from backend:', backendCash);
+          balanceManager.updateCash(backendCash, true);
+          setCurrentBalance(backendCash);
+        } else {
+          // Fallback to current balance manager balance
+          const currentBalance = balanceManager.getBalance();
+          console.log('Bank Account Creation: Opening form with balance manager balance:', currentBalance);
+          setCurrentBalance(currentBalance.cash);
+        }
+      } catch (error) {
+        console.warn('Failed to refresh balance from backend on form open:', error);
+        // Fallback to current balance manager balance
+        const currentBalance = balanceManager.getBalance();
+        setCurrentBalance(currentBalance.cash);
+      }
+      
       // Freeze dialogue when UI opens
       window.dispatchEvent(new CustomEvent('freeze-dialogue'));
     };
@@ -119,9 +144,13 @@ const BankAccountCreationFlow: React.FC = () => {
       errs.push(`Minimum deposit is ₹${MIN_DEPOSIT}`);
     }
     
+    // Get fresh balance to avoid race conditions
+    const freshBalance = balanceManager.getBalance().cash;
+    setCurrentBalance(freshBalance);
+    
     // Check if user has sufficient cash balance
-    if (num > 0 && currentBalance < num) {
-      errs.push(`Insufficient balance. You have ₹${currentBalance.toLocaleString()}, but need ₹${num.toLocaleString()}`);
+    if (num > 0 && freshBalance < num) {
+      errs.push(`Insufficient balance. You have ₹${freshBalance.toLocaleString()}, but need ₹${num.toLocaleString()}`);
     }
     
     setErrors(errs);
@@ -129,6 +158,20 @@ const BankAccountCreationFlow: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    // Force refresh balance from backend before validation to ensure accuracy
+    try {
+      const { playerStateApi } = await import('../../../utils/api');
+      const response = await playerStateApi.get();
+      if (response.success && response.data) {
+        const backendCash = response.data.financial?.rupees || response.data.rupees || 0;
+        console.log('Bank Account Creation: Refreshed balance from backend:', backendCash);
+        balanceManager.updateCash(backendCash, true);
+        setCurrentBalance(backendCash);
+      }
+    } catch (error) {
+      console.warn('Failed to refresh balance from backend, using current balance:', error);
+    }
+    
     if (!validate()) return;
     const initialDeposit = Number(deposit);
     
@@ -163,14 +206,29 @@ const BankAccountCreationFlow: React.FC = () => {
       if (response.success) {
         const accountData = response.data;
         
+        // If onboarding was completed by the API, mark it in localStorage too
+        if (response.onboardingCompleted) {
+          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+          console.log('Bank onboarding marked as completed in database and localStorage');
+        }
+        
         // Update balance manager to reflect the deposit transaction
         if (initialDeposit > 0) {
           try {
-            balanceManager.processDeposit(initialDeposit, "Bank Account Creation");
+            // Double-check balance before processing deposit
+            const preDepositBalance = balanceManager.getBalance().cash;
+            if (preDepositBalance >= initialDeposit) {
+              balanceManager.processDeposit(initialDeposit, "Bank Account Creation");
+            } else {
+              console.warn(`Insufficient balance for deposit: have ${preDepositBalance}, need ${initialDeposit}. Updating manually.`);
+              // Update balance manually if balance check fails
+              balanceManager.updateCash(Math.max(0, preDepositBalance - initialDeposit));
+              balanceManager.updateBankBalance(accountData.balance);
+            }
           } catch (error) {
             console.warn('Balance manager deposit failed, updating manually:', error);
             const currentBalance = balanceManager.getBalance();
-            balanceManager.updateCash(currentBalance.cash - initialDeposit);
+            balanceManager.updateCash(Math.max(0, currentBalance.cash - initialDeposit));
             balanceManager.updateBankBalance(accountData.balance);
           }
         }
