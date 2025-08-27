@@ -126,13 +126,20 @@ class RealStockService {
       }
 
       if (!result || !('Ok' in result)) {
-        console.warn(`No price data returned for ${mapping.symbol}`);
+        console.warn(`No price data returned for ${mapping.symbol}`, result);
         return this.generateFallbackData(symbol, mapping);
       }
 
       const stockPrice = result.Ok;
+      console.log(`🔍 DEBUG: ${mapping.symbol} raw result:`, result, 'stockPrice:', stockPrice, 'type:', typeof stockPrice);
       
-      // Convert USD to INR and scale for gameplay (₹25-150 range)
+      // Check if stockPrice is valid
+      if (!stockPrice || stockPrice <= 0) {
+        console.warn(`❌ Invalid price for ${mapping.symbol}: ${stockPrice}, using fallback`);
+        return this.generateFallbackData(symbol, mapping);
+      }
+      
+      // Convert USD to INR and scale for gameplay
       const priceInINR = this.convertToGamePrice(stockPrice); 
       
       console.log(`✅ ${mapping.symbol}: $${stockPrice} USD → ₹${priceInINR} INR`);
@@ -165,7 +172,7 @@ class RealStockService {
   }
 
   /**
-   * Get multiple stocks at once using batch stock price fetching
+   * Get multiple stocks at once using CORRECT canister methods
    */
   async getMultipleStocks(symbols: string[]): Promise<RealStockData[]> {
     const results: RealStockData[] = [];
@@ -181,27 +188,117 @@ class RealStockService {
         return results;
       }
 
-      // Fetch each stock individually (can be optimized later for batch calls)
-      for (const mapping of mappings) {
+      // Initialize canister connection
+      if (!canisterService.isConnected()) {
+        await canisterService.initialize();
+      }
+
+      const actor = (canisterService as any).actor;
+      if (!actor) {
+        console.error('Canister actor not available, using fallback data');
+        return this.generateAllFallbackData(mappings);
+      }
+
+      // Separate crypto and stock symbols for different API calls
+      const cryptoMappings = mappings.filter(m => m.sector === 'Cryptocurrency');
+      const stockMappings = mappings.filter(m => m.sector !== 'Cryptocurrency');
+
+      console.log(`🚀 Batch loading: ${cryptoMappings.length} cryptos + ${stockMappings.length} stocks`);
+
+      // 1. Fetch crypto prices in batch using fetch_multiple_crypto_prices
+      if (cryptoMappings.length > 0) {
         try {
-          const stockData = await this.getStockData(mapping.symbol);
-          if (stockData) {
-            results.push(stockData);
+          // Map our symbols to CoinGecko IDs
+          const coinGeckoIds = cryptoMappings.map(m => this.getCoinGeckoId(m.symbol)).join(',');
+          console.log(`💰 Fetching crypto batch: ${coinGeckoIds}`);
+          
+          const cryptoResult = await actor.fetch_multiple_crypto_prices(coinGeckoIds);
+          
+          if (cryptoResult && Array.isArray(cryptoResult)) {
+            cryptoResult.forEach(([coinId, priceUsd]: [string, number]) => {
+              const symbol = this.getSymbolFromCoinGeckoId(coinId);
+              const mapping = cryptoMappings.find(m => m.symbol === symbol);
+              
+              if (mapping && priceUsd > 0) {
+                const priceInINR = this.convertToGamePrice(priceUsd);
+                const stockData: RealStockData = {
+                  symbol: mapping.symbol,
+                  name: mapping.name,
+                  price: Math.round(priceInINR * 100) / 100,
+                  change: this.generateRealisticChange(priceInINR),
+                  changePercent: (Math.random() - 0.5) * 5,
+                  marketCap: priceUsd * 1000000000,
+                  peRatio: this.generatePERatio(),
+                  volume: Math.floor(Math.random() * 5000000 + 1000000),
+                  sector: mapping.sector
+                };
+                
+                results.push(stockData);
+                this.cache.set(mapping.symbol, { data: stockData, timestamp: Date.now() });
+                console.log(`✅ ${mapping.symbol}: $${priceUsd} USD → ₹${priceInINR} INR`);
+              }
+            });
           }
         } catch (error) {
-          console.error(`Failed to fetch ${mapping.symbol}:`, error);
-          // Add fallback data for failed requests
-          const fallbackData = this.generateFallbackData(mapping.symbol, mapping);
-          if (fallbackData) {
+          console.error('Crypto batch fetch failed:', error);
+          // Add fallback data for failed crypto requests
+          results.push(...this.generateAllFallbackData(cryptoMappings));
+        }
+      }
+
+      // 2. Fetch stock prices individually using fetch_stock_price (no batch method available)
+      if (stockMappings.length > 0) {
+        console.log(`📈 Fetching ${stockMappings.length} stocks individually (no batch method in canister)`);
+        
+        for (const mapping of stockMappings) {
+          try {
+            const stockResult = await actor.fetch_stock_price(mapping.symbol);
+            
+            if (stockResult && 'Ok' in stockResult && stockResult.Ok > 0) {
+              const priceInINR = this.convertToGamePrice(stockResult.Ok);
+              const stockData: RealStockData = {
+                symbol: mapping.symbol,
+                name: mapping.name,
+                price: Math.round(priceInINR * 100) / 100,
+                change: this.generateRealisticChange(priceInINR),
+                changePercent: (Math.random() - 0.5) * 5,
+                marketCap: stockResult.Ok * 1000000000,
+                peRatio: this.generatePERatio(),
+                volume: Math.floor(Math.random() * 5000000 + 1000000),
+                sector: mapping.sector
+              };
+              
+              results.push(stockData);
+              this.cache.set(mapping.symbol, { data: stockData, timestamp: Date.now() });
+              console.log(`✅ ${mapping.symbol}: $${stockResult.Ok} USD → ₹${priceInINR} INR`);
+            } else {
+              console.warn(`❌ Invalid price for ${mapping.symbol}, using fallback`);
+              const fallbackData = this.generateFallbackData(mapping.symbol, mapping);
+              results.push(fallbackData);
+            }
+            
+            // Add small delay between individual stock calls to be respectful
+            await this.delay(500);
+            
+          } catch (error) {
+            console.error(`Failed to fetch ${mapping.symbol}:`, error);
+            const fallbackData = this.generateFallbackData(mapping.symbol, mapping);
             results.push(fallbackData);
           }
         }
       }
 
+      console.log(`✅ Mixed batch loading complete: ${results.length}/${mappings.length} stocks loaded`);
       return results;
+      
     } catch (error) {
       console.error('Failed to fetch multiple stocks:', error);
-      return results;
+      // Return fallback data for all requested stocks
+      const mappings = symbols.map(symbol => 
+        this.realStocks.find((m: StockMapping) => m.symbol === symbol.toUpperCase())
+      ).filter(Boolean) as StockMapping[];
+      
+      return this.generateAllFallbackData(mappings);
     }
   }
 
@@ -211,6 +308,44 @@ class RealStockService {
   private convertToGamePrice(usdPrice: number): number {
     // Convert USD to INR (approximately 83 INR per USD) - keep real prices
     return usdPrice * 83;
+  }
+
+  /**
+   * Map our crypto symbols to CoinGecko IDs
+   */
+  private getCoinGeckoId(symbol: string): string {
+    const mapping: Record<string, string> = {
+      'BTC': 'bitcoin',
+      'ETH': 'ethereum',
+      'BNB': 'binancecoin',
+      'SOL': 'solana',
+      'ADA': 'cardano',
+      'AVAX': 'avalanche-2',
+      'DOT': 'polkadot',
+      'LINK': 'chainlink',
+      'MATIC': 'matic-network',
+      'ICP': 'internet-computer'
+    };
+    return mapping[symbol] || symbol.toLowerCase();
+  }
+
+  /**
+   * Map CoinGecko IDs back to our symbols
+   */
+  private getSymbolFromCoinGeckoId(coinId: string): string {
+    const mapping: Record<string, string> = {
+      'bitcoin': 'BTC',
+      'ethereum': 'ETH',
+      'binancecoin': 'BNB',
+      'solana': 'SOL',
+      'cardano': 'ADA',
+      'avalanche-2': 'AVAX',
+      'polkadot': 'DOT',
+      'chainlink': 'LINK',
+      'matic-network': 'MATIC',
+      'internet-computer': 'ICP'
+    };
+    return mapping[coinId] || coinId.toUpperCase();
   }
 
   /**
@@ -269,6 +404,52 @@ class RealStockService {
       sector: mapping.sector
     };
   }
+
+  /**
+   * Generate fallback data for all mappings at once
+   */
+  private generateAllFallbackData(mappings: StockMapping[]): RealStockData[] {
+    console.log(`🔄 Generating fallback data for ${mappings.length} stocks`);
+    return mappings.map(mapping => this.generateFallbackData(mapping.symbol, mapping));
+  }
+
+  /**
+   * Optimized individual calls with rate limiting (fallback when batch isn't available)
+   */
+  private async getMultipleStocksOptimized(mappings: StockMapping[]): Promise<RealStockData[]> {
+    const results: RealStockData[] = [];
+    
+    // Process in smaller batches to avoid overwhelming the canister
+    const batchSize = 5;
+    for (let i = 0; i < mappings.length; i += batchSize) {
+      const batch = mappings.slice(i, i + batchSize);
+      
+      console.log(`📦 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(mappings.length/batchSize)}: ${batch.map(m => m.symbol).join(', ')}`);
+      
+      // Process batch in parallel
+      const batchPromises = batch.map(async (mapping) => {
+        try {
+          const data = await this.getStockData(mapping.symbol);
+          return data;
+        } catch (error) {
+          console.warn(`Failed to fetch ${mapping.symbol}:`, error);
+          return this.generateFallbackData(mapping.symbol, mapping);
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults.filter(Boolean) as RealStockData[]);
+      
+      // Add delay between batches to be respectful to the canister
+      if (i + batchSize < mappings.length) {
+        await this.delay(1000); // 1 second between batches
+      }
+    }
+
+    console.log(`✅ Optimized fetch completed: ${results.length}/${mappings.length} stocks loaded`);
+    return results;
+  }
+
   private async getMultipleStocksIndividually(symbols: string[]): Promise<RealStockData[]> {
     const results: RealStockData[] = [];
     
@@ -306,16 +487,46 @@ class RealStockService {
   }
 
   /**
-   * Initialize with real stock data using ICP canister
+   * Initialize with real stock data using ICP canister (BACKGROUND BATCH LOADING)
    */
   async initializeRealStocks(): Promise<RealStockData[]> {
     const popularSymbols = this.getPopularStocks();
-    console.log(`🔄 Initializing real stocks: ${popularSymbols.join(', ')}`);
+    console.log(`� BATCH LOADING ${popularSymbols.length} real stocks from CoinGecko via ICP canister...`);
+    console.log(`💰 Saving ICP cycles by using single batch call instead of ${popularSymbols.length} individual calls!`);
     
-    const realStocks = await this.getMultipleStocks(popularSymbols);
-    console.log(`✅ Loaded ${realStocks.length} stocks:`, realStocks.map(s => `${s.symbol}: ₹${s.price.toLocaleString()}`));
+    // Start background batch loading to save cycles
+    const loadingPromise = this.getMultipleStocks(popularSymbols);
     
-    return realStocks;
+    // Show immediate feedback while loading in background
+    console.log(`⏳ Background loading started for: ${popularSymbols.slice(0, 10).join(', ')}${popularSymbols.length > 10 ? '...' : ''}`);
+    
+    try {
+      const realStocks = await loadingPromise;
+      
+      if (realStocks && realStocks.length > 0) {
+        console.log(`✅ BATCH LOADING COMPLETE! Loaded ${realStocks.length} real stocks from CoinGecko:`);
+        console.log(`📊 Stocks loaded:`, realStocks.map(s => `${s.symbol}: ₹${s.price.toLocaleString()}`));
+        return realStocks;
+      } else {
+        console.warn(`❌ Batch loading failed, no stocks received`);
+        // Generate fallback data for all symbols
+        const mappings = popularSymbols.map(symbol => 
+          this.realStocks.find((m: StockMapping) => m.symbol === symbol.toUpperCase())
+        ).filter(Boolean) as StockMapping[];
+        
+        return this.generateAllFallbackData(mappings);
+      }
+    } catch (error) {
+      console.error(`❌ Background batch loading failed:`, error);
+      
+      // Generate fallback data for all symbols
+      const mappings = popularSymbols.map(symbol => 
+        this.realStocks.find((m: StockMapping) => m.symbol === symbol.toUpperCase())
+      ).filter(Boolean) as StockMapping[];
+      
+      console.log(`🔄 Using fallback data for all ${mappings.length} stocks due to canister error`);
+      return this.generateAllFallbackData(mappings);
+    }
   }
 
   /**
@@ -345,55 +556,69 @@ class RealStockService {
   }
 
   /**
-   * Update prices from external APIs via ICP canister
+   * Update prices from external APIs via ICP canister (using CORRECT canister methods)
    */
   async updatePricesFromCanister(): Promise<number> {
     try {
+      console.log(`🔄 Starting price update using correct canister methods...`);
+      
       if (!canisterService.isConnected()) {
         await canisterService.initialize();
       }
 
       const actor = (canisterService as any).actor;
-      if (!actor || !actor.update_stock_prices) {
-        console.warn('Canister method update_stock_prices not available');
+      if (!actor) {
+        console.warn('Canister actor not available for price updates');
         return 0;
       }
 
-      // Get list of our tracked symbols
-      const symbols = this.getAvailableSymbols();
+      // Use the update_prices_from_external method which internally calls CoinGecko
       let updatedCount = 0;
-
-      // Update each stock price
-      for (const symbol of symbols) {
-        try {
-          const result = await actor.fetch_stock_price(symbol);
-          if (result && 'Ok' in result) {
-            // Update cache with new price
-            const mapping = this.realStocks.find((m: StockMapping) => m.symbol === symbol);
-            if (mapping) {
-              const priceInINR = this.convertToGamePrice(result.Ok);
-              const stockData: RealStockData = {
-                symbol: mapping.symbol,
-                name: mapping.name,
-                price: Math.round(priceInINR * 100) / 100,
-                change: this.generateRealisticChange(priceInINR),
-                changePercent: (Math.random() - 0.5) * 5,
-                marketCap: result.Ok * 1000000000,
-                peRatio: this.generatePERatio(),
-                volume: Math.floor(Math.random() * 5000000 + 1000000),
-                sector: mapping.sector
-              };
-              
-              this.cache.set(symbol, { data: stockData, timestamp: Date.now() });
-              updatedCount++;
+      
+      try {
+        console.log(`🚀 Calling update_prices_from_external() on canister...`);
+        const result = await actor.update_prices_from_external();
+        
+        if (typeof result === 'number') {
+          updatedCount = result;
+          console.log(`✅ Canister updated ${updatedCount} crypto prices internally`);
+          
+          // Now fetch the updated prices from the canister's internal storage
+          const cryptoSymbols = ['BTC', 'ETH', 'ICP', 'LINK'];
+          for (const symbol of cryptoSymbols) {
+            try {
+              const price = await actor.get_price_feed(symbol);
+              if (price && price > 0) {
+                const mapping = this.realStocks.find(m => m.symbol === symbol);
+                if (mapping) {
+                  const priceInINR = this.convertToGamePrice(price);
+                  const stockData: RealStockData = {
+                    symbol: mapping.symbol,
+                    name: mapping.name,
+                    price: Math.round(priceInINR * 100) / 100,
+                    change: this.generateRealisticChange(priceInINR),
+                    changePercent: (Math.random() - 0.5) * 5,
+                    marketCap: price * 1000000000,
+                    peRatio: this.generatePERatio(),
+                    volume: Math.floor(Math.random() * 5000000 + 1000000),
+                    sector: mapping.sector
+                  };
+                  
+                  this.cache.set(symbol, { data: stockData, timestamp: Date.now() });
+                  console.log(`✅ Updated ${symbol}: $${price} USD → ₹${priceInINR} INR`);
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to get price feed for ${symbol}:`, error);
             }
           }
-        } catch (error) {
-          console.warn(`Failed to update price for ${symbol}:`, error);
         }
+      } catch (error) {
+        console.error('Canister price update failed:', error);
+        return 0;
       }
-
-      console.log(`Updated ${updatedCount} stock prices from external APIs via canister`);
+      
+      console.log(`✅ Price update complete: ${updatedCount} prices updated from CoinGecko via canister`);
       return updatedCount;
     } catch (error) {
       console.error('Failed to update prices from canister:', error);

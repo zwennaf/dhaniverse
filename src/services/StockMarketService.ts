@@ -43,7 +43,7 @@ class StockMarketService {
   }
 
   /**
-   * Initialize stock data from ICP canister
+   * Initialize stock data from ICP canister (BACKGROUND BATCH LOADING)
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -51,9 +51,10 @@ class StockMarketService {
     }
 
     try {
-      console.log('🔄 Initializing StockMarketService with real stock data...');
+      console.log('� StockMarketService: Starting BATCH loading of real stock data...');
+      console.log('💰 Using optimized batch calls to save ICP cycles!');
       
-      // Get real stock data from ICP canister
+      // Start background batch loading from ICP canister
       const realStocks = await realStockService.initializeRealStocks();
       
       if (!realStocks || realStocks.length === 0) {
@@ -80,14 +81,15 @@ class StockMarketService {
       }));
 
       this.isInitialized = true;
-      console.log(`✅ StockMarketService loaded ${this.stockData.length} real stocks:`, 
+      console.log(`✅ StockMarketService BATCH LOADING COMPLETE!`); 
+      console.log(`📊 Loaded ${this.stockData.length} real stocks:`, 
         this.stockData.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
       
-      // Start periodic updates
+      // Start periodic batch updates in background
       this.startPeriodicUpdates();
       
     } catch (error) {
-      console.error('❌ Failed to initialize StockMarketService:', error);
+      console.error('❌ StockMarketService batch initialization failed:', error);
       throw error;
     }
   }
@@ -139,34 +141,43 @@ class StockMarketService {
   }
 
   /**
-   * Start periodic updates from canister
+   * Start periodic BATCH updates from canister (saves cycles!)
    */
   private startPeriodicUpdates(): void {
     setInterval(async () => {
       try {
-        console.log('🔄 Updating stock prices from ICP canister...');
-        const updatedStocks = await realStockService.initializeRealStocks();
+        console.log('🔄 Starting periodic BATCH update to save ICP cycles...');
         
-        if (updatedStocks && updatedStocks.length > 0) {
-          updatedStocks.forEach((realStock: any) => {
-            const existingStock = this.stockData.find(s => s.id === realStock.symbol.toLowerCase());
-            if (existingStock) {
-              existingStock.currentPrice = realStock.price;
-              existingStock.priceHistory.push(realStock.price);
-              if (existingStock.priceHistory.length > 24) {
-                existingStock.priceHistory.shift();
+        // Use batch update method to save cycles
+        const updatedCount = await realStockService.updatePricesFromCanister();
+        
+        if (updatedCount > 0) {
+          // Refresh our local stock data with updated cache
+          const symbols = this.stockData.map(s => s.id.toUpperCase());
+          for (const symbol of symbols) {
+            const cached = (realStockService as any).cache.get(symbol);
+            if (cached) {
+              const existingStock = this.stockData.find(s => s.id === symbol.toLowerCase());
+              if (existingStock) {
+                existingStock.currentPrice = cached.data.price;
+                existingStock.priceHistory.push(cached.data.price);
+                if (existingStock.priceHistory.length > 24) {
+                  existingStock.priceHistory.shift();
+                }
+                existingStock.lastUpdate = Date.now();
+                existingStock.businessGrowth = cached.data.changePercent * 2;
+                existingStock.volatility = Math.abs(cached.data.changePercent) / 10 + 1;
               }
-              existingStock.lastUpdate = Date.now();
-              existingStock.businessGrowth = realStock.changePercent * 2;
-              existingStock.volatility = Math.abs(realStock.changePercent) / 10 + 1;
             }
-          });
-          console.log('✅ Updated stock prices from canister');
+          }
+          console.log(`✅ BATCH update completed: ${updatedCount} stocks updated`);
+        } else {
+          console.log('⏭️ Skipping individual updates to save ICP cycles');
         }
       } catch (error) {
-        console.error('❌ Failed to update stock prices:', error);
+        console.error('❌ Periodic batch update failed:', error);
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 10 * 60 * 1000); // 10 minutes instead of 5 to save even more cycles
   }
 
   /**
