@@ -29,7 +29,8 @@ export class ICPIntegrationManager {
   private constructor() {
     // Initialize services
     this.walletManager = new WalletManager();
-    this.icpService = new ICPActorService(ICP_CONFIG.CANISTER_ID);
+    // Use singleton instance to prevent duplication
+    this.icpService = ICPActorService.getInstance(ICP_CONFIG.CANISTER_ID);
     this.dualStorageManager = new DualStorageManager(this.icpService, this.walletManager);
   }
 

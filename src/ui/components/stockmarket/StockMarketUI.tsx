@@ -8,6 +8,7 @@ const StockMarketUI: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [playerRupees, setPlayerRupees] = useState(0);
     const [stocks, setStocks] = useState<Stock[]>([]);
+    const [mayaOnboardingCompleted, setMayaOnboardingCompleted] = useState(false);
 
     // Subscribe to balance manager updates
     useEffect(() => {
@@ -43,8 +44,10 @@ const StockMarketUI: React.FC = () => {
             // Show the stock market UI
             setIsOpen(true);
 
-            // Complete Maya onboarding when stock market UI opens
-            completeMayaOnboardingOnStockMarketEntry();
+            // Complete Maya onboarding when stock market UI opens (only once)
+            if (!mayaOnboardingCompleted) {
+                completeMayaOnboardingOnStockMarketEntry();
+            }
 
             // Add the active class to the container to enable pointer events
             const container = document.getElementById(
@@ -60,6 +63,11 @@ const StockMarketUI: React.FC = () => {
      * Complete the final Maya onboarding objective when player enters stock market
      */
     const completeMayaOnboardingOnStockMarketEntry = () => {
+        if (mayaOnboardingCompleted) {
+            console.log("StockMarketUI: Maya onboarding already completed, skipping...");
+            return;
+        }
+        
         const tm = getTaskManager();
         const activeTasks = tm.getActiveTasks();
         
@@ -69,11 +77,18 @@ const StockMarketUI: React.FC = () => {
             console.log("StockMarketUI: Completing Maya onboarding - player has entered stock market");
             tm.completeTask('explore-dhani-stocks');
             
+            // Mark Maya onboarding as completed to prevent future calls
+            setMayaOnboardingCompleted(true);
+            
             // Remove the task after a short delay
             setTimeout(() => {
                 tm.removeTask('explore-dhani-stocks');
                 console.log("StockMarketUI: Maya onboarding complete - all objectives cleared");
             }, 2000); // Give 2 seconds to show completion
+        } else {
+            // If the task doesn't exist, mark as completed anyway
+            setMayaOnboardingCompleted(true);
+            console.log("StockMarketUI: No explore-dhani-stocks task found, marking Maya onboarding as complete");
         }
     };
 

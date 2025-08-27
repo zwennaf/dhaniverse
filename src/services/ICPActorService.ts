@@ -30,20 +30,53 @@ export interface BankAccount {
 }
 
 export class ICPActorService {
+    private static instance: ICPActorService | null = null;
+    private static isInitializing: boolean = false;
+    
     private web3BankingService: Web3BankingService | null = null;
     private icpService: ICPService;
     private canisterId: string;
     private connected = false;
     private connectedWallet: string | null = null;
     private icpReady = false;
+    private initializationPromise: Promise<void> | null = null;
 
     constructor(canisterId: string = 'dzbzg-eqaaa-aaaap-an3rq-cai') {
+        // Initialize properties first
         this.canisterId = canisterId;
         this.icpService = new ICPService();
-        this.initializeICP();
+        
+        // Singleton pattern to prevent multiple instances
+        if (ICPActorService.instance) {
+            console.log('ICPActorService: Returning existing instance to prevent duplication');
+            return ICPActorService.instance;
+        }
+        
+        if (ICPActorService.isInitializing) {
+            console.log('ICPActorService: Already initializing, please wait...');
+            // Return the existing instance if available, otherwise this instance
+            return ICPActorService.instance || this;
+        }
+        
+        ICPActorService.isInitializing = true;
+        ICPActorService.instance = this;
+        
+        this.initializationPromise = this.initializeICP();
     }
 
-    private async initializeICP() {
+    public static getInstance(canisterId?: string): ICPActorService {
+        if (!ICPActorService.instance) {
+            new ICPActorService(canisterId);
+        }
+        return ICPActorService.instance!;
+    }
+
+    private async initializeICP(): Promise<void> {
+        if (this.icpReady) {
+            console.log('ICPActorService: Already initialized, skipping...');
+            return;
+        }
+        
         try {
             // Wait for ICP service to be ready
             await this.icpService.healthCheck();
@@ -52,6 +85,14 @@ export class ICPActorService {
         } catch (error) {
             console.warn('ICP Service initialization failed, will use fallback:', error);
             this.icpReady = false;
+        } finally {
+            ICPActorService.isInitializing = false;
+        }
+    }
+
+    public async waitForInitialization(): Promise<void> {
+        if (this.initializationPromise) {
+            await this.initializationPromise;
         }
     }
 

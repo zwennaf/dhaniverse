@@ -51,7 +51,8 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const { user, isSignedIn, refreshAuth } = useAuth();
 
     // Services
-    const icpService = new ICPActorService();
+    // Use singleton instance to prevent duplication
+    const icpService = ICPActorService.getInstance();
     const walletManager = new WalletManager();
     
     // Core UI state
