@@ -130,7 +130,7 @@ export class BankOnboardingManager {
     this.conversationStage = 'ASK_NAME';
     // Show requirement dialogue first, then open form
     dialogueManager.showDialogue({
-      text: "Great! To open your account, I'll need your full name and a minimum deposit of ₹500 to get started.",
+      text: "Great! To open your account, I'll need your full name and a minimum deposit of ₹10000 to get started.",
       characterName: 'Bank Manager',
       showBackdrop: true,
       allowSpaceAdvance: true
