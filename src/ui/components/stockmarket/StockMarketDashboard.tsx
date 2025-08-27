@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import TradeStockPopup from "./TradeStockPopup.tsx";
 import StockDetail from "./StockDetail.tsx";
 import StockGraph from "./StockGraph.tsx";
@@ -46,6 +47,9 @@ type TabOption = "market" | "portfolio";
 type ViewMode = "cards" | "table";
 
 const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees }) => {
+    // Auth context for Internet Identity persistence
+    const { user, isSignedIn, refreshAuth } = useAuth();
+
     // Services
     const icpService = new ICPActorService();
     const walletManager = new WalletManager();
@@ -67,6 +71,34 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [isLoading, setIsLoading] = useState(true);
     const [loadingStage, setLoadingStage] = useState("Loading Stock Market Data");
     const [viewMode, setViewMode] = useState<ViewMode>("cards");
+
+    // Log authentication status for debugging
+    useEffect(() => {
+        console.log('StockMarketDashboard - Auth status:', { user, isSignedIn });
+        
+        // Check for Internet Identity authentication persistence
+        const checkIIAuth = async () => {
+            try {
+                const { AuthClient } = await import("@dfinity/auth-client");
+                const authClient = await AuthClient.create();
+                const isAuthenticated = await authClient.isAuthenticated();
+                
+                if (isAuthenticated && !isSignedIn) {
+                    console.log('Internet Identity session found but user not signed in - refreshing auth');
+                    refreshAuth();
+                } else if (isAuthenticated && isSignedIn) {
+                    console.log('Internet Identity session active and user signed in');
+                } else if (!isSignedIn && localStorage.getItem('token')) {
+                    console.log('Token found but user not signed in - refreshing auth');
+                    refreshAuth();
+                }
+            } catch (error) {
+                console.log('Internet Identity check failed:', error);
+            }
+        };
+        
+        checkIIAuth();
+    }, [user, isSignedIn, refreshAuth]);
 
     // Load portfolio
     useEffect(() => {

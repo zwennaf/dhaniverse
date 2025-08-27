@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   selectedCharacter?: string; // C1, C2, C3, or C4
   createdAt: Date;
   googleId?: string;
+  internetIdentityPrincipal?: string; // For Internet Identity authentication
   // Game-specific data
   gameData: {
     level: number;

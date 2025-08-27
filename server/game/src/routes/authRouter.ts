@@ -11,7 +11,7 @@ const authRouter = new Router();
 
 // Initialize services
 const emailService = new EmailService();
-const otpService = new OTPService(mongodb);
+const _otpService = new OTPService(mongodb);
 const magicLinkService = new MagicLinkService();
 
 // Rate limiting helper
@@ -221,7 +221,7 @@ authRouter.get("/auth/me", async (ctx: Context) => {
                 id: userDoc._id?.toString() || "",
                 email: userDoc.email,
                 gameUsername: userDoc.gameUsername,
-                selectedCharacter: userDoc.selectedCharacter || "C2", // Default to C2
+                selectedCharacter: userDoc.selectedCharacter || "C4", // Default to C4
             },
         };
     } catch (error) {
@@ -374,7 +374,7 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
                 id: updatedUser?._id?.toString() || "",
                 email: updatedUser?.email || "",
                 gameUsername: updatedUser?.gameUsername || "",
-                selectedCharacter: updatedUser?.selectedCharacter || "C2", // Default to C2
+                selectedCharacter: updatedUser?.selectedCharacter || "C4", // Default to C4
             },
         };
     } catch (error) {
@@ -468,7 +468,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                     id: user.id,
                     email: user.email,
                     gameUsername: user.gameUsername,
-                    selectedCharacter: user.selectedCharacter || "C2",
+                    selectedCharacter: user.selectedCharacter || "C4",
                 },
                 isNewUser: false,
             };
@@ -500,7 +500,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                 id: newUser.id,
                 email: newUser.email,
                 gameUsername: newUser.gameUsername,
-                selectedCharacter: "C2", // Default for new users
+                selectedCharacter: "C4", // Default for new users
             },
             isNewUser: true,
         };
@@ -508,6 +508,96 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         ctx.response.status = 500;
         ctx.response.body = { error: "Internal server error" };
         console.error("Google auth error:", error);
+    }
+});
+
+// Internet Identity authentication
+authRouter.post("/auth/internet-identity", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { principal } = body;
+
+        console.log('Internet Identity authentication attempt:', { principal: principal ? 'provided' : 'missing' });
+
+        if (!principal || typeof principal !== "string") {
+            ctx.response.status = 400;
+            ctx.response.body = { error: "Principal is required" };
+            return;
+        }
+
+        // Collections
+        const usersCol = mongodb.getCollection<UserDocument>("users");
+
+        // Check if user exists by Internet Identity principal
+        const user = await usersCol.findOne({ internetIdentityPrincipal: principal });
+
+        if (user) {
+            // Existing user - sign them in
+            console.log('Internet Identity: Existing user found, signing in');
+            await usersCol.updateOne(
+                { _id: user._id },
+                { $set: { lastLoginAt: new Date() } }
+            );
+
+            const token = await createToken(user._id!.toString());
+            ctx.response.body = {
+                success: true,
+                token,
+                user: {
+                    id: user._id!.toString(),
+                    email: user.email || "",
+                    gameUsername: user.gameUsername,
+                    selectedCharacter: user.selectedCharacter || "C4",
+                },
+                isNewUser: false,
+            };
+            return;
+        }
+
+        // New user - create account with Internet Identity principal
+        const newUserDoc: Partial<UserDocument> = {
+            email: "", // Internet Identity doesn't provide email
+            passwordHash: "", // No password for Internet Identity users
+            gameUsername: "", // User will set this in profile
+            internetIdentityPrincipal: principal,
+            selectedCharacter: "C2", // Default character
+            createdAt: new Date(),
+            lastLoginAt: new Date(),
+            isActive: true,
+            gameData: {
+                level: 1,
+                experience: 0,
+                achievements: [],
+                preferences: {
+                    soundEnabled: true,
+                    musicEnabled: true,
+                    language: "en"
+                }
+            }
+        };
+
+        const result = await usersCol.insertOne(newUserDoc as UserDocument);
+        console.log('Internet Identity: New user created with ID:', result.insertedId.toString());
+        
+        const newUser = {
+            id: result.insertedId.toString(),
+            email: "",
+            gameUsername: "",
+            selectedCharacter: "C2",
+        };
+
+        const token = await createToken(newUser.id);
+        ctx.response.status = 201;
+        ctx.response.body = {
+            success: true,
+            token,
+            user: newUser,
+            isNewUser: true,
+        };
+    } catch (_error) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Internal server error" };
+        console.error("Internet Identity auth error:", _error);
     }
 });
 
@@ -552,9 +642,9 @@ authRouter.get("/auth/health", async (ctx: Context) => {
             success: true,
             emailService: isEmailHealthy ? 'healthy' : 'unhealthy',
             magicLinkStats,
-            authMethods: ['google', 'magic_link']
+            authMethods: ['google', 'magic_link', 'internet_identity']
         };
-    } catch (error) {
+    } catch (_error) {
         ctx.response.status = 500;
         ctx.response.body = {
             success: false,
@@ -572,7 +662,7 @@ authRouter.post("/auth/cleanup-magic-links", async (ctx: Context) => {
             success: true,
             message: `Cleaned up ${cleaned} expired magic links`
         };
-    } catch (error) {
+    } catch (_error) {
         ctx.response.status = 500;
         ctx.response.body = {
             success: false,
@@ -616,7 +706,7 @@ authRouter.get("/auth/debug-email", async (ctx: Context) => {
         ctx.response.status = 500;
         ctx.response.body = {
             success: false,
-            error: error.message,
+            error: (error as Error)?.message || "Unknown error",
             message: "Debug endpoint failed"
         };
     }

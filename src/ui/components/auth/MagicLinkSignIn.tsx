@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import PixelButton from "../atoms/PixelButton";
 import GoogleSignInButton from "./GoogleSignInButton";
+import InternetIdentityButton from "./InternetIdentityButton";
 import SEO from "../SEO";
 import analytics from "../../../utils/analytics";
 
@@ -97,7 +98,7 @@ const MagicLinkSignIn = () => {
     }
 
     const navigate = useNavigate();
-    const { sendMagicLink, signInWithGoogle, isLoaded } = useAuth();
+    const { sendMagicLink, signInWithGoogle, signInWithInternetIdentity, isLoaded } = useAuth();
     const [email, setEmail] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -163,6 +164,29 @@ const MagicLinkSignIn = () => {
         setError(error);
     };
 
+    const handleInternetIdentitySuccess = async (identity: any) => {
+        setLoading(true);
+        setError("");
+
+        const result = await signInWithInternetIdentity(identity);
+
+        if (result.success) {
+            // Track successful Internet Identity sign in (using 'google' as placeholder)
+            analytics.trackSignInSuccess('google', result.isNewUser);
+            
+            // Navigate to profile - new users will be prompted to set username there
+            navigate("/profile");
+        } else {
+            setError(result.error || "Internet Identity sign in failed");
+        }
+
+        setLoading(false);
+    };
+
+    const handleInternetIdentityError = (error: string) => {
+        setError(error);
+    };
+
     const handleResendMagicLink = () => {
         setMagicLinkSent(false);
         setSuccess("");
@@ -201,7 +225,7 @@ const MagicLinkSignIn = () => {
                 <p className="text-center text-dhani-text/80 text-sm font-robert mb-6">
                     {magicLinkSent 
                         ? "Check your email for a magic link to sign in securely."
-                        : "Continue your financial education journey. Enter your email to get started."
+                        : "Continue your financial education journey. Choose your preferred sign-in method below."
                     }
                 </p>
 
@@ -252,12 +276,21 @@ const MagicLinkSignIn = () => {
                             disabled={loading}
                         />
 
+                        <InternetIdentityButton
+                            onSuccess={handleInternetIdentitySuccess}
+                            onError={handleInternetIdentityError}
+                            disabled={loading}
+                        />
+
                         <div className="text-center space-y-2">
                             <p className="text-dhani-text/60 text-xs font-robert">
                                 ✨ No passwords needed! We'll send you a secure magic link to sign in instantly.
                             </p>
                             <p className="text-dhani-text/60 text-xs font-robert">
-                                New to Dhaniverse? Just enter your email above - we'll create your account automatically!
+                                🌐 Internet Identity provides anonymous, secure login powered by the Internet Computer.
+                            </p>
+                            <p className="text-dhani-text/60 text-xs font-robert">
+                                New to Dhaniverse? Just choose any sign-in method above - we'll create your account automatically!
                             </p>
                         </div>
                     </>
@@ -302,6 +335,12 @@ const MagicLinkSignIn = () => {
                         <GoogleSignInButton
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}
+                            disabled={loading}
+                        />
+
+                        <InternetIdentityButton
+                            onSuccess={handleInternetIdentitySuccess}
+                            onError={handleInternetIdentityError}
                             disabled={loading}
                         />
                     </div>

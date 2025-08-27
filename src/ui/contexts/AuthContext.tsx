@@ -14,8 +14,10 @@ interface AuthContextType {
   sendMagicLink: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   verifyMagicLink: (token: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean; message?: string }>;
   signInWithGoogle: (googleToken: string, gameUsername?: string) => Promise<{ success: boolean; error?: string; isNewUser?: boolean }>;
+  signInWithInternetIdentity: (identity: any) => Promise<{ success: boolean; error?: string; isNewUser?: boolean }>;
   signOut: () => Promise<void>;
   updateProfile: (gameUsername: string, selectedCharacter?: string) => Promise<{ success: boolean; error?: string }>;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,10 +36,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     checkAuth();
   }, []);
+
   const checkAuth = async () => {
     try {
       const token = localStorage.getItem('dhaniverse_token');
       if (!token) {
+        // Check for Internet Identity session if no token
+        await checkInternetIdentitySession();
         setIsLoaded(true);
         return;
       }
@@ -53,14 +58,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const data = await response.json();
         setUser(data.user);
       } else {
-        // Invalid token, remove it
+        // Invalid token, remove it and check for II session
         localStorage.removeItem('dhaniverse_token');
+        await checkInternetIdentitySession();
       }
     } catch (error) {
       console.error('Auth check error:', error);
       localStorage.removeItem('dhaniverse_token');
+      await checkInternetIdentitySession();
     } finally {
       setIsLoaded(true);
+    }
+  };
+
+  // Check for existing Internet Identity session
+  const checkInternetIdentitySession = async () => {
+    try {
+      console.log('Checking for existing Internet Identity session...');
+      const { AuthClient } = await import("@dfinity/auth-client");
+      const authClient = await AuthClient.create();
+      
+      if (await authClient.isAuthenticated()) {
+        console.log('Found existing Internet Identity session, attempting to restore...');
+        const identity = authClient.getIdentity();
+        
+        if (!identity.getPrincipal().isAnonymous()) {
+          const result = await signInWithInternetIdentity(identity);
+          if (result.success) {
+            console.log('Successfully restored Internet Identity session');
+          } else {
+            console.log('Failed to restore Internet Identity session:', result.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Internet Identity session check failed:', error);
     }
   };  const sendMagicLink = async (email: string): Promise<{ success: boolean; error?: string; message?: string }> => {
     try {
@@ -159,8 +191,60 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const signInWithInternetIdentity = async (identity: any): Promise<{ success: boolean; error?: string; isNewUser?: boolean }> => {
+    try {
+      console.log('Starting Internet Identity sign-in');
+      
+      // Get the principal from the identity
+      const principal = identity.getPrincipal().toString();
+      console.log('Internet Identity Principal:', principal);
+
+      // Validate that we have a non-anonymous principal
+      if (identity.getPrincipal().isAnonymous()) {
+        return { success: false, error: 'Anonymous authentication not allowed' };
+      }
+
+      const response = await fetch(`${API_BASE}/auth/internet-identity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ principal }),
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok) {
+        localStorage.setItem('dhaniverse_token', data.token);
+        setUser(data.user);
+        return { success: true, isNewUser: data.isNewUser };
+      } else {
+        console.error('Internet Identity sign-in failed:', data);
+        return { success: false, error: data.error || data.message || 'Internet Identity sign in failed' };
+      }
+    } catch (error) {
+      console.error('Internet Identity sign in error:', error);
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  };
+
   const signOut = async (): Promise<void> => {
+    // Remove local storage token
     localStorage.removeItem('dhaniverse_token');
+    
+    // Try to logout from Internet Identity if it exists
+    try {
+      const { AuthClient } = await import("@dfinity/auth-client");
+      const authClient = await AuthClient.create();
+      if (await authClient.isAuthenticated()) {
+        await authClient.logout();
+      }
+    } catch (error) {
+      console.log("Internet Identity logout not needed or failed:", error);
+    }
+    
     setUser(null);
   };
 
@@ -199,6 +283,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Refresh authentication status (can be called from components)
+  const refreshAuth = async (): Promise<void> => {
+    await checkAuth();
+  };
+
   const isSignedIn = !!user;
 
   const value: AuthContextType = {
@@ -208,8 +297,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     sendMagicLink,
     verifyMagicLink,
     signInWithGoogle,
+    signInWithInternetIdentity,
     signOut,
     updateProfile,
+    refreshAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

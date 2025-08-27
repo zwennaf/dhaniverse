@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import DepositWithdrawPanel from "./DepositWithdrawPanel";
 import FixedDepositPanel from "./FixedDepositPanel";
 import Web3BankingFeatures from "./Web3BankingFeatures";
@@ -39,6 +40,9 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     onClose,
     playerRupees,
 }) => {
+    // Auth context for Internet Identity persistence
+    const { user, isSignedIn, refreshAuth } = useAuth();
+
     // Core banking state
     const [activeTab, setActiveTab] = useState("overview");
     const [bankBalance, setBankBalance] = useState(0);
@@ -61,6 +65,34 @@ const BankingDashboard: React.FC<BankingDashboardProps> = ({
     
     // DeFi Vault State
     const [showDeFiVault, setShowDeFiVault] = useState(false);
+
+    // Log authentication status for debugging
+    useEffect(() => {
+        console.log('BankingDashboard - Auth status:', { user, isSignedIn });
+        
+        // Check for Internet Identity authentication persistence
+        const checkIIAuth = async () => {
+            try {
+                const { AuthClient } = await import("@dfinity/auth-client");
+                const authClient = await AuthClient.create();
+                const isAuthenticated = await authClient.isAuthenticated();
+                
+                if (isAuthenticated && !isSignedIn) {
+                    console.log('Internet Identity session found but user not signed in - refreshing auth');
+                    refreshAuth();
+                } else if (isAuthenticated && isSignedIn) {
+                    console.log('Internet Identity session active and user signed in');
+                } else if (!isSignedIn && localStorage.getItem('token')) {
+                    console.log('Token found but user not signed in - refreshing auth');
+                    refreshAuth();
+                }
+            } catch (error) {
+                console.log('Internet Identity check failed:', error);
+            }
+        };
+        
+        checkIIAuth();
+    }, [user, isSignedIn, refreshAuth]);
 
     // Initialize all Web3 services
     useEffect(() => {

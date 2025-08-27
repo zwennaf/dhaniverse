@@ -15,6 +15,7 @@ export interface User {
     selectedCharacter?: string;
     createdAt: Date;
     googleId?: string;
+    internetIdentityPrincipal?: string;
 }
 
 class MongoDatabase {
@@ -248,6 +249,24 @@ class MongoDatabase {
             googleId: userDoc.googleId,
         };
     }
+
+    async findUserByInternetIdentityPrincipal(principal: string): Promise<User | null> {
+        const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
+        const userDoc = await users.findOne({ internetIdentityPrincipal: principal });
+        if (!userDoc) return null;
+
+        return {
+            id: userDoc._id?.toString() ?? "",
+            email: userDoc.email,
+            passwordHash: userDoc.passwordHash,
+            gameUsername: userDoc.gameUsername,
+            selectedCharacter: userDoc.selectedCharacter,
+            createdAt: userDoc.createdAt,
+            googleId: userDoc.googleId,
+            internetIdentityPrincipal: userDoc.internetIdentityPrincipal,
+        };
+    }
+
     // Game state methods
     async getPlayerState(userId: string): Promise<PlayerStateDocument | null> {
         const playerStates = this.getCollection<PlayerStateDocument>(
