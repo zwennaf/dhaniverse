@@ -1,23 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import StockMarketDashboard from "./StockMarketDashboard.tsx";
 import { balanceManager } from "../../../services/BalanceManager";
-
-interface Stock {
-    id: string;
-    name: string;
-    currentPrice: number;
-    priceHistory: number[];
-    debtEquityRatio: number;
-    businessGrowth: number;
-    news: string[];
-    marketCap: number;
-    peRatio: number;
-    eps: number;
-    industryAvgPE: number;
-    outstandingShares: number;
-    volatility: number;
-    lastUpdate: number;
-}
+import { type Stock } from "../../../services/StockService";
 
 const StockMarketUI: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
