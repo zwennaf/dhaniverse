@@ -6,6 +6,7 @@ import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import { initializeBankAccountCreationFlow } from './ui/components/banking/BankAccountCreationFlow.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
+import { AuthProvider } from './ui/contexts/AuthContext.tsx';
 
 import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
@@ -58,14 +59,18 @@ function initializeBankingUI() {
   const bankingUIContainer = document.getElementById('banking-ui-container');
   
   if (bankingUIContainer) {
-    // Create a root and explicitly render the BankingUI component
+    // Create a root and explicitly render the BankingUI component wrapped in AuthProvider
     const bankingUIRoot = ReactDOM.createRoot(bankingUIContainer);
-    bankingUIRoot.render(React.createElement(BankingUI));
+    bankingUIRoot.render(
+      React.createElement(AuthProvider, null,
+        React.createElement(BankingUI)
+      )
+    );
     
     // Make sure the banking container is visible
     bankingUIContainer.style.display = 'block';
     
-    console.log("Banking UI initialized and mounted");
+    console.log("Banking UI initialized and mounted with AuthProvider");
   } else {
     console.error("Could not find banking-ui-container element");
   }
@@ -76,14 +81,18 @@ function initializeStockMarketUI() {
   const stockMarketUIContainer = document.getElementById('stock-market-ui-container');
   
   if (stockMarketUIContainer) {
-    // Create a root and explicitly render the StockMarketUI component
+    // Create a root and explicitly render the StockMarketUI component wrapped in AuthProvider
     const stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
-    stockMarketUIRoot.render(React.createElement(StockMarketUI));
+    stockMarketUIRoot.render(
+      React.createElement(AuthProvider, null,
+        React.createElement(StockMarketUI)
+      )
+    );
     
     // Make sure the stock market container is visible
     stockMarketUIContainer.style.display = 'block';
     
-    console.log("Stock Market UI initialized and mounted");
+    console.log("Stock Market UI initialized and mounted with AuthProvider");
   } else {
     console.error("Could not find stock-market-ui-container element");
   }
