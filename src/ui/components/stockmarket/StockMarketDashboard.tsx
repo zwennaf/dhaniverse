@@ -73,7 +73,9 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         const loadPortfolio = async () => {
             try {
                 const response = await stockApi.getPortfolio();
+                console.log('Initial portfolio load response:', response);
                 if (response.success && response.data) {
+                    console.log('Initial portfolio holdings data:', response.data.holdings);
                     const transformed: PlayerPortfolio = {
                         holdings: response.data.holdings?.map((h: any) => ({
                             stockId: h.symbol,
@@ -83,6 +85,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                         })) || [],
                         transactionHistory: [],
                     };
+                    console.log('Initial transformed portfolio:', transformed);
                     setPortfolio(transformed);
                 }
             } catch (e) {
@@ -265,12 +268,22 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         }
 
         try {
+            console.log('Attempting to buy stock:', {
+                stockId: stockId.toUpperCase(),
+                quantity,
+                price: stock.currentPrice,
+                name: stock.name,
+                totalCost
+            });
+
             const response = await stockApi.buyStock(
                 stockId.toUpperCase(),
                 quantity,
                 stock.currentPrice,
                 stock.name
             );
+
+            console.log('Buy stock API response:', response);
 
             if (response.success) {
                 // Update balance

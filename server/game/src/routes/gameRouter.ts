@@ -892,11 +892,19 @@ gameRouter.post("/game/fixed-deposits/:id/claim", async (ctx) => {
 gameRouter.get("/game/stock-portfolio", async (ctx) => {
     try {
         const userId = ctx.state.userId;
+        console.log('Backend received get portfolio request for userId:', userId);
+        
         const stockPortfolios = mongodb.getCollection<StockPortfolioDocument>(
             COLLECTIONS.STOCK_PORTFOLIOS
         );
 
         let portfolio = await stockPortfolios.findOne({ userId });
+        console.log('Found portfolio from database:', portfolio ? {
+            userId: portfolio.userId,
+            holdingsCount: portfolio.holdings?.length || 0,
+            holdings: portfolio.holdings
+        } : 'No portfolio found');
+        
         // Create initial portfolio if doesn't exist
         if (!portfolio) {
             const newPortfolio: StockPortfolioDocument = {
@@ -911,7 +919,14 @@ gameRouter.get("/game/stock-portfolio", async (ctx) => {
 
             const result = await stockPortfolios.insertOne(newPortfolio);
             portfolio = { ...newPortfolio, _id: result.insertedId };
+            console.log('Created new empty portfolio for user');
         }
+
+        console.log('Returning portfolio to frontend:', {
+            userId: portfolio.userId,
+            holdingsCount: portfolio.holdings?.length || 0,
+            holdings: portfolio.holdings
+        });
 
         ctx.response.body = {
             success: true,
@@ -957,6 +972,15 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
         const body = await ctx.request.body.json();
         const { stockId, stockName, quantity, price } = body;
 
+        console.log('Backend received buy stock request:', {
+            userId,
+            stockId,
+            stockName,
+            quantity,
+            price,
+            body
+        });
+
         if (
             !stockId ||
             !stockName ||
@@ -965,6 +989,7 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
             typeof price !== "number" ||
             price <= 0
         ) {
+            console.log('Invalid parameters detected');
             ctx.response.status = 400;
             ctx.response.body = { error: "Invalid stock purchase parameters" };
             return;
@@ -1083,6 +1108,15 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
                 $set: { lastUpdated: new Date() },
             }
         );
+
+        console.log('Stock purchase completed successfully:', {
+            userId,
+            stockId,
+            quantity,
+            totalCost,
+            portfolioId: portfolio._id?.toString(),
+            holdingsCount: portfolio.holdings.length
+        });
 
         ctx.response.body = {
             success: true,

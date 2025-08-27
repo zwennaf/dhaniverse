@@ -8,10 +8,12 @@ const API_BASE =
 // Helper function to get auth headers
 const getAuthHeaders = () => {
     const token = localStorage.getItem("dhaniverse_token");
-    return {
+    const headers = {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
     };
+    console.log('Auth headers:', { hasToken: !!token, headers });
+    return headers;
 };
 
 // Helper function to handle API responses
@@ -284,10 +286,13 @@ export const fixedDepositApi = {
 export const stockApi = {
     // Get stock portfolio
     getPortfolio: async () => {
+        console.log('Fetching portfolio from:', `${API_BASE}/game/stock-portfolio`);
         const response = await fetch(`${API_BASE}/game/stock-portfolio`, {
             headers: getAuthHeaders(),
         });
-        return handleApiResponse(response);
+        const result = await handleApiResponse(response);
+        console.log('Portfolio API result:', result);
+        return result;
     },
     // Buy stock
     buyStock: async (
@@ -296,12 +301,19 @@ export const stockApi = {
         price: number,
         stockName?: string
     ) => {
+        const payload = { stockId, stockName, quantity, price };
+        console.log('Sending buy stock request:', payload);
+        console.log('API endpoint:', `${API_BASE}/game/stock-portfolio/buy`);
+        
         const response = await fetch(`${API_BASE}/game/stock-portfolio/buy`, {
             method: "POST",
             headers: getAuthHeaders(),
-            body: JSON.stringify({ stockId, stockName, quantity, price }),
+            body: JSON.stringify(payload),
         });
-        return handleApiResponse(response);
+        
+        const result = await handleApiResponse(response);
+        console.log('Buy stock API result:', result);
+        return result;
     },
 
     // Sell stock
