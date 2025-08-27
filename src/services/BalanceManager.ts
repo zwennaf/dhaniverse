@@ -482,10 +482,10 @@ class BalanceManager {
     // Reset all balances (for testing)
     reset() {
         this.currentBalance = {
-            cash: 1000,
+            cash: 100000, // Increased for real stock trading
             bankBalance: 0,
             stockValue: 0,
-            totalValue: 1000,
+            totalValue: 100000,
         };
         this.transactions = [];
         this.saveToStorage();

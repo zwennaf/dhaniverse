@@ -1,7 +1,9 @@
 import { GameObjects, Input } from 'phaser';
 import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
-import realStockService from '../../services/RealStockService';
+import { canisterService } from '../../services/CanisterService';
+import { balanceManager } from '../../services/BalanceManager';
+import { stockService } from '../../services/StockService';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -258,37 +260,30 @@ export class StockMarketManager {
     nextOpenTime = now + timeToNextOpen;
     nextCloseTime = now + timeToNextClose;
     
-    // Set up market status
+    // Set up market status - always open for better gameplay experience
     this.marketStatus = {
-      isOpen: isMarketHours,
+      isOpen: true, // Always keep market open for trading
       trend: randomTrend,
       volatility: 1.0 + Math.random(), // Base volatility between 1.0 and 2.0
       nextOpenTime: nextOpenTime,
       nextCloseTime: nextCloseTime
     };
     
-    console.log(`Market initialized: ${isMarketHours ? 'OPEN' : 'CLOSED'}, Trend: ${randomTrend}`);
+    console.log(`Market initialized: OPEN (24/7 for gameplay), Trend: ${randomTrend}`);
     
-    // Schedule market open/close events
+    // Schedule market open/close events (for UI updates only)
     this.scheduleMarketStatusChanges();
   }
 
   /**
-   * Update market status - checks if market should be open/closed
+   * Update market status - Real stock markets are 24/7 for gameplay
    */
   private updateMarketStatus(): void {
     const now = Date.now();
-    const currentHour = new Date().getHours();
-    const isMarketHours = currentHour >= this.MARKET_OPEN_HOUR && currentHour < this.MARKET_CLOSE_HOUR;
     
-    // Update market open/closed status
-    if (this.marketStatus.isOpen !== isMarketHours) {
-      this.marketStatus.isOpen = isMarketHours;
-      console.log(`Market status changed: ${isMarketHours ? 'OPENED' : 'CLOSED'}`);
-      
-      // Trigger market status change events
-      this.scheduleMarketStatusChanges();
-    }
+    // Real stock market is always open for gaming experience
+    // Players can trade Tesla, Apple, Microsoft etc. anytime
+    this.marketStatus.isOpen = true;
     
     // Update market trend periodically
     if (Math.random() < 0.1) { // 10% chance to change trend
@@ -296,7 +291,7 @@ export class StockMarketManager {
       const newTrend = trends[Math.floor(Math.random() * trends.length)];
       if (newTrend !== this.marketStatus.trend) {
         this.marketStatus.trend = newTrend;
-        console.log(`Market trend changed to: ${newTrend}`);
+        console.log(`Real stock market trend changed to: ${newTrend}`);
       }
     }
   }
@@ -549,36 +544,42 @@ export class StockMarketManager {
 
   
   /**
-   * Initialize real stock data from external API
+   * Initialize real stock data from external API via ICP canister
    */
   private async initializeRealStockData(): Promise<void> {
     try {
-      console.log('Loading real stock market data...');
-      const realStocks = await realStockService.initializeRealStocks();
+      console.log('Loading real stock market data from ICP canister...');
       
-      // Convert real stock data to our Stock interface format
-      this.stockData = realStocks.map((realStock, index) => ({
-        id: realStock.symbol.toLowerCase(),
-        name: realStock.name,
-        sector: realStock.sector,
-        currentPrice: realStock.price,
-        priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
-        debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
-        businessGrowth: realStock.changePercent / 10, // Convert to business growth
-        news: [],
-        volatility: Math.abs(realStock.changePercent) / 10 + 1, // Base volatility on price change
-        lastUpdate: Date.now(),
-        marketCap: realStock.marketCap,
-        peRatio: realStock.peRatio || 20, // Default P/E if not available
-        eps: realStock.price / (realStock.peRatio || 20), // Calculate EPS
-        outstandingShares: realStock.marketCap / realStock.price,
-        industryAvgPE: this.getIndustryAveragePE(realStock.sector)
-      }));
+      // Use the new StockService to get actual stock data (Tesla, Apple, Microsoft, etc.)
+      const realStocks = await stockService.getAllStocks();
+      
+      if (realStocks && realStocks.length > 0) {
+        // Convert real stock data to our Stock interface format
+        this.stockData = realStocks.map((realStock: any, index: number) => ({
+          id: realStock.id,
+          name: realStock.name,
+          sector: realStock.sector,
+          currentPrice: realStock.currentPrice,
+          priceHistory: realStock.priceHistory,
+          debtEquityRatio: realStock.debtEquityRatio,
+          businessGrowth: realStock.businessGrowth,
+          news: realStock.news,
+          volatility: realStock.volatility,
+          lastUpdate: realStock.lastUpdate,
+          marketCap: realStock.marketCap,
+          peRatio: realStock.peRatio,
+          eps: realStock.eps,
+          outstandingShares: realStock.outstandingShares,
+          industryAvgPE: realStock.industryAvgPE
+        }));
 
-      console.log(`Loaded ${this.stockData.length} real stocks:`, this.stockData.map(s => s.name));
-      
-      // Start periodic updates every 5 minutes
-      this.startRealTimeUpdates();
+        console.log(`Loaded ${this.stockData.length} real stocks:`, this.stockData.map(s => `${s.name} (₹${s.currentPrice})`));
+        
+        // Start periodic updates every 5 minutes for real-time price changes
+        this.startRealTimeUpdates();
+      } else {
+        throw new Error('No real stocks loaded, using fallback data');
+      }
       
     } catch (error) {
       console.error('Failed to load real stock data, falling back to mock data:', error);
@@ -641,38 +642,45 @@ export class StockMarketManager {
   }
 
   /**
-   * Update real stock prices from API
+   * Update real stock prices from API via ICP canister
    */
   private async updateRealStockPrices(): Promise<void> {
     try {
-      if (!this.marketStatus.isOpen) {
-        return; // Don't update during market close
-      }
-
+      // Get symbols of our tracked stocks and get updated stock data
       const symbols = this.stockData.map(stock => stock.id.toUpperCase());
-      const updatedStocks = await realStockService.getMultipleStocks(symbols);
+      const updatedStocks = await stockService.getAllStocks();
 
       for (const updatedStock of updatedStocks) {
-        const existingStock = this.stockData.find(s => s.id === updatedStock.symbol.toLowerCase());
+        const existingStock = this.stockData.find(s => s.id === updatedStock.id);
         if (existingStock) {
           // Update price history
-          existingStock.priceHistory.push(updatedStock.price);
+          existingStock.priceHistory.push(updatedStock.currentPrice);
           if (existingStock.priceHistory.length > 15) {
             existingStock.priceHistory.shift(); // Keep only last 15 prices
           }
 
           // Update current price and metrics
-          existingStock.currentPrice = updatedStock.price;
+          existingStock.currentPrice = updatedStock.currentPrice;
           existingStock.marketCap = updatedStock.marketCap;
-          existingStock.peRatio = updatedStock.peRatio || existingStock.peRatio;
+          existingStock.peRatio = updatedStock.peRatio;
           existingStock.lastUpdate = Date.now();
-          existingStock.volatility = Math.abs(updatedStock.changePercent) / 10 + 1;
+          
+          // Calculate change percentage from price history for volatility and growth
+          const priceChange = existingStock.priceHistory.length > 1 
+            ? ((existingStock.currentPrice - existingStock.priceHistory[existingStock.priceHistory.length - 2]) / existingStock.priceHistory[existingStock.priceHistory.length - 2]) * 100
+            : 0;
+          
+          existingStock.volatility = Math.abs(priceChange) / 10 + 1;
+          
+          // Update business growth based on recent price change
+          existingStock.businessGrowth = priceChange / 5;
         }
       }
 
-      console.log('Updated real stock prices');
+      console.log(`Updated ${updatedStocks.length} real stock prices via ICP canister`);
     } catch (error) {
       console.error('Failed to update stock prices:', error);
+      // Continue with existing prices rather than crashing
     }
   }
 
@@ -685,17 +693,17 @@ export class StockMarketManager {
         id: 'technova',
         name: 'TechNova',
         sector: 'Technology',
-        currentPrice: 1500,
+        currentPrice: 45,
         priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 1500 + Math.random() * 300 - 150),
+          (_, i) => 45 + Math.random() * 20 - 10),
         debtEquityRatio: 0.7,
         businessGrowth: 4.2,
         news: [],
         volatility: 1.5,
         lastUpdate: Date.now(),
-        marketCap: 1500000000,
+        marketCap: 45000000,
         peRatio: 25,
-        eps: 60,
+        eps: 1.8,
         outstandingShares: 1000000,
         industryAvgPE: 20
       },
@@ -703,17 +711,17 @@ export class StockMarketManager {
         id: 'greenedge',
         name: 'GreenEdge',
         sector: 'Energy',
-        currentPrice: 850,
+        currentPrice: 28,
         priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 850 + Math.random() * 200 - 100),
+          (_, i) => 28 + Math.random() * 10 - 5),
         debtEquityRatio: 1.2,
         businessGrowth: 2.8,
         news: [],
         volatility: 2.0,
         lastUpdate: Date.now(),
-        marketCap: 850000000,
+        marketCap: 28000000,
         peRatio: 18,
-        eps: 47.22,
+        eps: 1.56,
         outstandingShares: 1000000,
         industryAvgPE: 15
       },
@@ -721,17 +729,17 @@ export class StockMarketManager {
         id: 'bytex',
         name: 'ByteX',
         sector: 'Technology',
-        currentPrice: 3200,
+        currentPrice: 85,
         priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 3200 + Math.random() * 600 - 300),
+          (_, i) => 85 + Math.random() * 30 - 15),
         debtEquityRatio: 0.5,
         businessGrowth: -1.3,
         news: [],
         volatility: 3.0,
         lastUpdate: Date.now(),
-        marketCap: 3200000000,
+        marketCap: 85000000,
         peRatio: 30,
-        eps: 106.67,
+        eps: 2.83,
         outstandingShares: 1000000,
         industryAvgPE: 20
       },
@@ -739,19 +747,127 @@ export class StockMarketManager {
         id: 'solarsphere',
         name: 'SolarSphere',
         sector: 'Energy',
-        currentPrice: 620,
+        currentPrice: 32,
         priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 620 + Math.random() * 150 - 75),
+          (_, i) => 32 + Math.random() * 8 - 4),
         debtEquityRatio: 1.8,
         businessGrowth: 6.5,
         news: [],
         volatility: 1.8,
         lastUpdate: Date.now(),
-        marketCap: 620000000,
+        marketCap: 32000000,
         peRatio: 12,
-        eps: 51.67,
+        eps: 2.67,
         outstandingShares: 1000000,
         industryAvgPE: 15
+      },
+      {
+        id: 'metaverse',
+        name: 'MetaVerse Inc',
+        sector: 'Technology',
+        currentPrice: 58,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 58 + Math.random() * 15 - 7.5),
+        debtEquityRatio: 0.8,
+        businessGrowth: 8.2,
+        news: [],
+        volatility: 2.5,
+        lastUpdate: Date.now(),
+        marketCap: 58000000,
+        peRatio: 22,
+        eps: 2.64,
+        outstandingShares: 1000000,
+        industryAvgPE: 20
+      },
+      {
+        id: 'healthplus',
+        name: 'HealthPlus',
+        sector: 'Healthcare',
+        currentPrice: 42,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 42 + Math.random() * 12 - 6),
+        debtEquityRatio: 0.4,
+        businessGrowth: 5.1,
+        news: [],
+        volatility: 1.2,
+        lastUpdate: Date.now(),
+        marketCap: 42000000,
+        peRatio: 16,
+        eps: 2.63,
+        outstandingShares: 1000000,
+        industryAvgPE: 18
+      },
+      {
+        id: 'autotech',
+        name: 'AutoTech Motors',
+        sector: 'Automotive',
+        currentPrice: 35,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 35 + Math.random() * 10 - 5),
+        debtEquityRatio: 1.5,
+        businessGrowth: 3.7,
+        news: [],
+        volatility: 2.2,
+        lastUpdate: Date.now(),
+        marketCap: 35000000,
+        peRatio: 14,
+        eps: 2.5,
+        outstandingShares: 1000000,
+        industryAvgPE: 15
+      },
+      {
+        id: 'foodcorp',
+        name: 'FoodCorp',
+        sector: 'Consumer Goods',
+        currentPrice: 25,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 25 + Math.random() * 6 - 3),
+        debtEquityRatio: 0.6,
+        businessGrowth: 2.1,
+        news: [],
+        volatility: 1.0,
+        lastUpdate: Date.now(),
+        marketCap: 25000000,
+        peRatio: 12,
+        eps: 2.08,
+        outstandingShares: 1000000,
+        industryAvgPE: 13
+      },
+      {
+        id: 'finbank',
+        name: 'FinBank',
+        sector: 'Financial',
+        currentPrice: 68,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 68 + Math.random() * 18 - 9),
+        debtEquityRatio: 2.5,
+        businessGrowth: 4.8,
+        news: [],
+        volatility: 1.8,
+        lastUpdate: Date.now(),
+        marketCap: 68000000,
+        peRatio: 19,
+        eps: 3.58,
+        outstandingShares: 1000000,
+        industryAvgPE: 17
+      },
+      {
+        id: 'telecom',
+        name: 'TeleCom Ltd',
+        sector: 'Telecommunications',
+        currentPrice: 38,
+        priceHistory: Array.from({ length: 15 }, 
+          (_, i) => 38 + Math.random() * 8 - 4),
+        debtEquityRatio: 1.1,
+        businessGrowth: 1.9,
+        news: [],
+        volatility: 1.4,
+        lastUpdate: Date.now(),
+        marketCap: 38000000,
+        peRatio: 15,
+        eps: 2.53,
+        outstandingShares: 1000000,
+        industryAvgPE: 16
       }
     ];
   }
@@ -1091,10 +1207,7 @@ export class StockMarketManager {
       return { success: false, message: "Please enter a valid quantity." };
     }
     
-    // Check if market is open
-    if (!this.marketStatus.isOpen) {
-      return { success: false, message: "Cannot trade while market is closed." };
-    }
+    // Real stock market is always open for gaming - no market closure restrictions
     
     // Find the stock
     const stock = this.stockData.find(s => s.id === stockId);
@@ -1107,8 +1220,10 @@ export class StockMarketManager {
     
     // Check if player has enough money
     const playerRupees = this.scene.getPlayerRupees();
+    console.log(`Attempting to buy ${quantity} shares of ${stock.name} for ₹${totalCost}. Player has ₹${playerRupees}`);
+    
     if (totalCost > playerRupees) {
-      return { success: false, message: "Not enough rupees for this purchase." };
+      return { success: false, message: `Not enough rupees for this purchase. You need ₹${totalCost.toLocaleString()} but only have ₹${playerRupees.toLocaleString()}.` };
     }
     
     // Deduct rupees from player
@@ -1145,7 +1260,7 @@ export class StockMarketManager {
     });
     
     // Log transaction
-    console.log(`Purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
+    console.log(`Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost}`);
     
     return { 
       success: true, 
@@ -1165,10 +1280,7 @@ export class StockMarketManager {
       return { success: false, message: "Please enter a valid quantity." };
     }
     
-    // Check if market is open
-    if (!this.marketStatus.isOpen) {
-      return { success: false, message: "Cannot trade while market is closed." };
-    }
+    // Real stock market is always open for gaming - no market closure restrictions
     
     // Find the stock
     const stock = this.stockData.find(s => s.id === stockId);

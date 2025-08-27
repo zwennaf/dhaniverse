@@ -1,28 +1,15 @@
 import React, { useState, useEffect } from "react";
 import TradeStockPopup from "./TradeStockPopup.tsx";
+import StockDetail from "./StockDetail.tsx";
+import StockGraph from "./StockGraph.tsx";
+import StockLeaderboard from "./StockLeaderboard.tsx";
+import NewsPopup from "./NewsPopup.tsx";
 import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
-import { canisterService } from "../../../services/CanisterService.ts";
-import realStockService from "../../../services/RealStockService";
-
-interface Stock {
-    id: string;
-    name: string;
-    currentPrice: number;
-    priceHistory: number[];
-    debtEquityRatio: number;
-    businessGrowth: number;
-    news: string[];
-    marketCap: number;
-    peRatio: number;
-    eps: number;
-    industryAvgPE: number;
-    outstandingShares: number;
-    volatility: number;
-    lastUpdate: number;
-    sector?: string;
-}
+import { stockService, type Stock } from "../../../services/StockService";
+import { ICPActorService } from "../../../services/ICPActorService";
+import { WalletManager } from "../../../services/WalletManager";
 
 interface StockHolding {
     stockId: string;
@@ -52,24 +39,34 @@ interface StockMarketDashboardProps {
     stocks: Stock[];
 }
 
-type SortField = "name" | "price" | "marketCap" | "peRatio" | "debtEquity" | "eps" | "growth";
+type SortField = "name" | "currentPrice" | "sector" | "marketCap" | "peRatio";
 type SortDirection = "asc" | "desc";
-type FilterOption = "all" | "undervalued" | "highGrowth" | "lowRisk" | "highRisk";
+type FilterOption = "all" | "technology" | "finance" | "healthcare" | "consumer" | "energy" | "cryptocurrency";
 type TabOption = "market" | "portfolio";
+type ViewMode = "cards" | "table";
 
-const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees, stocks }) => {
+const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees }) => {
+    // Services
+    const icpService = new ICPActorService();
+    const walletManager = new WalletManager();
+    
     // Core UI state
     const [activeTab, setActiveTab] = useState<TabOption>("market");
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [showTrade, setShowTrade] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
+    const [showGraph, setShowGraph] = useState(false);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [showNews, setShowNews] = useState(false);
     const [sortField, setSortField] = useState<SortField>("name");
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     const [filterOption, setFilterOption] = useState<FilterOption>("all");
-    const [filteredStocks, setFilteredStocks] = useState<Stock[]>(stocks);
+    const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
     const [currentRupees, setCurrentRupees] = useState(playerRupees);
     const [portfolio, setPortfolio] = useState<PlayerPortfolio>({ holdings: [], transactionHistory: [] });
     const [isLoading, setIsLoading] = useState(true);
-    const [loadingStage, setLoadingStage] = useState("Initializing Market Data");
+    const [loadingStage, setLoadingStage] = useState("Loading Stock Market Data");
+    const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
     // Load portfolio
     useEffect(() => {
@@ -95,175 +92,197 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         loadPortfolio();
     }, []);
 
-    // Real stock data load
+    // Load real stocks data
     useEffect(() => {
         let mounted = true;
         const load = async () => {
             try {
-                const initialized = await canisterService.initialize().catch(() => false);
-                if (!initialized) {
-                    console.warn("Canister not initialized, using fallback stock data");
-                    setFilteredStocks(stocks);
-                    return;
-                }
-
-                const realStocks = await realStockService.initializeRealStocks();
+                setLoadingStage("Loading Stock Market Data");
+                
+                const allStocks = await stockService.getAllStocks();
                 if (!mounted) return;
                 
-                if (realStocks && realStocks.length > 0) {
-                    const updated = stocks.map(s => {
-                        const realStock = realStocks.find(rs => 
-                            rs.symbol === s.id.toUpperCase() || 
-                            rs.symbol.toLowerCase() === s.id.toLowerCase()
-                        );
-                        if (realStock) {
-                            return {
-                                ...s,
-                                currentPrice: realStock.price,
-                                marketCap: realStock.marketCap,
-                                peRatio: realStock.peRatio || s.peRatio,
-                                priceHistory: [...s.priceHistory.slice(1), realStock.price],
-                                sector: realStock.sector,
-                                lastUpdate: Date.now()
-                            };
-                        }
-                        return s;
-                    });
-                    setFilteredStocks(updated);
-                    console.log("Successfully loaded real stock data from ICP canister");
+                if (allStocks && allStocks.length > 0) {
+                    setFilteredStocks(allStocks);
+                    console.log(`Successfully loaded ${allStocks.length} stocks`);
                 } else {
-                    setFilteredStocks(stocks);
-                    console.log("No real stock data available, using fallback");
+                    console.warn("No stocks loaded");
                 }
             } catch (e) {
-                console.warn("Real stock load failed, using fallback:", e);
-                setFilteredStocks(stocks);
+                console.error("Failed to load stocks:", e);
+            } finally {
+                setIsLoading(false);
             }
         };
         load();
         return () => { mounted = false; };
-    }, [stocks]);
+    }, []);
 
     // Listen for rupee updates
     useEffect(() => {
         const handler = (e: any) => {
             if (e.detail?.rupees !== undefined) setCurrentRupees(e.detail.rupees);
         };
-        window.addEventListener("rupee-update", handler as EventListener);
-        return () => window.removeEventListener("rupee-update", handler as EventListener);
+        window.addEventListener("rupeesUpdated", handler);
+        return () => window.removeEventListener("rupeesUpdated", handler);
     }, []);
 
-    // Filtering & sorting
-    useEffect(() => {
+    // Filter and sort stocks
+    const getDisplayStocks = () => {
         let result = [...filteredStocks];
         
-        // Apply filter
+        // Apply sector filter
         if (filterOption !== "all") {
             result = filteredStocks.filter(s => {
+                const sector = s.sector?.toLowerCase() || "";
                 switch (filterOption) {
-                    case "undervalued": return s.peRatio < s.industryAvgPE && s.eps > 30;
-                    case "highGrowth": return s.businessGrowth > 3;
-                    case "lowRisk": return s.debtEquityRatio < 0.8 && s.marketCap > 1_000_000_000;
-                    case "highRisk": return s.debtEquityRatio > 1.5 || s.volatility > 2.5;
+                    case "technology": return sector.includes("tech");
+                    case "finance": return sector.includes("finance");
+                    case "healthcare": return sector.includes("health");
+                    case "consumer": return sector.includes("consumer") || sector.includes("retail");
+                    case "energy": return sector.includes("energy");
+                    case "cryptocurrency": return sector.includes("crypto");
                     default: return true;
                 }
             });
         }
         
-        // Apply sort
+        // Apply sorting
         result.sort((a, b) => {
-            let aVal: number, bVal: number;
+            let aVal: any, bVal: any;
             switch (sortField) {
-                case "name": return sortDirection === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-                case "price": aVal = a.currentPrice; bVal = b.currentPrice; break;
-                case "marketCap": aVal = a.marketCap; bVal = b.marketCap; break;
-                case "peRatio": aVal = a.peRatio; bVal = b.peRatio; break;
-                case "growth": aVal = a.businessGrowth; bVal = b.businessGrowth; break;
-                default: aVal = 0; bVal = 0;
+                case "name": 
+                    aVal = a.name; 
+                    bVal = b.name; 
+                    break;
+                case "currentPrice": 
+                    aVal = a.currentPrice; 
+                    bVal = b.currentPrice; 
+                    break;
+                case "sector": 
+                    aVal = a.sector || ""; 
+                    bVal = b.sector || ""; 
+                    break;
+                case "marketCap": 
+                    aVal = a.marketCap; 
+                    bVal = b.marketCap; 
+                    break;
+                case "peRatio": 
+                    aVal = a.peRatio; 
+                    bVal = b.peRatio; 
+                    break;
+                default: 
+                    aVal = a.name; 
+                    bVal = b.name;
             }
-            return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+            
+            if (typeof aVal === "string") {
+                return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            } else {
+                return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+            }
         });
         
-        setFilteredStocks(result);
-    }, [sortField, sortDirection, filterOption]);
-
-    // Loading simulation
-    useEffect(() => {
-        const run = async () => {
-            setLoadingStage("Connecting to ICP Canister"); 
-            await new Promise(r => setTimeout(r, 900));
-            setLoadingStage("Loading CoinGecko Prices"); 
-            await new Promise(r => setTimeout(r, 1100));
-            setLoadingStage("Converting to Stock Data"); 
-            await new Promise(r => setTimeout(r, 800));
-            setIsLoading(false);
-        }; 
-        run();
-    }, []);
-
-    const handleSort = (field: SortField) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-        } else {
-            setSortField(field);
-            setSortDirection("asc");
-        }
+        return result;
     };
 
-    const renderSortIndicator = (field: SortField) => {
-        if (sortField !== field) return null;
-        return (
-            <span className="ml-1">
-                {sortDirection === "asc" ? "↑" : "↓"}
-            </span>
-        );
-    };
+    const displayStocks = getDisplayStocks();
 
     const calculatePortfolioValue = () => {
         let totalValue = 0;
         let totalInvestment = 0;
-
+        
         portfolio.holdings.forEach(holding => {
             const stock = filteredStocks.find(s => s.id === holding.stockId);
             if (stock) {
-                totalValue += stock.currentPrice * holding.quantity;
+                const currentValue = stock.currentPrice * holding.quantity;
+                totalValue += currentValue;
                 totalInvestment += holding.totalInvestment;
             }
         });
+        
+        const profitLoss = totalValue - totalInvestment;
+        const profitLossPercent = totalInvestment > 0 ? (profitLoss / totalInvestment) * 100 : 0;
+        
+        return { totalValue, totalInvestment, profitLoss, profitLossPercent };
+    };
 
-        const totalProfit = totalValue - totalInvestment;
-        const profitPercent = totalInvestment > 0 ? (totalProfit / totalInvestment) * 100 : 0;
+    const openTrade = (stock: Stock) => {
+        setSelectedStock(stock);
+        setShowTrade(true);
+    };
 
-        return {
-            totalValue,
-            totalInvestment,
-            totalProfit,
-            profitPercent,
-        };
+    const closeTrade = () => {
+        setShowTrade(false);
+        setSelectedStock(null);
+    };
+
+    const openDetail = (stock: Stock) => {
+        setSelectedStock(stock);
+        setShowDetail(true);
+    };
+
+    const closeDetail = () => {
+        setShowDetail(false);
+        setSelectedStock(null);
+    };
+
+    const openGraph = () => {
+        setShowGraph(true);
+        setShowDetail(false);
+    };
+
+    const closeGraph = () => {
+        setShowGraph(false);
+        setShowDetail(true);
+    };
+
+    const openNews = () => {
+        setShowNews(true);
+        setShowDetail(false);
+    };
+
+    const closeNews = () => {
+        setShowNews(false);
+        setShowDetail(true);
+    };
+
+    const openLeaderboard = () => {
+        setShowLeaderboard(true);
+    };
+
+    const closeLeaderboard = () => {
+        setShowLeaderboard(false);
     };
 
     const handleBuyStock = async (stockId: string, quantity: number) => {
         const stock = filteredStocks.find(s => s.id === stockId);
-        if (!stock) {
-            return { success: false, message: "Stock not found" };
-        }
+        if (!stock) return { success: false, message: "Stock not found" };
 
-        const cost = stock.currentPrice * quantity;
-        
-        if (cost > currentRupees) {
+        const totalCost = stock.currentPrice * quantity;
+        if (totalCost > currentRupees) {
             return { success: false, message: "Insufficient funds" };
         }
 
         try {
-            const response = await stockApi.buyStock(stock.id, quantity, stock.currentPrice);
-            
+            const response = await stockApi.buyStock(
+                stockId.toUpperCase(),
+                quantity,
+                stock.currentPrice,
+                stock.name
+            );
+
             if (response.success) {
-                balanceManager.processWithdrawal(cost, `Stock purchase: ${stock.name}`);
-                setCurrentRupees(prev => prev - cost);
+                // Update balance
+                const newBalance = currentRupees - totalCost;
+                setCurrentRupees(newBalance);
+                balanceManager.updateCash(newBalance);
                 
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
+                console.log('Portfolio API Response:', portfolioResponse);
                 if (portfolioResponse.success && portfolioResponse.data) {
+                    console.log('Portfolio holdings data:', portfolioResponse.data.holdings);
                     const transformedPortfolio: PlayerPortfolio = {
                         holdings: portfolioResponse.data.holdings?.map((holding: any) => ({
                             stockId: holding.symbol,
@@ -273,41 +292,42 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                         })) || [],
                         transactionHistory: [],
                     };
+                    console.log('Transformed portfolio:', transformedPortfolio);
                     setPortfolio(transformedPortfolio);
                 }
-                
+
                 return {
                     success: true,
-                    message: `Successfully bought ${quantity} shares of ${stock.name} for ₹${cost.toLocaleString()}`,
+                    message: `Successfully purchased ${quantity} shares of ${stock.name} for ₹${totalCost.toLocaleString()}`,
                 };
             }
             
-            return { success: false, message: response.error || "Purchase failed" };
+            return { success: false, message: response.error || response.message || "Purchase failed" };
         } catch (error) {
             console.error("Buy stock error:", error);
-            return { success: false, message: "Transaction failed" };
+            return { success: false, message: "Transaction failed: " + (error instanceof Error ? error.message : "Unknown error occurred") };
         }
     };
 
     const handleSellStock = async (stockId: string, quantity: number) => {
         const stock = filteredStocks.find(s => s.id === stockId);
-        if (!stock) {
-            return { success: false, message: "Stock not found" };
-        }
+        if (!stock) return { success: false, message: "Stock not found" };
 
-        const holding = portfolio.holdings.find(h => h.stockId === stock.id);
-        
+        const holding = portfolio.holdings.find(h => h.stockId === stockId);
         if (!holding || holding.quantity < quantity) {
-            return { success: false, message: "Insufficient shares" };
+            return { success: false, message: "Insufficient shares to sell" };
         }
 
         try {
-            const response = await stockApi.sellStock(stock.id, quantity, stock.currentPrice);
-            
+            const response = await stockApi.sellStock(stockId.toUpperCase(), quantity, stock.currentPrice);
+
             if (response.success) {
                 const saleValue = stock.currentPrice * quantity;
-                balanceManager.updateCash(currentRupees + saleValue);
-                setCurrentRupees(prev => prev + saleValue);
+                
+                // Update balance
+                const newBalance = currentRupees + saleValue;
+                setCurrentRupees(newBalance);
+                balanceManager.updateCash(newBalance);
                 
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
@@ -337,10 +357,10 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 };
             }
             
-            return { success: false, message: response.error || "Sale failed" };
+            return { success: false, message: response.error || response.message || "Sale failed" };
         } catch (error) {
             console.error("Sell stock error:", error);
-            return { success: false, message: "Transaction failed" };
+            return { success: false, message: "Transaction failed: " + (error instanceof Error ? error.message : "Unknown error occurred") };
         }
     };
 
@@ -389,6 +409,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                         <p className="text-xs text-gray-400 uppercase tracking-wide">Portfolio Value</p>
                                         <p className="text-xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
                                     </div>
+                                    <button 
+                                        onClick={openLeaderboard}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded font-medium hover:bg-purple-500 transition-colors duration-200"
+                                    >
+                                        LEADERBOARD
+                                    </button>
                                     <button onClick={onClose} className="text-gray-400 hover:text-yellow-500 text-2xl transition-colors duration-200">
                                         ×
                                     </button>
@@ -417,298 +443,320 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     }`}
                                     style={{ fontFamily:'VCR OSD Mono, monospace' }}
                                 >
-                                    PORTFOLIO ({portfolio.holdings.length})
+                                    PORTFOLIO
                                 </button>
                             </div>
                         </div>
 
                         {/* Main Content */}
-                        <div className="flex-1 flex overflow-hidden">
-                            {activeTab === "market" ? (
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            {activeTab === "market" && (
                                 <>
-                                    {/* Left: Stock List */}
-                                    <div className="w-1/2 bg-black border-r border-yellow-600/30 p-6 flex flex-col">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <h2 className="text-lg font-light text-yellow-500 tracking-wide uppercase" style={{ fontFamily:'VCR OSD Mono, monospace' }}>
-                                                Live Stocks
-                                            </h2>
-                                            <div className="flex space-x-2">
-                                                {(['all','undervalued','highGrowth','lowRisk','highRisk'] as FilterOption[]).map(f => (
-                                                    <button 
-                                                        key={f} 
-                                                        onClick={() => setFilterOption(f)} 
-                                                        className={`px-3 py-1 text-xs rounded border tracking-wider transition-colors duration-200 ${
-                                                            filterOption===f
-                                                                ?'bg-yellow-600 text-black border-yellow-600'
-                                                                :'bg-black border-gray-600 text-gray-400 hover:border-yellow-500'
-                                                        }`} 
-                                                        style={{ fontFamily:'VCR OSD Mono, monospace' }}
+                                    {/* Filters */}
+                                    <div className="bg-gray-900/50 border-b border-gray-700/50 p-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-6">
+                                                <div className="flex items-center space-x-3">
+                                                    <label className="text-sm text-gray-400 uppercase tracking-wide">Filter by Sector:</label>
+                                                    <select
+                                                        value={filterOption}
+                                                        onChange={(e) => setFilterOption(e.target.value as FilterOption)}
+                                                        className="bg-gray-800 border border-gray-600 text-white px-3 py-1 rounded text-sm focus:border-yellow-500 focus:outline-none"
                                                     >
-                                                        {f.toUpperCase()}
+                                                        <option value="all">All Sectors</option>
+                                                        <option value="technology">Technology</option>
+                                                        <option value="finance">Finance</option>
+                                                        <option value="healthcare">Healthcare</option>
+                                                        <option value="consumer">Consumer</option>
+                                                        <option value="energy">Energy</option>
+                                                        <option value="cryptocurrency">Cryptocurrency</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center space-x-3">
+                                                    <label className="text-sm text-gray-400 uppercase tracking-wide">Sort by:</label>
+                                                    <select
+                                                        value={sortField}
+                                                        onChange={(e) => setSortField(e.target.value as SortField)}
+                                                        className="bg-gray-800 border border-gray-600 text-white px-3 py-1 rounded text-sm focus:border-yellow-500 focus:outline-none"
+                                                    >
+                                                        <option value="name">Name</option>
+                                                        <option value="currentPrice">Price</option>
+                                                        <option value="sector">Sector</option>
+                                                        <option value="marketCap">Market Cap</option>
+                                                        <option value="peRatio">P/E Ratio</option>
+                                                    </select>
+                                                    <button
+                                                        onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+                                                        className="bg-gray-800 border border-gray-600 text-white px-3 py-1 rounded text-sm hover:border-yellow-500 focus:border-yellow-500 focus:outline-none"
+                                                    >
+                                                        {sortDirection === "asc" ? "↑" : "↓"}
                                                     </button>
-                                                ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center text-xs text-gray-400 mb-4 space-x-4">
-                                            <span className="uppercase tracking-wide">Sort by:</span>
-                                            {(['name','price','marketCap','peRatio','growth'] as SortField[]).map(sf => (
-                                                <button 
-                                                    key={sf} 
-                                                    onClick={() => handleSort(sf)} 
-                                                    className={`flex items-center space-x-1 transition-colors duration-200 ${
-                                                        sortField===sf ? 'text-yellow-500' : 'hover:text-yellow-500'
-                                                    }`}
-                                                >
-                                                    <span className="uppercase">{sf}</span>
-                                                    {renderSortIndicator(sf)}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        
-                                        <div className="flex-1 overflow-y-auto space-y-3 pr-2" style={{scrollbarWidth: 'thin', scrollbarColor: '#ca8a04 transparent'}}>
-                                            {filteredStocks.map(s => {
-                                                const isSel = selectedStock?.id === s.id;
-                                                const change = s.priceHistory.length>1 ? ((s.currentPrice - s.priceHistory[s.priceHistory.length-2]) / s.priceHistory[s.priceHistory.length-2]) * 100 : 0;
-                                                return (
-                                                    <div 
-                                                        key={s.id} 
-                                                        onClick={() => setSelectedStock(s)} 
-                                                        className={`p-4 rounded border cursor-pointer transition-all duration-200 ${
-                                                            isSel
-                                                                ? 'bg-yellow-600/10 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)]'
-                                                                : 'bg-black border-gray-700 hover:border-yellow-500/50 hover:bg-gray-900/50'
-                                                        }`}
+                                            <div className="flex items-center space-x-3">
+                                                <span className="text-sm text-gray-400">View:</span>
+                                                <div className="flex bg-gray-800 rounded border border-gray-600">
+                                                    <button
+                                                        onClick={() => setViewMode("cards")}
+                                                        className={`px-3 py-1 text-sm rounded-l ${viewMode === "cards" ? 'bg-yellow-600 text-black' : 'text-white hover:bg-gray-700'}`}
                                                     >
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div>
-                                                                <h3 className="text-white font-medium leading-none">{s.name}</h3>
-                                                                <p className="text-gray-400 text-xs tracking-wider mt-1">{s.id.toUpperCase()}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <div className="text-white font-medium">₹{s.currentPrice.toFixed(2)}</div>
-                                                                <div className={`text-xs font-medium ${change>=0?'text-yellow-500':'text-red-400'}`}>
-                                                                    {change>=0?'+':''}{change.toFixed(2)}%
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs text-gray-500">
-                                                            <span>MCap ₹{(s.marketCap/1_000_000).toFixed(0)}M</span>
-                                                            <span>P/E {s.peRatio.toFixed(1)}</span>
-                                                            <span>Vol {s.volatility.toFixed(1)}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                        📄 Cards
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setViewMode("table")}
+                                                        className={`px-3 py-1 text-sm rounded-r ${viewMode === "table" ? 'bg-yellow-600 text-black' : 'text-white hover:bg-gray-700'}`}
+                                                    >
+                                                        📊 Table
+                                                    </button>
+                                                </div>
+                                                <div className="text-sm text-gray-400">
+                                                    Showing {displayStocks.length} stocks
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Right: Stock Details */}
-                                    <div className="w-1/2 bg-black p-8 flex flex-col">
-                                        {selectedStock ? (
-                                            <>
-                                                <div className="flex justify-between items-start mb-8 border-b border-yellow-600/20 pb-6">
-                                                    <div>
-                                                        <h2 className="text-2xl font-light text-yellow-500 mb-2 tracking-wide" style={{ fontFamily:'VCR OSD Mono, monospace' }}>
-                                                            {selectedStock.name}
-                                                        </h2>
-                                                        <p className="text-gray-400 text-sm tracking-wider uppercase">
-                                                            {selectedStock.id} • {selectedStock.sector||'Technology'}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-3xl font-light text-white mb-1">₹{selectedStock.currentPrice.toFixed(2)}</div>
-                                                        <div className={`text-sm font-medium ${
-                                                            selectedStock.priceHistory.length>1 && selectedStock.currentPrice > selectedStock.priceHistory[selectedStock.priceHistory.length-2] 
-                                                                ? 'text-yellow-500' : 'text-red-400'
-                                                        }`}>
-                                                            {selectedStock.priceHistory.length>1
-                                                                ? `${selectedStock.currentPrice>selectedStock.priceHistory[selectedStock.priceHistory.length-2]?'+':''}${(((selectedStock.currentPrice-selectedStock.priceHistory[selectedStock.priceHistory.length-2])/selectedStock.priceHistory[selectedStock.priceHistory.length-2])*100).toFixed(2)}%`
-                                                                : '0.00%'
-                                                            }
+                                    {/* Stock List */}
+                                    <div className="flex-1 overflow-y-auto">
+                                        {viewMode === "cards" ? (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 p-6">
+                                                {displayStocks.map((stock) => {
+                                                    const holding = portfolio.holdings.find(h => h.stockId === stock.id);
+                                                    const owned = holding?.quantity || 0;
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={stock.id}
+                                                            className="bg-gray-900/80 border border-gray-700/50 rounded-lg p-6 hover:border-yellow-500/50 transition-all duration-200 cursor-pointer"
+                                                            onClick={() => openTrade(stock)}
+                                                        >
+                                                            <div className="flex justify-between items-start mb-4">
+                                                                <div>
+                                                                    <h3 className="text-lg font-medium text-white mb-1">{stock.name}</h3>
+                                                                    <p className="text-xs text-gray-400 uppercase tracking-wide">{stock.sector}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-2xl font-light text-yellow-500">₹{stock.currentPrice.toLocaleString()}</p>
+                                                                    {owned > 0 && (
+                                                                        <p className="text-xs text-blue-400 mt-1">Owned: {owned}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                                <div>
+                                                                    <p className="text-gray-400">Market Cap</p>
+                                                                    <p className="text-white">₹{(stock.marketCap / 1000000).toFixed(1)}M</p>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-gray-400">P/E Ratio</p>
+                                                                    <p className="text-white">{stock.peRatio.toFixed(1)}</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="flex space-x-2 mt-4">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); openDetail(stock); }}
+                                                                    className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-500 transition-colors duration-200 text-xs"
+                                                                >
+                                                                    DETAILS
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { 
+                                                                        e.stopPropagation(); 
+                                                                        setSelectedStock(stock);
+                                                                        setShowGraph(true);
+                                                                    }}
+                                                                    className="flex-1 bg-purple-600 text-white py-2 rounded font-medium hover:bg-purple-500 transition-colors duration-200 text-xs"
+                                                                >
+                                                                    📈 GRAPH
+                                                                </button>
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); openTrade(stock); }}
+                                                                    className="flex-1 bg-yellow-600 text-black py-2 rounded font-medium hover:bg-yellow-500 transition-colors duration-200 text-xs"
+                                                                >
+                                                                    TRADE
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="grid grid-cols-2 gap-4 mb-8">
-                                                    {[
-                                                        { label:'Market Cap', value:`₹${(selectedStock.marketCap/1_000_000).toFixed(0)}M`},
-                                                        { label:'P/E Ratio', value:selectedStock.peRatio.toFixed(1)},
-                                                        { label:'EPS', value:`₹${selectedStock.eps.toFixed(2)}`},
-                                                        { label:'Volatility', value:selectedStock.volatility.toFixed(1)},
-                                                    ].map(m => (
-                                                        <div key={m.label} className="bg-black border border-gray-700 rounded p-4">
-                                                            <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">{m.label}</div>
-                                                            <div className="text-lg font-light text-white">{m.value}</div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                
-                                                <div className="flex-1 bg-black border border-gray-700 rounded p-4 mb-8">
-                                                    <h3 className="text-sm font-medium text-yellow-500 mb-4 tracking-wider uppercase">Price History</h3>
-                                                    <div className="h-32 flex items-end space-x-1">
-                                                        {selectedStock.priceHistory.map((p,i) => {
-                                                            const max = Math.max(...selectedStock.priceHistory); 
-                                                            const min = Math.min(...selectedStock.priceHistory); 
-                                                            const h = max===min ? 50 : ((p-min)/(max-min))*100+10;
-                                                            return (
-                                                                <div 
-                                                                    key={i} 
-                                                                    className="flex-1 bg-yellow-600 rounded-t" 
-                                                                    style={{ height:`${h}%`}} 
-                                                                    title={`₹${p.toFixed(2)}`} 
-                                                                />
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="flex space-x-4">
-                                                    <button 
-                                                        onClick={() => setShowTrade(true)} 
-                                                        className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-medium py-3 rounded transition-colors duration-200" 
-                                                        style={{ fontFamily:'VCR OSD Mono, monospace' }}
-                                                    >
-                                                        BUY
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setShowTrade(true)} 
-                                                        className="flex-1 bg-black border border-gray-600 hover:border-yellow-500 text-white font-medium py-3 rounded transition-colors duration-200" 
-                                                        style={{ fontFamily:'VCR OSD Mono, monospace' }}
-                                                    >
-                                                        SELL
-                                                    </button>
-                                                </div>
-                                            </>
+                                                    );
+                                                })}
+                                            </div>
                                         ) : (
-                                            <div className="flex-1 flex items-center justify-center text-center">
-                                                <div>
-                                                    <div className="w-24 h-24 bg-yellow-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                        <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                                        </svg>
-                                                    </div>
-                                                    <h3 className="text-xl font-light text-gray-300 mb-2">Select a Stock</h3>
-                                                    <p className="text-gray-500">Choose a stock from the list to view details and trade</p>
+                                            <div className="p-6">
+                                                <div className="bg-gray-900/50 rounded-lg overflow-hidden">
+                                                    <table className="w-full">
+                                                        <thead className="bg-gray-800/50">
+                                                            <tr>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stock</th>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Price</th>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Market Cap</th>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">P/E</th>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Owned</th>
+                                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-700/50">
+                                                            {displayStocks.map((stock) => {
+                                                                const holding = portfolio.holdings.find(h => h.stockId === stock.id);
+                                                                const owned = holding?.quantity || 0;
+                                                                
+                                                                return (
+                                                                    <tr key={stock.id} className="hover:bg-gray-800/25 cursor-pointer" onClick={() => openTrade(stock)}>
+                                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                                            <div>
+                                                                                <div className="text-sm font-medium text-white">{stock.name}</div>
+                                                                                <div className="text-sm text-gray-400">{stock.sector}</div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-500 font-medium">
+                                                                            ₹{stock.currentPrice.toLocaleString()}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                            ₹{(stock.marketCap / 1000000).toFixed(1)}M
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                            {stock.peRatio.toFixed(1)}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                            {owned > 0 ? (
+                                                                                <span className="text-blue-400 font-medium">{owned}</span>
+                                                                            ) : (
+                                                                                <span className="text-gray-500">-</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                            <div className="flex space-x-1">
+                                                                                <button 
+                                                                                    onClick={(e) => { e.stopPropagation(); openDetail(stock); }}
+                                                                                    className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-500"
+                                                                                    title="Details"
+                                                                                >
+                                                                                    📋
+                                                                                </button>
+                                                                                <button 
+                                                                                    onClick={(e) => { 
+                                                                                        e.stopPropagation(); 
+                                                                                        setSelectedStock(stock);
+                                                                                        setShowGraph(true);
+                                                                                    }}
+                                                                                    className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-500"
+                                                                                    title="Graph"
+                                                                                >
+                                                                                    📈
+                                                                                </button>
+                                                                                <button 
+                                                                                    onClick={(e) => { e.stopPropagation(); openTrade(stock); }}
+                                                                                    className="bg-yellow-600 text-black px-2 py-1 rounded text-xs hover:bg-yellow-500"
+                                                                                    title="Trade"
+                                                                                >
+                                                                                    💰
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
                                 </>
-                            ) : (
-                                /* Portfolio View */
-                                <div className="flex-1 bg-black p-8 overflow-y-auto" style={{scrollbarWidth: 'thin', scrollbarColor: '#ca8a04 transparent'}}>
-                                    <div className="mb-8">
-                                        <h2 className="text-2xl font-light text-yellow-500 mb-6 tracking-wide" style={{ fontFamily:'VCR OSD Mono, monospace' }}>
-                                            YOUR PORTFOLIO
-                                        </h2>
-                                        
-                                        {/* Portfolio Summary */}
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                                            {(() => {
-                                                const stats = calculatePortfolioValue();
-                                                return [
-                                                    { label: 'Total Value', value: `₹${stats.totalValue.toLocaleString()}`, color: 'text-yellow-500' },
-                                                    { label: 'Total Investment', value: `₹${stats.totalInvestment.toLocaleString()}`, color: 'text-white' },
-                                                    { label: 'Total P&L', value: `₹${stats.totalProfit.toLocaleString()}`, color: stats.totalProfit >= 0 ? 'text-yellow-500' : 'text-red-400' },
-                                                    { label: 'Return %', value: `${stats.profitPercent.toFixed(2)}%`, color: stats.profitPercent >= 0 ? 'text-yellow-500' : 'text-red-400' }
-                                                ].map(stat => (
-                                                    <div key={stat.label} className="bg-black border border-gray-700 rounded p-4">
-                                                        <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">{stat.label}</div>
-                                                        <div className={`text-xl font-light ${stat.color}`}>{stat.value}</div>
-                                                    </div>
-                                                ));
-                                            })()}
+                            )}
+
+                            {activeTab === "portfolio" && (
+                                <div className="flex-1 p-6">
+                                    <div className="mb-6">
+                                        <div className="grid grid-cols-4 gap-4">
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <p className="text-gray-400 text-sm">Total Value</p>
+                                                <p className="text-2xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <p className="text-gray-400 text-sm">Total Investment</p>
+                                                <p className="text-2xl font-light text-white">₹{calculatePortfolioValue().totalInvestment.toLocaleString()}</p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <p className="text-gray-400 text-sm">Profit/Loss</p>
+                                                <p className={`text-2xl font-light ${calculatePortfolioValue().profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    ₹{calculatePortfolioValue().profitLoss.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <p className="text-gray-400 text-sm">P/L Percentage</p>
+                                                <p className={`text-2xl font-light ${calculatePortfolioValue().profitLossPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {calculatePortfolioValue().profitLossPercent.toFixed(2)}%
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Holdings */}
-                                    {portfolio.holdings.length === 0 ? (
-                                        <div className="text-center py-16">
-                                            <div className="w-24 h-24 bg-yellow-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                </svg>
-                                            </div>
-                                            <h3 className="text-xl font-light text-gray-300 mb-2">No Holdings Yet</h3>
-                                            <p className="text-gray-500 mb-6">Start trading to build your portfolio</p>
-                                            <button 
-                                                onClick={() => setActiveTab("market")} 
-                                                className="bg-yellow-600 hover:bg-yellow-500 text-black font-medium px-6 py-3 rounded transition-colors duration-200"
-                                                style={{ fontFamily:'VCR OSD Mono, monospace' }}
-                                            >
-                                                EXPLORE MARKET
-                                            </button>
+                                    <div className="bg-gray-900/50 rounded-lg overflow-hidden">
+                                        <div className="px-6 py-4 border-b border-gray-700/50">
+                                            <h3 className="text-lg font-medium text-white">Your Holdings</h3>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {portfolio.holdings.map(holding => {
-                                                const stock = filteredStocks.find(s => s.id === holding.stockId);
-                                                if (!stock) return null;
-                                                
-                                                const currentValue = stock.currentPrice * holding.quantity;
-                                                const profit = currentValue - holding.totalInvestment;
-                                                const profitPercent = (profit / holding.totalInvestment) * 100;
-                                                
-                                                return (
-                                                    <div key={holding.stockId} className="bg-black border border-gray-700 rounded p-6 hover:border-yellow-500/50 transition-colors duration-200">
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <div>
-                                                                <h3 className="text-white font-medium text-lg">{stock.name}</h3>
-                                                                <p className="text-gray-400 text-sm uppercase tracking-wide">{stock.id}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <div className="text-white font-medium">₹{stock.currentPrice.toFixed(2)}</div>
-                                                                <div className="text-sm text-gray-400">{holding.quantity} shares</div>
-                                                            </div>
-                                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className="bg-gray-800/50">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stock</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Quantity</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Avg. Price</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Current Price</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Value</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">P/L</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-700/50">
+                                                    {portfolio.holdings.map((holding) => {
+                                                        const stock = filteredStocks.find(s => s.id === holding.stockId);
+                                                        if (!stock) return null;
                                                         
-                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                            <div>
-                                                                <div className="text-gray-400 uppercase tracking-wide">Avg. Price</div>
-                                                                <div className="text-white font-medium">₹{holding.averagePurchasePrice.toFixed(2)}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-gray-400 uppercase tracking-wide">Invested</div>
-                                                                <div className="text-white font-medium">₹{holding.totalInvestment.toLocaleString()}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-gray-400 uppercase tracking-wide">Current Value</div>
-                                                                <div className="text-white font-medium">₹{currentValue.toLocaleString()}</div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-gray-400 uppercase tracking-wide">P&L</div>
-                                                                <div className={`font-medium ${profit >= 0 ? 'text-yellow-500' : 'text-red-400'}`}>
-                                                                    ₹{profit.toLocaleString()} ({profitPercent.toFixed(2)}%)
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                        const currentValue = stock.currentPrice * holding.quantity;
+                                                        const profitLoss = currentValue - holding.totalInvestment;
+                                                        const profitLossPercent = (profitLoss / holding.totalInvestment) * 100;
                                                         
-                                                        <div className="flex space-x-3 mt-4 pt-4 border-t border-gray-800">
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setSelectedStock(stock);
-                                                                    setShowTrade(true);
-                                                                }}
-                                                                className="bg-yellow-600 hover:bg-yellow-500 text-black font-medium px-4 py-2 rounded text-sm transition-colors duration-200"
-                                                            >
-                                                                BUY MORE
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setSelectedStock(stock);
-                                                                    setShowTrade(true);
-                                                                }}
-                                                                className="bg-black border border-gray-600 hover:border-yellow-500 text-white font-medium px-4 py-2 rounded text-sm transition-colors duration-200"
-                                                            >
-                                                                SELL
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                                        return (
+                                                            <tr key={holding.stockId} className="hover:bg-gray-800/25">
+                                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                                    <div>
+                                                                        <div className="text-sm font-medium text-white">{stock.name}</div>
+                                                                        <div className="text-sm text-gray-400">{stock.sector}</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{holding.quantity}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">₹{holding.averagePurchasePrice.toLocaleString()}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">₹{stock.currentPrice.toLocaleString()}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">₹{currentValue.toLocaleString()}</td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                    <div className={profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                                                        ₹{profitLoss.toLocaleString()}
+                                                                        <div className="text-xs">({profitLossPercent.toFixed(2)}%)</div>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                    <button
+                                                                        onClick={() => openTrade(stock)}
+                                                                        className="bg-yellow-600 text-black px-3 py-1 rounded text-xs font-medium hover:bg-yellow-500 transition-colors duration-200"
+                                                                    >
+                                                                        TRADE
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                            {portfolio.holdings.length === 0 && (
+                                                <div className="text-center py-12">
+                                                    <p className="text-gray-400">No holdings yet. Start trading to build your portfolio!</p>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -716,14 +764,60 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 )}
             </div>
 
+            {/* Trade Popup */}
             {showTrade && selectedStock && (
                 <TradeStockPopup
                     stock={selectedStock}
-                    playerRupees={currentRupees}
-                    holdings={portfolio.holdings}
+                    onClose={closeTrade}
                     onBuy={handleBuyStock}
                     onSell={handleSellStock}
-                    onClose={() => setShowTrade(false)}
+                    playerRupees={currentRupees}
+                    holdings={portfolio.holdings}
+                />
+            )}
+
+            {/* Stock Detail Popup */}
+            {showDetail && selectedStock && (
+                <StockDetail 
+                    stock={selectedStock}
+                    onShowGraph={() => {
+                        closeDetail();
+                        openGraph();
+                    }}
+                    onShowNews={() => {
+                        closeDetail();
+                        openNews();
+                    }}
+                    onTrade={() => {
+                        closeDetail();
+                        openTrade(selectedStock);
+                    }}
+                    onClose={closeDetail}
+                />
+            )}
+
+            {/* Stock Graph Popup */}
+            {showGraph && selectedStock && (
+                <StockGraph 
+                    stock={selectedStock}
+                    onClose={closeGraph}
+                />
+            )}
+
+            {/* Leaderboard Popup */}
+            {showLeaderboard && (
+                <StockLeaderboard 
+                    icpService={icpService}
+                    walletManager={walletManager}
+                    onClose={closeLeaderboard}
+                />
+            )}
+
+            {/* News Popup */}
+            {showNews && selectedStock && (
+                <NewsPopup 
+                    stock={selectedStock}
+                    onClose={closeNews}
                 />
             )}
         </>
