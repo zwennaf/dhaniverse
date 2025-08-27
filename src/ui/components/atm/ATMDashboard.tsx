@@ -299,10 +299,9 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
                                 tx._id ||
                                 tx.id ||
                                 `bank_${Date.now()}_${Math.random()}`,
-                            type:
-                                tx.type === "credit" || tx.type === "deposit"
-                                    ? "deposit"
-                                    : "withdrawal",
+                            type: (tx.type === "credit" || tx.type === "deposit") 
+                                ? "deposit" as const
+                                : "withdrawal" as const,
                             amount: tx.amount || 0,
                             timestamp: new Date(
                                 tx.timestamp || tx.createdAt || Date.now()
@@ -337,8 +336,9 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
                                 tx._id ||
                                 tx.id ||
                                 `stock_${Date.now()}_${Math.random()}`,
-                            type:
-                                tx.type === "buy" ? "stock_buy" : "stock_sell",
+                            type: tx.type === "buy" 
+                                ? "stock_buy" as const 
+                                : "stock_sell" as const,
                             amount: tx.amount || tx.quantity * tx.price || 0,
                             timestamp: new Date(
                                 tx.timestamp || tx.createdAt || Date.now()
