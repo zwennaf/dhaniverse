@@ -82,7 +82,7 @@ class RealStockService {
   }
 
   /**
-   * Get real stock data for a given symbol using ICP canister
+   * Get real stock data for a given symbol (AVOIDS INDIVIDUAL CANISTER CALLS)
    */
   async getStockData(symbol: string): Promise<RealStockData | null> {
     try {
@@ -99,73 +99,18 @@ class RealStockService {
         return null;
       }
 
-      // Call ICP canister to get real stock price from external API
-      if (!canisterService.isConnected()) {
-        await canisterService.initialize();
-      }
-
-      const actor = (canisterService as any).actor;
-      if (!actor) {
-        console.error('Canister actor not available');
-        return this.generateFallbackData(symbol, mapping);
-      }
-
-      // Call the canister's fetch_stock_price method for real stock data
-      let result;
-      try {
-        // Add timeout wrapper for canister calls to prevent 5-minute hangs
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000);
-        });
-
-        const fetchPromise = actor.fetch_stock_price(mapping.symbol);
-        result = await Promise.race([fetchPromise, timeoutPromise]);
-      } catch (error) {
-        console.error(`Failed to fetch price for ${mapping.symbol}:`, error);
-        return this.generateFallbackData(symbol, mapping);
-      }
-
-      if (!result || !('Ok' in result)) {
-        console.warn(`No price data returned for ${mapping.symbol}`, result);
-        return this.generateFallbackData(symbol, mapping);
-      }
-
-      const stockPrice = result.Ok;
-      console.log(`🔍 DEBUG: ${mapping.symbol} raw result:`, result, 'stockPrice:', stockPrice, 'type:', typeof stockPrice);
+      // ⚠️ AVOID INDIVIDUAL CANISTER CALLS - use fallback data to save cycles
+      console.log(`💰 Avoiding individual canister call for ${symbol} - using fallback data to save ICP cycles`);
       
-      // Check if stockPrice is valid
-      if (!stockPrice || stockPrice <= 0) {
-        console.warn(`❌ Invalid price for ${mapping.symbol}: ${stockPrice}, using fallback`);
-        return this.generateFallbackData(symbol, mapping);
-      }
+      // Generate fallback data instead of making expensive individual canister calls
+      const fallbackData = this.generateFallbackData(symbol, mapping);
       
-      // Convert USD to INR and scale for gameplay
-      const priceInINR = this.convertToGamePrice(stockPrice); 
-      
-      console.log(`✅ ${mapping.symbol}: $${stockPrice} USD → ₹${priceInINR} INR`);
-      
-      // Generate realistic stock metrics
-      const stockData: RealStockData = {
-        symbol: mapping.symbol,
-        name: mapping.name,
-        price: Math.round(priceInINR * 100) / 100,
-        change: this.generateRealisticChange(priceInINR),
-        changePercent: (Math.random() - 0.5) * 5, // ±2.5% realistic daily change
-        marketCap: stockPrice * 1000000000, // Simulated market cap
-        peRatio: this.generatePERatio(),
-        volume: Math.floor(Math.random() * 5000000 + 1000000), // 1M-6M volume
-        sector: mapping.sector
-      };
+      // Cache the fallback data
+      this.cache.set(symbol, { data: fallbackData, timestamp: Date.now() });
 
-      // Cache the data
-      this.cache.set(symbol, { data: stockData, timestamp: Date.now() });
-
-      // Store in canister for persistence
-      await this.storeInCanister(stockData);
-
-      return stockData;
+      return fallbackData;
     } catch (error) {
-      console.error(`Failed to fetch stock data for ${symbol}:`, error);
+      console.error(`Failed to get stock data for ${symbol}:`, error);
       const mapping = this.realStocks.find((m: StockMapping) => m.symbol === symbol.toUpperCase());
       return mapping ? this.generateFallbackData(symbol, mapping) : null;
     }
@@ -205,12 +150,13 @@ class RealStockService {
 
       console.log(`🚀 Batch loading: ${cryptoMappings.length} cryptos + ${stockMappings.length} stocks`);
 
-      // 1. Fetch crypto prices in batch using fetch_multiple_crypto_prices
+      // 1. Fetch ALL crypto prices in ONE call using CoinGecko's bulk endpoint
       if (cryptoMappings.length > 0) {
         try {
-          // Map our symbols to CoinGecko IDs
+          // Use ALL CoinGecko IDs at once - this is what CoinGecko is designed for!
           const coinGeckoIds = cryptoMappings.map(m => this.getCoinGeckoId(m.symbol)).join(',');
-          console.log(`💰 Fetching crypto batch: ${coinGeckoIds}`);
+          console.log(`� SINGLE CoinGecko call for ALL cryptos: ${coinGeckoIds}`);
+          console.log(`💰 This saves ${cryptoMappings.length - 1} individual API calls!`);
           
           const cryptoResult = await actor.fetch_multiple_crypto_prices(coinGeckoIds);
           
@@ -235,57 +181,31 @@ class RealStockService {
                 
                 results.push(stockData);
                 this.cache.set(mapping.symbol, { data: stockData, timestamp: Date.now() });
-                console.log(`✅ ${mapping.symbol}: $${priceUsd} USD → ₹${priceInINR} INR`);
+                console.log(`✅ ${mapping.symbol}: $${priceUsd} USD → ₹${priceInINR.toLocaleString()} INR`);
               }
             });
+            console.log(`🎉 BULK crypto fetch successful: ${cryptoResult.length} prices loaded in ONE call!`);
           }
         } catch (error) {
-          console.error('Crypto batch fetch failed:', error);
+          console.error('Bulk crypto fetch failed:', error);
           // Add fallback data for failed crypto requests
           results.push(...this.generateAllFallbackData(cryptoMappings));
         }
       }
 
-      // 2. Fetch stock prices individually using fetch_stock_price (no batch method available)
+      // 2. Use fallback data for stocks (NO INDIVIDUAL CALLS TO SAVE CYCLES!)
       if (stockMappings.length > 0) {
-        console.log(`📈 Fetching ${stockMappings.length} stocks individually (no batch method in canister)`);
+        console.log(`⚠️ Using fallback data for ${stockMappings.length} stocks to avoid spamming canister`);
+        console.log(`💰 This saves ${stockMappings.length} expensive individual canister calls!`);
         
-        for (const mapping of stockMappings) {
-          try {
-            const stockResult = await actor.fetch_stock_price(mapping.symbol);
-            
-            if (stockResult && 'Ok' in stockResult && stockResult.Ok > 0) {
-              const priceInINR = this.convertToGamePrice(stockResult.Ok);
-              const stockData: RealStockData = {
-                symbol: mapping.symbol,
-                name: mapping.name,
-                price: Math.round(priceInINR * 100) / 100,
-                change: this.generateRealisticChange(priceInINR),
-                changePercent: (Math.random() - 0.5) * 5,
-                marketCap: stockResult.Ok * 1000000000,
-                peRatio: this.generatePERatio(),
-                volume: Math.floor(Math.random() * 5000000 + 1000000),
-                sector: mapping.sector
-              };
-              
-              results.push(stockData);
-              this.cache.set(mapping.symbol, { data: stockData, timestamp: Date.now() });
-              console.log(`✅ ${mapping.symbol}: $${stockResult.Ok} USD → ₹${priceInINR} INR`);
-            } else {
-              console.warn(`❌ Invalid price for ${mapping.symbol}, using fallback`);
-              const fallbackData = this.generateFallbackData(mapping.symbol, mapping);
-              results.push(fallbackData);
-            }
-            
-            // Add small delay between individual stock calls to be respectful
-            await this.delay(500);
-            
-          } catch (error) {
-            console.error(`Failed to fetch ${mapping.symbol}:`, error);
-            const fallbackData = this.generateFallbackData(mapping.symbol, mapping);
-            results.push(fallbackData);
-          }
-        }
+        // Generate realistic fallback data instead of making expensive individual calls
+        const stockFallbackData = this.generateAllFallbackData(stockMappings);
+        results.push(...stockFallbackData);
+        
+        // Cache the fallback data
+        stockFallbackData.forEach(stockData => {
+          this.cache.set(stockData.symbol, { data: stockData, timestamp: Date.now() });
+        });
       }
 
       console.log(`✅ Mixed batch loading complete: ${results.length}/${mappings.length} stocks loaded`);
@@ -414,65 +334,6 @@ class RealStockService {
   }
 
   /**
-   * Optimized individual calls with rate limiting (fallback when batch isn't available)
-   */
-  private async getMultipleStocksOptimized(mappings: StockMapping[]): Promise<RealStockData[]> {
-    const results: RealStockData[] = [];
-    
-    // Process in smaller batches to avoid overwhelming the canister
-    const batchSize = 5;
-    for (let i = 0; i < mappings.length; i += batchSize) {
-      const batch = mappings.slice(i, i + batchSize);
-      
-      console.log(`📦 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(mappings.length/batchSize)}: ${batch.map(m => m.symbol).join(', ')}`);
-      
-      // Process batch in parallel
-      const batchPromises = batch.map(async (mapping) => {
-        try {
-          const data = await this.getStockData(mapping.symbol);
-          return data;
-        } catch (error) {
-          console.warn(`Failed to fetch ${mapping.symbol}:`, error);
-          return this.generateFallbackData(mapping.symbol, mapping);
-        }
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults.filter(Boolean) as RealStockData[]);
-      
-      // Add delay between batches to be respectful to the canister
-      if (i + batchSize < mappings.length) {
-        await this.delay(1000); // 1 second between batches
-      }
-    }
-
-    console.log(`✅ Optimized fetch completed: ${results.length}/${mappings.length} stocks loaded`);
-    return results;
-  }
-
-  private async getMultipleStocksIndividually(symbols: string[]): Promise<RealStockData[]> {
-    const results: RealStockData[] = [];
-    
-    // Process in batches to avoid overwhelming the canister
-    for (const symbol of symbols) {
-      try {
-        const data = await this.getStockData(symbol);
-        if (data) {
-          results.push(data);
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch individual stock data for ${symbol}:`, error);
-        // Continue with other stocks
-      }
-      // Add small delay between requests
-      await this.delay(300); // Reduced delay
-    }
-
-    console.log(`Individual fetch completed: ${results.length}/${symbols.length} stocks loaded`);
-    return results;
-  }
-
-  /**
    * Delay utility for rate limiting
    */
   private delay(ms: number): Promise<void> {
@@ -537,9 +398,14 @@ class RealStockService {
   }
 
   /**
-   * Store stock data in ICP canister for persistence
+   * Store stock data in ICP canister for persistence (DISABLED TO SAVE CYCLES)
    */
   private async storeInCanister(stockData: RealStockData): Promise<void> {
+    // ⚠️ DISABLED: Avoiding individual store calls to save ICP cycles
+    console.log(`💰 Skipping individual store call for ${stockData.symbol} to save ICP cycles`);
+    return; // Skip individual storage calls
+    
+    /*
     try {
       if (!canisterService.isConnected()) {
         await canisterService.initialize();
@@ -553,6 +419,7 @@ class RealStockService {
       console.warn('Failed to store stock data in canister:', error);
       // Non-critical error, continue operation
     }
+    */
   }
 
   /**
@@ -582,36 +449,10 @@ class RealStockService {
         if (typeof result === 'number') {
           updatedCount = result;
           console.log(`✅ Canister updated ${updatedCount} crypto prices internally`);
+          console.log(`💰 Skipping individual get_price_feed calls to save ICP cycles`);
           
-          // Now fetch the updated prices from the canister's internal storage
-          const cryptoSymbols = ['BTC', 'ETH', 'ICP', 'LINK'];
-          for (const symbol of cryptoSymbols) {
-            try {
-              const price = await actor.get_price_feed(symbol);
-              if (price && price > 0) {
-                const mapping = this.realStocks.find(m => m.symbol === symbol);
-                if (mapping) {
-                  const priceInINR = this.convertToGamePrice(price);
-                  const stockData: RealStockData = {
-                    symbol: mapping.symbol,
-                    name: mapping.name,
-                    price: Math.round(priceInINR * 100) / 100,
-                    change: this.generateRealisticChange(priceInINR),
-                    changePercent: (Math.random() - 0.5) * 5,
-                    marketCap: price * 1000000000,
-                    peRatio: this.generatePERatio(),
-                    volume: Math.floor(Math.random() * 5000000 + 1000000),
-                    sector: mapping.sector
-                  };
-                  
-                  this.cache.set(symbol, { data: stockData, timestamp: Date.now() });
-                  console.log(`✅ Updated ${symbol}: $${price} USD → ₹${priceInINR} INR`);
-                }
-              }
-            } catch (error) {
-              console.warn(`Failed to get price feed for ${symbol}:`, error);
-            }
-          }
+          // Skip individual price fetching to save cycles - prices are updated internally
+          console.log(`⏭️ Prices updated in canister internally, not fetching individual feeds to save cycles`);
         }
       } catch (error) {
         console.error('Canister price update failed:', error);
