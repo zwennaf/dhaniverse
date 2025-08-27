@@ -1207,5 +1207,21 @@ export class StockMarketManager {
   }
 }
 
-// Create a singleton instance for use in UI components
-export const stockMarketManager = new StockMarketManager(null as any); // We'll initialize the scene later
+// Create a singleton instance for use in UI components (lazy initialization)
+let _stockMarketManagerInstance: StockMarketManager | null = null;
+
+export const getStockMarketManager = (scene?: MainScene): StockMarketManager => {
+  if (!_stockMarketManagerInstance && scene) {
+    _stockMarketManagerInstance = new StockMarketManager(scene);
+  }
+  if (!_stockMarketManagerInstance) {
+    throw new Error('StockMarketManager not initialized. Call getStockMarketManager(scene) first.');
+  }
+  return _stockMarketManagerInstance;
+};
+
+// For backward compatibility
+export const stockMarketManager = {
+  getInstance: () => _stockMarketManagerInstance,
+  initialize: (scene: MainScene) => getStockMarketManager(scene)
+};

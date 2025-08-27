@@ -8,7 +8,7 @@ import NewsPopup from "./NewsPopup.tsx";
 import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
-import { stockMarketManager, type Stock } from "../../../game/systems/StockMarketManager";
+import { stockMarketService, type Stock } from "../../../services/StockMarketService";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { WalletManager } from "../../../services/WalletManager";
 
@@ -135,17 +135,17 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 setLoadingStage("Loading Real Stock Market Data from ICP Canister");
                 
                 // Initialize real stock data if not already done
-                if (stockMarketManager.getStockMarketData().length === 0) {
-                    await stockMarketManager.initializeAsync();
+                if (!stockMarketService.isServiceInitialized()) {
+                    await stockMarketService.initialize();
                 }
                 
-                const allStocks = stockMarketManager.getStockMarketData();
+                const allStocks = stockMarketService.getStockMarketData();
                 if (!mounted) return;
                 
                 if (allStocks && allStocks.length > 0) {
                     setFilteredStocks(allStocks);
                     console.log(`✅ Successfully loaded ${allStocks.length} REAL stocks from ICP canister:`, 
-                        allStocks.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
+                        allStocks.map((s: Stock) => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
                 } else {
                     console.warn("❌ No real stocks loaded from canister");
                 }
