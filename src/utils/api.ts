@@ -227,24 +227,37 @@ export const bankingApi = {
 
     // Get bank transactions
     getTransactions: async () => {
+        // Banking transactions are embedded in the bank account data
+        // We'll get them from the account details endpoint instead
         try {
-            const response = await fetch(`${API_BASE}/game/bank-account/transactions`, {
+            const response = await fetch(`${API_BASE}/game/bank-account`, {
                 headers: getAuthHeaders(),
             });
             
-            // Handle case where endpoint doesn't exist yet
             if (response.status === 404) {
-                console.log('Bank transactions endpoint not available yet');
+                console.log('Bank account not found');
                 return {
                     success: true,
-                    data: [] // Return empty transactions array
+                    data: []
                 };
             }
             
-            return handleApiResponse(response);
+            if (!response.ok) {
+                console.warn("Bank account API error:", response.status);
+                return {
+                    success: true,
+                    data: []
+                };
+            }
+            
+            const result = await response.json();
+            // Extract transactions from bank account data
+            return {
+                success: true,
+                data: result.data?.transactions || []
+            };
         } catch (error) {
             console.warn("Bank transactions API not available:", error);
-            // Return empty transactions if API endpoint doesn't exist
             return {
                 success: true,
                 data: []
@@ -339,7 +352,7 @@ export const stockApi = {
     // Get stock transactions
     getTransactions: async () => {
         try {
-            const response = await fetch(`${API_BASE}/game/stock-portfolio/transactions`, {
+            const response = await fetch(`${API_BASE}/game/stock-transactions`, {
                 headers: getAuthHeaders(),
             });
             
@@ -349,6 +362,15 @@ export const stockApi = {
                 return {
                     success: true,
                     data: [] // Return empty transactions array
+                };
+            }
+            
+            // Only call handleApiResponse for successful responses
+            if (!response.ok) {
+                console.warn("Stock transactions API error:", response.status);
+                return {
+                    success: true,
+                    data: []
                 };
             }
             
