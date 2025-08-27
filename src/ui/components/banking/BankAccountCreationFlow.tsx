@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { animate, stagger } from 'motion';
 import { bankingApi } from '../../../utils/api';
 import { balanceManager } from '../../../services/BalanceManager';
+import { dialogueManager } from '../../../services/DialogueManager';
 
 interface CreatedAccountDetails {
   accountNumber: string;
@@ -16,7 +17,7 @@ interface CreatedAccountDetails {
 
 type FlowStep = 'HIDDEN' | 'FORM' | 'PROCESSING' | 'DETAILS' | 'SUCCESS';
 
-const MIN_DEPOSIT = 500;
+const MIN_DEPOSIT = 10000; // Increased to ₹10,000 to match realistic banking standards
 
 const BankAccountCreationFlow: React.FC = () => {
   const [step, setStep] = useState<FlowStep>('HIDDEN');
@@ -75,18 +76,31 @@ const BankAccountCreationFlow: React.FC = () => {
         
         // Step 2: Check if bank onboarding is already completed in progression
         if (progressionState.hasCompletedBankOnboarding) {
-          console.log('🏦 Bank onboarding already completed in progression, skipping UI');
+          console.log('🏦 Bank onboarding already completed in progression, showing welcome back dialogue');
           
           // Mark localStorage flag as well for consistency
           localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
           
-          // Directly trigger completion since onboarding is done
-          window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
-            detail: { 
-              name: 'Existing User', 
-              account: null // Will be handled by the onboarding manager
-            } 
-          }));
+          // Show welcome back dialogue for existing users
+          dialogueManager.showDialogue({
+            text: 'Welcome back to Dhaniverse Bank! Your account is ready for use.',
+            characterName: 'Bank Manager',
+            allowSpaceAdvance: true,
+            showBackdrop: false
+          }, { 
+            onAdvance: () => {
+              dialogueManager.closeDialogue();
+              
+              // After dialogue, trigger completion and open banking UI
+              window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
+                detail: { 
+                  name: 'Existing User', 
+                  account: null,
+                  openBankingUI: true // Signal to open banking UI
+                } 
+              }));
+            }
+          });
           return;
         }
         

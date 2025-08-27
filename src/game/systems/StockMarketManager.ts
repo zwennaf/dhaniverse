@@ -3,14 +3,14 @@ import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
 import { canisterService } from '../../services/CanisterService';
 import { balanceManager } from '../../services/BalanceManager';
-import { stockService } from '../../services/StockService';
+import { realStockService } from '../../services/RealStockService';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
 }
 
 // Enhanced Stock interface with more realistic properties
-interface Stock {
+export interface Stock {
   id: string;
   name: string;
   sector: string;
@@ -30,7 +30,7 @@ interface Stock {
 }
 
 // Market status interface to track overall market conditions
-interface MarketStatus {
+export interface MarketStatus {
   isOpen: boolean;        // Whether the market is currently open
   trend: 'bull' | 'bear' | 'neutral'; // Overall market trend
   volatility: number;     // Overall market volatility
@@ -39,14 +39,14 @@ interface MarketStatus {
 }
 
 // Player's portfolio to track owned stocks
-interface StockHolding {
+export interface StockHolding {
   stockId: string;
   quantity: number;
   averagePurchasePrice: number;
   totalInvestment: number;
 }
 
-interface PlayerPortfolio {
+export interface PlayerPortfolio {
   holdings: StockHolding[];
   transactionHistory: StockTransaction[];
 }
@@ -544,65 +544,76 @@ export class StockMarketManager {
 
   
   /**
-   * Initialize real stock data from external API via ICP canister
+   * Public async initialization method for UI components
    */
-  private async initializeRealStockData(): Promise<void> {
+  public async initializeAsync(): Promise<void> {
     try {
-      console.log('Loading real stock market data from ICP canister...');
-      
-      // Use the new StockService to get actual stock data (Tesla, Apple, Microsoft, etc.)
-      const realStocks = await stockService.getAllStocks();
-      
-      if (realStocks && realStocks.length > 0) {
-        // Convert real stock data to our Stock interface format
-        this.stockData = realStocks.map((realStock: any, index: number) => ({
-          id: realStock.id,
-          name: realStock.name,
-          sector: realStock.sector,
-          currentPrice: realStock.currentPrice,
-          priceHistory: realStock.priceHistory,
-          debtEquityRatio: realStock.debtEquityRatio,
-          businessGrowth: realStock.businessGrowth,
-          news: realStock.news,
-          volatility: realStock.volatility,
-          lastUpdate: realStock.lastUpdate,
-          marketCap: realStock.marketCap,
-          peRatio: realStock.peRatio,
-          eps: realStock.eps,
-          outstandingShares: realStock.outstandingShares,
-          industryAvgPE: realStock.industryAvgPE
-        }));
-
-        console.log(`Loaded ${this.stockData.length} real stocks:`, this.stockData.map(s => `${s.name} (₹${s.currentPrice})`));
-        
-        // Start periodic updates every 5 minutes for real-time price changes
-        this.startRealTimeUpdates();
-      } else {
-        throw new Error('No real stocks loaded, using fallback data');
+      // Initialize real stock data if not already done
+      if (this.stockData.length === 0) {
+        await this.initializeRealStockData();
       }
-      
     } catch (error) {
-      console.error('Failed to load real stock data, falling back to mock data:', error);
-      this.stockData = this.generateInitialStockData();
+      console.error('Failed to initialize StockMarketManager:', error);
+      throw error;
     }
   }
 
   /**
-   * Generate realistic price history based on current price and recent change
+   * Initialize real stock data from external API via ICP canister
+   */
+  private async initializeRealStockData(): Promise<void> {
+    console.log('Loading real stock market data from ICP canister...');
+    
+    // ONLY use RealStockService - NO FALLBACK to mock data
+    const realStocks = await realStockService.initializeRealStocks();
+    
+    if (!realStocks || realStocks.length === 0) {
+      throw new Error('Failed to load real stock data from ICP canister. Cannot proceed without real stock prices.');
+    }
+
+    // Convert RealStockData to our Stock interface format
+    this.stockData = realStocks.map((realStock: any, index: number) => ({
+      id: realStock.symbol.toLowerCase(),
+      name: realStock.name,
+      sector: realStock.sector,
+      currentPrice: realStock.price, // Real price in INR from canister
+      priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
+      debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
+      businessGrowth: realStock.changePercent * 2, // Based on recent performance
+      news: [],
+      volatility: Math.abs(realStock.changePercent) / 10 + 1,
+      lastUpdate: Date.now(),
+      marketCap: realStock.marketCap,
+      peRatio: realStock.peRatio,
+      eps: realStock.price / realStock.peRatio,
+      outstandingShares: Math.floor(realStock.marketCap / realStock.price),
+      industryAvgPE: 15 + Math.random() * 10
+    }));
+
+    console.log(`✅ Loaded ${this.stockData.length} REAL stocks from ICP canister:`, 
+      this.stockData.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
+    
+    // Start periodic updates every 5 minutes for real-time price changes
+    this.startRealTimeUpdates();
+  }
+
+  /**
+   * Generate realistic price history based on current price and change percent
    */
   private generateRealisticPriceHistory(currentPrice: number, changePercent: number): number[] {
+    // Generate 24 historical data points (hourly for a day)
     const history: number[] = [];
-    let price = currentPrice * (1 - changePercent / 100); // Start from previous price
+    const basePrice = currentPrice / (1 + changePercent / 100); // Estimate yesterday's price
     
-    for (let i = 0; i < 15; i++) {
-      // Add small random variations
-      const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
-      price = price * (1 + variation);
-      history.push(Math.round(price * 100) / 100); // Round to 2 decimal places
+    for (let i = 0; i < 24; i++) {
+      // Create realistic price movements throughout the day
+      const progress = i / 23; // 0 to 1
+      const randomFactor = (Math.random() - 0.5) * 0.02; // ±1% random variation
+      const trendFactor = progress * (changePercent / 100); // Progressive trend
+      const price = basePrice * (1 + trendFactor + randomFactor);
+      history.push(Math.max(price, 1)); // Ensure positive prices
     }
     
-    // Ensure the last price matches current price
-    history[history.length - 1] = currentPrice;
     return history;
   }
 
@@ -645,231 +656,47 @@ export class StockMarketManager {
    * Update real stock prices from API via ICP canister
    */
   private async updateRealStockPrices(): Promise<void> {
-    try {
-      // Get symbols of our tracked stocks and get updated stock data
-      const symbols = this.stockData.map(stock => stock.id.toUpperCase());
-      const updatedStocks = await stockService.getAllStocks();
+    console.log('🔄 Updating real stock prices from ICP canister...');
+    
+    // Get updated real stock data from ICP canister - NO FALLBACK
+    const updatedStocks = await realStockService.initializeRealStocks();
 
-      for (const updatedStock of updatedStocks) {
-        const existingStock = this.stockData.find(s => s.id === updatedStock.id);
-        if (existingStock) {
-          // Update price history
-          existingStock.priceHistory.push(updatedStock.currentPrice);
-          if (existingStock.priceHistory.length > 15) {
-            existingStock.priceHistory.shift(); // Keep only last 15 prices
-          }
-
-          // Update current price and metrics
-          existingStock.currentPrice = updatedStock.currentPrice;
-          existingStock.marketCap = updatedStock.marketCap;
-          existingStock.peRatio = updatedStock.peRatio;
-          existingStock.lastUpdate = Date.now();
-          
-          // Calculate change percentage from price history for volatility and growth
-          const priceChange = existingStock.priceHistory.length > 1 
-            ? ((existingStock.currentPrice - existingStock.priceHistory[existingStock.priceHistory.length - 2]) / existingStock.priceHistory[existingStock.priceHistory.length - 2]) * 100
-            : 0;
-          
-          existingStock.volatility = Math.abs(priceChange) / 10 + 1;
-          
-          // Update business growth based on recent price change
-          existingStock.businessGrowth = priceChange / 5;
-        }
-      }
-
-      console.log(`Updated ${updatedStocks.length} real stock prices via ICP canister`);
-    } catch (error) {
-      console.error('Failed to update stock prices:', error);
-      // Continue with existing prices rather than crashing
+    if (!updatedStocks || updatedStocks.length === 0) {
+      console.error('❌ Failed to update stock prices from ICP canister - no data received');
+      return; // Keep existing prices rather than using fallback
     }
+
+    for (const realStock of updatedStocks) {
+      const existingStock = this.stockData.find(s => s.id === realStock.symbol.toLowerCase());
+      if (existingStock) {
+        // Update price history with real canister data
+        existingStock.priceHistory.push(realStock.price);
+        if (existingStock.priceHistory.length > 24) {
+          existingStock.priceHistory.shift(); // Keep only last 24 hours
+        }
+
+        // Update current price and metrics from real stock data
+        existingStock.currentPrice = realStock.price;
+        existingStock.marketCap = realStock.marketCap;
+        existingStock.peRatio = realStock.peRatio;
+        existingStock.lastUpdate = Date.now();
+        
+        // Calculate business growth and volatility from real change percent
+        existingStock.businessGrowth = realStock.changePercent * 2;
+        existingStock.volatility = Math.abs(realStock.changePercent) / 10 + 1;
+      }
+    }
+
+    console.log(`✅ Updated ${updatedStocks.length} real stock prices via ICP canister`);
   }
 
   /**
-   * Generate initial stock data for the market (fallback for when real API fails)
+   * Generate initial stock data for the market (DEPRECATED - NOT USED)
+   * We now ONLY use real stock data from ICP canister - NO FALLBACK
    */
   private generateInitialStockData(): Stock[] {
-    return [
-      {
-        id: 'technova',
-        name: 'TechNova',
-        sector: 'Technology',
-        currentPrice: 45,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 45 + Math.random() * 20 - 10),
-        debtEquityRatio: 0.7,
-        businessGrowth: 4.2,
-        news: [],
-        volatility: 1.5,
-        lastUpdate: Date.now(),
-        marketCap: 45000000,
-        peRatio: 25,
-        eps: 1.8,
-        outstandingShares: 1000000,
-        industryAvgPE: 20
-      },
-      {
-        id: 'greenedge',
-        name: 'GreenEdge',
-        sector: 'Energy',
-        currentPrice: 28,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 28 + Math.random() * 10 - 5),
-        debtEquityRatio: 1.2,
-        businessGrowth: 2.8,
-        news: [],
-        volatility: 2.0,
-        lastUpdate: Date.now(),
-        marketCap: 28000000,
-        peRatio: 18,
-        eps: 1.56,
-        outstandingShares: 1000000,
-        industryAvgPE: 15
-      },
-      {
-        id: 'bytex',
-        name: 'ByteX',
-        sector: 'Technology',
-        currentPrice: 85,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 85 + Math.random() * 30 - 15),
-        debtEquityRatio: 0.5,
-        businessGrowth: -1.3,
-        news: [],
-        volatility: 3.0,
-        lastUpdate: Date.now(),
-        marketCap: 85000000,
-        peRatio: 30,
-        eps: 2.83,
-        outstandingShares: 1000000,
-        industryAvgPE: 20
-      },
-      {
-        id: 'solarsphere',
-        name: 'SolarSphere',
-        sector: 'Energy',
-        currentPrice: 32,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 32 + Math.random() * 8 - 4),
-        debtEquityRatio: 1.8,
-        businessGrowth: 6.5,
-        news: [],
-        volatility: 1.8,
-        lastUpdate: Date.now(),
-        marketCap: 32000000,
-        peRatio: 12,
-        eps: 2.67,
-        outstandingShares: 1000000,
-        industryAvgPE: 15
-      },
-      {
-        id: 'metaverse',
-        name: 'MetaVerse Inc',
-        sector: 'Technology',
-        currentPrice: 58,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 58 + Math.random() * 15 - 7.5),
-        debtEquityRatio: 0.8,
-        businessGrowth: 8.2,
-        news: [],
-        volatility: 2.5,
-        lastUpdate: Date.now(),
-        marketCap: 58000000,
-        peRatio: 22,
-        eps: 2.64,
-        outstandingShares: 1000000,
-        industryAvgPE: 20
-      },
-      {
-        id: 'healthplus',
-        name: 'HealthPlus',
-        sector: 'Healthcare',
-        currentPrice: 42,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 42 + Math.random() * 12 - 6),
-        debtEquityRatio: 0.4,
-        businessGrowth: 5.1,
-        news: [],
-        volatility: 1.2,
-        lastUpdate: Date.now(),
-        marketCap: 42000000,
-        peRatio: 16,
-        eps: 2.63,
-        outstandingShares: 1000000,
-        industryAvgPE: 18
-      },
-      {
-        id: 'autotech',
-        name: 'AutoTech Motors',
-        sector: 'Automotive',
-        currentPrice: 35,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 35 + Math.random() * 10 - 5),
-        debtEquityRatio: 1.5,
-        businessGrowth: 3.7,
-        news: [],
-        volatility: 2.2,
-        lastUpdate: Date.now(),
-        marketCap: 35000000,
-        peRatio: 14,
-        eps: 2.5,
-        outstandingShares: 1000000,
-        industryAvgPE: 15
-      },
-      {
-        id: 'foodcorp',
-        name: 'FoodCorp',
-        sector: 'Consumer Goods',
-        currentPrice: 25,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 25 + Math.random() * 6 - 3),
-        debtEquityRatio: 0.6,
-        businessGrowth: 2.1,
-        news: [],
-        volatility: 1.0,
-        lastUpdate: Date.now(),
-        marketCap: 25000000,
-        peRatio: 12,
-        eps: 2.08,
-        outstandingShares: 1000000,
-        industryAvgPE: 13
-      },
-      {
-        id: 'finbank',
-        name: 'FinBank',
-        sector: 'Financial',
-        currentPrice: 68,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 68 + Math.random() * 18 - 9),
-        debtEquityRatio: 2.5,
-        businessGrowth: 4.8,
-        news: [],
-        volatility: 1.8,
-        lastUpdate: Date.now(),
-        marketCap: 68000000,
-        peRatio: 19,
-        eps: 3.58,
-        outstandingShares: 1000000,
-        industryAvgPE: 17
-      },
-      {
-        id: 'telecom',
-        name: 'TeleCom Ltd',
-        sector: 'Telecommunications',
-        currentPrice: 38,
-        priceHistory: Array.from({ length: 15 }, 
-          (_, i) => 38 + Math.random() * 8 - 4),
-        debtEquityRatio: 1.1,
-        businessGrowth: 1.9,
-        news: [],
-        volatility: 1.4,
-        lastUpdate: Date.now(),
-        marketCap: 38000000,
-        peRatio: 15,
-        eps: 2.53,
-        outstandingShares: 1000000,
-        industryAvgPE: 16
-      }
-    ];
+    console.warn('⚠️  generateInitialStockData() called but should not be used - only real canister data allowed');
+    throw new Error('Fallback stock data generation is disabled - must use real ICP canister data');
   }
 
   /**
@@ -1379,3 +1206,6 @@ export class StockMarketManager {
     };
   }
 }
+
+// Create a singleton instance for use in UI components
+export const stockMarketManager = new StockMarketManager(null as any); // We'll initialize the scene later

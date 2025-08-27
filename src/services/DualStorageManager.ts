@@ -130,7 +130,7 @@ export class DualStorageManager {
             
             // Default to local storage for 'local', 'hybrid', or when blockchain unavailable
             const localData = this.getLocalBankingData();
-            return localData.bankAccount?.balance || 1000; // Default starting balance
+            return localData.bankAccount?.balance || 10000; // Updated default starting balance to match new minimum deposit
         } catch (error) {
             console.error('Failed to get balance:', error);
             return 0;
@@ -151,7 +151,7 @@ export class DualStorageManager {
             
             // Default to local storage for 'local', 'hybrid', or when blockchain unavailable
             const localData = this.getLocalBankingData();
-            const currentBalance = localData.bankAccount?.balance || 1000;
+            const currentBalance = localData.bankAccount?.balance || 10000;
             const newBalance = currentBalance + amount;
             
             const updatedAccount = {

@@ -8,7 +8,7 @@ import NewsPopup from "./NewsPopup.tsx";
 import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
-import { stockService, type Stock } from "../../../services/StockService";
+import { stockMarketManager, type Stock } from "../../../game/systems/StockMarketManager";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { WalletManager } from "../../../services/WalletManager";
 
@@ -132,19 +132,25 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         let mounted = true;
         const load = async () => {
             try {
-                setLoadingStage("Loading Stock Market Data");
+                setLoadingStage("Loading Real Stock Market Data from ICP Canister");
                 
-                const allStocks = await stockService.getAllStocks();
+                // Initialize real stock data if not already done
+                if (stockMarketManager.getStockMarketData().length === 0) {
+                    await stockMarketManager.initializeAsync();
+                }
+                
+                const allStocks = stockMarketManager.getStockMarketData();
                 if (!mounted) return;
                 
                 if (allStocks && allStocks.length > 0) {
                     setFilteredStocks(allStocks);
-                    console.log(`Successfully loaded ${allStocks.length} stocks`);
+                    console.log(`✅ Successfully loaded ${allStocks.length} REAL stocks from ICP canister:`, 
+                        allStocks.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
                 } else {
-                    console.warn("No stocks loaded");
+                    console.warn("❌ No real stocks loaded from canister");
                 }
             } catch (e) {
-                console.error("Failed to load stocks:", e);
+                console.error("❌ Failed to load real stocks from ICP canister:", e);
             } finally {
                 setIsLoading(false);
             }

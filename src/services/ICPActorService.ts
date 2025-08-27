@@ -235,7 +235,7 @@ export class ICPActorService {
             // In a real implementation, this would call the canister's createAccount method
             const account: BankAccount = {
                 principal,
-                rupeesBalance: 1000,
+                rupeesBalance: 100000, // Updated starting balance to match 1 lakh rupees (as per user preference)
                 tokenBalance: 0,
                 createdAt: Date.now(),
                 lastUpdated: Date.now()

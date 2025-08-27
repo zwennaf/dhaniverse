@@ -323,7 +323,7 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
             playerState = { ...newPlayerState, _id: insertRes.insertedId } as PlayerStateDocument & { _id: ObjectId };
         }
 
-        const STARTER_AMOUNT = 100000; // Increased for real stock trading (stocks cost thousands of rupees)
+        const STARTER_AMOUNT = 100000; // 1 lakh starter money for real stock trading
         // Atomic conditional update to prevent race double-increment
         const filter: Record<string, unknown> = {
             userId,

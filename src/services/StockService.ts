@@ -30,34 +30,34 @@ class StockService {
     private cacheTimeout = 60000; // 1 minute cache
     
     private stocks: StockMapping[] = [
-        // Tech Giants
-        { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', basePrice: 19000 },
-        { symbol: 'MSFT', name: 'Microsoft Corporation', sector: 'Technology', basePrice: 35000 },
-        { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Technology', basePrice: 12500 },
-        { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Technology', basePrice: 14000 },
-        { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Automotive', basePrice: 25000 },
-        { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Technology', basePrice: 45000 },
-        { symbol: 'NVDA', name: 'NVIDIA Corporation', sector: 'Technology', basePrice: 120000 },
-        { symbol: 'NFLX', name: 'Netflix Inc.', sector: 'Entertainment', basePrice: 45000 },
+        // Tech Giants (scaled to realistic INR prices)
+        { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', basePrice: 19000 },        // ~$230 * 83
+        { symbol: 'MSFT', name: 'Microsoft Corporation', sector: 'Technology', basePrice: 35000 }, // ~$420 * 83
+        { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Technology', basePrice: 12500 },   // ~$150 * 83
+        { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Technology', basePrice: 14000 },  // ~$170 * 83
+        { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Automotive', basePrice: 25000 },       // ~$300 * 83
+        { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Technology', basePrice: 45000 }, // ~$540 * 83
+        { symbol: 'NVDA', name: 'NVIDIA Corporation', sector: 'Technology', basePrice: 120000 }, // ~$1440 * 83
+        { symbol: 'NFLX', name: 'Netflix Inc.', sector: 'Entertainment', basePrice: 45000 },  // ~$540 * 83
         
-        // Financial Services
-        { symbol: 'JPM', name: 'JPMorgan Chase & Co.', sector: 'Finance', basePrice: 18000 },
-        { symbol: 'BAC', name: 'Bank of America Corp.', sector: 'Finance', basePrice: 3800 },
-        { symbol: 'V', name: 'Visa Inc.', sector: 'Finance', basePrice: 28000 },
-        { symbol: 'MA', name: 'Mastercard Inc.', sector: 'Finance', basePrice: 42000 },
+        // Financial Services  
+        { symbol: 'JPM', name: 'JPMorgan Chase & Co.', sector: 'Finance', basePrice: 18000 }, // ~$217 * 83
+        { symbol: 'BAC', name: 'Bank of America Corp.', sector: 'Finance', basePrice: 3800 }, // ~$46 * 83
+        { symbol: 'V', name: 'Visa Inc.', sector: 'Finance', basePrice: 28000 },              // ~$337 * 83
+        { symbol: 'MA', name: 'Mastercard Inc.', sector: 'Finance', basePrice: 42000 },      // ~$506 * 83
         
         // Healthcare
-        { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', basePrice: 13500 },
-        { symbol: 'PFE', name: 'Pfizer Inc.', sector: 'Healthcare', basePrice: 2900 },
-        { symbol: 'UNH', name: 'UnitedHealth Group', sector: 'Healthcare', basePrice: 52000 },
+        { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', basePrice: 13500 }, // ~$163 * 83
+        { symbol: 'PFE', name: 'Pfizer Inc.', sector: 'Healthcare', basePrice: 2900 },       // ~$35 * 83
+        { symbol: 'UNH', name: 'UnitedHealth Group', sector: 'Healthcare', basePrice: 52000 }, // ~$627 * 83
         
         // Consumer Goods
-        { symbol: 'KO', name: 'Coca-Cola Company', sector: 'Consumer Goods', basePrice: 6200 },
-        { symbol: 'PEP', name: 'PepsiCo Inc.', sector: 'Consumer Goods', basePrice: 17000 },
-        { symbol: 'WMT', name: 'Walmart Inc.', sector: 'Retail', basePrice: 8500 },
+        { symbol: 'KO', name: 'Coca-Cola Company', sector: 'Consumer Goods', basePrice: 6200 }, // ~$75 * 83
+        { symbol: 'PEP', name: 'PepsiCo Inc.', sector: 'Consumer Goods', basePrice: 17000 },  // ~$205 * 83
+        { symbol: 'WMT', name: 'Walmart Inc.', sector: 'Retail', basePrice: 8500 },           // ~$102 * 83
         
         // Energy
-        { symbol: 'XOM', name: 'Exxon Mobil Corporation', sector: 'Energy', basePrice: 12000 },
+        { symbol: 'XOM', name: 'Exxon Mobil Corporation', sector: 'Energy', basePrice: 12000 }, // ~$145 * 83
         
         // Cryptocurrencies
         { symbol: 'BTC', name: 'Bitcoin', sector: 'Cryptocurrency', basePrice: 8200000 },

@@ -140,17 +140,37 @@ export class BankOnboardingManager {
         window.dispatchEvent(new CustomEvent('open-bank-account-creation-flow'));
         
         // Listen for completion
-        const finishHandler = (e: Event) => {
+        const finishHandler = (e: CustomEvent) => {
           window.removeEventListener('bank-account-creation-finished', finishHandler as EventListener);
-          this.handleAccountCreationFinished();
+          this.handleAccountCreationFinished(e.detail);
         };
         window.addEventListener('bank-account-creation-finished', finishHandler as EventListener);
       }
     });
   }
 
-  private handleAccountCreationFinished(): void {
-    // Get account data from localStorage
+  private handleAccountCreationFinished(eventDetail?: any): void {
+    // Check if this is an existing user who should open banking UI
+    if (eventDetail?.openBankingUI) {
+      console.log('🏦 Opening banking UI for existing user');
+      
+      // Get the existing bank account
+      const account = this.getBankAccount();
+      if (account) {
+        // Open banking UI directly
+        const mainScene = this.scene;
+        if (mainScene && typeof mainScene.openBankingUI === 'function') {
+          mainScene.openBankingUI(account);
+        } else {
+          window.dispatchEvent(new CustomEvent('openBankingUI', { detail: { account } }));
+        }
+      }
+      
+      this.completeOnboarding();
+      return;
+    }
+
+    // Get account data from localStorage for new users
     const accountData = localStorage.getItem('dhaniverse_bank_account_details');
     const holderName = localStorage.getItem('dhaniverse_bank_account_holder_name');
     
