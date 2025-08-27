@@ -1330,4 +1330,32 @@ gameRouter.get("/game/sync", async (ctx) => {
     }
 });
 
+// Bank onboarding status endpoint
+gameRouter.get("/game/bank-onboarding/status", async (ctx) => {
+    try {
+        const userId = ctx.state.userId;
+        
+        // Check if user has a bank account (indicates onboarding completion)
+        const bankAccounts = mongodb.getCollection<BankAccountDocument>(
+            COLLECTIONS.BANK_ACCOUNTS
+        );
+        const bankAccount = await bankAccounts.findOne({ userId });
+        
+        const isOnboarded = !!bankAccount;
+        
+        ctx.response.body = {
+            success: true,
+            data: {
+                isOnboarded,
+                hasAccount: isOnboarded,
+                completedAt: bankAccount?.createdAt || null
+            }
+        };
+    } catch (error) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Failed to get bank onboarding status" };
+        console.error("Bank onboarding status error:", error);
+    }
+});
+
 export default gameRouter;

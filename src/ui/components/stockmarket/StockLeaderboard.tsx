@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ICPActorService } from '../../../services/ICPActorService';
-import { WalletManager } from '../../../services/WalletManager';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface LeaderboardEntry {
   principal: string;
@@ -13,42 +13,60 @@ interface LeaderboardEntry {
 
 interface StockLeaderboardProps {
   icpService: ICPActorService;
-  walletManager: WalletManager;
   onClose: () => void;
 }
 
 const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
   icpService,
-  walletManager,
   onClose
 }) => {
+  const { user, isSignedIn, signInWithInternetIdentity } = useAuth();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [userRank, setUserRank] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
-    const checkConnection = () => {
-      const connected = walletManager.getConnectionStatus().connected && icpService.isActorConnected();
-      setIsConnected(connected);
-    };
-
-    checkConnection();
-    
-    // Listen for wallet connection changes
-    walletManager.onConnectionChange(() => {
-      checkConnection();
-    });
-  }, []);
-
-  useEffect(() => {
-    if (isConnected) {
+    // Use Internet Identity authentication status instead of wallet manager
+    if (isSignedIn) {
       loadLeaderboard();
     } else {
       setLoading(false);
     }
-  }, [isConnected]);
+  }, [isSignedIn]);
+
+  // Connect with Internet Identity
+  const connectInternetIdentity = async () => {
+    try {
+      setIsConnecting(true);
+      const { AuthClient } = await import("@dfinity/auth-client");
+      const authClient = await AuthClient.create();
+      
+      await authClient.login({
+        identityProvider: "https://identity.ic0.app",
+        windowOpenerFeatures: "width=500,height=600,left=200,top=200",
+        onSuccess: async () => {
+          const identity = authClient.getIdentity();
+          const result = await signInWithInternetIdentity(identity);
+          if (result.success) {
+            console.log('Internet Identity connection successful');
+          } else {
+            setError('Failed to sign in with Internet Identity');
+          }
+        },
+        onError: (error) => {
+          console.error('Internet Identity login failed:', error);
+          setError('Internet Identity login failed');
+        }
+      });
+    } catch (error) {
+      console.error('Failed to connect Internet Identity:', error);
+      setError('Failed to connect Internet Identity');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const loadLeaderboard = async () => {
     try {
@@ -61,10 +79,9 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
         setLeaderboard(leaderboardResult.data);
       }
 
-      // Get user's rank if connected
-      const principal = walletManager.getPrincipal();
-      if (principal) {
-        const rankResult = await icpService.getUserRank(principal);
+      // Get user's rank if connected and user exists
+      if (user?.id) {
+        const rankResult = await icpService.getUserRank(user.id);
         if (rankResult.success && rankResult.rank !== undefined) {
           setUserRank(rankResult.rank);
         }
@@ -78,8 +95,8 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
   };
 
   const recordTrade = async (profit: number, stockSymbol: string): Promise<void> => {
-    if (!isConnected) {
-      throw new Error('Wallet not connected');
+    if (!isSignedIn) {
+      throw new Error('Not signed in with Internet Identity');
     }
 
     try {
@@ -100,10 +117,9 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
     // This would verify a specific trade exists on-chain
     // For now, we'll just check if the user has any trades recorded
     try {
-      const principal = walletManager.getPrincipal();
-      if (!principal) return false;
+      if (!user?.id) return false;
       
-      const rankResult = await icpService.getUserRank(principal);
+      const rankResult = await icpService.getUserRank(user.id);
       return rankResult.success && rankResult.rank !== undefined && rankResult.rank > 0; // If user has a rank, they have trades
     } catch (error) {
       console.error('Trade verification failed:', error);
@@ -141,7 +157,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
     }
   };
 
-  if (!isConnected) {
+  if (!isSignedIn) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl p-6">
@@ -159,15 +175,20 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
           
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔗</div>
-            <h3 className="text-xl font-bold text-white mb-2">Connect Your ICP Wallet</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Connect with Internet Identity</h3>
             <p className="text-gray-300 mb-6">
-              Connect your wallet to view the blockchain-verified trading leaderboard and compete with other players.
+              Sign in with Internet Identity to view the blockchain-verified trading leaderboard and compete with other players.
             </p>
             <button
-              onClick={() => walletManager.connectWallet()}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={connectInternetIdentity}
+              disabled={isConnecting}
+              className={`px-6 py-3 bg-blue-600 text-white rounded-lg transition-colors ${
+                isConnecting 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'hover:bg-blue-700'
+              }`}
             >
-              Connect Wallet
+              {isConnecting ? 'Connecting...' : 'Connect with Internet Identity'}
             </button>
           </div>
         </div>
@@ -251,7 +272,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
                 <div
                   key={entry.principal}
                   className={`p-4 rounded-lg border transition-colors ${
-                    entry.principal === walletManager.getPrincipal()
+                    entry.principal === user?.id
                       ? 'bg-blue-900/30 border-blue-600'
                       : 'bg-gray-700 border-gray-600 hover:bg-gray-600'
                   }`}
@@ -269,7 +290,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
                           <span className="text-white font-medium">
                             {entry.displayName || `Trader ${entry.principal.slice(0, 8)}...`}
                           </span>
-                          {entry.principal === walletManager.getPrincipal() && (
+                          {entry.principal === user?.id && (
                             <span className="px-2 py-1 bg-blue-600 text-xs rounded-full text-white">
                               You
                             </span>
@@ -336,13 +357,12 @@ export const StockLeaderboardUtils = {
   
   verifyTrade: async (
     icpService: ICPActorService,
-    walletManager: WalletManager
+    userId: string
   ): Promise<boolean> => {
     try {
-      const principal = walletManager.getPrincipal();
-      if (!principal) return false;
+      if (!userId) return false;
       
-      const rankResult = await icpService.getUserRank(principal);
+      const rankResult = await icpService.getUserRank(userId);
       return rankResult.success && rankResult.rank !== undefined && rankResult.rank > 0;
     } catch (error) {
       console.error('Trade verification failed:', error);

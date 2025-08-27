@@ -110,7 +110,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     console.log('Initial portfolio holdings data:', response.data.holdings);
                     const transformed: PlayerPortfolio = {
                         holdings: response.data.holdings?.map((h: any) => ({
-                            stockId: h.symbol,
+                            stockId: h.symbol.toLowerCase(), // Convert to lowercase to match stock IDs
                             quantity: h.quantity,
                             averagePurchasePrice: h.averagePrice,
                             totalInvestment: h.quantity * h.averagePrice,
@@ -329,12 +329,21 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 if (portfolioResponse.success && portfolioResponse.data) {
                     console.log('Portfolio holdings data:', portfolioResponse.data.holdings);
                     const transformedPortfolio: PlayerPortfolio = {
-                        holdings: portfolioResponse.data.holdings?.map((holding: any) => ({
-                            stockId: holding.symbol,
-                            quantity: holding.quantity,
-                            averagePurchasePrice: holding.averagePrice,
-                            totalInvestment: holding.quantity * holding.averagePrice,
-                        })) || [],
+                        holdings: portfolioResponse.data.holdings?.map((holding: any) => {
+                            console.log('Transforming holding:', {
+                                original: holding,
+                                symbol: holding.symbol,
+                                stockId: holding.symbol.toLowerCase(), // Convert to lowercase to match stock IDs
+                                quantity: holding.quantity,
+                                averagePrice: holding.averagePrice
+                            });
+                            return {
+                                stockId: holding.symbol.toLowerCase(), // Convert to lowercase to match stock IDs
+                                quantity: holding.quantity,
+                                averagePurchasePrice: holding.averagePrice,
+                                totalInvestment: holding.quantity * holding.averagePrice,
+                            };
+                        }) || [],
                         transactionHistory: [],
                     };
                     console.log('Transformed portfolio:', transformedPortfolio);
@@ -757,8 +766,16 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-700/50">
                                                     {portfolio.holdings.map((holding) => {
+                                                        console.log('Rendering portfolio holding:', {
+                                                            holdingStockId: holding.stockId,
+                                                            availableStockIds: filteredStocks.map(s => s.id),
+                                                            stockFound: !!filteredStocks.find(s => s.id === holding.stockId)
+                                                        });
                                                         const stock = filteredStocks.find(s => s.id === holding.stockId);
-                                                        if (!stock) return null;
+                                                        if (!stock) {
+                                                            console.warn('Stock not found for holding:', holding.stockId);
+                                                            return null;
+                                                        }
                                                         
                                                         const currentValue = stock.currentPrice * holding.quantity;
                                                         const profitLoss = currentValue - holding.totalInvestment;
@@ -853,7 +870,6 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             {showLeaderboard && (
                 <StockLeaderboard 
                     icpService={icpService}
-                    walletManager={walletManager}
                     onClose={closeLeaderboard}
                 />
             )}

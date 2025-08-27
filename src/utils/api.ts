@@ -12,7 +12,7 @@ const getAuthHeaders = () => {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
     };
-    console.log('Auth headers:', { hasToken: !!token, headers });
+    console.log('Auth headers:', { hasToken: !!token, tokenStart: token?.substring(0, 20) + '...' });
     return headers;
 };
 
