@@ -231,6 +231,16 @@ export const bankingApi = {
             const response = await fetch(`${API_BASE}/game/bank-account/transactions`, {
                 headers: getAuthHeaders(),
             });
+            
+            // Handle case where endpoint doesn't exist yet
+            if (response.status === 404) {
+                console.log('Bank transactions endpoint not available yet');
+                return {
+                    success: true,
+                    data: [] // Return empty transactions array
+                };
+            }
+            
             return handleApiResponse(response);
         } catch (error) {
             console.warn("Bank transactions API not available:", error);
@@ -332,6 +342,16 @@ export const stockApi = {
             const response = await fetch(`${API_BASE}/game/stock-portfolio/transactions`, {
                 headers: getAuthHeaders(),
             });
+            
+            // Handle case where endpoint doesn't exist yet
+            if (response.status === 404) {
+                console.log('Stock transactions endpoint not available yet');
+                return {
+                    success: true,
+                    data: [] // Return empty transactions array
+                };
+            }
+            
             return handleApiResponse(response);
         } catch (error) {
             console.warn("Stock transactions API not available:", error);

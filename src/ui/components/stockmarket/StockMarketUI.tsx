@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import StockMarketDashboard from "./StockMarketDashboard.tsx";
 import { balanceManager } from "../../../services/BalanceManager";
 import { type Stock } from "../../../services/StockService";
+import { getTaskManager } from "../../../game/tasks/TaskManager";
 
 const StockMarketUI: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -42,6 +43,9 @@ const StockMarketUI: React.FC = () => {
             // Show the stock market UI
             setIsOpen(true);
 
+            // Complete Maya onboarding when stock market UI opens
+            completeMayaOnboardingOnStockMarketEntry();
+
             // Add the active class to the container to enable pointer events
             const container = document.getElementById(
                 "stock-market-ui-container"
@@ -51,6 +55,27 @@ const StockMarketUI: React.FC = () => {
                 console.log("Stock Market UI activated");
             }
         };
+
+    /**
+     * Complete the final Maya onboarding objective when player enters stock market
+     */
+    const completeMayaOnboardingOnStockMarketEntry = () => {
+        const tm = getTaskManager();
+        const activeTasks = tm.getActiveTasks();
+        
+        // Complete the final "explore-dhani-stocks" objective
+        const exploreTask = activeTasks.find(t => t.id === 'explore-dhani-stocks');
+        if (exploreTask) {
+            console.log("StockMarketUI: Completing Maya onboarding - player has entered stock market");
+            tm.completeTask('explore-dhani-stocks');
+            
+            // Remove the task after a short delay
+            setTimeout(() => {
+                tm.removeTask('explore-dhani-stocks');
+                console.log("StockMarketUI: Maya onboarding complete - all objectives cleared");
+            }, 2000); // Give 2 seconds to show completion
+        }
+    };
 
         // Listen for rupee updates from the game while stock market UI is open
         const handleRupeeUpdate = (event: CustomEvent) => {

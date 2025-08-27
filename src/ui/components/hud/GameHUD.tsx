@@ -564,10 +564,20 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
             // 6. After reaching stock market: Show "Go inside and explore Dhani stocks"
             if (state.hasReachedStockMarket && !activeTasks.some(t => t.id === 'explore-dhani-stocks')) {
-                // Remove return to maya task if still present
-                if (activeTasks.some(t => t.id === 'return-to-maya-stock-market')) {
-                    tasksToRemove.push('return-to-maya-stock-market');
-                }
+                // Clean up ALL Maya onboarding tasks when stock market is reached
+                const mayaOnboardingTaskIds = [
+                    'meet-maya',
+                    'follow-maya-to-bank',
+                    'claim-joining-bonus',
+                    'enter-bank-speak-manager',
+                    'return-to-maya-stock-market'
+                ];
+                
+                mayaOnboardingTaskIds.forEach(taskId => {
+                    if (activeTasks.some(t => t.id === taskId)) {
+                        tasksToRemove.push(taskId);
+                    }
+                });
                 
                 tm.addTask({
                     id: 'explore-dhani-stocks',
@@ -576,6 +586,20 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     active: true,
                     completed: false
                 });
+                
+                // Auto-complete Maya onboarding after some time if player is exploring the stock market
+                setTimeout(() => {
+                    const exploreTask = tm.getActiveTasks().find(t => t.id === 'explore-dhani-stocks');
+                    if (exploreTask) {
+                        // Check if stock market UI is active (player is already exploring)
+                        const stockMarketContainer = document.getElementById('stock-market-ui-container');
+                        if (stockMarketContainer && stockMarketContainer.classList.contains('active')) {
+                            console.log("GameHUD: Auto-completing Maya onboarding - player is exploring stock market");
+                            tm.completeTask('explore-dhani-stocks');
+                            setTimeout(() => tm.removeTask('explore-dhani-stocks'), 1000);
+                        }
+                    }
+                }, 5000); // Check after 5 seconds
             }
 
             // Clean up outdated tasks

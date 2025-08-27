@@ -219,7 +219,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
         </div>
 
         {/* User Rank Display */}
-        {userRank > 0 && (
+        {userRank > 0 && leaderboard && leaderboard.length > 0 && (
           <div className="bg-blue-900/50 border-b border-blue-700 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -258,7 +258,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
                 Retry
               </button>
             </div>
-          ) : leaderboard.length === 0 ? (
+          ) : (!leaderboard || leaderboard.length === 0) ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📊</div>
               <h3 className="text-xl font-bold text-white mb-2">No Traders Yet</h3>
@@ -268,7 +268,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
-              {leaderboard.map((entry, index) => (
+              {leaderboard && leaderboard.length > 0 ? leaderboard.map((entry, index) => (
                 <div
                   key={entry.principal}
                   className={`p-4 rounded-lg border transition-colors ${
@@ -314,7 +314,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
                   </div>
                   
                   {/* Badges */}
-                  {entry.badges.length > 0 && (
+                  {entry.badges && entry.badges.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {entry.badges.map((badge) => (
                         <span
@@ -327,7 +327,15 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
                     </div>
                   )}
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📊</div>
+                  <h3 className="text-xl font-bold text-white mb-2">No Traders Yet</h3>
+                  <p className="text-gray-300">
+                    Be the first to make profitable trades and appear on the leaderboard!
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1530,6 +1530,9 @@ export class MayaNPCManager {
             }, 1000);
         }
         
+        // Clean up ALL Maya onboarding objectives when tutorial completes
+        this.cleanupMayaOnboardingObjectives();
+        
         // Add new objective to explore stock market
         if (!tm.getActiveTasks().some(t => t.id === 'explore-dhani-stocks')) {
             console.log("MayaNPCManager: Setting new objective to explore Dhani stocks");
@@ -1541,6 +1544,41 @@ export class MayaNPCManager {
                 completed: false
             });
         }
+    }
+
+    /**
+     * Clean up all Maya onboarding objectives when the tutorial is complete
+     */
+    private cleanupMayaOnboardingObjectives(): void {
+        const tm = getTaskManager();
+        const activeTasks = tm.getActiveTasks();
+        
+        // List of all Maya onboarding task IDs that should be cleaned up
+        const mayaOnboardingTaskIds = [
+            'meet-maya',
+            'follow-maya-to-bank',
+            'claim-joining-bonus',
+            'enter-bank-speak-manager',
+            'return-to-maya-stock-market'
+        ];
+        
+        console.log("MayaNPCManager: Cleaning up Maya onboarding objectives...");
+        
+        // Find and clean up any remaining Maya onboarding tasks
+        mayaOnboardingTaskIds.forEach(taskId => {
+            const task = activeTasks.find(t => t.id === taskId);
+            if (task) {
+                console.log(`MayaNPCManager: Completing and removing Maya task: ${taskId}`);
+                tm.completeTask(taskId);
+                
+                // Remove the task after a short delay
+                setTimeout(() => {
+                    tm.removeTask(taskId);
+                }, 1000);
+            }
+        });
+        
+        console.log("MayaNPCManager: Maya onboarding cleanup complete");
     }
 
     // Handle adding the next objective after the initial Maya intro dialogue is fully closed
