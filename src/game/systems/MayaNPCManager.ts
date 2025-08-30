@@ -53,24 +53,39 @@ export class MayaNPCManager {
     // Fixed initial tracker start point (points A-D as requested)
     private readonly initialTrackerPoint = { x: 1043, y: 669 };
 
+    // State management flags to prevent duplicate initialization
+    private isInitializing: boolean = false;
+    private initializationComplete: boolean = false;
+    private eventListenersSetup: boolean = false;
+
     // Maya's position (determined by player progression state)
     public x: number = 7779; // Default position
     public y: number = 3581; // Default position
 
     private async initializeMayaPosition(): Promise<void> {
+        // Prevent duplicate initialization
+        if (this.isInitializing || this.initializationComplete) {
+            console.log('🚀 Maya: Initialization already in progress or complete, skipping...');
+            return;
+        }
+        
+        this.isInitializing = true;
+        
         try {
             // Import and get position from progression manager
             const { progressionManager } = await import('../../services/ProgressionManager');
             
             // Check if progression manager has been initialized with player state
-            // If not, retry after a short delay
             const state = progressionManager.getState();
             if (!state || (state.onboardingStep === 'not_started' && !state.hasMetMaya && !state.hasFollowedMaya && !state.hasClaimedMoney)) {
                 // Progression manager hasn't been initialized with player state yet
-                // Retry after a delay
-                console.log('🚀 Maya: Progression manager not ready, retrying in 500ms...');
-                this.scene.time.delayedCall(500, () => {
-                    this.initializeMayaPosition();
+                // Retry after a delay (only once more to prevent infinite recursion)
+                console.log('🚀 Maya: Progression manager not ready, retrying once in 1000ms...');
+                this.isInitializing = false; // Reset flag to allow retry
+                this.scene.time.delayedCall(1000, () => {
+                    if (!this.initializationComplete) {
+                        this.initializeMayaPosition();
+                    }
                 });
                 return;
             }
@@ -113,6 +128,9 @@ export class MayaNPCManager {
             // Update location tracker for existing players
             this.updateLocationTrackerForProgress();
             
+            // Mark initialization as complete
+            this.initializationComplete = true;
+            
             console.log('🚀 Maya: Initialized from progression state:', {
                 position: { x: this.x, y: this.y },
                 guideCompleted: this.guideCompleted,
@@ -120,11 +138,16 @@ export class MayaNPCManager {
                 state: state
             });
         } catch (e) {
-            console.log('🚀 Maya: Error accessing progression, retrying in 500ms:', e);
-            // Retry after a delay if there's an error
-            this.scene.time.delayedCall(500, () => {
-                this.initializeMayaPosition();
+            console.log('🚀 Maya: Error accessing progression, retrying once in 1000ms:', e);
+            this.isInitializing = false; // Reset flag to allow retry
+            // Retry after a delay (only once more to prevent infinite recursion)
+            this.scene.time.delayedCall(1000, () => {
+                if (!this.initializationComplete) {
+                    this.initializeMayaPosition();
+                }
             });
+        } finally {
+            this.isInitializing = false;
         }
     }
 
@@ -246,6 +269,12 @@ export class MayaNPCManager {
      * Set up event listeners for dynamic objective updates based on progression
      */
     private setupObjectiveListeners(): void {
+        // Prevent duplicate event listener setup
+        if (this.eventListenersSetup) {
+            console.log('🚀 Maya: Event listeners already set up, skipping...');
+            return;
+        }
+
         // Listen for bank onboarding completion to trigger stock market guidance
         const handleBankOnboardingComplete = () => {
             console.log('MayaNPCManager: Bank onboarding completed, updating objective for stock market guidance');
@@ -258,8 +287,15 @@ export class MayaNPCManager {
             this.updateObjectiveExploreStockMarket();
         };
 
+        // Store references to handlers for potential cleanup
+        (this as any).bankOnboardingHandler = handleBankOnboardingComplete;
+        (this as any).stockMarketArrivalHandler = handleStockMarketArrival;
+
         window.addEventListener('bank-onboarding-complete' as any, handleBankOnboardingComplete);
         window.addEventListener('stock-market-arrival' as any, handleStockMarketArrival);
+        
+        this.eventListenersSetup = true;
+        console.log('🚀 Maya: Event listeners set up successfully');
     }
 
     private createMayaAnimations(): void {
@@ -1340,6 +1376,24 @@ export class MayaNPCManager {
     }
 
     public destroy(): void {
+        console.log('🚀 Maya: Cleaning up resources...');
+        
+        // Clean up event listeners first
+        if (this.eventListenersSetup) {
+            const bankHandler = (this as any).bankOnboardingHandler;
+            const stockHandler = (this as any).stockMarketArrivalHandler;
+            
+            if (bankHandler) {
+                window.removeEventListener('bank-onboarding-complete' as any, bankHandler);
+            }
+            if (stockHandler) {
+                window.removeEventListener('stock-market-arrival' as any, stockHandler);
+            }
+            
+            this.eventListenersSetup = false;
+            console.log('🚀 Maya: Event listeners cleaned up');
+        }
+        
         // Clean up dialog system
         this.clearDialogKeyListeners();
         
@@ -1368,11 +1422,21 @@ export class MayaNPCManager {
             this.dialogContainer = null;
         }
 
-        // Cleanup any pending global listener for starting Maya move
-        const pending = (this as any).__pendingMayaStartMove;
-        if (pending) {
-            window.removeEventListener('dialogue-gotit' as any, pending as any);
-            (this as any).__pendingMayaStartMove = null;
+        // Clean up additional UI elements
+        if (this.followReminderText) {
+            this.followReminderText.destroy();
+            this.followReminderText = null;
+        }
+        
+        if (this.alertText) {
+            this.alertText.destroy();
+            this.alertText = null;
+        }
+
+        // Clean up timers and intervals
+        if (this.alertTimerEvent) {
+            this.alertTimerEvent.destroy();
+            this.alertTimerEvent = null;
         }
 
         // Cleanup bank task location monitoring interval
@@ -1380,6 +1444,21 @@ export class MayaNPCManager {
             clearInterval(this.bankTaskLocationInterval);
             this.bankTaskLocationInterval = null;
         }
+
+        // Clean up movement tweens
+        if (this.movingTween) {
+            this.movingTween.destroy();
+            this.movingTween = null;
+        }
+
+        // Cleanup any pending global listener for starting Maya move
+        const pending = (this as any).__pendingMayaStartMove;
+        if (pending) {
+            window.removeEventListener('dialogue-gotit' as any, pending as any);
+            (this as any).__pendingMayaStartMove = null;
+        }
+
+        console.log('🚀 Maya: Resource cleanup complete');
     }
 
     /**
