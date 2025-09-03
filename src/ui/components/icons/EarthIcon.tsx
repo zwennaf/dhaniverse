@@ -1,9 +1,11 @@
 
 import React from 'react';
+import GlobeIcon from './GlobeIcon';
 
 const EarthIcon = ({ className = "" }: { className?: string }) => {
   return (
-    <svg width="129" height="130" viewBox="0 0 129 130" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    < >
+      <svg width="129" height="130" viewBox="0 0 129 130" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <mask id="path-1-inside-1_1_1411" fill="white">
         <path fillRule="evenodd" clipRule="evenodd" d="M4.1163 6.06969L4.1163 11.2059L0.264038 11.2059V121.642H4.11951L4.11951 125.495H6.68591V129.347H122.258V125.495H124.824V121.642H128.679L128.679 11.2058L124.828 11.2058V6.06958L122.261 6.06958V0.932861H6.68271L6.68271 6.06969L4.1163 6.06969ZM0.265183 129.347H0.264038V129.347H0.265183V129.347Z"/>
       </mask>
@@ -19,7 +21,9 @@ const EarthIcon = ({ className = "" }: { className?: string }) => {
           <stop offset="1" stopColor="#2382D8"/>
         </linearGradient>
       </defs>
-    </svg>
+      </svg>
+      <GlobeIcon className='absolute w-14' />
+    </>
   );
 };
 
