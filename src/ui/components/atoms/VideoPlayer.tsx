@@ -159,10 +159,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ thumbnailSrc, videoSrc = "", 
                                 aria-label="Close"
                                 className="w-10 h-10 rounded-full bg-white/6 flex items-center justify-center"
                             >
-                                {/* cross / X icon */}
-                                <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
+                                x
                             </button>
                         </div>
 
