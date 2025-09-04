@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './ui/App.tsx';
+import GlobalIntro from './ui/components/GlobalIntro';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import { initializeBankAccountCreationFlow } from './ui/components/banking/BankAccountCreationFlow.tsx';
@@ -32,7 +33,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       React.createElement(
         BrowserRouter,
         null,
-        React.createElement(App)
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(GlobalIntro, null),
+          React.createElement(App, null)
+        )
       )
     );
   }

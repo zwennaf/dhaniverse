@@ -40,27 +40,29 @@ const LandingPage = () => {
   const [showVideo, setShowVideo] = React.useState(false);
   const [showCTAs, setShowCTAs] = React.useState(false);
 
-  // Overlay timing - keep visible until header animation completes
+  // Overlay now tied to global intro completion
   useEffect(() => {
-    // Ensure overlay stays at least TIMING.overlay, but prefer to keep it until header animation is done
-    const minMs = TIMING.overlay * 1000;
-    const headerMs = HEADER_HOLD_MS + HEADER_MOVE_MS + 200;
-    const delayMs = Math.max(minMs, headerMs);
-    const timer = setTimeout(() => setShowOverlay(false), delayMs);
-    return () => clearTimeout(timer);
+    const hide = () => setShowOverlay(false);
+    window.addEventListener('introAnimationComplete', hide, { once: true });
+    // Failsafe: hide overlay after 4.5s even if event not received
+    const timeout = setTimeout(hide, 4500);
+    return () => { window.removeEventListener('introAnimationComplete', hide); clearTimeout(timeout); };
   }, []);
 
-  // Step-by-step reveal after header animation completes
+  // Listen for global intro completion and then sequence reveals
+  useEffect(() => {
+    const handler = () => setHeaderAnimationDone(true);
+    window.addEventListener('introAnimationComplete', handler, { once: true });
+    return () => window.removeEventListener('introAnimationComplete', handler);
+  }, []);
+
   useEffect(() => {
     if (!headerAnimationDone) return;
-    // orchestrate sequential reveals
-    const t1 = setTimeout(() => setShowHero(true), 150);
-    const t2 = setTimeout(() => setShowSubtext(true), 400);
-    const t3 = setTimeout(() => setShowVideo(true), 700);
-    const t4 = setTimeout(() => setShowCTAs(true), 1000);
-    return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
-    };
+    const t1 = setTimeout(() => setShowHero(true), 120);
+    const t2 = setTimeout(() => setShowSubtext(true), 360);
+    const t3 = setTimeout(() => setShowVideo(true), 640);
+    const t4 = setTimeout(() => setShowCTAs(true), 900);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [headerAnimationDone]);
   
   // Check if the user is signed in but doesn't have a username set
@@ -171,13 +173,9 @@ const LandingPage = () => {
         type="website"
       />
       
-      {/* Header with intro animation (keep above overlay) */}
+      {/* Header (global intro handles logo morph) */}
       <div className="sticky top-6 w-full z-40 header-wrapper">
-        <Header 
-          className="w-[90%] m-auto" 
-          enableIntroAnimation={true}
-          onAnimationComplete={() => setHeaderAnimationDone(true)}
-        />
+        <Header className="w-[90%] m-auto" />
       </div>
 
       {/* Black overlay with blur in */}
