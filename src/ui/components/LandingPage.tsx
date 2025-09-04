@@ -13,10 +13,33 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { CoinIcon2 } from './icons/CoinIcon2';
 import analytics from '../../utils/analytics';
+import { motion, AnimatePresence } from 'motion/react';
+
+// Centralized timing for the page animations
+const TIMING = {
+  overlay: 0.6,
+  hero: 0.6,
+  subtext: 0.45,
+  ctas: 0.55,
+  video: 0.8
+};
+
+// Header animation timing - must match Header.tsx
+const HEADER_HOLD_MS = 800;
+const HEADER_MOVE_MS = 900;
+const HEADER_TOTAL_S = (HEADER_HOLD_MS + HEADER_MOVE_MS) / 1000;
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, isLoaded, isSignedIn } = useUser();
+  const [showOverlay, setShowOverlay] = React.useState(true);
+  const [headerAnimationDone, setHeaderAnimationDone] = React.useState(false);
+
+  // Overlay timing - keep visible until header animation completes
+  useEffect(() => {
+    const timer = setTimeout(() => setShowOverlay(false), TIMING.overlay * 1000);
+    return () => clearTimeout(timer);
+  }, []);
   
   // Check if the user is signed in but doesn't have a username set
   // If so, redirect them to the profile page to set one up
@@ -56,6 +79,65 @@ const LandingPage = () => {
     { quote: "When I HODL my cash in the bank, I opened a fake FD. Then I understood interest. My bank gives better than Mu Sigma!", author: "Dr, 33" }
   ];
 
+  // Animation variants for hero content (after header animation completes)
+  const heroVariants: Record<string, any> = {
+    hidden: { opacity: 0, filter: 'blur(12px)', y: 18 },
+    show: {
+      opacity: 1,
+      filter: 'blur(0px)',
+      y: 0,
+      transition: {
+        duration: TIMING.hero,
+        easing: 'ease-out',
+        // if header finished, small delay; otherwise wait until header's total time + a small buffer
+        delay: headerAnimationDone ? 0.3 : HEADER_TOTAL_S + 0.2
+      }
+    }
+  };
+
+  const subtextVariants: Record<string, any> = {
+    hidden: { opacity: 0, filter: 'blur(10px)', y: 12 },
+    show: { 
+      opacity: 1, 
+      filter: 'blur(0px)', 
+      y: 0, 
+      transition: {
+        duration: TIMING.subtext,
+        easing: 'ease-out',
+        delay: headerAnimationDone ? 0.6 : HEADER_TOTAL_S + 0.5
+      }
+    }
+  };
+
+  const ctaVariants: Record<string, any> = {
+    hidden: { opacity: 0, scale: 0.7, filter: 'blur(4px)' },
+    show: {
+      opacity: 1,
+      scale: [0.7, 1.05, 1],
+      filter: 'blur(0px)',
+      transition: {
+        duration: TIMING.ctas,
+        easing: 'cubic-bezier(0.34,1.56,0.64,1)',
+        delay: headerAnimationDone ? 0.9 : HEADER_TOTAL_S + 0.8
+      }
+    }
+  };
+
+  const videoVariants: Record<string, any> = {
+    hidden: { opacity: 0, y: 40, filter: 'blur(10px)' },
+    show: { 
+      opacity: 1, 
+      y: 0, 
+      filter: 'blur(0px)', 
+      transition: {
+        duration: TIMING.video,
+        easing: 'ease-out',
+        delay: headerAnimationDone ? 1.2 : HEADER_TOTAL_S + 1.1
+      }
+    }
+  };
+
+  
   return (
     <div className="min-h-screen relative flex flex-col text-white bg-black">
       <SEO 
@@ -66,36 +148,87 @@ const LandingPage = () => {
         type="website"
       />
       
-      
-      <Header className="sticky top-6 w-[90%] m-auto z-10" />
+      {/* Header with intro animation */}
+      <div className="sticky top-6 w-full z-30">
+        <Header 
+          className="w-[90%] m-auto" 
+          enableIntroAnimation={true}
+          onAnimationComplete={() => setHeaderAnimationDone(true)}
+        />
+      </div>
+
+      {/* Black overlay with blur in */}
+      <AnimatePresence>
+        {showOverlay && (
+          <motion.div
+            className="fixed inset-0 bg-black z-50"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
+        )}
+      </AnimatePresence>
       
       {/* Hero section */}
       <section className="w-full pt-16 pb-12 flex flex-col items-center justify-center relative">
         <div className="max-w-6xl mx-auto w-full text-center mb-8 px-4">
-          <div className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 ">
+          <motion.div
+            variants={heroVariants}
+            initial="hidden"
+            animate="show"
+            className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 "
+          >
             <p className="text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
-          </div>
+          </motion.div>
           
-          <h1 className="text-3xl lg:text-6xl font-vcr mb-4 tracking-wider">
+          <motion.h1
+            variants={heroVariants}
+            initial="hidden"
+            animate="show"
+            className="text-3xl lg:text-6xl font-vcr mb-4 tracking-wider"
+          >
             Welcome to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
-          </h1>
+          </motion.h1>
           
-          <p className="text-lg font-robert mb-6 tracking-widest text-white/80">
+          <motion.p
+            variants={subtextVariants}
+            initial="hidden"
+            animate="show"
+            className="text-lg font-robert mb-6 tracking-widest text-white/80"
+          >
             No lectures. Just quests, coins, maps, and clarity.
-          </p>
+          </motion.p>
           
-          <VideoPlayer 
-            thumbnailSrc={mapUrl} 
-            videoSrc="https://www.youtube.com/embed/6wBJPf9ul8E" 
+          <motion.div
+            variants={videoVariants}
+            initial="hidden"
+            animate="show"
             className="mb-6"
-          />
+          >
+            <VideoPlayer 
+              thumbnailSrc={mapUrl} 
+              videoSrc="https://www.youtube.com/embed/6wBJPf9ul8E" 
+              className="mb-0"
+            />
+          </motion.div>
           
-          <div className="flex flex-col items-center justify-center mt-6 gap-8">
-            <p className="sm:text-2xl text-xl font-vcr flex items-center">
+          <motion.div
+            variants={heroVariants}
+            initial="hidden"
+            animate="show"
+            className="flex flex-col items-center justify-center mt-6 gap-8"
+          >
+            <motion.p className="sm:text-2xl text-xl font-vcr flex items-center" variants={subtextVariants}>
               Your financial glow-up starts here <ChevronRight className="w-4 h-4 ml-1" /><ChevronRight className="w-4 h-4 -ml-2" />
-            </p>
+            </motion.p>
           
-            <div className='flex flex-col sm:flex-row gap-3 sm:gap-5'>
+            <motion.div
+              className='flex flex-col sm:flex-row gap-3 sm:gap-5'
+              variants={ctaVariants}
+              initial="hidden"
+              animate="show"
+            >
               {isSignedIn ? (
                 <>
                   <PixelButton size="lg" className="hover:bg-dhani-gold/50" onClick={() => {
@@ -124,10 +257,15 @@ const LandingPage = () => {
                   </PixelButton>
                 </>
               )}
-            </div>
+            </motion.div>
             
             {/* Internal Navigation Links */}
-            <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+            <motion.div
+              className="mt-8 flex flex-wrap justify-center gap-4 text-sm"
+              variants={subtextVariants}
+              initial="hidden"
+              animate="show"
+            >
               <a href="/game" className="text-dhani-gold hover:text-dhani-gold/80 underline">Financial RPG Game</a>
               <span className="text-white/40">•</span>
               <a href="/sign-up" className="text-white/70 hover:text-white underline">Create Account</a>
@@ -137,8 +275,8 @@ const LandingPage = () => {
               <a href="#features" className="text-white/70 hover:text-white underline">Features</a>
               <span className="text-white/40">•</span>
               <a href="#testimonials" className="text-white/70 hover:text-white underline">Reviews</a>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
         {/* Features section */} 
