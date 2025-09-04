@@ -16,10 +16,21 @@ const COMPLETE_EVENT = 'introAnimationComplete';
 const FINE_TUNE_X = 8; // px: subtle right shift to better align with header logo
 
 const GlobalIntro: React.FC = () => {
+  // Do not show the global intro on the in-game route
+  if (typeof window !== 'undefined' && (
+    window.location.pathname.startsWith('/game') ||
+    window.location.pathname.startsWith('/sign-in') ||
+    window.location.pathname.startsWith('/sign-up') ||
+    window.location.pathname.startsWith('/profile')
+  )) {
+    return null;
+  }
+
   const [ready, setReady] = useState(false);          // measurement finished & target known
   const [start, setStart] = useState(false);          // entire sequence started (frame after ready)
   const [moveStarted, setMoveStarted] = useState(false); // movement phase begun (after hold)
   const [target, setTarget] = useState<{x:number;y:number;scale:number}>({x:0,y:0,scale:1});
+  const [measuredSize, setMeasuredSize] = useState<{width:number;height:number,fontSize:string,fontFamily:string} | null>(null);
   const [finished, setFinished] = useState(false);    // unmount trigger
   const dispatchedRef = useRef(false);                // completion event guard
   const measuringRef = useRef(false);
@@ -36,7 +47,22 @@ const GlobalIntro: React.FC = () => {
     const desiredW = vw * 0.7; const desiredH = vh * 0.4;
     const scaleW = desiredW / rect.width; const scaleH = desiredH / rect.height;
   const initialScale = Math.max(MIN_INITIAL_SCALE, Math.min(scaleW, scaleH));
-  setTarget({ x: targetX - cx + FINE_TUNE_X, y: targetY - cy, scale: initialScale });
+  // compute computed styles once to keep typography stable while animating
+  const cs = window.getComputedStyle(anchor);
+  const fontSize = cs.fontSize || '32px';
+  const fontFamily = cs.fontFamily || '';
+
+  const next = { x: targetX - cx + FINE_TUNE_X, y: targetY - cy, scale: initialScale };
+
+  // Avoid tiny updates that cause extra renders/layout shifts
+  const prev = target;
+  const dx = Math.abs(prev.x - next.x);
+  const dy = Math.abs(prev.y - next.y);
+  const ds = Math.abs(prev.scale - next.scale);
+  if (dx > 2 || dy > 2 || ds > 0.02 || measuredSize === null) {
+    setTarget(next);
+    setMeasuredSize({ width: rect.width, height: rect.height, fontSize, fontFamily });
+  }
   }, [finished]);
 
   // Measure header brand anchor repeatedly until it exists & has size
@@ -48,7 +74,8 @@ const GlobalIntro: React.FC = () => {
       function loop() {
         measure();
         const anchor = document.querySelector('[data-brand-anchor]');
-        if (anchor && target.scale !== 1) { // heuristic: we computed something
+        // When we've captured measuredSize once, consider ready (stable)
+        if (anchor && measuredSize) {
           setReady(true);
           measuringRef.current = false;
           return;
