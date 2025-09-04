@@ -14,19 +14,20 @@ import { useUser } from '../contexts/AuthContext';
 import { CoinIcon2 } from './icons/CoinIcon2';
 import analytics from '../../utils/analytics';
 import { motion, AnimatePresence } from 'motion/react';
+import RevealOnScroll from './atoms/RevealOnScroll';
 
 // Centralized timing for the page animations
 const TIMING = {
-  overlay: 0.6,
-  hero: 0.6,
-  subtext: 0.45,
-  ctas: 0.55,
-  video: 0.8
+  overlay: 0.15,
+  hero: 0.8,
+  subtext: 0.6,
+  ctas: 0.7,
+  video: 0.7 // we'll use a slightly faster video entrance for a snappier 'in' feel
 };
 
 // Header animation timing - must match Header.tsx
-const HEADER_HOLD_MS = 800;
-const HEADER_MOVE_MS = 900;
+const HEADER_HOLD_MS = 500;
+const HEADER_MOVE_MS = 600;
 const HEADER_TOTAL_S = (HEADER_HOLD_MS + HEADER_MOVE_MS) / 1000;
 
 const LandingPage = () => {
@@ -34,12 +35,33 @@ const LandingPage = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [showOverlay, setShowOverlay] = React.useState(true);
   const [headerAnimationDone, setHeaderAnimationDone] = React.useState(false);
+  const [showHero, setShowHero] = React.useState(false);
+  const [showSubtext, setShowSubtext] = React.useState(false);
+  const [showVideo, setShowVideo] = React.useState(false);
+  const [showCTAs, setShowCTAs] = React.useState(false);
 
   // Overlay timing - keep visible until header animation completes
   useEffect(() => {
-    const timer = setTimeout(() => setShowOverlay(false), TIMING.overlay * 1000);
+    // Ensure overlay stays at least TIMING.overlay, but prefer to keep it until header animation is done
+    const minMs = TIMING.overlay * 1000;
+    const headerMs = HEADER_HOLD_MS + HEADER_MOVE_MS + 200;
+    const delayMs = Math.max(minMs, headerMs);
+    const timer = setTimeout(() => setShowOverlay(false), delayMs);
     return () => clearTimeout(timer);
   }, []);
+
+  // Step-by-step reveal after header animation completes
+  useEffect(() => {
+    if (!headerAnimationDone) return;
+    // orchestrate sequential reveals
+    const t1 = setTimeout(() => setShowHero(true), 150);
+    const t2 = setTimeout(() => setShowSubtext(true), 400);
+    const t3 = setTimeout(() => setShowVideo(true), 700);
+    const t4 = setTimeout(() => setShowCTAs(true), 1000);
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+    };
+  }, [headerAnimationDone]);
   
   // Check if the user is signed in but doesn't have a username set
   // If so, redirect them to the profile page to set one up
@@ -81,14 +103,14 @@ const LandingPage = () => {
 
   // Animation variants for hero content (after header animation completes)
   const heroVariants: Record<string, any> = {
-    hidden: { opacity: 0, filter: 'blur(12px)', y: 18 },
+    hidden: { opacity: 0, filter: 'blur(14px)', y: 60 },
     show: {
       opacity: 1,
       filter: 'blur(0px)',
       y: 0,
       transition: {
-        duration: TIMING.hero,
-        easing: 'ease-out',
+  duration: TIMING.hero,
+  easing: [0.16, 1, 0.3, 1],
         // if header finished, small delay; otherwise wait until header's total time + a small buffer
         delay: headerAnimationDone ? 0.3 : HEADER_TOTAL_S + 0.2
       }
@@ -96,43 +118,44 @@ const LandingPage = () => {
   };
 
   const subtextVariants: Record<string, any> = {
-    hidden: { opacity: 0, filter: 'blur(10px)', y: 12 },
-    show: { 
-      opacity: 1, 
-      filter: 'blur(0px)', 
-      y: 0, 
+    hidden: { opacity: 0, filter: 'blur(12px)', y: 40 },
+    show: {
+      opacity: 1,
+      filter: 'blur(0px)',
+      y: 0,
       transition: {
-        duration: TIMING.subtext,
-        easing: 'ease-out',
+  duration: TIMING.subtext,
+  easing: [0.16, 1, 0.3, 1],
         delay: headerAnimationDone ? 0.6 : HEADER_TOTAL_S + 0.5
       }
     }
   };
 
   const ctaVariants: Record<string, any> = {
-    hidden: { opacity: 0, scale: 0.7, filter: 'blur(4px)' },
+    hidden: { opacity: 0, scale: 0.85, filter: 'blur(6px)' },
     show: {
       opacity: 1,
-      scale: [0.7, 1.05, 1],
+      scale: [0.85, 1.03, 1],
       filter: 'blur(0px)',
       transition: {
-        duration: TIMING.ctas,
-        easing: 'cubic-bezier(0.34,1.56,0.64,1)',
+  duration: TIMING.ctas,
+  easing: [0.16, 1, 0.3, 1],
         delay: headerAnimationDone ? 0.9 : HEADER_TOTAL_S + 0.8
       }
     }
   };
 
   const videoVariants: Record<string, any> = {
-    hidden: { opacity: 0, y: 40, filter: 'blur(10px)' },
-    show: { 
-      opacity: 1, 
-      y: 0, 
-      filter: 'blur(0px)', 
+    hidden: { opacity: 0, y: 300, filter: 'blur(14px)' },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
       transition: {
-        duration: TIMING.video,
-        easing: 'ease-out',
-        delay: headerAnimationDone ? 1.2 : HEADER_TOTAL_S + 1.1
+  // slightly snappier entrance from far down
+  duration: 0.7,
+  easing: [0.16, 1, 0.3, 1],
+        delay: headerAnimationDone ? 1.0 : HEADER_TOTAL_S + 0.9
       }
     }
   };
@@ -148,8 +171,8 @@ const LandingPage = () => {
         type="website"
       />
       
-      {/* Header with intro animation */}
-      <div className="sticky top-6 w-full z-30">
+      {/* Header with intro animation (keep above overlay) */}
+      <div className="sticky top-6 w-full z-40 header-wrapper">
         <Header 
           className="w-[90%] m-auto" 
           enableIntroAnimation={true}
@@ -176,7 +199,7 @@ const LandingPage = () => {
           <motion.div
             variants={heroVariants}
             initial="hidden"
-            animate="show"
+            animate={showHero ? 'show' : 'hidden'}
             className="inline-block px-3 border-[2px] mt-20 mb-20 border-white/50 "
           >
             <p className="text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
@@ -185,7 +208,7 @@ const LandingPage = () => {
           <motion.h1
             variants={heroVariants}
             initial="hidden"
-            animate="show"
+            animate={showHero ? 'show' : 'hidden'}
             className="text-3xl lg:text-6xl font-vcr mb-4 tracking-wider"
           >
             Welcome to <span className="text-dhani-gold pixel-glow">Dhaniverse</span>
@@ -194,7 +217,7 @@ const LandingPage = () => {
           <motion.p
             variants={subtextVariants}
             initial="hidden"
-            animate="show"
+            animate={showSubtext ? 'show' : 'hidden'}
             className="text-lg font-robert mb-6 tracking-widest text-white/80"
           >
             No lectures. Just quests, coins, maps, and clarity.
@@ -203,7 +226,7 @@ const LandingPage = () => {
           <motion.div
             variants={videoVariants}
             initial="hidden"
-            animate="show"
+            animate={showVideo ? 'show' : 'hidden'}
             className="mb-6"
           >
             <VideoPlayer 
@@ -216,7 +239,7 @@ const LandingPage = () => {
           <motion.div
             variants={heroVariants}
             initial="hidden"
-            animate="show"
+            animate={showHero ? 'show' : 'hidden'}
             className="flex flex-col items-center justify-center mt-6 gap-8"
           >
             <motion.p className="sm:text-2xl text-xl font-vcr flex items-center" variants={subtextVariants}>
@@ -227,7 +250,7 @@ const LandingPage = () => {
               className='flex flex-col sm:flex-row gap-3 sm:gap-5'
               variants={ctaVariants}
               initial="hidden"
-              animate="show"
+              animate={showCTAs ? 'show' : 'hidden'}
             >
               {isSignedIn ? (
                 <>
@@ -281,37 +304,40 @@ const LandingPage = () => {
       </section>
         {/* Features section */} 
       <section id="features" className="w-full px-4 py-8 md:py-16 flex flex-col items-center">
-        <div className="max-w-6xl mx-auto w-full text-center mb-8 md:mb-12">
+        <RevealOnScroll className="max-w-6xl mx-auto w-full text-center mb-8 md:mb-12">
           <div className="inline-block px-3 border-[2px] mt-10 md:mt-20 mb-10 md:mb-20 border-white/50">
             <p className="text-sm md:text-lg tracking-widest font-robert px-1 py-2 text-white/80">Learn Personal Finance with Fun</p>
           </div>
           <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-vcr mb-6 md:mb-10 tracking-wide px-2">
             What Makes <span className="text-dhani-gold pixel-glow">Dhaniverse</span> Different?
           </h2>
-        </div>
-          <div className="max-w-6xl mx-auto w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 lg:items-start">
-          <div className="overflow-hidden order-2 lg:order-1">
+        </RevealOnScroll>
+        <div className="max-w-6xl mx-auto w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 lg:items-start">
+          <RevealOnScroll className="overflow-hidden order-2 lg:order-1" delay={0.1}>
             <img src="/UI/whatMakesDifference.png" alt="Dhaniverse Map" className="w-full h-auto" />
-          </div>
-          
+          </RevealOnScroll>
           <div className="space-y-1 sm:space-y-2 md:space-y-3 lg:space-y-4 order-1 lg:order-2 flex flex-col justify-center lg:justify-start">
-            <FeatureCard 
-              icon={<LeafIcon />}
-              title="No mental stress — just clarity."
-              description="Learn through gameplay, not lectures. No trauma. No pressure. Just understanding."
-            />
-            
-            <FeatureCard 
-              icon={<CoinIcon2 />}
-              title="Dummy currency, real skills."
-              description="Earn in-game coins & level up while learning real-world money skills."
-            />
-            
-            <FeatureCard 
-              icon={<EarthIcon />}
-              title="Ethical, real-world adventure"
-              description="No ads. Just fun quests that teach real financial wisdom."
-            />
+            <RevealOnScroll delay={0.05}>
+              <FeatureCard 
+                icon={<LeafIcon />}
+                title="No mental stress — just clarity."
+                description="Learn through gameplay, not lectures. No trauma. No pressure. Just understanding."
+              />
+            </RevealOnScroll>
+            <RevealOnScroll delay={0.15}>
+              <FeatureCard 
+                icon={<CoinIcon2 />}
+                title="Dummy currency, real skills."
+                description="Earn in-game coins & level up while learning real-world money skills."
+              />
+            </RevealOnScroll>
+            <RevealOnScroll delay={0.25}>
+              <FeatureCard 
+                icon={<EarthIcon />}
+                title="Ethical, real-world adventure"
+                description="No ads. Just fun quests that teach real financial wisdom."
+              />
+            </RevealOnScroll>
           </div>
         </div>
       </section>
@@ -319,13 +345,11 @@ const LandingPage = () => {
       {/* Game world section */}
       <section className="w-full px-4 py-16">
         <div className="max-w-6xl mx-auto">
-          <div className="section-title-border mb-1">
+          <RevealOnScroll className="section-title-border mb-1">
             <p className="text-md md:text-xl lg:text-2xl text-center font-vcr text-white/80">Buildings that teaches you the real use of money</p>
-          </div>
-          
-          <div className="relative bg-black/30 p-6">
-            <img src="/UI/buildingsThatTeach.svg" alt="" />
-            
+          </RevealOnScroll>
+          <RevealOnScroll className="relative bg-black/30 p-6" delay={0.15}>
+            <img src="/UI/buildingsThatTeach.svg" alt="Buildings that teach" />
             <div className="mt-8 absolute bottom-16 left-16 w-full flex items-center justify-between">
               <p className="text-sm md:text-xl lg:text-2xl font-vcr">
                 Explore a full-on financial world.<br/>
@@ -335,18 +359,17 @@ const LandingPage = () => {
                 <ArrowRight className="w-6 h-6 md:w-9 md:h-9 lg:w-12 lg:h-12" />
               </div>
             </div>
-          </div>
+          </RevealOnScroll>
         </div>
       </section>
       
       {/* Testimonials section with marquee */}
       <section id="testimonials" className="w-full relative m-auto py-16 ">
         <div className="w-[150px] h-[150px] lg:w-[350px] lg:h-[350px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
-        <div className=" mx-auto px-4 mb-8">
+        <RevealOnScroll className=" mx-auto px-4 mb-8">
           <h2 className="text-3xl md:text-5xl font-vcr mb-8 text-center">What Players Say?</h2>
-        </div>
-        
-        <div className="mb-4">
+        </RevealOnScroll>
+        <RevealOnScroll className="mb-4" delay={0.1}>
           <ScrollVelocityTestimonials 
             testimonials={testimonials1} 
             baseVelocity={-50}
@@ -355,9 +378,8 @@ const LandingPage = () => {
             numCopies={4}
             velocityMapping={{ input: [0, 1000], output: [0, 3] }}
           />
-        </div>
-        
-        <div className="mb-16">
+        </RevealOnScroll>
+        <RevealOnScroll className="mb-16" delay={0.2}>
           <ScrollVelocityTestimonials 
             testimonials={testimonials2} 
             baseVelocity={50}
@@ -366,11 +388,12 @@ const LandingPage = () => {
             numCopies={4}
             velocityMapping={{ input: [0, 1000], output: [0, 4] }}
           />
-        </div>
-      </section>      <section className='w-full relative md:mb-32 mb-16'>
+        </RevealOnScroll>
+      </section>
+      <section className='w-full relative md:mb-32 mb-16'>
         <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] -translate-y-1/2 absolute top-0 left-0 bg-dhani-gold/60 blur-[400px]" />
         <div className="w-[350px] h-[350px] lg:w-[500px] lg:h-[500px] translate-y-1/2 absolute bottom-0 right-0 bg-dhani-gold/60 blur-[400px]" />
-        <div className="max-w-6xl mx-auto px-2 sm:px-5 py-8 sm:py-12 relative">
+  <RevealOnScroll className="max-w-6xl mx-auto px-2 sm:px-5 py-8 sm:py-12 relative" offsetY={60}>
           <div 
             className="mx-auto text-center relative p-4 sm:p-8 md:p-12 lg:p-16"
             style={{
@@ -404,7 +427,7 @@ const LandingPage = () => {
               )}
             </div>
           </div>
-        </div>
+        </RevealOnScroll>
       </section>
       <Footer />
     </div>

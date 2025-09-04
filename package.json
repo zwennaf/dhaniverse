@@ -51,7 +51,7 @@
         "ethers": "6.15.0",
         "google-auth-library": "10.1.0",
         "livekit-client": "^2.15.4",
-    "lucide-react": "0.525.0",
+        "lucide-react": "0.525.0",
         "motion": "^12.23.12",
         "path": "0.12.7",
         "phaser": "^3.88.2",

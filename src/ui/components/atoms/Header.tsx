@@ -22,10 +22,10 @@ const Header = ({ className, enableIntroAnimation = false, onAnimationComplete }
   const [animDone, setAnimDone] = useState(!enableIntroAnimation);
   const [startMorph, setStartMorph] = useState(false);
   
-  // Animation timing constants
-  const HOLD_MS = 800; // ms to hold logo at center
-  const MOVE_MS = 900; // ms to morph to header
-  const HEADER_REVEAL_MS = 300; // ms for header to fully appear
+  // Animation timing constants (optimized for responsiveness)
+  const HOLD_MS = 500; // ms to hold logo at center
+  const MOVE_MS = 600; // ms to morph to header
+  const HEADER_REVEAL_MS = 0; // ms for header to fully appear
 
   // Setup morphing animation after DOM content loads
   useEffect(() => {
@@ -96,7 +96,7 @@ const Header = ({ className, enableIntroAnimation = false, onAnimationComplete }
 
   // Actions reveal timing
   const actionsVariants: Record<string, any> = {
-    hidden: { opacity: 0, filter: 'blur(6px)' },
+    hidden: { opacity: 1, filter: 'blur(6px)' },
     show: {
       opacity: 1,
       filter: 'blur(0px)',
@@ -123,7 +123,7 @@ const Header = ({ className, enableIntroAnimation = false, onAnimationComplete }
           className="fixed inset-0 z-[70] pointer-events-none flex items-center justify-center"
           initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 1 }}
         >
           {/* Always render a centered logo so it's visible immediately. Once measured becomes true
               the animate prop will change and the morphing animation will run. */}
@@ -153,7 +153,7 @@ const Header = ({ className, enableIntroAnimation = false, onAnimationComplete }
             transition={{
               delay: startMorph ? HOLD_MS/1000 : 0,
               duration: startMorph ? MOVE_MS/1000 : 0,
-              ease: [0.25, 0.1, 0.25, 1],
+              ease: [0.16, 1, 0.3, 1],
               type: 'tween'
             }}
             aria-hidden={animDone}
