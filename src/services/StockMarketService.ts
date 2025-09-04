@@ -5,6 +5,7 @@ import { realStockService } from './RealStockService';
 
 export interface Stock {
   id: string;
+  symbol: string;         // Original uppercase symbol for API calls
   name: string;
   sector: string;
   currentPrice: number;
@@ -64,7 +65,8 @@ class StockMarketService {
       // Convert RealStockData to Stock interface
       this.stockData = realStocks.map((realStock: any) => ({
         id: realStock.symbol.toLowerCase(),
-        name: realStock.name,
+        symbol: realStock.symbol, // Keep original uppercase symbol for API calls
+        name: realStock.companyName || realStock.name || realStock.symbol,
         sector: realStock.sector,
         currentPrice: realStock.price,
         priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
@@ -141,38 +143,38 @@ class StockMarketService {
   }
 
   /**
-   * Start periodic BATCH updates from canister (saves cycles!)
+   * Start periodic BATCH updates using timer-based system (saves cycles!)
    */
   private startPeriodicUpdates(): void {
     setInterval(async () => {
       try {
         console.log('🔄 Starting periodic BATCH update to save ICP cycles...');
         
-        // Use batch update method to save cycles
-        const updatedCount = await realStockService.updatePricesFromCanister();
+        // Use batch refresh to get updated prices from APIs
+        const symbols = this.stockData.map(s => s.id.toUpperCase());
+        const updatedStocks = await realStockService.getMultipleStocks(symbols);
         
-        if (updatedCount > 0) {
-          // Refresh our local stock data with updated cache
-          const symbols = this.stockData.map(s => s.id.toUpperCase());
+        if (updatedStocks.length > 0) {
+          // Refresh our local stock data with updated prices
           for (const symbol of symbols) {
-            const cached = (realStockService as any).cache.get(symbol);
-            if (cached) {
+            const updatedStock = updatedStocks.find((s: any) => s.symbol === symbol);
+            if (updatedStock) {
               const existingStock = this.stockData.find(s => s.id === symbol.toLowerCase());
               if (existingStock) {
-                existingStock.currentPrice = cached.data.price;
-                existingStock.priceHistory.push(cached.data.price);
+                existingStock.currentPrice = updatedStock.price;
+                existingStock.priceHistory.push(updatedStock.price);
                 if (existingStock.priceHistory.length > 24) {
                   existingStock.priceHistory.shift();
                 }
                 existingStock.lastUpdate = Date.now();
-                existingStock.businessGrowth = cached.data.changePercent * 2;
-                existingStock.volatility = Math.abs(cached.data.changePercent) / 10 + 1;
+                existingStock.businessGrowth = updatedStock.changePercent * 2;
+                existingStock.volatility = Math.abs(updatedStock.changePercent) / 10 + 1;
               }
             }
           }
-          console.log(`✅ BATCH update completed: ${updatedCount} stocks updated`);
+          console.log(`✅ BATCH update completed: ${updatedStocks.length} stocks updated`);
         } else {
-          console.log('⏭️ Skipping individual updates to save ICP cycles');
+          console.log('⏭️ No stocks updated from APIs');
         }
       } catch (error) {
         console.error('❌ Periodic batch update failed:', error);

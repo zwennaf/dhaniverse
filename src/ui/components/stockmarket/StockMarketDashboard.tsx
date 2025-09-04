@@ -308,7 +308,8 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
 
         try {
             console.log('Attempting to buy stock:', {
-                stockId: stockId.toUpperCase(),
+                stockSymbol: stock.symbol,
+                stockId: stockId,
                 quantity,
                 price: stock.currentPrice,
                 name: stock.name,
@@ -316,7 +317,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             });
 
             const response = await stockApi.buyStock(
-                stockId.toUpperCase(),
+                stock.symbol, // Use original uppercase symbol
                 quantity,
                 stock.currentPrice,
                 stock.name
@@ -380,7 +381,14 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         }
 
         try {
-            const response = await stockApi.sellStock(stockId.toUpperCase(), quantity, stock.currentPrice);
+            console.log('Attempting to sell stock:', {
+                stockSymbol: stock.symbol,
+                stockId: stockId,
+                quantity,
+                price: stock.currentPrice
+            });
+            
+            const response = await stockApi.sellStock(stock.symbol, quantity, stock.currentPrice);
 
             if (response.success) {
                 const saleValue = stock.currentPrice * quantity;

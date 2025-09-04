@@ -3,7 +3,8 @@ import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
 import { canisterService } from '../../services/CanisterService';
 import { balanceManager } from '../../services/BalanceManager';
-import { realStockService } from '../../services/RealStockService';
+import { realStockService, type StockMapping } from '../../services/RealStockService';
+import { realStocks as stockConfig } from '../../config/RealStocks';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -12,6 +13,7 @@ interface NPCSprite extends GameObjects.Sprite {
 // Enhanced Stock interface with more realistic properties
 export interface Stock {
   id: string;
+  symbol: string;         // Original uppercase symbol for API calls
   name: string;
   sector: string;
   currentPrice: number;
@@ -572,23 +574,39 @@ export class StockMarketManager {
     }
 
     // Convert RealStockData to our Stock interface format
-    this.stockData = realStocks.map((realStock: any, index: number) => ({
-      id: realStock.symbol.toLowerCase(),
-      name: realStock.name,
-      sector: realStock.sector,
-      currentPrice: realStock.price, // Real price in INR from canister
-      priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
-      debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
-      businessGrowth: realStock.changePercent * 2, // Based on recent performance
-      news: [],
-      volatility: Math.abs(realStock.changePercent) / 10 + 1,
-      lastUpdate: Date.now(),
-      marketCap: realStock.marketCap,
-      peRatio: realStock.peRatio,
-      eps: realStock.price / realStock.peRatio,
-      outstandingShares: Math.floor(realStock.marketCap / realStock.price),
-      industryAvgPE: 15 + Math.random() * 10
-    }));
+    this.stockData = realStocks.map((stockData: any, index: number) => {
+      console.log(`🔍 Mapping stock ${index} from RealStocks.ts config:`, {
+        symbol: stockData.symbol,
+        companyName: stockData.companyName,
+        sector: stockData.sector,
+        expectedName: stockConfig.find(s => s.symbol === stockData.symbol)?.name || 'NOT_FOUND'
+      });
+      
+      // Get the mapping from the config to ensure we have the correct company name
+      const stockMapping = stockConfig.find(s => s.symbol === stockData.symbol);
+      const displayName = stockData.companyName || stockMapping?.name || stockData.symbol;
+      
+      console.log(`📋 Final display name for ${stockData.symbol}: "${displayName}"`);
+      
+      return {
+        id: stockData.symbol.toLowerCase(),
+        symbol: stockData.symbol, // Keep original uppercase symbol for API calls
+        name: displayName,
+        sector: stockData.sector,
+        currentPrice: stockData.price, // Real price in INR from canister
+        priceHistory: this.generateRealisticPriceHistory(stockData.price, stockData.changePercent),
+        debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
+        businessGrowth: stockData.changePercent * 2, // Based on recent performance
+        news: [],
+        volatility: Math.abs(stockData.changePercent) / 10 + 1,
+        lastUpdate: Date.now(),
+        marketCap: stockData.marketCap,
+        peRatio: stockData.peRatio,
+        eps: stockData.price / stockData.peRatio,
+        outstandingShares: Math.floor(stockData.marketCap / stockData.price),
+        industryAvgPE: 15 + Math.random() * 10
+      };
+    });
 
     console.log(`✅ Loaded ${this.stockData.length} REAL stocks from ICP canister:`, 
       this.stockData.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
@@ -641,53 +659,22 @@ export class StockMarketManager {
    * Start real-time stock price updates
    */
   private startRealTimeUpdates(): void {
-    // Update every 5 minutes during market hours
-    setInterval(async () => {
-      await this.updateRealStockPrices();
-    }, 5 * 60 * 1000); // 5 minutes
-
-    // Also update when market status changes
+    // DISABLED: No more automatic updates to prevent canister spam
+    console.log('🚫 Real-time updates DISABLED to prevent canister cycle waste');
+    
+    // Only update market status (no API calls)
     setInterval(() => {
       this.updateMarketStatus();
     }, 60 * 1000); // 1 minute
   }
 
   /**
-   * Update real stock prices from API via ICP canister
+   * Update real stock prices - DISABLED to prevent canister spam
    */
   private async updateRealStockPrices(): Promise<void> {
-    console.log('🔄 Updating real stock prices from ICP canister...');
-    
-    // Get updated real stock data from ICP canister - NO FALLBACK
-    const updatedStocks = await realStockService.initializeRealStocks();
-
-    if (!updatedStocks || updatedStocks.length === 0) {
-      console.error('❌ Failed to update stock prices from ICP canister - no data received');
-      return; // Keep existing prices rather than using fallback
-    }
-
-    for (const realStock of updatedStocks) {
-      const existingStock = this.stockData.find(s => s.id === realStock.symbol.toLowerCase());
-      if (existingStock) {
-        // Update price history with real canister data
-        existingStock.priceHistory.push(realStock.price);
-        if (existingStock.priceHistory.length > 24) {
-          existingStock.priceHistory.shift(); // Keep only last 24 hours
-        }
-
-        // Update current price and metrics from real stock data
-        existingStock.currentPrice = realStock.price;
-        existingStock.marketCap = realStock.marketCap;
-        existingStock.peRatio = realStock.peRatio;
-        existingStock.lastUpdate = Date.now();
-        
-        // Calculate business growth and volatility from real change percent
-        existingStock.businessGrowth = realStock.changePercent * 2;
-        existingStock.volatility = Math.abs(realStock.changePercent) / 10 + 1;
-      }
-    }
-
-    console.log(`✅ Updated ${updatedStocks.length} real stock prices via ICP canister`);
+    console.log('� Stock price updates DISABLED to prevent canister cycle waste');
+    // DO NOTHING - use only cached data from initial load
+    return;
   }
 
   /**

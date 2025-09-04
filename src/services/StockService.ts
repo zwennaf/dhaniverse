@@ -1,4 +1,4 @@
-import { canisterService } from './CanisterService';
+import { realStockService } from './RealStockService';
 
 export interface Stock {
     id: string;
@@ -73,64 +73,44 @@ class StockService {
     ];
 
     private async getPrice(symbol: string): Promise<number> {
-        // Check cache first
-        const cached = this.cache.get(symbol);
-        if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-            return cached.price;
-        }
-
-        try {
-            // Try to get real price from ICP canister with 10 second timeout
-            const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Timeout')), 10000);
-            });
-
-            const pricePromise = canisterService.fetchExternalPrice(symbol);
-            const result = await Promise.race([pricePromise, timeoutPromise]);
-
-            if (result && typeof result === 'number' && result > 0) {
-                // Convert USD to INR (approx rate) and add some variation
-                const priceInINR = result * (80 + Math.random() * 6); // 80-86 INR per USD
-                this.cache.set(symbol, { price: priceInINR, timestamp: Date.now() });
-                console.log(`Real price for ${symbol}: $${result} = ₹${Math.round(priceInINR)}`);
-                return priceInINR;
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.log(`Using base price for ${symbol} due to API issue:`, errorMessage);
-        }
-
-        // Fallback to base price with significant random variation
+        // Deprecated: individual canister calls removed. Use batch fetch via realStockService instead.
+        // Keep simple fallback behavior here if needed by callers, but primary flow uses getAllStocks/getStock.
         const stock = this.stocks.find(s => s.symbol === symbol);
         if (stock) {
             const variation = (Math.random() - 0.5) * 0.3; // ±15% variation from base price
             const price = stock.basePrice * (1 + variation);
             this.cache.set(symbol, { price, timestamp: Date.now() });
-            console.log(`Fallback price for ${symbol}: ₹${Math.round(price)} (base: ₹${stock.basePrice})`);
             return price;
         }
 
-        return 100; // Ultimate fallback
+        return 100;
     }
 
     async getAllStocks(): Promise<Stock[]> {
-        console.log('Loading all stocks...');
-        
-        const stocks: Stock[] = [];
-        
-        for (const stockMapping of this.stocks) {
-            try {
-                const price = await this.getPrice(stockMapping.symbol);
-                const peRatio = 15 + Math.random() * 20;
-                const marketCap = price * (1000000 + Math.random() * 10000000);
-                
+        console.log('Loading all stocks via RealStockService (batch) ...');
+
+        const symbols = this.stocks.map(s => s.symbol);
+        let results = [] as any[];
+
+        try {
+            results = await realStockService.getMultipleStocks(symbols);
+        } catch (err) {
+            console.error('RealStockService batch fetch failed, falling back to local generation:', err);
+            results = [];
+        }
+
+        const stocks: Stock[] = this.stocks.map(mapping => {
+            const data = results.find(r => r.symbol === mapping.symbol);
+            if (data) {
+                const price = data.price || mapping.basePrice;
+                const peRatio = data.peRatio || 15 + Math.random() * 20;
+                const marketCap = data.marketCap || Math.round(price * (1000000 + Math.random() * 10000000));
+
                 const stock: Stock = {
-                    id: stockMapping.symbol.toLowerCase(),
-                    name: stockMapping.name,
+                    id: mapping.symbol.toLowerCase(),
+                    name: mapping.name,
                     currentPrice: Math.round(price),
-                    priceHistory: Array.from({ length: 15 }, (_, i) => 
-                        Math.round(price * (0.95 + Math.random() * 0.1))
-                    ),
+                    priceHistory: Array.from({ length: 15 }, () => Math.round(price * (0.95 + Math.random() * 0.1))),
                     debtEquityRatio: 0.3 + Math.random() * 1.2,
                     businessGrowth: (Math.random() - 0.5) * 10,
                     news: [],
@@ -138,20 +118,37 @@ class StockService {
                     peRatio: Math.round(peRatio * 10) / 10,
                     eps: Math.round((price / peRatio) * 100) / 100,
                     industryAvgPE: 15 + Math.random() * 10,
-                    outstandingShares: Math.round(marketCap / price),
+                    outstandingShares: Math.round(marketCap / Math.max(1, price)),
                     volatility: 1 + Math.random() * 3,
                     lastUpdate: Date.now(),
-                    sector: stockMapping.sector
+                    sector: mapping.sector
                 };
-                
-                stocks.push(stock);
-                console.log(`Loaded ${stock.name}: ₹${stock.currentPrice.toLocaleString()}`);
-            } catch (error) {
-                console.error(`Failed to load ${stockMapping.name}:`, error);
+                return stock;
             }
-        }
-        
-        console.log(`Successfully loaded ${stocks.length} stocks`);
+
+            // Fallback if data missing
+            const fallbackPrice = mapping.basePrice * (1 + (Math.random() - 0.5) * 0.3);
+            const fallbackMarketCap = Math.round(fallbackPrice * (1000000 + Math.random() * 10000000));
+            return {
+                id: mapping.symbol.toLowerCase(),
+                name: mapping.name,
+                currentPrice: Math.round(fallbackPrice),
+                priceHistory: Array.from({ length: 15 }, () => Math.round(fallbackPrice * (0.95 + Math.random() * 0.1))),
+                debtEquityRatio: 0.3 + Math.random() * 1.2,
+                businessGrowth: (Math.random() - 0.5) * 10,
+                news: [],
+                marketCap: fallbackMarketCap,
+                peRatio: Math.round((15 + Math.random() * 20) * 10) / 10,
+                eps: Math.round((fallbackPrice / (15 + Math.random() * 20)) * 100) / 100,
+                industryAvgPE: 15 + Math.random() * 10,
+                outstandingShares: Math.round(fallbackMarketCap / Math.max(1, fallbackPrice)),
+                volatility: 1 + Math.random() * 3,
+                lastUpdate: Date.now(),
+                sector: mapping.sector
+            };
+        });
+
+        console.log(`Loaded ${stocks.length} stocks (batch)`);
         return stocks;
     }
 

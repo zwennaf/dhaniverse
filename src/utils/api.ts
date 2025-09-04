@@ -324,15 +324,55 @@ export const stockApi = {
         price: number,
         stockName?: string
     ) => {
-        const payload = { stockId, stockName, quantity, price };
-        console.log('Sending buy stock request:', payload);
-        console.log('API endpoint:', `${API_BASE}/game/stock-portfolio/buy`);
+        // Validate required parameters
+        if (!stockId || !stockId.trim()) {
+            throw new Error('Stock ID is required');
+        }
+        if (!quantity || quantity <= 0) {
+            throw new Error('Quantity must be greater than 0');
+        }
+        if (!price || price <= 0) {
+            throw new Error('Price must be greater than 0');
+        }
+
+        const payload = { 
+            stockId: stockId.trim().toUpperCase(), 
+            stockName: stockName || stockId.trim().toUpperCase(), 
+            quantity: parseInt(quantity.toString()), 
+            price: parseFloat(price.toString()) 
+        };
+        
+        console.log('🚀 Sending buy stock request:', payload);
+        console.log('📡 API endpoint:', `${API_BASE}/game/stock-portfolio/buy`);
+        console.log('🔑 Headers:', getAuthHeaders());
         
         const response = await fetch(`${API_BASE}/game/stock-portfolio/buy`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify(payload),
         });
+        
+        console.log('📥 Response status:', response.status);
+        console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Buy stock API error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText,
+                payload: payload
+            });
+            
+            // Try to parse error as JSON for better debugging
+            try {
+                const errorJson = JSON.parse(errorText);
+                console.error('❌ Parsed error JSON:', errorJson);
+                throw new Error(`API Error ${response.status}: ${errorJson.message || errorJson.error || errorText}`);
+            } catch (parseError) {
+                throw new Error(`API Error ${response.status}: ${errorText}`);
+            }
+        }
         
         const result = await handleApiResponse(response);
         console.log('Buy stock API result:', result);
