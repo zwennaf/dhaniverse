@@ -22,15 +22,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ thumbnailSrc, videoSrc = "", 
         return src.includes("?") ? `${src}&autoplay=1&rel=0` : `${src}?autoplay=1&rel=0`;
     };
 
-    useEffect(() => {
-        // Lock scroll while modal is open
-        const prev = document.body.style.overflow;
-        if (isOpen) document.body.style.overflow = "hidden";
-        else document.body.style.overflow = prev;
-        return () => {
-            document.body.style.overflow = prev;
-        };
-    }, [isOpen]);
+    // useEffect(() => {
+    //     // Lock scroll while modal is open
+    //     const prev = document.body.style.overflow;
+    //     if (isOpen) document.body.style.overflow = "hidden";
+    //     else document.body.style.overflow = prev;
+    //     return () => {
+    //         document.body.style.overflow = prev;
+    //     };
+    // }, [isOpen]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -110,7 +110,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ thumbnailSrc, videoSrc = "", 
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-6"
+                        className="fixed inset-0 z-50 flex items-center justify-center"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -152,14 +152,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ thumbnailSrc, videoSrc = "", 
                         </motion.div>
 
                         {/* back button outside container (top-right) */}
-                        <div className="absolute right-4 top-4 z-50">
+                        <div className="absolute right-12 rounded-2xl -bottom-10 z-50 bg-white/20 backdrop-blur-md border border-white/10 hover:bg-white/30 transition-colors shadow-lg">
                             <button
                                 ref={backButtonRef}
                                 onClick={handleClose}
                                 aria-label="Close"
-                                className="w-10 h-10 rounded-full bg-white/6 flex items-center justify-center"
+                                className="flex items-center rounded-2xl justify-center bg-transparent"
                             >
-                                x
+                                {/* cross / X text */}
+                                <span className="text-white text-base font-bold leading-none">close</span>
                             </button>
                         </div>
 

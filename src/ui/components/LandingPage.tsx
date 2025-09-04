@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from './atoms/Header';
 import Footer from './atoms/Footer';
-import VideoPlayer from './atoms/VideoPlayer';
 import PixelButton from './atoms/PixelButton';
 import FeatureCard from './atoms/FeatureCard';
 import ScrollVelocityTestimonials from './atoms/ScrollVelocityTestimonials';
@@ -15,6 +14,7 @@ import { CoinIcon2 } from './icons/CoinIcon2';
 import analytics from '../../utils/analytics';
 import { motion, AnimatePresence } from 'motion/react';
 import RevealOnScroll from './atoms/RevealOnScroll';
+import VideoPlayer from './atoms/VideoPlayer';
 
 // Centralized timing for the page animations
 const TIMING = {
@@ -39,6 +39,8 @@ const LandingPage = () => {
   const [showSubtext, setShowSubtext] = React.useState(false);
   const [showVideo, setShowVideo] = React.useState(false);
   const [showCTAs, setShowCTAs] = React.useState(false);
+
+  // (VideoPlayer handles its own scroll lock when opened)
 
   // Overlay now tied to global intro completion
   useEffect(() => {
@@ -148,15 +150,15 @@ const LandingPage = () => {
   };
 
   const videoVariants: Record<string, any> = {
-    hidden: { opacity: 0, y: 300, filter: 'blur(14px)' },
+    hidden: { opacity: 0, scale: 0.85, filter: 'blur(14px)' },
     show: {
       opacity: 1,
-      y: 0,
+      scale: [0.85, 1.02, 1],
       filter: 'blur(0px)',
       transition: {
-  // slightly snappier entrance from far down
-  duration: 0.7,
-  easing: [0.16, 1, 0.3, 1],
+        // popup-style entrance with slight overshoot
+        duration: 0.6,
+        easing: [0.16, 1, 0.3, 1],
         delay: headerAnimationDone ? 1.0 : HEADER_TOTAL_S + 0.9
       }
     }
@@ -227,10 +229,9 @@ const LandingPage = () => {
             animate={showVideo ? 'show' : 'hidden'}
             className="mb-6"
           >
-            <VideoPlayer 
+            <VideoPlayer
               thumbnailSrc={mapUrl} 
               videoSrc="https://www.youtube.com/embed/6wBJPf9ul8E" 
-              className="mb-0"
             />
           </motion.div>
           
