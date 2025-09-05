@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import PixelButton from '../atoms/PixelButton';
 import { ArrowLeft, PencilLine } from 'lucide-react';
 import CoinIcon from '../icons/CoinIcon';
+import { playerStateApi, bankingApi } from '../../../utils/api';
 
 const Profile: React.FC = () => {
   const { user, isLoaded } = useUser();
@@ -14,7 +15,7 @@ const Profile: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2>(2);
   const [editing, setEditing] = useState(false);
   const prefilledOnce = useRef(false); // ensure we only prefill from user one time
 
@@ -43,28 +44,43 @@ const Profile: React.FC = () => {
     prefilledOnce.current = true;
   }, [isLoaded, user]);
 
-  // Subscribe to BalanceManager for live balances (best-effort)
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
     let mounted = true;
-  (async () => {
+
+    const loadBalances = async () => {
       try {
-    const { balanceManager } = await import('../../../services/BalanceManager');
+        const [playerStateRes, bankAccountRes] = await Promise.all([
+          playerStateApi.get(),
+          bankingApi.getAccount(),
+        ]);
+
         if (!mounted) return;
-        const { cash, bankBalance } = balanceManager.getBalance();
-        setCashBalance(cash);
-        setBankBalance(bankBalance);
-        unsubscribe = balanceManager.onBalanceChange?.((b: any) => {
-          setCashBalance(b.cash);
-          setBankBalance(b.bankBalance);
-        });
-      } catch (e) {
-        // BalanceManager not available; ignore gracefully
+
+        // Extract cash/rupees from player state safely
+        const rupees =
+          playerStateRes?.data?.financial?.rupees ??
+          playerStateRes?.data?.rupees ??
+          playerStateRes?.financial?.rupees ??
+          null;
+
+        // Extract bank balance from bank account response safely
+        const bankBalance =
+          bankAccountRes?.data?.balance ??
+          bankAccountRes?.data?.account?.balance ??
+          bankAccountRes?.balance ??
+          null;
+
+        setCashBalance(typeof rupees === 'number' ? rupees : null);
+        setBankBalance(typeof bankBalance === 'number' ? bankBalance : null);
+      } catch (err) {
+        console.warn('Error loading balances from API', err);
       }
-    })();
+    };
+
+    loadBalances();
+
     return () => {
       mounted = false;
-      if (unsubscribe) unsubscribe();
     };
   }, []);
 
