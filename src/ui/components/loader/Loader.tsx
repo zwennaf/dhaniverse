@@ -161,34 +161,19 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     let stepIndex = 0;
     let animationFrame: number;
     
-    let fastForward = false;
-    const handleAlreadyPreloaded = () => {
-      // Trigger fast-forward if we haven't shown welcome yet
-      if (!showWelcome) {
-        fastForward = true;
-      }
-    };
-    window.addEventListener('gameAssetsAlreadyPreloaded', handleAlreadyPreloaded);
+  // Removed fast-forward skip: always show full loader experience even if assets are cached
 
     const updateProgress = () => {
       // Calculate speed based on current progress (slower as it approaches 95)
       let speed;
-      if (fastForward) {
-        // Aggressive speeds to catch up quickly
-        if (currentProgress < 70) speed = 6;
-        else if (currentProgress < 85) speed = 4;
-        else if (currentProgress < 95) speed = 2.5;
-        else speed = 1.5;
+      if (currentProgress < 60) {
+        speed = 0.8; // Fast initial speed
+      } else if (currentProgress < 80) {
+        speed = 0.4; // Medium speed
+      } else if (currentProgress < 95) {
+        speed = 0.15; // Slow final approach
       } else {
-        if (currentProgress < 60) {
-          speed = 0.8; // Fast initial speed
-        } else if (currentProgress < 80) {
-          speed = 0.4; // Medium speed
-        } else if (currentProgress < 95) {
-          speed = 0.15; // Slow down significantly
-        } else {
-          speed = 0.05; // Very slow crawl to 100
-        }
+        speed = 0.05; // Gentle crawl to 100 to let user read tip
       }
       
       currentProgress += speed;
@@ -260,7 +245,6 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
-      window.removeEventListener('gameAssetsAlreadyPreloaded', handleAlreadyPreloaded);
     };
   }, [onLoadingComplete, shouldPreloadTutorial]);
 
@@ -436,25 +420,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
         </div>
       </div>
       
-      {/* Click to continue overlay */}
-  {showWelcome && (
-        <div 
-          className="absolute inset-0 cursor-pointer z-20"
-          onClick={() => {
-            setIsComplete(true);
-            setTimeout(async () => {
-              try {
-                if (shouldPreloadTutorial) {
-                  await playerStateApi.update({ hasCompletedTutorial: true });
-                }
-              } catch (e) {
-                console.warn('Failed to persist tutorial completion:', e);
-              }
-              onLoadingComplete();
-            }, 300); // Reduced from 1000ms to 300ms
-          }}
-        />
-      )}
+  {/* Removed click-to-continue overlay: user must press SPACE */}
     </div>
   );
 };
