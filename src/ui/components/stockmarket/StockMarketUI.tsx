@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import StockMarketDashboard from "./StockMarketDashboard.tsx";
 import { balanceManager } from "../../../services/BalanceManager";
-import { type Stock } from "../../../services/StockService";
+import { type Stock } from "../../../services/StockMarketService";
 import { getTaskManager } from "../../../game/tasks/TaskManager";
 
 const StockMarketUI: React.FC = () => {

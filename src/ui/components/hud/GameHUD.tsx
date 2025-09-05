@@ -57,7 +57,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [previousRupees, setPreviousRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
-        { id: string; username: string; message: string; timestamp?: number }[]
+        { id: string; username: string; message: string; timestamp?: number; skin?: string; color?: string }[]
     >([]);
     const [chatInput, setChatInput] = useState("");
     // Always show chat window, but control focus state - start unfocused
@@ -327,7 +327,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         const handleChat = (e: any) => {
             console.log("Received chat message:", e.detail);
-            const { id, username, message } = e.detail;
+            const { id, username, message, skin } = e.detail;
 
             if (!message) {
                 console.warn(
@@ -360,11 +360,13 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 }
             }
 
+            const skinId = (skin || 'C1').replace(/-Preview$/i,'');
+            const characterColor = characters.find(c => c.id === skinId)?.color || '#B2EEE6';
+
             setChatMessages((prev) => {
-                // Keep only the last 50 messages to prevent memory issues
                 const newMessages = [
                     ...prev,
-                    { id: messageId, username, message, timestamp: Date.now() },
+                    { id: messageId, username, message, timestamp: Date.now(), skin: skinId, color: characterColor },
                 ];
                 if (newMessages.length > 50) {
                     return newMessages.slice(-50);
@@ -496,6 +498,26 @@ const GameHUD: React.FC<GameHUDProps> = ({
             // Remove completed or outdated tasks
             const tasksToRemove: string[] = [];
             
+                        // Ensure only one primary Maya onboarding task is active at a time (inline safeguard until QuestController exists)
+                        const mayaOrder = [
+                            'meet-maya',
+                            'follow-maya-to-bank',
+                            'claim-joining-bonus',
+                            'enter-bank-speak-manager',
+                            'return-to-maya-stock-market',
+                            'explore-dhani-stocks'
+                        ];
+                        const currentMayaTasks = activeTasks.filter(t => mayaOrder.includes(t.id));
+                        if (currentMayaTasks.length > 1) {
+                            const desired = currentMayaTasks.reduce((acc, t) => (mayaOrder.indexOf(t.id) > mayaOrder.indexOf(acc.id) ? t : acc), currentMayaTasks[0]);
+                            currentMayaTasks.forEach(t => {
+                                if (t.id !== desired.id) {
+                                    tm.completeTask(t.id);
+                                    setTimeout(() => tm.removeTask(t.id), 400);
+                                }
+                            });
+                        }
+
             // 1. Initial state: Show "Meet Maya" objective
             if (!state.hasMetMaya && !activeTasks.some(t => t.id === 'meet-maya')) {
                 tm.addTask({
@@ -616,6 +638,18 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 tm.completeTask(taskId);
                 setTimeout(() => tm.removeTask(taskId), 1000);
             });
+
+                        // Final cleanup: once player is truly free (stock market reached & explore task completed or claimed money & bank onboarding complete), remove all trackers & tasks
+                        const freed = state.hasReachedStockMarket && state.hasCompletedBankOnboarding;
+                        if (freed) {
+                            const leftover = tm.getActiveTasks().filter(t => ['meet-maya','follow-maya-to-bank','claim-joining-bonus','enter-bank-speak-manager','return-to-maya-stock-market','explore-dhani-stocks'].includes(t.id));
+                            leftover.forEach(t => {
+                                tm.completeTask(t.id);
+                                setTimeout(() => tm.removeTask(t.id), 300);
+                            });
+                            // Disable Maya tracker
+                            locationTrackerManager.setTargetEnabled('maya', false);
+                        }
         };
 
         // Set up periodic progression checking
@@ -1020,10 +1054,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                     <div
                                         className="w-8 h-8 rounded-full backdrop-blur-sm bg-cover border-2 border-black shadow-sm"
                                         style={{
-                                            backgroundImage: `url('/characters/${user?.selectedCharacter || 'C1'}-Preview.png')`,
+                                            backgroundImage: `url('/characters/${(msg.skin || 'C1')}-Preview.png')`,
                                             backgroundPosition: 'center -25px',
                                             backgroundSize: '400%',
-                                            backgroundColor: characters.find(c => c.id === (user?.selectedCharacter || 'C1'))?.color || '#B2EEE6',
+                                            backgroundColor: msg.color || '#B2EEE6',
                                         }}
                                     />
                                 </div>
@@ -1031,10 +1065,10 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                 <div className="relative">
                                     <div className="bg-black/75 text-white rounded-2xl px-4 py-3 w-full border border-black/30 backdrop-blur-sm shadow-md">
                                         <div className="flex items-start justify-between gap-2">
-                                            <div 
+                        <div 
                                                 className="text-[12px] font-['Tickerbit',Arial,sans-serif]"
                                                 style={{
-                                                    color: characters.find(c => c.id === (user?.selectedCharacter || 'C1'))?.color || '#B2EEE6'
+                            color: msg.color || '#B2EEE6'
                                                 }}
                                             >
                                                 {msg.username}
