@@ -71,6 +71,18 @@ const ATMDashboard: React.FC<ATMDashboardProps> = ({
         };
     }, []);
 
+    // Close on ESC key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                handleClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [playerRupees, totalRupeesChange]);
+
     // Real-time event listeners for transaction updates
     useEffect(() => {
         // Load initial transactions

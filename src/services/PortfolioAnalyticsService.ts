@@ -395,6 +395,44 @@ export class PortfolioAnalyticsService {
     console.log('📊 Loaded existing portfolio into analytics:', syntheticTransactions.length, 'holdings');
   }
 
+  /**
+   * Hydrate full historical transactions (buy & sell) from backend so realized P/L persists across reloads.
+   * Backend should return chronological transactions with shape: { type: 'buy'|'sell', symbol, quantity, price, timestamp }
+   */
+  public hydrateServerTransactions(transactions: { type: 'buy' | 'sell'; symbol: string; quantity: number; price: number; timestamp?: number }[], stockNames?: { [id: string]: string }): void {
+    if (!transactions || transactions.length === 0) return;
+
+    // Remove any previously hydrated real transactions (keep synthetic existing_ buys so holdings still show if server omitted them)
+    this.allTimeTransactions = this.allTimeTransactions.filter(t => t.id.startsWith('existing_'));
+    this.sessionTransactions = [];
+
+    // Sort by timestamp ascending to compute cost basis correctly
+    const ordered = [...transactions].sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    ordered.forEach(trx => {
+      const base: PortfolioTransaction = {
+        id: `srv_${trx.type}_${trx.symbol.toLowerCase()}_${trx.timestamp || Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+        stockId: trx.symbol.toLowerCase(),
+        stockName: stockNames?.[trx.symbol.toLowerCase()] || trx.symbol,
+        type: trx.type,
+        quantity: trx.quantity,
+        price: trx.price,
+        total: trx.price * trx.quantity,
+        timestamp: trx.timestamp || Date.now()
+      };
+      this.allTimeTransactions.push(base);
+      this.sessionTransactions.push(base);
+      if (trx.type === 'sell') {
+        // compute realized P/L for this sell immediately
+        this.calculateSellProfitLoss(base);
+      }
+    });
+
+    // Rebuild portfolio history quickly with last snapshot
+    this.updatePortfolioHistory();
+    console.log('📊 Hydrated server transactions into analytics:', ordered.length);
+  }
+
   public getTransactionCount(): number {
     return this.allTimeTransactions.length;
   }

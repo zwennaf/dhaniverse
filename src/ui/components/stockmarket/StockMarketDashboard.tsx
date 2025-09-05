@@ -74,6 +74,31 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [loadingStage, setLoadingStage] = useState("Loading Stock Market Data");
     const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
+    // Fetch server transactions (authoritative) and hydrate analytics. Returns true if real history applied.
+    const fetchAndHydrateTransactions = async (stockNames?: { [id: string]: string }) => {
+        try {
+            const txResp = await stockApi.getTransactions();
+            if (txResp.success && Array.isArray(txResp.data) && txResp.data.length > 0) {
+                // Clear then hydrate with ordered server transactions
+                portfolioAnalytics.clearAllData();
+                portfolioAnalytics.hydrateServerTransactions(
+                    txResp.data.map((t: any) => ({
+                        type: t.type,
+                        symbol: (t.stockId || t.symbol || t.stockSymbol || '').toLowerCase(),
+                        quantity: t.quantity,
+                        price: t.price,
+                        timestamp: t.timestamp instanceof Date ? t.timestamp.getTime() : (typeof t.timestamp === 'string' ? Date.parse(t.timestamp) : t.timestamp)
+                    })),
+                    stockNames
+                );
+                return true;
+            }
+        } catch (err) {
+            console.warn('⚠️ Failed to fetch server stock transactions for hydration:', err);
+        }
+        return false;
+    };
+
     // Log authentication status for debugging
     useEffect(() => {
         console.log('StockMarketDashboard - Auth status:', { user, isSignedIn });
@@ -102,44 +127,46 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         checkIIAuth();
     }, [user, isSignedIn, refreshAuth]);
 
-    // Load portfolio
+    // Load portfolio + hydrate server transactions (persistent realized P/L & history)
     useEffect(() => {
-        const loadPortfolio = async () => {
+        const loadPortfolioAndTransactions = async () => {
             try {
-                // Clear analytics data first
-                portfolioAnalytics.clearAllData();
-                
                 const response = await stockApi.getPortfolio();
                 console.log('Initial portfolio load response:', response);
                 if (response.success && response.data) {
-                    console.log('Initial portfolio holdings data:', response.data.holdings);
+                    const rawHoldings = response.data.holdings || [];
                     const transformed: PlayerPortfolio = {
-                        holdings: response.data.holdings?.map((h: any) => ({
-                            stockId: h.symbol.toLowerCase(), // Convert to lowercase to match stock IDs
+                        holdings: rawHoldings.map((h: any) => ({
+                            stockId: (h.symbol || h.stockId).toLowerCase(),
                             quantity: h.quantity,
                             averagePurchasePrice: h.averagePrice,
                             totalInvestment: h.quantity * h.averagePrice,
-                        })) || [],
+                        })),
                         transactionHistory: [],
                     };
-                    console.log('Initial transformed portfolio:', transformed);
                     setPortfolio(transformed);
-                    
-                    // Load existing portfolio into analytics service
-                    if (transformed.holdings.length > 0) {
-                        // Create stock name mapping
-                        const stockNames: { [stockId: string]: string } = {};
-                        filteredStocks.forEach(stock => {
-                            stockNames[stock.symbol.toLowerCase()] = stock.name;
-                        });
+
+                    // Build name map from stocks + holdings fallback
+                    const stockNames: { [stockId: string]: string } = {};
+                    filteredStocks.forEach(s => { stockNames[s.symbol.toLowerCase()] = s.name; });
+                    rawHoldings.forEach((h: any) => {
+                        const key = (h.symbol || h.stockId || '').toLowerCase();
+                        if (key && !stockNames[key] && h.name) stockNames[key] = h.name;
+                    });
+
+                    const hydrated = await fetchAndHydrateTransactions(stockNames);
+                    if (!hydrated && transformed.holdings.length > 0) {
+                        portfolioAnalytics.clearAllData();
                         portfolioAnalytics.loadExistingPortfolio(transformed.holdings, stockNames);
                     }
                 }
             } catch (e) {
-                console.error("Portfolio load failed", e);
+                console.error('Portfolio load failed', e);
             }
         };
-        loadPortfolio();
+        loadPortfolioAndTransactions();
+        // filteredStocks intentionally excluded to prevent re-run loops
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Load real stocks data
@@ -360,6 +387,17 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     price: stock.currentPrice,
                     total: totalCost,
                 });
+
+                // Dispatch a unified stock-transaction event so ATM / other UIs can show it in history immediately
+                window.dispatchEvent(new CustomEvent('stock-transaction', {
+                    detail: {
+                        type: 'buy',
+                        amount: totalCost,
+                        symbol: stock.symbol,
+                        quantity,
+                        price: stock.currentPrice
+                    }
+                }));
                 
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
@@ -387,13 +425,13 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     console.log('Transformed portfolio:', transformedPortfolio);
                     setPortfolio(transformedPortfolio);
                     
-                    // Reload analytics with updated portfolio
-                    if (transformedPortfolio.holdings.length > 0) {
-                        // Create stock name mapping
-                        const stockNames: { [stockId: string]: string } = {};
-                        filteredStocks.forEach(stock => {
-                            stockNames[stock.symbol.toLowerCase()] = stock.name;
-                        });
+                    // Hydrate from server transactions (preferred) else fallback to synthetic holdings
+                    const stockNames: { [stockId: string]: string } = {};
+                    filteredStocks.forEach(s => { stockNames[s.symbol.toLowerCase()] = s.name; });
+                    transformedPortfolio.holdings.forEach((h: any) => { if (!stockNames[h.stockId]) stockNames[h.stockId] = h.stockId.toUpperCase(); });
+                    const hydrated = await fetchAndHydrateTransactions(stockNames);
+                    if (!hydrated && transformedPortfolio.holdings.length > 0) {
+                        portfolioAnalytics.clearAllData();
                         portfolioAnalytics.loadExistingPortfolio(transformedPortfolio.holdings, stockNames);
                     }
                 }
@@ -447,6 +485,17 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     price: stock.currentPrice,
                     total: saleValue,
                 });
+
+                // Dispatch stock-transaction event for real-time ATM/history updates
+                window.dispatchEvent(new CustomEvent('stock-transaction', {
+                    detail: {
+                        type: 'sell',
+                        amount: saleValue,
+                        symbol: stock.symbol,
+                        quantity,
+                        price: stock.currentPrice
+                    }
+                }));
                 
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
@@ -463,13 +512,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     };
                     setPortfolio(transformedPortfolio);
                     
-                    // Reload analytics with updated portfolio
-                    if (transformedPortfolio.holdings.length > 0) {
-                        // Create stock name mapping
-                        const stockNames: { [stockId: string]: string } = {};
-                        filteredStocks.forEach(stock => {
-                            stockNames[stock.symbol.toLowerCase()] = stock.name;
-                        });
+                    const stockNames: { [stockId: string]: string } = {};
+                    filteredStocks.forEach(s => { stockNames[s.symbol.toLowerCase()] = s.name; });
+                    transformedPortfolio.holdings.forEach((h: any) => { if (!stockNames[h.stockId]) stockNames[h.stockId] = h.stockId.toUpperCase(); });
+                    const hydrated = await fetchAndHydrateTransactions(stockNames);
+                    if (!hydrated && transformedPortfolio.holdings.length > 0) {
+                        portfolioAnalytics.clearAllData();
                         portfolioAnalytics.loadExistingPortfolio(transformedPortfolio.holdings, stockNames);
                     }
                 }
