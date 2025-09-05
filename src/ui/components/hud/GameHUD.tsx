@@ -327,7 +327,15 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
         const handleChat = (e: any) => {
             console.log("Received chat message:", e.detail);
-            const { id, username, message, skin } = e.detail;
+            const { id, username, message } = e.detail;
+            // server may send senderId separately
+            const senderId = e.detail.senderId || e.detail.id;
+            let skin = e.detail.skin;
+
+            // Prefer our local selected character for our own messages (more reliable)
+            if (!skin && senderId && selfPlayerId && senderId === selfPlayerId) {
+                skin = user?.selectedCharacter;
+            }
 
             if (!message) {
                 console.warn(
@@ -360,7 +368,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 }
             }
 
-            const skinId = (skin || 'C1').replace(/-Preview$/i,'');
+            // Normalize skin string: strip path, extension and '-Preview' suffix
+            const raw = (skin || 'C1');
+            const skinId = String(raw).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
             const characterColor = characters.find(c => c.id === skinId)?.color || '#B2EEE6';
 
             setChatMessages((prev) => {

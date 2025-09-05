@@ -287,6 +287,11 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
         return; // Skip update if nothing significant changed
     }
 
+    // If client included a skin in the update payload, persist it on the connection
+    if ((message as any).skin && ["C1", "C2", "C3", "C4"].includes((message as any).skin)) {
+        connection.skin = (message as any).skin;
+    }
+
     // Update player position
     connection.position.x = updateData.x;
     connection.position.y = updateData.y;
@@ -303,6 +308,7 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
             x: connection.position.x,
             y: connection.position.y,
             animation: connection.animation,
+            skin: connection.skin || "C2",
         },
     });
 }
@@ -364,11 +370,14 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
         );
 
         // Broadcast chat message to all players (including sender)
+        // Include senderId and skin so clients can reliably render avatars/colors
         broadcast({
             type: "chat",
             id: messageId,
+            senderId: connection.id,
             username: connection.username,
             message: trimmedMessage,
+            skin: connection.skin || "C2",
         });
 
         console.log(

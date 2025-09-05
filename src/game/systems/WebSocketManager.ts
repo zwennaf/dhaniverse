@@ -97,12 +97,16 @@ export class WebSocketManager {
     private connectionTimeout: number = 10000;
     private isConnecting: boolean = false;
     private lastPositionSent: { x: number; y: number } | null = null;
+    private lastSentSkin: string | null = null;
     private static globalConnectionLock: boolean = false; // Global lock to prevent multiple connections
 
     constructor(scene: MainGameScene, player: Player) {
         console.log("Creating new WebSocketManager instance");
         this.scene = scene;
         this.player = player;
+
+        // Initialize lastSentSkin to current selected character
+        this.lastSentSkin = this.scene.registry.get("selectedCharacter") || null;
 
         this.connectionStatusText = this.scene.add
             .text(this.scene.cameras.main.width / 2, 20, "Connecting...", {
@@ -438,11 +442,20 @@ export class WebSocketManager {
                 y: Math.round(currentPosition.y),
             };
 
-            this.sendMessage("update", {
+            const updateData: any = {
                 x: roundedPosition.x,
                 y: roundedPosition.y,
                 animation: currentAnimation,
-            });
+            };
+
+            // Include skin in update if it has changed
+            const currentSkin = this.scene.registry.get("selectedCharacter");
+            if (currentSkin && currentSkin !== this.lastSentSkin) {
+                updateData.skin = currentSkin;
+                this.lastSentSkin = currentSkin;
+            }
+
+            this.sendMessage("update", updateData);
 
             this.lastPositionSent = roundedPosition;
             this.player.setLastSentPosition(currentPosition);
@@ -538,14 +551,20 @@ export class WebSocketManager {
 
             case "chat": {
                 if (data.username && data.message) {
-                    // Try to infer skin for sender (if it's us, use current selected character; else look up existing other player sprite key)
-                    let skin: string | undefined;
-                    if (data.id === this.playerId) {
-                        skin = this.scene.registry.get("selectedCharacter") || undefined;
-                    } else {
-                        const other = this.otherPlayers.get(data.id);
-                        if (other) skin = other.sprite.texture.key;
+                    // Use skin from server data if available, otherwise infer it
+                    let skin: string | undefined = (data as any).skin || data.skin;
+                    // Prefer explicit senderId from server if present
+                    const senderId = (data as any).senderId || data.id;
+
+                    if (!skin) {
+                        if (senderId === this.playerId) {
+                            skin = this.scene.registry.get("selectedCharacter") || undefined;
+                        } else {
+                            const other = this.otherPlayers.get(senderId);
+                            if (other) skin = other.sprite.texture.key;
+                        }
                     }
+
                     window.dispatchEvent(
                         new CustomEvent("chat-message", {
                             detail: {
@@ -741,6 +760,7 @@ export class WebSocketManager {
         const messageId = `chat-${Date.now()}-${Math.random()
             .toString(36)
             .substring(2, 9)}`;
-        this.sendMessage("chat", { message: message.trim(), id: messageId });
+        const skin = this.scene.registry.get("selectedCharacter") || "C1";
+        this.sendMessage("chat", { message: message.trim(), id: messageId, skin });
     }
 }
