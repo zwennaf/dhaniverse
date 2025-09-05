@@ -229,6 +229,8 @@ export function startGame(username: string, selectedCharacter: string = 'C2'): v
 
     // If assets already preloaded, go straight to Phaser init
     if (assetsReady) {
+        // Notify loaders that assets were already in memory so they can fast-forward progress animation
+        try { window.dispatchEvent(new CustomEvent('gameAssetsAlreadyPreloaded')); } catch {}
         initializePhaserGame(username, selectedCharacter, roomCode);
         return;
     }

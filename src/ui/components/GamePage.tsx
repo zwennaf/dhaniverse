@@ -2,20 +2,21 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
-import { playerStateApi } from '../../utils/api';
 import SEO from './SEO';
-import OnboardingWrapper from './onboarding/OnboardingWrapper';
+// Onboarding wrapper intentionally not imported – we currently always skip slides.
+import { playerStateApi } from '../../utils/api';
 import BankOnboardingUI from './banking/onboarding/BankOnboardingUI';
 import Loader from './loader/Loader';
-import { enableMayaTrackerOnGameStart, locationTrackerManager } from '../../services/LocationTrackerManager';
-import { shouldShowMainTutorial } from '../../config/onboarding';
+import { locationTrackerManager } from '../../services/LocationTrackerManager';
+// Tutorial gating now relies solely on backend player state (hasCompletedTutorial) instead of static config
 
 const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [showLoader, setShowLoader] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false); // Toggle this to control onboarding
+  // Onboarding disabled (we always skip). Kept state placeholder in case we re-enable quickly.
+  const [showOnboarding] = useState(false);
+  const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false);
   // Ref to avoid duplicate tracker activation
   const trackerActivatedRef = useRef(false);
   const gameStartedRef = useRef(false);
@@ -37,46 +38,32 @@ const GamePage: React.FC = () => {
       return;
     }
 
-    // Check player tutorial status
+    // Check player tutorial status from backend
     const checkTutorialStatus = async () => {
       try {
-        console.log("GamePage: Checking tutorial status...");
-        
-        // Use centralized configuration to determine if tutorial should be shown
-        const shouldShowTutorial = shouldShowMainTutorial();
-        console.log("GamePage: Should show tutorial:", shouldShowTutorial);
-        
-        setHasCompletedTutorial(!shouldShowTutorial);
-        
-        // Set window flag for GameHUD to check
-        (window as any).__tutorialCompleted = !shouldShowTutorial;
-        
-        if (shouldShowTutorial) {
-          // NEW user (tutorial incomplete): show loader first; game will start after onboarding continue
-          console.log("GamePage: New/incomplete tutorial user -> showing loader then onboarding; delaying game start");
-          setShowLoader(true);
-        } else {
-          // RETURNING user (tutorial completed): show loader briefly then start game immediately
-          console.log("GamePage: Returning user -> showing loader then starting game");
-          setShowLoader(true);
-          setTimeout(() => {
-            setIsLoading(false);
-            if (!gameStartedRef.current) {
-              startGameFlow(gameUsername);
-              gameStartedRef.current = true;
-            }
-          }, 1000); // Brief loader for consistent UX
-        }
-      } catch (error) {
-        console.error("GamePage: Error checking tutorial status:", error);
-        // Default to showing loader and onboarding on error for testing
+        console.log("GamePage: Fetching player state for tutorial status...");
+        const resp = await playerStateApi.get();
+        const completed = !!resp?.data?.hasCompletedTutorial;
+        setHasCompletedTutorial(completed);
+        (window as any).__tutorialCompleted = completed;
+
+        // Always show loader briefly for consistent experience
         setShowLoader(true);
-        // Do NOT start game yet; maintain expected flow
+        // Regardless of completion we skip showing the onboarding UI.
+        setTimeout(() => {
+          setIsLoading(false);
+          if (!gameStartedRef.current && user?.gameUsername) {
+            startGameFlow(user.gameUsername);
+            gameStartedRef.current = true;
+          }
+        }, 700);
+      } catch (e) {
+        console.error('GamePage: Failed to fetch player state, defaulting to showing onboarding', e);
+        setShowLoader(true);
       }
     };
-
     checkTutorialStatus();
-  }, [isLoaded, isSignedIn, user?.gameUsername, user?.selectedCharacter, navigate, hasCompletedTutorial]);
+  }, [isLoaded, isSignedIn, user?.gameUsername, navigate]);
 
   const startGameFlow = (gameUsername: string) => {
     console.log("GamePage useEffect: Starting game for", gameUsername);
@@ -99,167 +86,65 @@ const GamePage: React.FC = () => {
   };
 
   const handleLoaderComplete = () => {
-    console.log("GamePage: Loader completed");
+    console.log("GamePage: Loader completed (skipping onboarding)");
     setShowLoader(false);
     setIsLoading(false);
-    
-    // Check if user needs onboarding
+    // If backend had not marked completion, mark it now silently so slides never appear later.
     if (!hasCompletedTutorial) {
-      console.log("GamePage: Showing onboarding for new user");
-      setShowOnboarding(true);
+      (async () => {
+        try {
+          await playerStateApi.update({ hasCompletedTutorial: true });
+          setHasCompletedTutorial(true);
+          (window as any).__tutorialCompleted = true;
+          console.log('GamePage: Forced tutorial completion to skip onboarding');
+        } catch (e) {
+          console.warn('GamePage: Failed to force-complete tutorial (continuing anyway)', e);
+        }
+      })();
     }
-    // For returning users, the game will start automatically when isLoading becomes false
+    if (user?.gameUsername && !gameStartedRef.current) {
+      startGameFlow(user.gameUsername);
+      gameStartedRef.current = true;
+    }
   };
 
   const handleContinueToGame = async () => {
     console.log("GamePage: User clicked continue to game");
     
     try {
-      // Update the player state to mark tutorial as completed
-      await playerStateApi.update({
-        hasCompletedTutorial: false, // Keep as false as requested for testing
-      });
-      
-      console.log("GamePage: Updated hasCompletedTutorial to false for testing");
-      
-      // Hide onboarding and start the game
-      setShowOnboarding(false);
-      
-      if (user?.gameUsername && !gameStartedRef.current) {
-        // Start game only now (after onboarding) for new users
-        startGameFlow(user.gameUsername);
-        gameStartedRef.current = true;
-      }
-      // After game starts, if tutorial not completed AND main tutorial is enabled, enable Maya tracking
-      if (!hasCompletedTutorial && shouldShowMainTutorial()) {
-        setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
-      }
-      // Inform the game/HUD that onboarding finished and first task should be assigned
-      // Mark pending in case HUD hasn't mounted yet, then dispatch
-      (window as any).__assignFirstTaskPending = true;
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('assign-first-task'));
-      }, 500);
-    } catch (error) {
-      console.error("GamePage: Error updating tutorial status:", error);
-      // Continue to game anyway
-      setShowOnboarding(false);
-      if (user?.gameUsername && !gameStartedRef.current) {
-        startGameFlow(user.gameUsername);
-        gameStartedRef.current = true;
-      }
-      if (!hasCompletedTutorial) {
-        setTimeout(() => enableMayaTrackerOnGameStart(), 2000); // Use new centralized function
-      }
-      (window as any).__assignFirstTaskPending = true;
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('assign-first-task'));
-      }, 500);
+      await playerStateApi.update({ hasCompletedTutorial: true });
+      setHasCompletedTutorial(true);
+      (window as any).__tutorialCompleted = true;
+      console.log('GamePage: Tutorial marked complete in backend');
+    } catch (e) {
+      console.error('GamePage: Failed to persist tutorial completion, proceeding anyway', e);
     }
+    // Hide onboarding and start game
+    if (user?.gameUsername && !gameStartedRef.current) {
+      startGameFlow(user.gameUsername);
+      gameStartedRef.current = true;
+    }
+    // Assign first task only for brand new players
+    (window as any).__assignFirstTaskPending = true;
+    setTimeout(() => window.dispatchEvent(new CustomEvent('assign-first-task')), 400);
   };
 
   // Helper to enable Maya tracker once Maya target exists in manager
-  const attemptEnableMayaTracker = () => {
-    console.log("GamePage: attemptEnableMayaTracker called, trackerActivated:", trackerActivatedRef.current);
-    
-    // Estimated initial Maya spawn (keep synced with MayaNPCManager.x,y)
-    const EST_MAYA_POS = { x: 7779, y: 3581 };
-
-    const ensurePlaceholder = () => {
-      if (!locationTrackerManager.getTarget('maya')) {
-        console.log("GamePage: Creating Maya tracker placeholder");
-        locationTrackerManager.addTarget({
-          id: 'maya',
-          name: 'Maya',
-          position: EST_MAYA_POS,
-          image: '/characters/maya-preview.png',
-          enabled: true
-        });
-        trackerActivatedRef.current = true;
-        return true;
-      }
-      return false;
-    };
-
-    const tryEnable = () => {
-      const mayaTarget = locationTrackerManager.getTarget('maya');
-      if (mayaTarget) {
-        console.log("GamePage: Maya target found, enabled:", mayaTarget.enabled);
-        if (!mayaTarget.enabled) {
-          locationTrackerManager.setTargetEnabled('maya', true);
-          console.log("GamePage: Enabled Maya tracker");
-        }
-        trackerActivatedRef.current = true;
-        return true;
-      }
-      // create placeholder if still missing
-      return ensurePlaceholder();
-    };
-
-    // Always try to enable, regardless of previous state when tutorial not completed
-    if (!hasCompletedTutorial) {
-      console.log("GamePage: Tutorial not completed, forcing tracker enable");
-      trackerActivatedRef.current = false; // Reset to allow re-enabling
-    }
-    
-    if (trackerActivatedRef.current && hasCompletedTutorial) {
-      console.log("GamePage: Tracker already activated and tutorial completed, skipping");
-      return;
-    }
-
-    // Immediate attempt
-    if (tryEnable()) return;
-
-    // Aggressive retries for reliability
-    const retrySchedule = [50, 100, 200, 400, 800, 1200, 2000, 3000];
-    retrySchedule.forEach(delay => {
-      setTimeout(() => { 
-        if (!trackerActivatedRef.current || !hasCompletedTutorial) {
-          tryEnable(); 
-        }
-      }, delay);
-    });
-
-    // Safety long-poll as last resort
-    let attempts = 0;
-    const interval = setInterval(() => {
-      if (trackerActivatedRef.current && hasCompletedTutorial) { 
-        clearInterval(interval); 
-        return; 
-      }
-      attempts++;
-      if (tryEnable() || attempts > 60) { // ~12s max (60 * 200ms)
-        clearInterval(interval);
-      }
-    }, 200);
-  };
+  // Removed auto-enabling logic; tracker is now user-controlled (e.g., via key press/debug toggle).
 
 
 
   // Extra safeguard: attempt tracker each time this component becomes focused (e.g., after reloads/navigation back)
   useEffect(() => {
-    const onVisibility = () => {
-      // Only enable Maya tracker if tutorial is enabled AND not completed
-      if (document.visibilityState === 'visible' && !hasCompletedTutorial && shouldShowMainTutorial()) {
-        attemptEnableMayaTracker();
-      }
-    };
-    
-    // Handle Maya tracker removal event
+    // Only listen for external requests to remove the tracker; we no longer auto-enable on visibility.
     const handleRemoveMayaTracker = () => {
-      console.log("GamePage: Removing Maya tracker");
+      console.log("GamePage: Removing Maya tracker (external event)");
       locationTrackerManager.setTargetEnabled('maya', false);
       trackerActivatedRef.current = false;
     };
-    
-    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('remove-maya-tracker', handleRemoveMayaTracker);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('remove-maya-tracker', handleRemoveMayaTracker);
-    };
-  }, [hasCompletedTutorial]);
+    return () => window.removeEventListener('remove-maya-tracker', handleRemoveMayaTracker);
+  }, []);
 
   // Cleanup effect
   useEffect(() => {
@@ -320,9 +205,7 @@ const GamePage: React.FC = () => {
   }
 
   // Show onboarding for first-time players (only if tutorial not completed)
-  if (showOnboarding && !hasCompletedTutorial) {
-    return <OnboardingWrapper onContinueToGame={handleContinueToGame} />;
-  }
+  // Onboarding wrapper suppressed.
    
   // The game will be rendered by Phaser in the game-container div
   return (

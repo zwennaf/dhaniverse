@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { cacheAssets, resolveAsset } from '../../utils/assetCache';
 import { initChunkCache, preloadAndCacheChunks } from '../../../game/cache/mapChunkCache.ts';
 import { NumberCounter } from '../common';
+import { playerStateApi } from '../../../utils/api';
 
 interface LoaderProps {
   onLoadingComplete: () => void;
@@ -46,11 +47,25 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     "TIP: Save regularly to protect your progress"
   ];
 
-  // Decide if tutorial should be shown & start preloading its assets if needed
+  // Decide if tutorial should be shown by querying backend player state instead of localStorage
   useEffect(() => {
-    // Assumption: localStorage flag 'dhaniverse_onboarding_done' === 'true' means skip tutorial
-    const needsTutorial = localStorage.getItem('dhaniverse_onboarding_done') !== 'true';
-  setShouldPreloadTutorial(needsTutorial);
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await playerStateApi.get();
+        if (cancelled) return;
+        const needsTutorial = !resp?.data?.hasCompletedTutorial;
+        setShouldPreloadTutorial(needsTutorial);
+        if (!needsTutorial) {
+          // Ensure flags remain consistent; no tutorial assets required
+          tutorialAssetsLoadedRef.current = true;
+          setTutorialAssetsLoaded(true);
+        }
+      } catch (e) {
+        // Fallback: show tutorial if backend fails (better to educate than skip)
+        if (!cancelled) setShouldPreloadTutorial(true);
+      }
+    })();
 
   const tutorialImages: string[] = [
       '/game/first-tutorial/w1.png',
@@ -69,10 +84,9 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       '/game/first-tutorial/atm-intro.png',
       '/game/first-tutorial/stock-intro.png'
     ];
-    let cancelled = false;
-    if (needsTutorial) {
+    if (shouldPreloadTutorial) {
       cacheAssets(tutorialImages).then(() => {
-        if (cancelled) return; 
+        if (cancelled) return;
         tutorialAssetsLoadedRef.current = true;
         setTutorialAssetsLoaded(true);
       }).catch(() => {});
@@ -92,7 +106,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [shouldPreloadTutorial]);
 
   // Preload a small set of initial map chunks & metadata into localStorage cache
   useEffect(() => {
@@ -147,17 +161,34 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
     let stepIndex = 0;
     let animationFrame: number;
     
+    let fastForward = false;
+    const handleAlreadyPreloaded = () => {
+      // Trigger fast-forward if we haven't shown welcome yet
+      if (!showWelcome) {
+        fastForward = true;
+      }
+    };
+    window.addEventListener('gameAssetsAlreadyPreloaded', handleAlreadyPreloaded);
+
     const updateProgress = () => {
       // Calculate speed based on current progress (slower as it approaches 95)
       let speed;
-      if (currentProgress < 60) {
-        speed = 0.8; // Fast initial speed
-      } else if (currentProgress < 80) {
-        speed = 0.4; // Medium speed
-      } else if (currentProgress < 95) {
-        speed = 0.15; // Slow down significantly
+      if (fastForward) {
+        // Aggressive speeds to catch up quickly
+        if (currentProgress < 70) speed = 6;
+        else if (currentProgress < 85) speed = 4;
+        else if (currentProgress < 95) speed = 2.5;
+        else speed = 1.5;
       } else {
-        speed = 0.05; // Very slow crawl to 100
+        if (currentProgress < 60) {
+          speed = 0.8; // Fast initial speed
+        } else if (currentProgress < 80) {
+          speed = 0.4; // Medium speed
+        } else if (currentProgress < 95) {
+          speed = 0.15; // Slow down significantly
+        } else {
+          speed = 0.05; // Very slow crawl to 100
+        }
       }
       
       currentProgress += speed;
@@ -219,7 +250,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       }
       
       setProgress(Math.floor(currentProgress));
-      animationFrame = requestAnimationFrame(updateProgress);
+  animationFrame = requestAnimationFrame(updateProgress);
     };
     
     // Start the continuous animation
@@ -229,6 +260,7 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }
+      window.removeEventListener('gameAssetsAlreadyPreloaded', handleAlreadyPreloaded);
     };
   }, [onLoadingComplete, shouldPreloadTutorial]);
 
@@ -239,7 +271,15 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         setIsComplete(true);
-        setTimeout(() => {
+        setTimeout(async () => {
+          try {
+            // Mark tutorial complete in backend if it was shown
+            if (shouldPreloadTutorial) {
+              await playerStateApi.update({ hasCompletedTutorial: true });
+            }
+          } catch (e) {
+            console.warn('Failed to persist tutorial completion:', e);
+          }
           onLoadingComplete();
         }, 300);
       }
@@ -402,7 +442,14 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
           className="absolute inset-0 cursor-pointer z-20"
           onClick={() => {
             setIsComplete(true);
-            setTimeout(() => {
+            setTimeout(async () => {
+              try {
+                if (shouldPreloadTutorial) {
+                  await playerStateApi.update({ hasCompletedTutorial: true });
+                }
+              } catch (e) {
+                console.warn('Failed to persist tutorial completion:', e);
+              }
               onLoadingComplete();
             }, 300); // Reduced from 1000ms to 300ms
           }}

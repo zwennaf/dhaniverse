@@ -64,6 +64,7 @@ interface ChatMessage extends ServerMessageBase {
     id: string;
     username: string;
     message: string;
+    skin?: string;
 }
 
 interface OnlineUsersCountMessage extends ServerMessageBase {
@@ -535,23 +536,28 @@ export class WebSocketManager {
                 );
                 break;
 
-            case "chat":
+            case "chat": {
                 if (data.username && data.message) {
+                    // Try to infer skin for sender (if it's us, use current selected character; else look up existing other player sprite key)
+                    let skin: string | undefined;
+                    if (data.id === this.playerId) {
+                        skin = this.scene.registry.get("selectedCharacter") || undefined;
+                    } else {
+                        const other = this.otherPlayers.get(data.id);
+                        if (other) skin = other.sprite.texture.key;
+                    }
                     window.dispatchEvent(
                         new CustomEvent("chat-message", {
                             detail: {
-                                id:
-                                    data.id ||
-                                    `chat-${Date.now()}-${Math.random()
-                                        .toString(36)
-                                        .substring(2, 9)}`,
+                                id: data.id || `chat-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                                 username: data.username,
                                 message: data.message,
-                            },
+                                skin
+                            }
                         })
                     );
                 }
-                break;
+                break; }
         }
     }
 
