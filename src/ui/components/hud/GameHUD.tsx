@@ -16,6 +16,14 @@ import { dialogueManager } from '../../../services/DialogueManager';
 import { getTaskManager } from '../../../game/tasks/TaskManager';
 import { GameTask } from '../../../game/tasks/TaskTypes';
 import AnimatedRupeeCounter from '../common/AnimatedRupeeCounter';
+import { useUser } from '../../contexts/AuthContext';
+
+const characters = [
+  { id: 'C1', label: 'Soul', color: '#B2EEE6', preview: '/characters/C1-Preview.png', full: '/characters/C1.png' },
+  { id: 'C2', label: 'Wheat', color: '#F4E4BC', preview: '/characters/C2-Preview.png', full: '/characters/C2.png' },
+  { id: 'C3', label: 'Lavender', color: '#E6E6FA', preview: '/characters/C3-Preview.png', full: '/characters/C3.png' },
+  { id: 'C4', label: 'Sea', color: '#87CEEB', preview: '/characters/C4-Preview.png', full: '/characters/C4.png' },
+];
 
 interface GameHUDProps {
     rupees?: number;
@@ -45,6 +53,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     icpService,
     voiceEnabled = true,
 }) => {
+    const { user } = useUser();
     const [currentRupees, setCurrentRupees] = useState(rupees);
     const [previousRupees, setPreviousRupees] = useState(rupees);
     const [chatMessages, setChatMessages] = useState<
@@ -1007,11 +1016,14 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                 className="flex items-start gap-3 mb-3 will-change-transform w-full"
                             >
                                 {/* avatar */}
-                                <div className="w-8 h-8 rounded-full flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full  flex-shrink-0">
                                     <div
-                                        className="w-5 h-5 mt-[50px] ml-[20px] rounded-full bg-cover bg-center border-2 border-black/60 shadow-sm"
+                                        className="w-8 h-8 rounded-full backdrop-blur-sm bg-cover border-2 border-black shadow-sm"
                                         style={{
-                                            backgroundImage: `url('/characters/C1.png')`,
+                                            backgroundImage: `url('/characters/${user?.selectedCharacter || 'C1'}-Preview.png')`,
+                                            backgroundPosition: 'center -25px',
+                                            backgroundSize: '400%',
+                                            backgroundColor: characters.find(c => c.id === (user?.selectedCharacter || 'C1'))?.color || '#B2EEE6',
                                         }}
                                     />
                                 </div>
@@ -1019,7 +1031,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                 <div className="relative">
                                     <div className="bg-black/75 text-white rounded-2xl px-4 py-3 w-full border border-black/30 backdrop-blur-sm shadow-md">
                                         <div className="flex items-start justify-between gap-2">
-                                            <div className="text-[12px] text-[#F1CD36] font-['Tickerbit',Arial,sans-serif]">
+                                            <div 
+                                                className="text-[12px] font-['Tickerbit',Arial,sans-serif]"
+                                                style={{
+                                                    color: characters.find(c => c.id === (user?.selectedCharacter || 'C1'))?.color || '#B2EEE6'
+                                                }}
+                                            >
                                                 {msg.username}
                                             </div>
                                             <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">

@@ -182,7 +182,9 @@ export function initializeHUD(initialRupees = 0) {
     // Mount React component
     hudRootRef = ReactDOM.createRoot(hudContainer);
     hudRootRef.render(
-      React.createElement(GameHUD, { rupees: initialRupees })
+      React.createElement(AuthProvider, null,
+        React.createElement(GameHUD, { rupees: initialRupees })
+      )
     );
     
     return hudRootRef;

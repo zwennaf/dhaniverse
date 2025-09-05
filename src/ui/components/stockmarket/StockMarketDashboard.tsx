@@ -8,6 +8,7 @@ import NewsPopup from "./NewsPopup.tsx";
 import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
+import { portfolioAnalytics } from '../../../services/PortfolioAnalyticsService';
 import { stockMarketService, type Stock } from "../../../services/StockMarketService";
 import { ICPActorService } from "../../../services/ICPActorService";
 import { WalletManager } from "../../../services/WalletManager";
@@ -105,6 +106,9 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     useEffect(() => {
         const loadPortfolio = async () => {
             try {
+                // Clear analytics data first
+                portfolioAnalytics.clearAllData();
+                
                 const response = await stockApi.getPortfolio();
                 console.log('Initial portfolio load response:', response);
                 if (response.success && response.data) {
@@ -120,6 +124,16 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     };
                     console.log('Initial transformed portfolio:', transformed);
                     setPortfolio(transformed);
+                    
+                    // Load existing portfolio into analytics service
+                    if (transformed.holdings.length > 0) {
+                        // Create stock name mapping
+                        const stockNames: { [stockId: string]: string } = {};
+                        filteredStocks.forEach(stock => {
+                            stockNames[stock.symbol.toLowerCase()] = stock.name;
+                        });
+                        portfolioAnalytics.loadExistingPortfolio(transformed.holdings, stockNames);
+                    }
                 }
             } catch (e) {
                 console.error("Portfolio load failed", e);
@@ -230,6 +244,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
 
     const displayStocks = getDisplayStocks();
 
+    // Create stock price map for portfolio analytics
+    const stockPriceMap = filteredStocks.reduce((map, stock) => {
+        map[stock.symbol.toLowerCase()] = stock.currentPrice; // Use lowercase for consistency
+        return map;
+    }, {} as { [stockId: string]: number });
+
     const calculatePortfolioValue = () => {
         let totalValue = 0;
         let totalInvestment = 0;
@@ -331,6 +351,16 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 setCurrentRupees(newBalance);
                 balanceManager.updateCash(newBalance);
                 
+                // Record transaction in analytics
+                portfolioAnalytics.recordTransaction({
+                    stockId: stock.symbol.toLowerCase(), // Ensure consistent lowercase
+                    stockName: stock.name,
+                    type: 'buy',
+                    quantity,
+                    price: stock.currentPrice,
+                    total: totalCost,
+                });
+                
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
                 console.log('Portfolio API Response:', portfolioResponse);
@@ -356,6 +386,16 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                     };
                     console.log('Transformed portfolio:', transformedPortfolio);
                     setPortfolio(transformedPortfolio);
+                    
+                    // Reload analytics with updated portfolio
+                    if (transformedPortfolio.holdings.length > 0) {
+                        // Create stock name mapping
+                        const stockNames: { [stockId: string]: string } = {};
+                        filteredStocks.forEach(stock => {
+                            stockNames[stock.symbol.toLowerCase()] = stock.name;
+                        });
+                        portfolioAnalytics.loadExistingPortfolio(transformedPortfolio.holdings, stockNames);
+                    }
                 }
 
                 return {
@@ -398,12 +438,23 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                 setCurrentRupees(newBalance);
                 balanceManager.updateCash(newBalance);
                 
+                // Record transaction in analytics
+                portfolioAnalytics.recordTransaction({
+                    stockId: stock.symbol.toLowerCase(), // Ensure consistent lowercase
+                    stockName: stock.name,
+                    type: 'sell',
+                    quantity,
+                    price: stock.currentPrice,
+                    total: saleValue,
+                });
+                
                 // Update portfolio
                 const portfolioResponse = await stockApi.getPortfolio();
                 if (portfolioResponse.success && portfolioResponse.data) {
                     const transformedPortfolio: PlayerPortfolio = {
                         holdings: portfolioResponse.data.holdings?.map((holding: any) => ({
-                            stockId: holding.symbol,
+                            // Normalize to lowercase to stay consistent with filteredStocks ids
+                            stockId: holding.symbol.toLowerCase(),
                             quantity: holding.quantity,
                             averagePurchasePrice: holding.averagePrice,
                             totalInvestment: holding.quantity * holding.averagePrice,
@@ -411,6 +462,16 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                         transactionHistory: [],
                     };
                     setPortfolio(transformedPortfolio);
+                    
+                    // Reload analytics with updated portfolio
+                    if (transformedPortfolio.holdings.length > 0) {
+                        // Create stock name mapping
+                        const stockNames: { [stockId: string]: string } = {};
+                        filteredStocks.forEach(stock => {
+                            stockNames[stock.symbol.toLowerCase()] = stock.name;
+                        });
+                        portfolioAnalytics.loadExistingPortfolio(transformedPortfolio.holdings, stockNames);
+                    }
                 }
                 
                 const profit = saleValue - holding.averagePurchasePrice * quantity;
@@ -518,7 +579,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                         </div>
 
                         {/* Main Content */}
-                        <div className="flex-1 overflow-hidden flex flex-col">
+                        <div className="flex-1 overflow-y-auto flex flex-col">
                             {activeTab === "market" && (
                                 <>
                                     {/* Filters */}
@@ -737,29 +798,137 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
 
                             {activeTab === "portfolio" && (
                                 <div className="flex-1 p-6">
+                                    {/* Portfolio Overview */}
                                     <div className="mb-6">
-                                        <div className="grid grid-cols-4 gap-4">
+                                        <h2 className="text-2xl font-bold text-white mb-4">Portfolio Analytics</h2>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                                             <div className="bg-gray-900/50 p-4 rounded-lg">
-                                                <p className="text-gray-400 text-sm">Total Value</p>
-                                                <p className="text-2xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
-                                            </div>
-                                            <div className="bg-gray-900/50 p-4 rounded-lg">
-                                                <p className="text-gray-400 text-sm">Total Investment</p>
-                                                <p className="text-2xl font-light text-white">₹{calculatePortfolioValue().totalInvestment.toLocaleString()}</p>
-                                            </div>
-                                            <div className="bg-gray-900/50 p-4 rounded-lg">
-                                                <p className="text-gray-400 text-sm">Profit/Loss</p>
-                                                <p className={`text-2xl font-light ${calculatePortfolioValue().profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ₹{calculatePortfolioValue().profitLoss.toLocaleString()}
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Profit/Loss if you sold all holdings at current prices">Unrealized P/L</p>
+                                                </div>
+                                                <p className={`text-2xl font-light ${portfolioAnalytics.getUnrealizedProfitLoss(stockPriceMap) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    ₹{portfolioAnalytics.getUnrealizedProfitLoss(stockPriceMap).toLocaleString()}
                                                 </p>
                                             </div>
                                             <div className="bg-gray-900/50 p-4 rounded-lg">
-                                                <p className="text-gray-400 text-sm">P/L Percentage</p>
-                                                <p className={`text-2xl font-light ${calculatePortfolioValue().profitLossPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    {calculatePortfolioValue().profitLossPercent.toFixed(2)}%
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Actual profit/loss from completed trades">Realized P/L</p>
+                                                </div>
+                                                <p className={`text-2xl font-light ${portfolioAnalytics.getPortfolioMetrics(stockPriceMap).netProfitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                    ₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).netProfitLoss.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Percentage of profitable trades (sells only)">Win Rate</p>
+                                                </div>
+                                                <p className="text-2xl font-light text-blue-400">
+                                                    {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).winRate.toFixed(1)}%
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Number of completed sell transactions">Total Trades</p>
+                                                </div>
+                                                <p className="text-2xl font-light text-purple-400">
+                                                    {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).totalTrades}
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {/* Advanced Metrics */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Average profit per winning trade">Avg Win</p>
+                                                </div>
+                                                <p className="text-xl font-light text-green-400">
+                                                    ₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).averageWin.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Average loss per losing trade">Avg Loss</p>
+                                                </div>
+                                                <p className="text-xl font-light text-red-400">
+                                                    ₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).averageLoss.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Best single trade profit">Largest Win</p>
+                                                </div>
+                                                <p className="text-xl font-light text-green-400">
+                                                    ₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).largestWin.toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Worst single trade loss">Largest Loss</p>
+                                                </div>
+                                                <p className="text-xl font-light text-red-400">
+                                                    ₹{Math.abs(portfolioAnalytics.getPortfolioMetrics(stockPriceMap).largestLoss).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Risk Metrics */}
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Total profits ÷ Total losses (higher is better)">Profit Factor</p>
+                                                </div>
+                                                <p className="text-xl font-light text-cyan-400">
+                                                    {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).profitFactor === Infinity ? '∞' : portfolioAnalytics.getPortfolioMetrics(stockPriceMap).profitFactor.toFixed(2)}
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Largest peak-to-trough decline">Max Drawdown</p>
+                                                </div>
+                                                <p className="text-xl font-light text-orange-400">
+                                                    {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).maxDrawdown.toFixed(2)}%
+                                                </p>
+                                            </div>
+                                            <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-gray-400 text-sm" title="Time spent in current trading session">Session Duration</p>
+                                                </div>
+                                                <p className="text-xl font-light text-blue-400">
+                                                    {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).sessionDuration.toFixed(1)}h
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Best/Worst Performing Stocks */}
+                                        {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).bestPerformingStock && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                                <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-gray-400 text-sm" title="Current holding with highest unrealized gains">Best Performing Stock</p>
+                                                    </div>
+                                                    <p className="text-lg font-light text-green-400">
+                                                        {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).bestPerformingStock?.stockName}
+                                                    </p>
+                                                    <p className="text-sm text-green-400">
+                                                        +₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).bestPerformingStock?.profitLoss.toLocaleString()}
+                                                        ({portfolioAnalytics.getPortfolioMetrics(stockPriceMap).bestPerformingStock?.profitLossPercent.toFixed(2)}%)
+                                                    </p>
+                                                </div>
+                                                <div className="bg-gray-900/50 p-4 rounded-lg">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-gray-400 text-sm" title="Current holding with lowest unrealized gains/highest losses">Worst Performing Stock</p>
+                                                    </div>
+                                                    <p className="text-lg font-light text-red-400">
+                                                        {portfolioAnalytics.getPortfolioMetrics(stockPriceMap).worstPerformingStock?.stockName}
+                                                    </p>
+                                                    <p className="text-sm text-red-400">
+                                                        ₹{portfolioAnalytics.getPortfolioMetrics(stockPriceMap).worstPerformingStock?.profitLoss.toLocaleString()}
+                                                        ({portfolioAnalytics.getPortfolioMetrics(stockPriceMap).worstPerformingStock?.profitLossPercent.toFixed(2)}%)
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="bg-gray-900/50 rounded-lg overflow-hidden">
@@ -830,6 +999,79 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                             {portfolio.holdings.length === 0 && (
                                                 <div className="text-center py-12">
                                                     <p className="text-gray-400">No holdings yet. Start trading to build your portfolio!</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Transaction History */}
+                                    <div className="bg-gray-900/50 rounded-lg overflow-hidden mt-6">
+                                        <div className="px-6 py-4 border-b border-gray-700/50">
+                                            <h3 className="text-lg font-medium text-white">Transaction History</h3>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead className="bg-gray-800/50">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stock</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Quantity</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Price</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">P/L</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-700/50">
+                                                    {portfolioAnalytics.getTransactionHistory(20).map((transaction) => (
+                                                        <tr key={transaction.id} className="hover:bg-gray-800/25">
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                {new Date(transaction.timestamp).toLocaleDateString()}
+                                                                <div className="text-xs text-gray-400">
+                                                                    {new Date(transaction.timestamp).toLocaleTimeString()}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <div className="text-sm font-medium text-white">{transaction.stockName}</div>
+                                                                <div className="text-sm text-gray-400">{transaction.stockId}</div>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                                                    transaction.type === 'buy'
+                                                                        ? 'bg-green-100 text-green-800'
+                                                                        : 'bg-red-100 text-red-800'
+                                                                }`}>
+                                                                    {transaction.type.toUpperCase()}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                {transaction.quantity}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                ₹{transaction.price.toLocaleString()}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                                                ₹{transaction.total.toLocaleString()}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                                {transaction.type === 'sell' && transaction.profitLoss !== undefined ? (
+                                                                    <div className={transaction.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                                                        ₹{transaction.profitLoss.toLocaleString()}
+                                                                        <div className="text-xs">
+                                                                            ({transaction.profitLossPercent?.toFixed(2)}%)
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-gray-400">-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {portfolioAnalytics.getTransactionHistory().length === 0 && (
+                                                <div className="text-center py-12">
+                                                    <p className="text-gray-400">No transactions yet. Start trading to see your history!</p>
                                                 </div>
                                             )}
                                         </div>

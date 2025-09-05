@@ -26,10 +26,10 @@ const Profile: React.FC = () => {
 
   const characters = useMemo(
     () => [
-      { id: 'C1', label: 'Sea', color: '#B2EEE6', preview: '/characters/C1-Preview.png', full: '/characters/C1.png' },
-      { id: 'C2', label: 'Lavender', preview: '/characters/C2-Preview.png', full: '/characters/C2.png' },
-      { id: 'C3', label: 'Wheat', preview: '/characters/C3-Preview.png', full: '/characters/C3.png' },
-      { id: 'C4', label: 'Soul', preview: '/characters/C4-Preview.png', full: '/characters/C4.png' },
+      { id: 'C1', label: 'Soul', color: '#B2EEE6', preview: '/characters/C1-Preview.png', full: '/characters/C1.png' },
+      { id: 'C2', label: 'Wheat', preview: '/characters/C2-Preview.png', full: '/characters/C2.png' },
+      { id: 'C3', label: 'Lavender', preview: '/characters/C3-Preview.png', full: '/characters/C3.png' },
+      { id: 'C4', label: 'Sea', preview: '/characters/C4-Preview.png', full: '/characters/C4.png' },
     ],
     []
   );
