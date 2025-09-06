@@ -17,6 +17,10 @@ export class Player {
     private username: string;
     private movementSmoothing: number = 0.2; // Controls movement smoothness (lower = smoother)
 
+    // Depth ordering: ensure player appears above NPCs but below global UI/dialogs
+    private static readonly PLAYER_DEPTH = 1500;
+    private static readonly PLAYER_NAME_DEPTH = Player.PLAYER_DEPTH + 1;
+
     constructor(
         scene: Scene,
         x: number,
@@ -34,9 +38,9 @@ export class Player {
         this.shiftKey = scene.input.keyboard!.addKey("SHIFT");
 
         // Create player sprite
-        this.sprite = scene.add.sprite(x, y, "character");
-        this.sprite.setScale(0.3); // Scale up the character to be more visible
-        this.sprite.setDepth(1000); // Set highest depth so player appears above all NPCs and other players
+    this.sprite = scene.add.sprite(x, y, "character");
+    this.sprite.setScale(0.3); // Scale up the character to be more visible
+    this.sprite.setDepth(Player.PLAYER_DEPTH); // Ensure player appears above NPCs and other players
 
         // Ensure animations exist for the 'character' texture (local player)
         ensureCharacterAnimations(this.scene, "character");
@@ -66,7 +70,7 @@ export class Player {
                 padding: Constants.PLAYER_NAME_PADDING,
             })
             .setOrigin(0.5, 3)
-            .setDepth(1001); // Player name should be above player sprite
+                .setDepth(Player.PLAYER_NAME_DEPTH); // Player name should be above player sprite
 
         // Ensure font is loaded and refresh the text if needed
         FontUtils.ensureFontLoaded(
