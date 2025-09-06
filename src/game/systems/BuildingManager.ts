@@ -11,10 +11,10 @@ export class BuildingManager {
   private stockMarketEntrance: { x: number, y: number };
   private bankExitLocation: { x: number, y: number };
   private bankCenterTerminal: { x: number, y: number };
-  private bankCenterInteractionText: GameObjects.Text;
-  private buildingInteractionText: GameObjects.Text;
-  private stockMarketInteractionText: GameObjects.Text;
-  private bankExitInteractionText: GameObjects.Text;
+  private bankCenterInteractionText: GameObjects.Container;
+  private buildingInteractionText: GameObjects.Container;
+  private stockMarketInteractionText: GameObjects.Container;
+  private bankExitInteractionText: GameObjects.Container;
   private interactionKey: Input.Keyboard.Key | null = null;
   private spaceKey: Input.Keyboard.Key | null = null;
   private enterKey: Input.Keyboard.Key | null = null;
@@ -29,88 +29,34 @@ export class BuildingManager {
     this.stockMarketEntrance = { x: 2565, y: 3550 }; // Stock market building entrance
     this.bankExitLocation = { x: 550, y: 2918 }; // Exit location inside bank building
   this.bankCenterTerminal = { x: 586, y: 2918 }; // Center terminal to open banking dashboard
-      // Initialize buildingInteractionText with improved visual style
-    this.buildingInteractionText = scene.add.text(
-      this.buildingEntrance.x, 
-      this.buildingEntrance.y - 50, 
-      "Press E to enter", 
-      {
-        fontFamily: Constants.UI_TEXT_FONT,
-        fontSize: Constants.UI_TEXT_SIZE,
-        color: Constants.UI_TEXT_COLOR,
-        align: 'center',
-        backgroundColor: Constants.UI_TEXT_BACKGROUND,
-        padding: Constants.UI_TEXT_PADDING,
-        shadow: {
-          offsetX: 1,
-          offsetY: 1,
-          color: '#000000',
-          blur: 3,
-          fill: true
-        }
-      }
-    ).setOrigin(0.5).setAlpha(0);
+      // Initialize buildingInteractionText with rounded background + centered text
+      this.buildingInteractionText = this.createRoundedInteractionLabel(
+        this.buildingEntrance.x,
+        this.buildingEntrance.y - 50,
+        'Press [E] to Enter'
+      ).setAlpha(0);
     
-    // Add stock market interaction text
-    this.stockMarketInteractionText = scene.add.text(
-      this.stockMarketEntrance.x, 
-      this.stockMarketEntrance.y - 50, 
-      "Press E to enter Stock Market", 
-      {
-        fontFamily: Constants.UI_TEXT_FONT,
-        fontSize: Constants.UI_TEXT_SIZE,
-        color: Constants.UI_TEXT_COLOR,
-        align: 'center',
-        backgroundColor: Constants.UI_TEXT_BACKGROUND,
-        padding: Constants.UI_TEXT_PADDING,
-        shadow: {
-          offsetX: 1,
-          offsetY: 1,
-          color: '#000000',
-          blur: 3,
-          fill: true
-        }
-      }
-    ).setOrigin(0.5).setAlpha(0);
+    // Add stock market interaction text (rounded)
+    this.stockMarketInteractionText = this.createRoundedInteractionLabel(
+      this.stockMarketEntrance.x,
+      this.stockMarketEntrance.y - 50,
+      'Press [E] to Enter Stock Market'
+    ).setAlpha(0);
     
     
     // Add bank exit interaction text (shown when near exit location inside bank)
-    this.bankExitInteractionText = scene.add.text(
+    this.bankExitInteractionText = this.createRoundedInteractionLabel(
       this.bankExitLocation.x,
       this.bankExitLocation.y - 50,
-      "Press E to exit bank", 
-      {
-        fontFamily: Constants.UI_TEXT_FONT,
-        fontSize: Constants.UI_TEXT_SIZE,
-        color: Constants.UI_TEXT_COLOR,
-        align: 'center',
-        backgroundColor: Constants.UI_TEXT_BACKGROUND,
-        padding: Constants.UI_TEXT_PADDING,
-        shadow: {
-          offsetX: 1,
-          offsetY: 1,
-          color: '#000000',
-          blur: 3,
-          fill: true
-        }
-      }
-    ).setOrigin(0.5).setAlpha(0);
+      'Press E to exit bank'
+    ).setAlpha(0);
 
     // Add bank center interaction text (open dashboard)
-    this.bankCenterInteractionText = scene.add.text(
+    this.bankCenterInteractionText = this.createRoundedInteractionLabel(
       this.bankCenterTerminal.x,
       this.bankCenterTerminal.y - 110,
-      "Press E to open Banking", 
-      {
-        fontFamily: Constants.UI_TEXT_FONT,
-        fontSize: Constants.UI_TEXT_SIZE,
-        color: Constants.UI_TEXT_COLOR,
-        align: 'center',
-        backgroundColor: Constants.UI_TEXT_BACKGROUND,
-        padding: Constants.UI_TEXT_PADDING,
-        shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true }
-      }
-    ).setOrigin(0.5).setAlpha(0);
+      'Press E to open Banking'
+    ).setAlpha(0);
     
     // Setup keys for interaction with null checks
     if (scene.input.keyboard) {
@@ -441,6 +387,48 @@ export class BuildingManager {
         });
       }
     }
+  }
+
+  /**
+   * Create a rounded background label container with centered text.
+   * Returns a GameObjects.Container positioned at (x,y) whose children are a Graphics background and a Text object.
+   */
+  private createRoundedInteractionLabel(x: number, y: number, message: string): GameObjects.Container {
+    const container = this.scene.add.container(x, y);
+
+    const text = this.scene.add.text(0, 0, message, {
+      fontFamily: Constants.UI_TEXT_FONT,
+      fontSize: Constants.UI_TEXT_SIZE,
+      color: Constants.UI_TEXT_COLOR,
+      align: 'center',
+      padding: Constants.UI_TEXT_PADDING,
+      shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true }
+    }).setOrigin(0.5, 0.5);
+
+    // Determine padding (support numeric or object padding)
+    let pad = 8;
+    try {
+      if (typeof (Constants as any).UI_TEXT_PADDING === 'number') pad = (Constants as any).UI_TEXT_PADDING;
+      else if ((Constants as any).UI_TEXT_PADDING && typeof (Constants as any).UI_TEXT_PADDING.x === 'number') pad = (Constants as any).UI_TEXT_PADDING.x;
+    } catch (e) { /* ignore and use default */ }
+
+    const width = text.width + pad * 2;
+    const height = text.height + pad * 2;
+    const radius = Math.min(12, Math.floor(Math.min(width, height) / 4));
+
+    const bg = this.scene.add.graphics();
+    try {
+      const colorValue = Phaser.Display.Color.HexStringToColor((Constants as any).UI_TEXT_BACKGROUND || '#000000').color;
+      bg.fillStyle(colorValue, 1);
+    } catch (e) {
+      // fallback to black if parsing fails
+      bg.fillStyle(0x000000, 1);
+    }
+    bg.fillRoundedRect(-width / 2, -height / 2, width, height, radius);
+
+    container.add([bg, text]);
+
+    return container;
   }
 
   private exitBuilding(): void {

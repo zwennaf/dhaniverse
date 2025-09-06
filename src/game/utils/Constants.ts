@@ -41,10 +41,10 @@ export const Constants = {
     // Stock broker specific styling (cyan color)
     BROKER_NAME_COLOR: "#00ffff",
     // UI text styling
-    UI_TEXT_FONT: "Pixeloid",
+    UI_TEXT_FONT: "Tickerbit",
     UI_TEXT_SIZE: "16px",
     UI_TEXT_COLOR: "#ffffff",
-    UI_TEXT_BACKGROUND: "#00000080",
+    UI_TEXT_BACKGROUND: "#000000",
     UI_TEXT_PADDING: { x: 8, y: 4 },
     // System message styling (connection status, etc.)
     SYSTEM_TEXT_FONT: "Pixeloid",
