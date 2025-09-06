@@ -41,6 +41,13 @@ const MagicLinkVerification = () => {
                     }, 2000);
                 } else {
                     setStatus('error');
+                    
+                    // Check if this is a ban - redirect to banned page
+                    if (result.error === 'BANNED') {
+                        navigate('/banned', { replace: true });
+                        return;
+                    }
+                    
                     setMessage(result.error || 'Failed to verify magic link');
                 }
             } catch (error) {

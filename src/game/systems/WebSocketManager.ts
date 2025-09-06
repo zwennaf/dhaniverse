@@ -473,23 +473,48 @@ export class WebSocketManager {
     private handleServerMessage(data: ServerMessage): void {
         switch (data.type) {
             case "banned": {
-                // Show a simple in-game notification / toast substitute
+                // Handle ban notification from server
+                const banData = data as any;
+                const banInfo = {
+                    banned: true,
+                    reason: banData.reason || 'You have been banned from the game',
+                    banType: banData.banType || 'account',
+                    expiresAt: banData.expiresAt
+                };
+                
+                // Store ban info and dispatch event for UI handling
                 try {
-                    window.dispatchEvent(new CustomEvent('user-banned', { detail: { reason: (data as any).reason } }));
-                } catch {}
-                console.warn('You are banned from the game');
+                    sessionStorage.setItem('ban_info', JSON.stringify(banInfo));
+                    window.dispatchEvent(new CustomEvent('user-banned', { detail: banInfo }));
+                } catch (error) {
+                    console.error('Failed to handle ban notification:', error);
+                }
+                
+                console.warn('You are banned from the game:', banInfo.reason);
+                if (banInfo.expiresAt) {
+                    console.warn('Ban expires at:', new Date(banInfo.expiresAt).toLocaleString());
+                }
                 this.disconnect();
                 return;
             }
             case 'forceKick': {
-                console.warn('Force kicked:', (data as any).reason);
-                alert((data as any).reason || 'You were disconnected by an administrator');
+                const reason = (data as any).reason || 'You were disconnected by an administrator';
+                console.warn('Force kicked:', reason);
+                
+                // For force kicks, show alert and disconnect
+                alert(reason);
                 this.disconnect();
+                
+                // Navigate to home after a brief delay
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
                 return;
             }
             case 'afkKick': {
-                console.warn('AFK kicked:', (data as any).reason);
-                alert((data as any).reason || 'Kicked for being AFK');
+                const reason = (data as any).reason || 'Kicked for being AFK';
+                console.warn('AFK kicked:', reason);
+                alert(reason);
                 this.disconnect();
                 return;
             }

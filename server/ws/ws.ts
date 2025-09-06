@@ -24,7 +24,7 @@ function col<T extends Document = Document>(name: string) {
   return mongoClient.db().collection<T>(name); 
 }
 
-interface BanRule { type:'email'|'internet_identity'|'ip'; value:string; active:boolean; expiresAt?:Date }
+interface BanRule { type:'email'|'internet_identity'|'ip'; value:string; active:boolean; expiresAt?:Date; reason?:string }
 interface SessionLog { userId?:string; username?:string; email?:string; ip?:string; event:'join'|'leave'; timestamp:Date; position?:{x:number;y:number}; skin?:string }
 interface ChatMessageLog { userId?:string; username?:string; message:string; timestamp:Date }
 interface IpLog { userId?:string; email?:string; ip:string; firstSeen:Date; lastSeen:Date; count:number }
@@ -237,27 +237,55 @@ async function validateAdminToken(token?: string) {
     } catch(_) { return null; }
 }
 
-// Helper function to extract IP from request
+// Helper function to extract IP from request (improved pattern based on PHP)
 function extractIpFromRequest(req: Request): string | undefined {
-    // Check various headers for real IP
-    const xForwardedFor = req.headers.get('x-forwarded-for');
-    if (xForwardedFor) {
-        // X-Forwarded-For can contain multiple IPs, take the first one
-        return xForwardedFor.split(',')[0].trim();
+    let clientIp = "unknown";
+    
+    // Check for client IP from shared internet (highest priority)
+    const clientIpHeader = req.headers.get("http-client-ip");
+    if (clientIpHeader && clientIpHeader.trim() !== "") {
+        clientIp = clientIpHeader.trim();
+    }
+    // Check for IP from proxy (second priority)
+    else {
+        const forwardedFor = req.headers.get("x-forwarded-for");
+        if (forwardedFor && forwardedFor.trim() !== "") {
+            // Take the first IP in the chain (original client)
+            clientIp = forwardedFor.split(',')[0].trim();
+        }
+        // Check other common proxy headers
+        else {
+            const realIp = req.headers.get("x-real-ip");
+            const cfConnectingIp = req.headers.get("cf-connecting-ip"); // Cloudflare
+            const azureClientIp = req.headers.get("x-azure-clientip"); // Azure
+            
+            if (cfConnectingIp && cfConnectingIp.trim() !== "") {
+                clientIp = cfConnectingIp.trim();
+            } else if (azureClientIp && azureClientIp.trim() !== "") {
+                clientIp = azureClientIp.trim();
+            } else if (realIp && realIp.trim() !== "") {
+                clientIp = realIp.trim();
+            } else {
+                // No valid IP found in headers, check for localhost development
+                return "127.0.0.1"; // Default for local development
+            }
+        }
     }
     
-    const xRealIp = req.headers.get('x-real-ip');
-    if (xRealIp) {
-        return xRealIp.trim();
+    // Clean up IP address (remove port if present)
+    if (clientIp !== "unknown" && clientIp.includes(':')) {
+        // Handle IPv6 format and port removal
+        if (clientIp.startsWith('[') && clientIp.includes(']:')) {
+            clientIp = clientIp.substring(1, clientIp.indexOf(']:'));
+        } else if (!clientIp.includes('::')) {
+            // IPv4 with port
+            clientIp = clientIp.split(':')[0];
+        }
     }
     
-    const cfConnectingIp = req.headers.get('cf-connecting-ip');
-    if (cfConnectingIp) {
-        return cfConnectingIp.trim();
-    }
+    console.log(`[WS IP Detection] Client IP: ${clientIp} (from headers: x-forwarded-for: ${req.headers.get("x-forwarded-for")}, x-real-ip: ${req.headers.get("x-real-ip")}, cf-connecting-ip: ${req.headers.get("cf-connecting-ip")})`);
     
-    // Fallback - this might be a proxy IP in production
-    return req.headers.get('x-forwarded-for') || undefined;
+    return clientIp === "unknown" ? undefined : clientIp;
 }
 
 // Authentication handler
@@ -931,7 +959,7 @@ setInterval(() => {
 
 // Periodic ban checking for active connections
 setInterval(async () => {
-    const connectionsToKick = new Array<{ id: string; reason: string }>();
+    const connectionsToKick = new Array<{ id: string; reason: string; banInfo?: { reason: string; banType: string; expiresAt?: string } }>();
     
     for (const [id, connection] of connections) {
         if (connection.authenticated && (connection.email || connection.ip)) {
@@ -941,24 +969,58 @@ setInterval(async () => {
             });
             
             if (banned) {
+                // Try to get detailed ban information
+                let banDetails = null;
+                try {
+                    const bans = col<BanRule>('bans');
+                    if (bans) {
+                        const banDoc = await bans.findOne({
+                            active: true,
+                            $or: [
+                                { type: 'email', value: connection.email?.toLowerCase() },
+                                { type: 'ip', value: connection.ip }
+                            ]
+                        });
+                        if (banDoc) {
+                            banDetails = {
+                                reason: banDoc.reason || 'Banned during session',
+                                banType: banDoc.type,
+                                expiresAt: banDoc.expiresAt?.toISOString()
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch ban details:', error);
+                }
+                
                 connectionsToKick.push({ 
                     id, 
-                    reason: 'Banned during session' 
+                    reason: banDetails?.reason || 'Banned during session',
+                    banInfo: banDetails || undefined
                 });
             }
         }
     }
     
     // Kick banned users
-    connectionsToKick.forEach(({ id, reason }) => {
+    connectionsToKick.forEach(({ id, reason, banInfo }) => {
         const connection = connections.get(id);
         if (connection) {
             try {
                 if (connection.socket.readyState === WebSocket.OPEN) {
-                    connection.socket.send(JSON.stringify({ 
+                    const banMessage: { type: string; reason: string; banType?: string; expiresAt?: string } = { 
                         type: 'banned', 
-                        reason: 'You have been banned from the game' 
-                    }));
+                        reason: reason || 'You have been banned from the game'
+                    };
+                    
+                    if (banInfo) {
+                        banMessage.banType = banInfo.banType;
+                        if (banInfo.expiresAt) {
+                            banMessage.expiresAt = banInfo.expiresAt;
+                        }
+                    }
+                    
+                    connection.socket.send(JSON.stringify(banMessage));
                 }
                 connection.socket.close(4403, 'banned');
             } catch(_error) {
@@ -1064,14 +1126,19 @@ Deno.serve({
                 try {
                     const body = await req.json();
                     const userId = body.userId as string | undefined;
+                    const email = body.email as string | undefined;
                     const reason = body.reason || 'Force disconnect by admin';
-                    if (!userId) return new Response(JSON.stringify({ error:'missing userId' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    
+                    if (!userId && !email) {
+                        return new Response(JSON.stringify({ error:'missing userId or email' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    }
+                    
                     // Find connections for this user
                     let kicked = 0;
                     const connectionsToKick = new Array<string>();
                     
                     connections.forEach((c, id) => {
-                        if (c.userId === userId) {
+                        if ((userId && c.userId === userId) || (email && c.email === email)) {
                             connectionsToKick.push(id);
                         }
                     });
@@ -1092,7 +1159,132 @@ Deno.serve({
                             kicked++;
                         }
                     });
+                    
+                    // Notify admins of kick action
+                    sendToAdmins({
+                        type: 'adminAction',
+                        action: 'kick',
+                        target: userId || email,
+                        reason,
+                        kicked,
+                        timestamp: Date.now()
+                    });
+                    
                     return new Response(JSON.stringify({ status:'ok', kicked }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                } catch(_error) {
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+            })();
+        }
+
+        // Admin announce endpoint
+        if (url.pathname === '/admin/announce' && req.method === 'POST') {
+            return (async () => {
+                const auth = req.headers.get('authorization') || '';
+                const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+                const admin = await validateAdminToken(token);
+                if (!admin) {
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+                try {
+                    const body = await req.json();
+                    const message = body.message as string;
+                    if (!message?.trim()) {
+                        return new Response(JSON.stringify({ error:'missing message' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    }
+                    
+                    // Broadcast announcement to all connected players
+                    broadcast({
+                        type: 'announcement',
+                        message: message.trim(),
+                        timestamp: Date.now(),
+                        from: 'Admin'
+                    });
+                    
+                    // Notify admins of announcement
+                    sendToAdmins({
+                        type: 'adminAction',
+                        action: 'announce',
+                        message: message.trim(),
+                        timestamp: Date.now()
+                    });
+                    
+                    return new Response(JSON.stringify({ status:'ok', broadcasted: getOnlineUsersCount() }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                } catch(_error) {
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+            })();
+        }
+
+        // Admin ban endpoint - for real-time enforcement
+        if (url.pathname === '/admin/ban' && req.method === 'POST') {
+            return (async () => {
+                const auth = req.headers.get('authorization') || '';
+                const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+                const admin = await validateAdminToken(token);
+                if (!admin) {
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+                try {
+                    const body = await req.json();
+                    const { type, value, reason, expiresAt } = body;
+                    if (!type || !value) {
+                        return new Response(JSON.stringify({ error:'missing type or value' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    }
+                    
+                    // Find and kick matching connections immediately
+                    let kicked = 0;
+                    const connectionsToKick = new Array<string>();
+                    
+                    connections.forEach((c, id) => {
+                        if (type === 'email' && c.email === value.toLowerCase()) {
+                            connectionsToKick.push(id);
+                        } else if (type === 'ip' && c.ip === value) {
+                            connectionsToKick.push(id);
+                        }
+                    });
+                    
+                    // Kick each connection
+                    const kickReason = reason || 'Banned by admin';
+                    connectionsToKick.forEach(id => {
+                        const c = connections.get(id);
+                        if (c) {
+                            try { 
+                                if (c.socket.readyState === WebSocket.OPEN) {
+                                    const banMessage: { type: string; reason: string; banType: string; expiresAt?: string } = { 
+                                        type:'banned', 
+                                        reason: kickReason,
+                                        banType: type 
+                                    };
+                                    
+                                    // Include expiration time if it's a temporary ban
+                                    if (expiresAt) {
+                                        banMessage.expiresAt = expiresAt;
+                                    }
+                                    
+                                    c.socket.send(JSON.stringify(banMessage)); 
+                                }
+                                c.socket.close(4002, 'banned');
+                            } catch(_error) {
+                                console.error('Error banning connection:', _error);
+                            }
+                            handleDisconnect(id);
+                            kicked++;
+                        }
+                    });
+                    
+                    // Notify admins of ban action
+                    sendToAdmins({
+                        type: 'adminAction',
+                        action: 'ban',
+                        banType: type,
+                        target: value,
+                        reason: kickReason,
+                        kicked,
+                        timestamp: Date.now()
+                    });
+                    
+                    return new Response(JSON.stringify({ status:'ok', banned: value, kicked }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
                 } catch(_error) {
                     return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
                 }

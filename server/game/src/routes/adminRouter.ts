@@ -125,6 +125,43 @@ adminRouter.post("/admin/ban", async (ctx) => {
   const expiresAt = data.durationMinutes ? new Date(Date.now() + data.durationMinutes * 60000) : undefined;
   const doc: BanRuleDocument = { type: data.type, value: data.value.toLowerCase(), reason: data.reason, createdAt: new Date(), createdBy: (ctx.state as unknown as { adminUser: UserDocument }).adminUser.email, expiresAt, active: true };
   await bansCol.insertOne(doc as unknown as BanRuleDocument);
+  
+  // Immediately kick the banned user from active sessions via WebSocket server
+  try {
+    // Use Azure WebSocket server for production, localhost for development
+    const wsServerUrl = Deno.env.get("DENO_ENV") === "development" 
+      ? "http://localhost:8001" 
+      : "https://dhaniverse-ws.azurewebsites.net";
+    
+    const kickPayload: { type: string; value: string; reason: string; expiresAt?: string } = {
+      type: data.type,
+      value: data.value,
+      reason: data.reason || 'Banned by admin'
+    };
+    
+    // Include expiration time if it's a temporary ban
+    if (expiresAt) {
+      kickPayload.expiresAt = expiresAt.toISOString();
+    }
+    
+    const kickResponse = await fetch(`${wsServerUrl}/admin/ban`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': ctx.request.headers.get('Authorization') || ''
+      },
+      body: JSON.stringify(kickPayload)
+    });
+    
+    if (kickResponse.ok) {
+      const kickResult = await kickResponse.json();
+      console.log(`Ban applied and ${kickResult.kicked || 0} users immediately disconnected`);
+    }
+  } catch (error) {
+    console.error('Failed to immediately kick banned user via WebSocket:', error);
+    // Don't fail the ban operation if kick fails
+  }
+  
   ctx.response.body = { success: true };
 });
 
@@ -165,6 +202,55 @@ adminRouter.post("/admin/check-ban", async (ctx) => {
     const b = await bansCol.find({ type: 'internet_identity', value: data.principal.toLowerCase(), active: true }).toArray(); matches.push(...b);
   }
   ctx.response.body = { banned: matches.length > 0, matches };
+});
+
+// IP Geolocation endpoint to avoid CORS issues
+adminRouter.post("/admin/geolocate-ip", async (ctx) => {
+  try {
+    const data = await readJson<{ ip: string }>(ctx);
+    if (!data?.ip) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: 'IP address required' };
+      return;
+    }
+
+    const ip = data.ip;
+    
+    // Skip geolocation for local/private IPs
+    if (ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+      ctx.response.body = {
+        ip,
+        country_code: 'XX',
+        country_name: 'Local Network',
+        region_name: 'Local',
+        city_name: 'Localhost',
+        latitude: 0,
+        longitude: 0,
+        zip_code: '00000',
+        time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        asn: 'Local',
+        as: 'Local Network',
+        isp: 'Local'
+      };
+      return;
+    }
+
+    const API_KEY = Deno.env.get("IP_GEOLOCATION_API_KEY") || "EE3DA45AE7AB739FFED29B251A4EB9D1";
+    const response = await fetch(`https://api.ip2location.io/?key=${API_KEY}&ip=${encodeURIComponent(ip)}`);
+    
+    if (!response.ok) {
+      ctx.response.status = 500;
+      ctx.response.body = { error: 'Geolocation service unavailable' };
+      return;
+    }
+
+    const geoData = await response.json();
+    ctx.response.body = geoData;
+  } catch (error) {
+    console.error('IP geolocation error:', error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Geolocation failed' };
+  }
 });
 
 export default adminRouter;

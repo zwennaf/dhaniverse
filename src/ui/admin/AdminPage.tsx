@@ -47,15 +47,31 @@ interface IpLog {
     lastSeen: string;
     count: number;
 }
+interface IpGeolocation {
+    ip: string;
+    country_code: string;
+    country_name: string;
+    region_name: string;
+    city_name: string;
+    latitude: number;
+    longitude: number;
+    zip_code: string;
+    time_zone: string;
+    asn: string;
+    as: string;
+    is_proxy: boolean;
+}
 interface LivePlayer {
     connectionId: string;
     userId?: string;
     username?: string;
+    email?: string;
     x: number;
     y: number;
     animation?: string;
     skin?: string;
     lastUpdate?: number;
+    ip?: string;
 }
 interface ActivePlayerDoc {
     _id?: string;
@@ -78,6 +94,11 @@ const API_BASE =
     typeof window !== "undefined" && window.location.hostname === "localhost"
         ? "http://localhost:8000"
         : "https://api.dhaniverse.in";
+
+const WEBSOCKET_BASE =
+    typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "http://localhost:8001"
+        : "https://dhaniverse-ws.azurewebsites.net";
 
 // ------------- Modern UI Components ---------------
 const PixelButton: React.FC<{
@@ -331,10 +352,45 @@ const AdminPage: React.FC = () => {
         emailOrId: "",
         tempBanMinutes: "",
     });
+    const [ipGeoData, setIpGeoData] = useState<Map<string, IpGeolocation>>(new Map());
+    const [loadingGeoData, setLoadingGeoData] = useState<Set<string>>(new Set());
 
     const authHeaders: Record<string, string> = token
         ? { Authorization: `Bearer ${token}` }
         : {};
+
+    const fetchIpGeolocation = useCallback(async (ip: string) => {
+        if (ipGeoData.has(ip) || loadingGeoData.has(ip)) {
+            return;
+        }
+
+        setLoadingGeoData(prev => new Set(prev).add(ip));
+        
+        try {
+            // Use backend endpoint to avoid CORS issues
+            const response = await fetch(`${API_BASE}/admin/geolocate-ip`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaders
+                },
+                body: JSON.stringify({ ip })
+            });
+            
+            if (response.ok) {
+                const geoData = await response.json();
+                setIpGeoData(prev => new Map(prev).set(ip, geoData));
+            }
+        } catch (error) {
+            console.error('Failed to fetch IP geolocation:', error);
+        } finally {
+            setLoadingGeoData(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(ip);
+                return newSet;
+            });
+        }
+    }, [ipGeoData, loadingGeoData, authHeaders]);
 
     const fetcher = useCallback(
         async (path: string) => {
@@ -437,11 +493,29 @@ const AdminPage: React.FC = () => {
         };
     }, [autoRefresh, refreshMs]); // Remove loadAll and isLoading from dependencies
 
+    // Auto-fetch geolocation for IPs when they appear
+    useEffect(() => {
+        // Fetch geolocation for IP logs
+        ipLogs.forEach(ipLog => {
+            if (ipLog.ip && !ipGeoData.has(ipLog.ip) && !loadingGeoData.has(ipLog.ip)) {
+                fetchIpGeolocation(ipLog.ip);
+            }
+        });
+        
+        // Fetch geolocation for live players
+        livePlayers.forEach(player => {
+            if (player.ip && !ipGeoData.has(player.ip) && !loadingGeoData.has(player.ip)) {
+                fetchIpGeolocation(player.ip);
+            }
+        });
+    }, [ipLogs, livePlayers, fetchIpGeolocation, ipGeoData, loadingGeoData]);
+
     const submitBan = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!banForm.value.trim() || isLoading) return;
         
         try {
+            // Create ban in database - backend will automatically kick active users
             await fetch(`${API_BASE}/admin/ban`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
@@ -452,12 +526,14 @@ const AdminPage: React.FC = () => {
                         : undefined,
                 }),
             });
+            
             setBanForm({
                 type: "email",
                 value: "",
                 reason: "",
                 durationMinutes: "",
             });
+            console.log('Ban created and user immediately kicked:', banForm.value);
             // Only reload if not currently loading
             if (!isLoading) {
                 loadAll();
@@ -488,12 +564,14 @@ const AdminPage: React.FC = () => {
         e.preventDefault();
         if (!announce.trim()) return;
         try {
-            await fetch(`${API_BASE}/admin/announce`, {
+            // Use WebSocket server HTTP endpoint for real-time announcements
+            await fetch(`${WEBSOCKET_BASE}/admin/announce`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
                 body: JSON.stringify({ message: announce }),
             });
             setAnnounce("");
+            console.log('Announcement sent to all players:', announce);
         } catch (e) {
             console.error('Failed to send announcement:', e);
         }
@@ -531,12 +609,15 @@ const AdminPage: React.FC = () => {
             }
             if (kickForm.tempBanMinutes)
                 body.tempBanMinutes = Number(kickForm.tempBanMinutes);
-            await fetch(`${API_BASE}/admin/kick`, {
+            
+            // Use WebSocket server HTTP endpoint for real-time kick
+            await fetch(`${WEBSOCKET_BASE}/admin/kick`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
                 body: JSON.stringify(body),
             });
             setKickForm({ emailOrId: "", tempBanMinutes: "" });
+            console.log('User kicked:', kickForm.emailOrId);
         } catch (e) {
             console.error('Failed to kick user:', e);
         }
@@ -603,13 +684,17 @@ const AdminPage: React.FC = () => {
                                 connectionId: msg.connectionId,
                                 userId: msg.userId,
                                 username: msg.username,
+                                email: msg.email,
                                 x: msg.x,
                                 y: msg.y,
                                 animation: msg.animation,
                                 skin: msg.skin,
+                                ip: msg.ip,
                                 lastUpdate: Date.now(),
                             },
                         ]);
+                        // Update online count when player joins
+                        setLiveOnline(prev => (prev || 0) + 1);
                         break;
                     case "adminPlayerDisconnect":
                         setLivePlayers((prev) =>
@@ -617,6 +702,8 @@ const AdminPage: React.FC = () => {
                                 (p) => p.connectionId !== msg.connectionId
                             )
                         );
+                        // Update online count when player leaves
+                        setLiveOnline(prev => Math.max(0, (prev || 0) - 1));
                         break;
                     case "adminOnlineCount":
                         setLiveOnline(msg.count);
@@ -639,6 +726,28 @@ const AdminPage: React.FC = () => {
                             }, ...prev.slice(0, 199)];
                         });
                         break;
+                    case "adminAction":
+                        // Show real-time admin action feedback
+                        const action = msg.action;
+                        const target = msg.target;
+                        console.log(`✅ Admin action completed: ${action} on ${target}`, msg);
+                        
+                        // Update UI immediately based on action
+                        if (action === 'kick' && msg.kicked > 0) {
+                            // Remove kicked player from live players
+                            setLivePlayers(prev => 
+                                prev.filter(p => p.userId !== target && p.email !== target)
+                            );
+                        } else if (action === 'ban' && msg.kicked > 0) {
+                            // Remove banned player from live players
+                            setLivePlayers(prev => 
+                                prev.filter(p => 
+                                    !(msg.banType === 'email' && p.email === target) &&
+                                    !(msg.banType === 'ip' && p.ip === target)
+                                )
+                            );
+                        }
+                        break;
                 }
             } catch (e) {
                 console.error('Failed to parse admin websocket message:', e);
@@ -657,11 +766,13 @@ const AdminPage: React.FC = () => {
     const forceKick = async (userId?: string) => {
         if (!userId) return;
         try {
-            await fetch(`${API_BASE}/admin/kick`, {
+            // Use WebSocket server HTTP endpoint for real-time kick
+            await fetch(`${WEBSOCKET_BASE}/admin/kick`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
                 body: JSON.stringify({ userId, reason: "Kicked by admin" }),
             });
+            console.log('Force kicked user:', userId);
         } catch (e) {
             console.error('Failed to kick user:', e);
         }
@@ -1002,42 +1113,145 @@ const AdminPage: React.FC = () => {
                             right={
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                                    <Tag tone="success">{livePlayers.length} online</Tag>
+                                    <Tag tone="success">
+                                        {liveOnline !== null ? liveOnline : livePlayers.length} online
+                                    </Tag>
+                                    {liveOnline !== null && liveOnline !== livePlayers.length && (
+                                        <Tag tone="info" size="sm">
+                                            {livePlayers.length} visible
+                                        </Tag>
+                                    )}
                                 </div>
                             }
                             collapsible
                         >
+                            {/* World Map Overview */}
+                            {livePlayers.some(p => p.ip && ipGeoData.has(p.ip)) && (
+                                <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <h5 className="text-sm font-vcr text-white/80 mb-2">🌍 Global Player Distribution</h5>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Array.from(
+                                            livePlayers
+                                                .filter(p => p.ip && ipGeoData.has(p.ip))
+                                                .reduce((acc, player) => {
+                                                    const geo = ipGeoData.get(player.ip!);
+                                                    if (geo) {
+                                                        const key = `${geo.country_code}-${geo.country_name}`;
+                                                        acc.set(key, (acc.get(key) || 0) + 1);
+                                                    }
+                                                    return acc;
+                                                }, new Map<string, number>())
+                                        ).map(([countryInfo, count]) => {
+                                            const [code, name] = countryInfo.split('-');
+                                            return (
+                                                <div key={countryInfo} className="flex items-center gap-1">
+                                                    <Tag tone="info" size="sm">
+                                                        {code}
+                                                    </Tag>
+                                                    <span className="text-xs text-white/60">
+                                                        {name} ({count})
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                            
                             <div className="space-y-2">
                                 {livePlayers.map((player) => {
                                     const idleMs = Date.now() - (player.lastUpdate || 0);
                                     const idleMin = Math.floor(idleMs / 60000);
                                     const isIdle = idleMs > 120000; // 2 minutes
+                                    const geoData = player.ip ? ipGeoData.get(player.ip) : null;
+                                    const isLoadingGeo = player.ip ? loadingGeoData.has(player.ip) : false;
                                     
                                     return (
                                         <div
                                             key={player.connectionId}
-                                            className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                                            className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-3 h-3 rounded-full ${isIdle ? 'bg-yellow-400' : 'bg-green-400'}`} />
-                                                <div>
-                                                    <div className="text-sm font-vcr text-dhani-gold">
-                                                        {player.username || player.userId?.slice(0, 8) || "Anonymous"}
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className={`w-3 h-3 rounded-full ${isIdle ? 'bg-yellow-400' : 'bg-green-400'} flex-shrink-0`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <div className="text-sm font-vcr text-dhani-gold">
+                                                            {player.username || player.userId?.slice(0, 8) || "Anonymous"}
+                                                        </div>
+                                                        {geoData && (
+                                                            <div className="flex items-center gap-1">
+                                                                <Tag tone={geoData.is_proxy ? "warning" : "success"} size="sm">
+                                                                    {geoData.country_code}
+                                                                </Tag>
+                                                                {geoData.is_proxy && (
+                                                                    <Tag tone="warning" size="sm">PROXY</Tag>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {isLoadingGeo && (
+                                                            <div className="w-3 h-3 border border-dhani-gold/30 border-t-dhani-gold rounded-full animate-spin" />
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-white/50">
-                                                        Position: ({player.x}, {player.y})
+                                                        Game Position: ({player.x}, {player.y})
                                                         {isIdle && <span className="text-yellow-400 ml-2">Idle {idleMin}m</span>}
                                                     </div>
+                                                    {geoData && (
+                                                        <div className="text-xs text-white/40 space-y-1">
+                                                            <div className="flex items-center gap-1">
+                                                                <span>📍</span>
+                                                                <span className="truncate">
+                                                                    {geoData.city_name}, {geoData.region_name}, {geoData.country_name}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs">
+                                                                <span>🌐 {geoData.time_zone}</span>
+                                                                <span>•</span>
+                                                                <span>ISP: {geoData.as?.split(' ')[0] || 'Unknown'}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {player.ip && (
+                                                        <div className="text-xs text-white/30 font-mono">
+                                                            IP: {player.ip}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <PixelButton
-                                                variant="danger"
-                                                size="sm"
-                                                onClick={() => forceKick(player.userId)}
-                                                icon={<UserX size={14} />}
-                                            >
-                                                Kick
-                                            </PixelButton>
+                                            <div className="flex gap-2 flex-shrink-0">
+                                                {geoData && (
+                                                    <PixelButton
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => window.open(`https://www.google.com/maps?q=${geoData.latitude},${geoData.longitude}`, '_blank')}
+                                                        icon={<Globe size={14} />}
+                                                    >
+                                                        Map
+                                                    </PixelButton>
+                                                )}
+                                                {player.ip && (
+                                                    <PixelButton
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setBanForm(prev => ({ 
+                                                            ...prev, 
+                                                            type: "ip", 
+                                                            value: player.ip! 
+                                                        }))}
+                                                        icon={<Ban size={14} />}
+                                                    >
+                                                        Ban IP
+                                                    </PixelButton>
+                                                )}
+                                                <PixelButton
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => forceKick(player.userId)}
+                                                    icon={<UserX size={14} />}
+                                                >
+                                                    Kick
+                                                </PixelButton>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -1142,36 +1356,83 @@ const AdminPage: React.FC = () => {
                             collapsible
                         >
                             <div className="space-y-2">
-                                {ipLogs.slice(0, 30).map((ipLog) => (
-                                    <div
-                                        key={ipLog._id}
-                                        className="flex items-center justify-between p-2 rounded bg-white/5"
-                                    >
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-mono text-white/90">
-                                                {ipLog.ip}
+                                {ipLogs.slice(0, 30).map((ipLog) => {
+                                    const geoData = ipGeoData.get(ipLog.ip);
+                                    const isLoadingGeo = loadingGeoData.has(ipLog.ip);
+                                    
+                                    return (
+                                        <div
+                                            key={ipLog._id}
+                                            className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="text-sm font-mono text-white/90 font-semibold">
+                                                        {ipLog.ip}
+                                                    </div>
+                                                    {geoData && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Tag tone={geoData.is_proxy ? "warning" : "info"} size="sm">
+                                                                {geoData.country_code}
+                                                            </Tag>
+                                                            {geoData.is_proxy && (
+                                                                <Tag tone="warning" size="sm">PROXY</Tag>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {isLoadingGeo && (
+                                                        <div className="w-4 h-4 border-2 border-dhani-gold/30 border-t-dhani-gold rounded-full animate-spin" />
+                                                    )}
+                                                </div>
+                                                
+                                                {geoData && (
+                                                    <div className="text-xs text-white/70 mb-1">
+                                                        📍 {geoData.city_name}, {geoData.region_name}, {geoData.country_name}
+                                                        {geoData.zip_code && ` (${geoData.zip_code})`}
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="text-xs text-white/50">
+                                                    {ipLog.email || ipLog.userId?.slice(0, 8) || "Unknown"} • {ipLog.count} requests
+                                                </div>
+                                                <div className="text-xs text-white/40">
+                                                    Last seen: {new Date(ipLog.lastSeen).toLocaleString()}
+                                                    {geoData?.time_zone && ` (${geoData.time_zone})`}
+                                                </div>
+                                                
+                                                {geoData && (
+                                                    <div className="text-xs text-white/30 mt-1">
+                                                        ISP: {geoData.as} • ASN: {geoData.asn}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="text-xs text-white/50">
-                                                {ipLog.email || ipLog.userId?.slice(0, 8) || "Unknown"} • {ipLog.count} requests
-                                            </div>
-                                            <div className="text-xs text-white/40">
-                                                Last seen: {new Date(ipLog.lastSeen).toLocaleString()}
+                                            <div className="flex flex-col gap-2">
+                                                <PixelButton
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => setBanForm(prev => ({ 
+                                                        ...prev, 
+                                                        type: "ip", 
+                                                        value: ipLog.ip 
+                                                    }))}
+                                                    icon={<Ban size={14} />}
+                                                >
+                                                    Ban IP
+                                                </PixelButton>
+                                                {geoData && (
+                                                    <PixelButton
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => window.open(`https://www.google.com/maps?q=${geoData.latitude},${geoData.longitude}`, '_blank')}
+                                                        icon={<Globe size={14} />}
+                                                    >
+                                                        Map
+                                                    </PixelButton>
+                                                )}
                                             </div>
                                         </div>
-                                        <PixelButton
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={() => setBanForm(prev => ({ 
-                                                ...prev, 
-                                                type: "ip", 
-                                                value: ipLog.ip 
-                                            }))}
-                                            icon={<Ban size={14} />}
-                                        >
-                                            Ban IP
-                                        </PixelButton>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </GlassPanel>
 

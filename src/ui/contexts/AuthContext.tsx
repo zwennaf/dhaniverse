@@ -94,6 +94,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const data = await response.json();
         setUser(data.user);
       } else {
+        // Check if this is a ban response
+        if (response.status === 403) {
+          const data = await response.json();
+          if (data.banned && data.banInfo) {
+            // Store ban info for the BannedPage
+            sessionStorage.setItem('banInfo', JSON.stringify(data.banInfo));
+            // Don't remove token yet, just set user to null
+            setUser(null);
+            setIsLoaded(true);
+            return;
+          }
+        }
+        
         // Invalid token, remove it and check for II session
         try { localStorage.removeItem('dhaniverse_token'); } catch {}
         await checkInternetIdentitySession();
@@ -176,6 +189,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           message: data.message 
         };
       } else {
+        // Check if this is a ban response
+        if (data.banned && data.banInfo) {
+          // Store ban info for the BannedPage
+          sessionStorage.setItem('banInfo', JSON.stringify(data.banInfo));
+          return { success: false, error: 'BANNED' }; // Special error code
+        }
         return { success: false, error: data.error || 'Invalid magic link' };
       }
     } catch (error) {
@@ -219,6 +238,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { success: true, isNewUser: data.isNewUser };
       } else {
         console.error('Google sign-in failed:', data);
+        // Check if this is a ban response
+        if (data.banned && data.banInfo) {
+          // Store ban info for the BannedPage
+          sessionStorage.setItem('banInfo', JSON.stringify(data.banInfo));
+          return { success: false, error: 'BANNED' }; // Special error code
+        }
         return { success: false, error: data.error || data.message || 'Google sign in failed' };
       }
     } catch (error) {
@@ -258,6 +283,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { success: true, isNewUser: data.isNewUser };
       } else {
         console.error('Internet Identity sign-in failed:', data);
+        // Check if this is a ban response
+        if (data.banned && data.banInfo) {
+          // Store ban info for the BannedPage
+          sessionStorage.setItem('banInfo', JSON.stringify(data.banInfo));
+          return { success: false, error: 'BANNED' }; // Special error code
+        }
         return { success: false, error: data.error || data.message || 'Internet Identity sign in failed' };
       }
     } catch (error) {

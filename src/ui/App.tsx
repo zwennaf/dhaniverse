@@ -4,11 +4,13 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import LandingPage from './components/LandingPage';
 import GamePage from './components/GamePage';
+import ProtectedGameRoute from './components/ProtectedGameRoute';
 import CustomSignIn from './components/auth/CustomSignIn';
 import CustomSignUp from './components/auth/CustomSignUp';
 import MagicLinkVerification from './components/auth/MagicLinkVerification';
 import Profile from './components/auth/Profile';
 import AdminPage from './admin/AdminPage';
+import BannedPageWrapper from './components/BannedPageWrapper';
 
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -71,6 +73,9 @@ const AppRoutes = () => {
       {/* Magic link verification route - accessible without authentication */}
       <Route path="/auth/magic" element={<MagicLinkVerification />} />
       
+      {/* Banned page route - accessible without authentication */}
+      <Route path="/banned" element={<BannedPageWrapper />} />
+      
       {/* Protected routes */}
       <Route
         path="/profile"
@@ -82,11 +87,7 @@ const AppRoutes = () => {
       />
       <Route
         path="/game"
-        element={
-          <ProtectedRoute>
-            <GamePage />
-          </ProtectedRoute>
-        }
+        element={<ProtectedGameRoute />}
       />
       <Route
         path="/admin"

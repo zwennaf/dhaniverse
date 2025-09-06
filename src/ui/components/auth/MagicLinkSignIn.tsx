@@ -154,6 +154,12 @@ const MagicLinkSignIn = () => {
             // Navigate to profile - new users will be prompted to set username there
             navigate("/profile");
         } else {
+            // Check if this is a ban - redirect to banned page
+            if (result.error === 'BANNED') {
+                navigate('/banned', { replace: true });
+                return;
+            }
+            
             setError(result.error || "Google sign in failed");
         }
 
@@ -177,6 +183,12 @@ const MagicLinkSignIn = () => {
             // Navigate to profile - new users will be prompted to set username there
             navigate("/profile");
         } else {
+            // Check if this is a ban - redirect to banned page
+            if (result.error === 'BANNED') {
+                navigate('/banned', { replace: true });
+                return;
+            }
+            
             setError(result.error || "Internet Identity sign in failed");
         }
 

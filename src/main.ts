@@ -8,6 +8,7 @@ import BankingUI from './ui/components/banking/BankingUI.tsx';
 import { initializeBankAccountCreationFlow } from './ui/components/banking/BankAccountCreationFlow.tsx';
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 import { AuthProvider } from './ui/contexts/AuthContext.tsx';
+import { banCheckService } from './services/BanCheckService.ts';
 
 import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
@@ -194,6 +195,29 @@ export function initializeHUD(initialRupees = 0) {
 }
 
 /**
+ * Enhanced game initialization with ban checking
+ */
+export async function initializeGameWithBanCheck(initialRupees = 0) {
+  try {
+    // Check ban status before initializing game
+    const banStatus = await banCheckService.checkCurrentUserBan();
+    
+    if (banStatus.banned) {
+      console.warn('User is banned, preventing game initialization');
+      banCheckService.handleBanDetected(banStatus);
+      return null;
+    }
+    
+    // User is not banned, proceed with normal initialization
+    return initializeHUD(initialRupees);
+  } catch (error) {
+    console.error('Ban check failed during game initialization:', error);
+    // On error, proceed with game initialization (fail open)
+    return initializeHUD(initialRupees);
+  }
+}
+
+/**
  * Unmount the HUD React root and hide the container
  */
 export function unmountHUD() {
@@ -213,4 +237,36 @@ export function updateHUD(rupees: number) {
   import('./services/BalanceManager.ts').then(({ balanceManager }) => {
     balanceManager.updateCash(rupees, false); // false = don't notify to prevent loops
   }).catch(console.error);
+}
+
+/**
+ * Start periodic ban checking during gameplay
+ */
+let banCheckInterval: number | null = null;
+
+export function startPeriodicBanCheck() {
+  if (banCheckInterval) {
+    clearInterval(banCheckInterval);
+  }
+  
+  // Check for bans every 2 minutes during gameplay
+  banCheckInterval = window.setInterval(async () => {
+    try {
+      const banStatus = await banCheckService.checkCurrentUserBan();
+      if (banStatus.banned) {
+        console.warn('User banned during gameplay, handling ban...');
+        banCheckService.handleBanDetected(banStatus);
+        stopPeriodicBanCheck();
+      }
+    } catch (error) {
+      console.error('Periodic ban check failed:', error);
+    }
+  }, 2 * 60 * 1000); // 2 minutes
+}
+
+export function stopPeriodicBanCheck() {
+  if (banCheckInterval) {
+    clearInterval(banCheckInterval);
+    banCheckInterval = null;
+  }
 }

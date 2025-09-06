@@ -15,14 +15,14 @@ const emailService = new EmailService();
 const _otpService = new OTPService(mongodb);
 const magicLinkService = new MagicLinkService();
 
-async function isEmailBanned(email?: string): Promise<boolean> {
-    if (!email) return false;
+async function getBanDetails(email?: string): Promise<BanRuleDocument | null> {
+    if (!email) return null;
     const bans = mongodb.getCollection<BanRuleDocument>(COLLECTIONS.BANS);
     const now = new Date();
-    // expire old
+    // expire old bans first
     await bans.updateMany({ active: true, expiresAt: { $lte: now } }, { $set: { active: false } });
     const match = await bans.findOne({ active: true, type: 'email', value: email.toLowerCase() });
-    return !!match;
+    return match;
 }
 
 // Rate limiting helper
@@ -91,10 +91,59 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
 // IP logging middleware
 authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
     try {
-        // Get client IP address
-        const forwarded = ctx.request.headers.get("x-forwarded-for");
-        const realIp = ctx.request.headers.get("x-real-ip");
-        const clientIp = forwarded?.split(',')[0] || realIp || ctx.request.ip || "unknown";
+        // Get client IP address using proper priority (based on PHP pattern)
+        let clientIp = "unknown";
+        
+        // Check for client IP from shared internet (highest priority)
+        const clientIpHeader = ctx.request.headers.get("http-client-ip");
+        if (clientIpHeader && clientIpHeader.trim() !== "") {
+            clientIp = clientIpHeader.trim();
+        }
+        // Check for IP from proxy (second priority)
+        else {
+            const forwardedFor = ctx.request.headers.get("x-forwarded-for");
+            if (forwardedFor && forwardedFor.trim() !== "") {
+                // Take the first IP in the chain (original client)
+                clientIp = forwardedFor.split(',')[0].trim();
+            }
+            // Check other common proxy headers
+            else {
+                const realIp = ctx.request.headers.get("x-real-ip");
+                const cfConnectingIp = ctx.request.headers.get("cf-connecting-ip"); // Cloudflare
+                const azureClientIp = ctx.request.headers.get("x-azure-clientip"); // Azure
+                
+                if (cfConnectingIp && cfConnectingIp.trim() !== "") {
+                    clientIp = cfConnectingIp.trim();
+                } else if (azureClientIp && azureClientIp.trim() !== "") {
+                    clientIp = azureClientIp.trim();
+                } else if (realIp && realIp.trim() !== "") {
+                    clientIp = realIp.trim();
+                } else {
+                    // Fallback to remote address (lowest priority)
+                    const fallbackIp = ctx.request.ip;
+                    if (fallbackIp && fallbackIp !== "unknown") {
+                        clientIp = fallbackIp;
+                    } else {
+                        // For localhost development, set a recognizable IP
+                        clientIp = "127.0.0.1";
+                    }
+                }
+            }
+        }
+        
+        // Clean up IP address (remove port if present)
+        if (clientIp !== "unknown" && clientIp.includes(':')) {
+            // Handle IPv6 format and port removal
+            if (clientIp.startsWith('[') && clientIp.includes(']:')) {
+                clientIp = clientIp.substring(1, clientIp.indexOf(']:'));
+            } else if (!clientIp.includes('::')) {
+                // IPv4 with port
+                clientIp = clientIp.split(':')[0];
+            }
+        }
+        
+        console.log(`[IP Detection] All headers:`, Object.fromEntries(ctx.request.headers.entries()));
+        console.log(`[IP Detection] Client IP: ${clientIp} (from headers: x-forwarded-for: ${ctx.request.headers.get("x-forwarded-for")}, x-real-ip: ${ctx.request.headers.get("x-real-ip")}, cf-connecting-ip: ${ctx.request.headers.get("cf-connecting-ip")})`);
         
         // Store IP in state for later use
         (ctx.state as { clientIp?: string }).clientIp = clientIp;
@@ -113,13 +162,19 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
 
 // Helper function to log IP access
 async function logIpAccess({ userId, email, ip }: { userId?: string; email?: string; ip?: string }) {
-    if (!ip || ip === "unknown") return;
+    console.log(`[IP Logging] Attempting to log: userId=${userId}, email=${email}, ip=${ip}`);
+    
+    if (!ip || ip === "unknown") {
+        console.log(`[IP Logging] Skipping - invalid IP: ${ip}`);
+        return;
+    }
     
     try {
         const ipLogs = mongodb.getCollection<IpLogDocument>("ipLogs");
         const existing = await ipLogs.findOne({ ip, userId });
         
         if (existing) {
+            console.log(`[IP Logging] Updating existing record for IP: ${ip}`);
             await ipLogs.updateOne(
                 { _id: existing._id },
                 { 
@@ -128,6 +183,7 @@ async function logIpAccess({ userId, email, ip }: { userId?: string; email?: str
                 }
             );
         } else {
+            console.log(`[IP Logging] Creating new record for IP: ${ip}`);
             await ipLogs.insertOne({
                 userId,
                 email,
@@ -137,10 +193,30 @@ async function logIpAccess({ userId, email, ip }: { userId?: string; email?: str
                 count: 1
             } as IpLogDocument);
         }
+        console.log(`[IP Logging] Successfully logged IP: ${ip}`);
     } catch (error) {
         console.error("Failed to log IP access:", error);
     }
 }
+
+// Test endpoint for IP detection (remove in production)
+authRouter.get("/auth/test-ip", (ctx: Context) => {
+    const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+    
+    ctx.response.status = 200;
+    ctx.response.body = {
+        detectedIp: clientIp,
+        headers: {
+            "x-forwarded-for": ctx.request.headers.get("x-forwarded-for"),
+            "x-real-ip": ctx.request.headers.get("x-real-ip"),
+            "cf-connecting-ip": ctx.request.headers.get("cf-connecting-ip"),
+            "x-azure-clientip": ctx.request.headers.get("x-azure-clientip"),
+            "http-client-ip": ctx.request.headers.get("http-client-ip"),
+        },
+        oakRequestIp: ctx.request.ip,
+        allHeaders: Object.fromEntries(ctx.request.headers.entries())
+    };
+});
 
 // Send Magic Link for passwordless authentication
 authRouter.post("/auth/send-magic-link", async (ctx: Context) => {
@@ -230,9 +306,18 @@ authRouter.get("/auth/verify-magic-link", async (ctx: Context) => {
 
         if (result.success) {
             // Ban check before returning token
-            if (await isEmailBanned(result.user?.email)) {
+            const banDetails = await getBanDetails(result.user?.email);
+            if (banDetails) {
                 ctx.response.status = 403;
-                ctx.response.body = { error: "Account banned" };
+                ctx.response.body = { 
+                    error: "Account banned",
+                    banned: true,
+                    banInfo: {
+                        reason: banDetails.reason || "Account banned",
+                        banType: banDetails.type,
+                        expiresAt: banDetails.expiresAt?.toISOString()
+                    }
+                };
                 return;
             }
             
@@ -296,6 +381,22 @@ authRouter.get("/auth/me", async (ctx: Context) => {
             return;
         }
 
+        // Check if user is banned before returning user data
+        const banDetails = await getBanDetails(userDoc.email);
+        if (banDetails) {
+            ctx.response.status = 403;
+            ctx.response.body = { 
+                error: "Account banned",
+                banned: true,
+                banInfo: {
+                    reason: banDetails.reason || "Account banned",
+                    banType: banDetails.type,
+                    expiresAt: banDetails.expiresAt?.toISOString()
+                }
+            };
+            return;
+        }
+
         ctx.response.body = {
             user: {
                 id: userDoc._id?.toString() || "",
@@ -345,6 +446,23 @@ authRouter.post("/auth/validate-token", async (ctx: Context) => {
             ctx.response.body = {
                 valid: false,
                 error: "User not found",
+            };
+            return;
+        }
+
+        // Check if user is banned before returning user data
+        const banDetails = await getBanDetails(userDoc.email);
+        if (banDetails) {
+            ctx.response.status = 403;
+            ctx.response.body = {
+                valid: false,
+                error: "Account banned",
+                banned: true,
+                banInfo: {
+                    reason: banDetails.reason || "Account banned",
+                    banType: banDetails.type,
+                    expiresAt: banDetails.expiresAt?.toISOString()
+                }
             };
             return;
         }
@@ -539,8 +657,19 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         }
 
         if (user) {
-            if (await isEmailBanned(user.email)) {
-                ctx.response.status = 403; ctx.response.body = { error: 'Account banned' }; return;
+            const banDetails = await getBanDetails(user.email);
+            if (banDetails) {
+                ctx.response.status = 403; 
+                ctx.response.body = { 
+                    error: 'Account banned',
+                    banned: true,
+                    banInfo: {
+                        reason: banDetails.reason || "Account banned",
+                        banType: banDetails.type,
+                        expiresAt: banDetails.expiresAt?.toISOString()
+                    }
+                }; 
+                return;
             }
             // User exists, sign them in (preserves balances and profile)
             const token = await createToken(user.id);
@@ -583,7 +712,20 @@ authRouter.post("/auth/google", async (ctx: Context) => {
             googleId: googleId,
         });
 
-    if (await isEmailBanned(newUser.email)) { ctx.response.status = 403; ctx.response.body = { error: 'Account banned' }; return; }
+    const banDetails = await getBanDetails(newUser.email);
+    if (banDetails) { 
+        ctx.response.status = 403; 
+        ctx.response.body = { 
+            error: 'Account banned',
+            banned: true,
+            banInfo: {
+                reason: banDetails.reason || "Account banned",
+                banType: banDetails.type,
+                expiresAt: banDetails.expiresAt?.toISOString()
+            }
+        }; 
+        return; 
+    }
     const token = await createToken(newUser.id);
     
     // Log IP access for new user
@@ -634,8 +776,26 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
         const user = await usersCol.findOne({ internetIdentityPrincipal: principal });
 
         if (user) {
-            // Existing user - sign them in
-            console.log('Internet Identity: Existing user found, signing in');
+            // Existing user - check if banned before signing them in
+            console.log('Internet Identity: Existing user found, checking ban status');
+            
+            // Check for ban (Internet Identity users might not have email, use userId if no email)
+            const banDetails = await getBanDetails(user.email || user._id!.toString());
+            if (banDetails) {
+                ctx.response.status = 403;
+                ctx.response.body = { 
+                    error: "Account banned",
+                    banned: true,
+                    banInfo: {
+                        reason: banDetails.reason || "Account banned",
+                        banType: banDetails.type,
+                        expiresAt: banDetails.expiresAt?.toISOString()
+                    }
+                };
+                return;
+            }
+            
+            console.log('Internet Identity: User not banned, signing in');
             await usersCol.updateOne(
                 { _id: user._id },
                 { $set: { lastLoginAt: new Date() } }

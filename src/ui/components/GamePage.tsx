@@ -149,9 +149,9 @@ const GamePage: React.FC = () => {
   // Cleanup effect
   useEffect(() => {
     const handleBanned = (e: any) => {
-      alert(e?.detail?.reason || 'You are banned from the game.');
-      // Navigate out
-      navigate('/');
+      console.log("GamePage: User banned event received", e.detail);
+      // Don't navigate here anymore - let ProtectedGameRoute handle it
+      // The ProtectedGameRoute will detect the ban status and show BannedPage
     };
     window.addEventListener('user-banned', handleBanned);
     // Track if we've been unmounted due to navigation vs React remounting
