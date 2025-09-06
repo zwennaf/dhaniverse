@@ -79,7 +79,10 @@ type ServerMessage =
     | PlayerUpdateMessage
     | PlayerDisconnectMessage
     | ChatMessage
-    | OnlineUsersCountMessage;
+    | OnlineUsersCountMessage
+    | { type: 'banned'; reason?: string }
+    | { type: 'forceKick'; reason?: string }
+    | { type: 'afkKick'; reason?: string };
 
 export class WebSocketManager {
     private scene: MainGameScene;
@@ -469,6 +472,27 @@ export class WebSocketManager {
 
     private handleServerMessage(data: ServerMessage): void {
         switch (data.type) {
+            case "banned": {
+                // Show a simple in-game notification / toast substitute
+                try {
+                    window.dispatchEvent(new CustomEvent('user-banned', { detail: { reason: (data as any).reason } }));
+                } catch {}
+                console.warn('You are banned from the game');
+                this.disconnect();
+                return;
+            }
+            case 'forceKick': {
+                console.warn('Force kicked:', (data as any).reason);
+                alert((data as any).reason || 'You were disconnected by an administrator');
+                this.disconnect();
+                return;
+            }
+            case 'afkKick': {
+                console.warn('AFK kicked:', (data as any).reason);
+                alert((data as any).reason || 'Kicked for being AFK');
+                this.disconnect();
+                return;
+            }
             case "connect":
                 this.playerId = data.id;
                 // Dispatch event with self player id so UI (e.g., voice) can use it

@@ -19,6 +19,7 @@ const GlobalIntro: React.FC = () => {
   // Do not show the global intro on the in-game route
   if (typeof window !== 'undefined' && (
     window.location.pathname.startsWith('/game') ||
+    window.location.pathname.startsWith('/admin') ||
     window.location.pathname.startsWith('/sign-in') ||
     window.location.pathname.startsWith('/sign-up') ||
     window.location.pathname.startsWith('/profile')

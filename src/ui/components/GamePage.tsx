@@ -148,6 +148,12 @@ const GamePage: React.FC = () => {
 
   // Cleanup effect
   useEffect(() => {
+    const handleBanned = (e: any) => {
+      alert(e?.detail?.reason || 'You are banned from the game.');
+      // Navigate out
+      navigate('/');
+    };
+    window.addEventListener('user-banned', handleBanned);
     // Track if we've been unmounted due to navigation vs React remounting
     let hasNavigatedAway = false;
     
@@ -197,6 +203,7 @@ const GamePage: React.FC = () => {
         console.warn('GamePage: Prevented cleanup during React remount - keeping game state');
       }
     };
+  return () => { window.removeEventListener('user-banned', handleBanned); };
   }, []);
    
   // Show custom loader for first-time players or during initial loading

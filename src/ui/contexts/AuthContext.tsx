@@ -31,6 +31,42 @@ const API_BASE =
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  // In-memory fallback if both localStorage & sessionStorage unavailable
+  let memoryTokenRef: string | null = null;
+
+  const safeStoreToken = (token: string) => {
+    if (!token) return;
+    try {
+      localStorage.setItem('dhaniverse_token', token);
+      return;
+    } catch (e: any) {
+      if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+        // Attempt minimal cleanup: remove old hints or stale tokens
+        try {
+          Object.keys(localStorage).forEach(k => {
+            if (k.startsWith('dhaniverse_') && k !== 'dhaniverse_token') {
+              try { localStorage.removeItem(k); } catch {}
+            }
+          });
+          localStorage.setItem('dhaniverse_token', token);
+          return; // success after cleanup
+        } catch {}
+        // Fallback to sessionStorage
+        try {
+          sessionStorage.setItem('dhaniverse_token', token);
+          return;
+        } catch {}
+      }
+    }
+    // Final fallback to memory (volatile)
+    memoryTokenRef = token;
+  };
+
+  const safeReadToken = (): string | null => {
+    try { const t = localStorage.getItem('dhaniverse_token'); if (t) return t; } catch {}
+    try { const t = sessionStorage.getItem('dhaniverse_token'); if (t) return t; } catch {}
+    return memoryTokenRef;
+  };
 
   // Check for existing session on mount
   useEffect(() => {
@@ -39,7 +75,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('dhaniverse_token');
+  const token = safeReadToken();
       if (!token) {
         // Check for Internet Identity session if no token
         await checkInternetIdentitySession();
@@ -59,12 +95,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(data.user);
       } else {
         // Invalid token, remove it and check for II session
-        localStorage.removeItem('dhaniverse_token');
+        try { localStorage.removeItem('dhaniverse_token'); } catch {}
         await checkInternetIdentitySession();
       }
     } catch (error) {
       console.error('Auth check error:', error);
-      localStorage.removeItem('dhaniverse_token');
+      try { localStorage.removeItem('dhaniverse_token'); } catch {}
       await checkInternetIdentitySession();
     } finally {
       setIsLoaded(true);
@@ -132,7 +168,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('dhaniverse_token', data.token);
+  safeStoreToken(data.token);
         setUser(data.user);
         return { 
           success: true, 
@@ -178,7 +214,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Response data:', data);
 
       if (response.ok) {
-        localStorage.setItem('dhaniverse_token', data.token);
+  safeStoreToken(data.token);
         setUser(data.user);
         return { success: true, isNewUser: data.isNewUser };
       } else {
@@ -217,7 +253,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Response data:', data);
 
       if (response.ok) {
-        localStorage.setItem('dhaniverse_token', data.token);
+  safeStoreToken(data.token);
         setUser(data.user);
         return { success: true, isNewUser: data.isNewUser };
       } else {

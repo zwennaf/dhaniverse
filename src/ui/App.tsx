@@ -8,6 +8,7 @@ import CustomSignIn from './components/auth/CustomSignIn';
 import CustomSignUp from './components/auth/CustomSignUp';
 import MagicLinkVerification from './components/auth/MagicLinkVerification';
 import Profile from './components/auth/Profile';
+import AdminPage from './admin/AdminPage';
 
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -84,6 +85,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <GamePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminPage />
           </ProtectedRoute>
         }
       />
