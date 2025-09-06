@@ -49,6 +49,7 @@ jobs:
               --settings \
               DENO_ENV=production \
               JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
               ALLOWED_ORIGINS="https://dhaniverse.vercel.app" \
               AUTH_SERVER_URL="https://api.dhaniverse.in" \
               PRODUCTION_AUTH_SERVER_URL="https://api.dhaniverse.in" \
