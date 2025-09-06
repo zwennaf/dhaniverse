@@ -8,6 +8,7 @@ import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
 import gameRouter from "./src/routes/gameRouter.ts";
+import adminRouter from "./src/routes/adminRouter.ts";
 
 // Initialize database connection
 async function initializeDatabase() {
@@ -108,6 +109,10 @@ app.use(apiRouter.allowedMethods());
 // Auth routes - direct mounting without /api prefix for backward compatibility
 app.use(authRouter.routes());
 app.use(authRouter.allowedMethods());
+
+// Admin routes
+app.use(adminRouter.routes());
+app.use(adminRouter.allowedMethods());
 
 // Game routes - mounted directly AND under /api prefix for backward compatibility
 app.use(gameRouter.routes());

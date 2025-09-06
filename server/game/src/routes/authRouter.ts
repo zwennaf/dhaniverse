@@ -2,10 +2,11 @@ import { Router, Context } from "oak";
 import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
 import { createToken, verifyToken } from "../auth/jwt.ts";
-import type { UserDocument } from "../db/schemas.ts";
+import type { UserDocument, IpLogDocument } from "../db/schemas.ts";
 import { EmailService } from "../services/EmailService.ts";
 import { OTPService } from "../services/OTPService.ts";
 import { MagicLinkService } from "../services/MagicLinkService.ts";
+import { COLLECTIONS, BanRuleDocument } from "../db/schemas.ts";
 
 const authRouter = new Router();
 
@@ -13,6 +14,16 @@ const authRouter = new Router();
 const emailService = new EmailService();
 const _otpService = new OTPService(mongodb);
 const magicLinkService = new MagicLinkService();
+
+async function isEmailBanned(email?: string): Promise<boolean> {
+    if (!email) return false;
+    const bans = mongodb.getCollection<BanRuleDocument>(COLLECTIONS.BANS);
+    const now = new Date();
+    // expire old
+    await bans.updateMany({ active: true, expiresAt: { $lte: now } }, { $set: { active: false } });
+    const match = await bans.findOne({ active: true, type: 'email', value: email.toLowerCase() });
+    return !!match;
+}
 
 // Rate limiting helper
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -76,6 +87,60 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
 
     await next();
 });
+
+// IP logging middleware
+authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
+    try {
+        // Get client IP address
+        const forwarded = ctx.request.headers.get("x-forwarded-for");
+        const realIp = ctx.request.headers.get("x-real-ip");
+        const clientIp = forwarded?.split(',')[0] || realIp || ctx.request.ip || "unknown";
+        
+        // Store IP in state for later use
+        (ctx.state as { clientIp?: string }).clientIp = clientIp;
+        
+        await next();
+        
+        // Log IP after successful authentication if user info is available
+        if (ctx.response.status >= 200 && ctx.response.status < 300) {
+            // We'll log IP in individual route handlers where we have user context
+        }
+    } catch (error) {
+        console.error("IP logging middleware error:", error);
+        await next();
+    }
+});
+
+// Helper function to log IP access
+async function logIpAccess({ userId, email, ip }: { userId?: string; email?: string; ip?: string }) {
+    if (!ip || ip === "unknown") return;
+    
+    try {
+        const ipLogs = mongodb.getCollection<IpLogDocument>("ipLogs");
+        const existing = await ipLogs.findOne({ ip, userId });
+        
+        if (existing) {
+            await ipLogs.updateOne(
+                { _id: existing._id },
+                { 
+                    $set: { lastSeen: new Date() },
+                    $inc: { count: 1 }
+                }
+            );
+        } else {
+            await ipLogs.insertOne({
+                userId,
+                email,
+                ip,
+                firstSeen: new Date(),
+                lastSeen: new Date(),
+                count: 1
+            } as IpLogDocument);
+        }
+    } catch (error) {
+        console.error("Failed to log IP access:", error);
+    }
+}
 
 // Send Magic Link for passwordless authentication
 authRouter.post("/auth/send-magic-link", async (ctx: Context) => {
@@ -164,6 +229,21 @@ authRouter.get("/auth/verify-magic-link", async (ctx: Context) => {
         const result = await magicLinkService.verifyMagicLink(token);
 
         if (result.success) {
+            // Ban check before returning token
+            if (await isEmailBanned(result.user?.email)) {
+                ctx.response.status = 403;
+                ctx.response.body = { error: "Account banned" };
+                return;
+            }
+            
+            // Log IP access for successful magic link verification
+            const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+            await logIpAccess({
+                userId: result.user?.id,
+                email: result.user?.email,
+                ip: clientIp
+            });
+            
             ctx.response.status = 200;
             ctx.response.body = {
                 success: true,
@@ -459,8 +539,20 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         }
 
         if (user) {
+            if (await isEmailBanned(user.email)) {
+                ctx.response.status = 403; ctx.response.body = { error: 'Account banned' }; return;
+            }
             // User exists, sign them in (preserves balances and profile)
             const token = await createToken(user.id);
+            
+            // Log IP access
+            const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+            await logIpAccess({
+                userId: user.id,
+                email: user.email,
+                ip: clientIp
+            });
+            
             ctx.response.body = {
                 success: true,
                 token,
@@ -491,7 +583,17 @@ authRouter.post("/auth/google", async (ctx: Context) => {
             googleId: googleId,
         });
 
-        const token = await createToken(newUser.id);
+    if (await isEmailBanned(newUser.email)) { ctx.response.status = 403; ctx.response.body = { error: 'Account banned' }; return; }
+    const token = await createToken(newUser.id);
+    
+    // Log IP access for new user
+    const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+    await logIpAccess({
+        userId: newUser.id,
+        email: newUser.email,
+        ip: clientIp
+    });
+    
         ctx.response.status = 201;
         ctx.response.body = {
             success: true,
@@ -540,6 +642,15 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
             );
 
             const token = await createToken(user._id!.toString());
+            
+            // Log IP access
+            const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+            await logIpAccess({
+                userId: user._id!.toString(),
+                email: user.email || "",
+                ip: clientIp
+            });
+            
             ctx.response.body = {
                 success: true,
                 token,
@@ -587,6 +698,15 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
         };
 
         const token = await createToken(newUser.id);
+        
+        // Log IP access for new user
+        const clientIp = (ctx.state as { clientIp?: string }).clientIp;
+        await logIpAccess({
+            userId: newUser.id,
+            email: "",
+            ip: clientIp
+        });
+        
         ctx.response.status = 201;
         ctx.response.body = {
             success: true,

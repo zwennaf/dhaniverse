@@ -1,14 +1,146 @@
 import { load } from "https://deno.land/std@0.217.0/dotenv/mod.ts";
+import { MongoClient, Document } from "npm:mongodb";
 
 // Load environment variables
 await load({ export: true });
 
-const PORT = parseInt(Deno.env.get("PORT") || "8000");
-// JWT secret is used by the auth server for token validation
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",");
+// Mongo integration (optional)
+const mongoUri = Deno.env.get("MONGODB_URI");
+let mongoClient: MongoClient | null = null;
+let mongoReady = false;
+if (mongoUri) {
+  try {
+    mongoClient = new MongoClient(mongoUri);
+    await mongoClient.connect();
+    mongoReady = true;
+    console.log('[ws] Mongo connected');
+  } catch (e) {
+    console.error('[ws] Mongo connect failed', e);
+  }
+}
+
+function col<T extends Document = Document>(name: string) { 
+  if (!mongoReady || !mongoClient) return null; 
+  return mongoClient.db().collection<T>(name); 
+}
+
+interface BanRule { type:'email'|'internet_identity'|'ip'; value:string; active:boolean; expiresAt?:Date }
+interface SessionLog { userId?:string; username?:string; email?:string; ip?:string; event:'join'|'leave'; timestamp:Date; position?:{x:number;y:number}; skin?:string }
+interface ChatMessageLog { userId?:string; username?:string; message:string; timestamp:Date }
+interface IpLog { userId?:string; email?:string; ip:string; firstSeen:Date; lastSeen:Date; count:number }
+interface ActivePlayer { userId?:string; username?:string; email?:string; position:{x:number;y:number}; animation?:string; skin?:string; updatedAt:Date }
+
+async function expireBans() { 
+  try { 
+    const bans = col<BanRule>('bans'); 
+    if (!bans) return; 
+    await bans.updateMany(
+      { active: true, expiresAt: { $lte: new Date() } }, 
+      { $set: { active: false } }
+    ); 
+  } catch(_error) {
+    console.error('Failed to expire bans:', _error);
+  }
+}
+
+async function isBanned({ email, ip }: { email?:string; ip?:string }) { 
+  const bans = col<BanRule>('bans'); 
+  if (!bans) return false; 
+  await expireBans(); 
+  
+  const orConditions: Array<{ type: BanRule['type']; value: string }> = [];
+  if (email) orConditions.push({ type: 'email', value: email.toLowerCase() }); 
+  if (ip) orConditions.push({ type: 'ip', value: ip }); 
+  if (!orConditions.length) return false; 
+  
+  const docs = await bans.find({ 
+    active: true, 
+    $or: orConditions 
+  }).toArray(); 
+  const now = new Date(); 
+  return docs.some((d: BanRule) => !d.expiresAt || new Date(d.expiresAt) > now); 
+}
+
+async function logSession(entry: SessionLog){ 
+  const c = col<SessionLog>('sessionLogs'); 
+  if(!c) return; 
+  try{ 
+    await c.insertOne(entry); 
+  } catch(_error) {
+    console.error('Failed to log session:', _error);
+  } 
+}
+
+async function logChat(entry: ChatMessageLog){ 
+  const c = col<ChatMessageLog>('chatMessages'); 
+  if(!c) return; 
+  try{ 
+    await c.insertOne(entry); 
+  } catch(_error) {
+    console.error('Failed to log chat:', _error);
+  } 
+}
+
+async function updateIpLog({ userId, email, ip }: { userId?:string; email?:string; ip?:string }) { 
+  if(!ip) return; 
+  const c = col<IpLog>('ipLogs'); 
+  if(!c) return; 
+  try{ 
+    const existing = await c.findOne({ ip, userId }); 
+    if(existing){ 
+      await c.updateOne(
+        { _id: existing._id }, 
+        { 
+          $set: { lastSeen: new Date() }, 
+          $inc: { count: 1 } 
+        }
+      ); 
+    } else { 
+      await c.insertOne({ 
+        userId, 
+        email, 
+        ip, 
+        firstSeen: new Date(), 
+        lastSeen: new Date(), 
+        count: 1 
+      }); 
+    } 
+  } catch(_error) {
+    console.error('Failed to update IP log:', _error);
+  }
+}
+
+async function upsertActivePlayer(p: ActivePlayer){ 
+  const c = col<ActivePlayer>('activePlayers'); 
+  if(!c) return; 
+  try{ 
+    if(!p.userId) return; 
+    await c.updateOne(
+      { userId: p.userId }, 
+      { $set: p }, 
+      { upsert: true }
+    ); 
+  } catch(_error) {
+    console.error('Failed to upsert active player:', _error);
+  }
+}
+
+async function removeActivePlayer(userId?:string){ 
+  if(!userId) return; 
+  const c = col('activePlayers'); 
+  if(!c) return; 
+  try{ 
+    await c.deleteOne({ userId }); 
+  } catch(_error) {
+    console.error('Failed to remove active player:', _error);
+  } 
+}
 
 // Track server start time
 const SERVER_START_TIME = Date.now();
+// Core config
+const PORT = parseInt(Deno.env.get("PORT") || "8000");
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",");
 
 // Player data interface
 interface PlayerData {
@@ -35,6 +167,9 @@ interface Connection {
     userId?: string;
     pendingUpdate?: { x: number; y: number; animation?: string };
     skin?: string;
+    lastMovementTime?: number; // for AFK detection
+    ip?: string; // Store IP address
+    email?: string; // Store email for ban checking
 }
 
 // Message types
@@ -50,6 +185,7 @@ interface UpdateMessage {
     x: number;
     y: number;
     animation?: string;
+    skin?: string; // Add skin to the interface
 }
 
 interface ChatMessage {
@@ -68,6 +204,61 @@ const connections = new Map<string, Connection>();
 const userConnections = new Map<string, string>(); // userId -> connectionId
 const pendingAuthentications = new Map<string, number>(); // userId -> timestamp
 const connectionsByUserId = new Map<string, Set<string>>(); // userId -> Set of connectionIds (for cleanup)
+// Admin monitor connections (not treated as players)
+const adminMonitors = new Set<WebSocket>();
+
+// Utility: send to admin monitors
+function sendToAdmins(payload: Record<string, unknown>) {
+    const msg = JSON.stringify(payload);
+    adminMonitors.forEach(ws => {
+        try { 
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(msg); 
+            }
+        } catch(_error) {
+            console.error('Failed to send to admin monitor:', _error);
+        }
+    });
+}
+
+async function validateAdminToken(token?: string) {
+    if (!token) return null;
+    const authServerUrl =
+        Deno.env.get("DENO_ENV") === "production"
+            ? Deno.env.get("PRODUCTION_AUTH_SERVER_URL") || "https://api.dhaniverse.in"
+            : Deno.env.get("AUTH_SERVER_URL") || "http://localhost:8000";
+    try {
+        const r = await fetch(`${authServerUrl}/auth/validate-token`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token }) });
+        const d = await r.json();
+        if (!r.ok || !d.valid) return null;
+        const adminEmail = (Deno.env.get('ADMIN_EMAIL')||'').toLowerCase();
+        if (!adminEmail || d.email?.toLowerCase() !== adminEmail) return null;
+        return { userId: d.userId, email: d.email?.toLowerCase() };
+    } catch(_) { return null; }
+}
+
+// Helper function to extract IP from request
+function extractIpFromRequest(req: Request): string | undefined {
+    // Check various headers for real IP
+    const xForwardedFor = req.headers.get('x-forwarded-for');
+    if (xForwardedFor) {
+        // X-Forwarded-For can contain multiple IPs, take the first one
+        return xForwardedFor.split(',')[0].trim();
+    }
+    
+    const xRealIp = req.headers.get('x-real-ip');
+    if (xRealIp) {
+        return xRealIp.trim();
+    }
+    
+    const cfConnectingIp = req.headers.get('cf-connecting-ip');
+    if (cfConnectingIp) {
+        return cfConnectingIp.trim();
+    }
+    
+    // Fallback - this might be a proxy IP in production
+    return req.headers.get('x-forwarded-for') || undefined;
+}
 
 // Authentication handler
 async function handleAuthentication(
@@ -120,6 +311,17 @@ async function handleAuthentication(
 
         const userId = data.userId;
         const gameUsername = message.gameUsername || data.gameUsername;
+        const email: string | undefined = data.email?.toLowerCase();
+        const ip = connection.ip; // Use IP stored on connection
+
+        // Store email on connection for ban checking
+        connection.email = email;
+
+        if (await isBanned({ email, ip })) {
+            connection.socket.send(JSON.stringify({ type: 'banned', reason: 'Access denied' }));
+            connection.socket.close(4403, 'banned');
+            return;
+        }
 
         // Check if this connection is already authenticated for this user
         if (connection.authenticated && connection.userId === userId) {
@@ -220,11 +422,27 @@ async function handleAuthentication(
         // Broadcast updated online users count
         broadcastOnlineUsersCount();
 
-        console.log(
-            `User authenticated: ${connection.username} (${
-                connection.id
-            }) - Online users: ${getOnlineUsersCount()}`
-        );
+    console.log(`User authenticated: ${connection.username} (${connection.id}) - Online users: ${getOnlineUsersCount()}`);
+    updateIpLog({ userId, email, ip });
+    logSession({ userId, username: gameUsername, email, ip, event: 'join', timestamp: new Date(), position: { x: connection.position.x, y: connection.position.y }, skin: connection.skin });
+    upsertActivePlayer({ userId, username: gameUsername, email, position: { x: connection.position.x, y: connection.position.y }, animation: connection.animation, skin: connection.skin, updatedAt: new Date() });
+    connection.lastMovementTime = Date.now();
+    // Notify admin monitors with enhanced data
+    sendToAdmins({ 
+        type:'adminPlayerJoin', 
+        connectionId: connection.id, 
+        userId, 
+        username: gameUsername, 
+        email, 
+        ip, 
+        x: connection.position.x, 
+        y: connection.position.y, 
+        animation: connection.animation, 
+        skin: connection.skin,
+        timestamp: Date.now(),
+        lastActivity: connection.lastActivity,
+        authenticated: true
+    });
     } catch (error) {
         console.error(`Authentication error: ${error}`);
         connection.socket.send(
@@ -288,8 +506,8 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
     }
 
     // If client included a skin in the update payload, persist it on the connection
-    if ((message as any).skin && ["C1", "C2", "C3", "C4"].includes((message as any).skin)) {
-        connection.skin = (message as any).skin;
+    if (message.skin && ["C1", "C2", "C3", "C4"].includes(message.skin)) {
+        connection.skin = message.skin;
     }
 
     // Update player position
@@ -298,6 +516,9 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
     if (updateData.animation) {
         connection.animation = updateData.animation;
     }
+    // snapshot
+    upsertActivePlayer({ userId: connection.userId, username: connection.username, position: { x: connection.position.x, y: connection.position.y }, animation: connection.animation, skin: connection.skin, updatedAt: new Date() });
+    connection.lastMovementTime = Date.now();
 
     // Broadcast position update to other players
     broadcastToOthers(connection.id, {
@@ -310,6 +531,19 @@ function handlePositionUpdate(connection: Connection, message: UpdateMessage) {
             animation: connection.animation,
             skin: connection.skin || "C2",
         },
+    });
+    sendToAdmins({ 
+        type:'adminPlayerUpdate', 
+        connectionId: connection.id, 
+        userId: connection.userId, 
+        username: connection.username, 
+        x: connection.position.x, 
+        y: connection.position.y, 
+        animation: connection.animation, 
+        skin: connection.skin,
+        timestamp: Date.now(),
+        lastActivity: connection.lastActivity,
+        lastMovementTime: connection.lastMovementTime
     });
 }
 
@@ -378,6 +612,25 @@ function handleChatMessage(connection: Connection, message: ChatMessage) {
             username: connection.username,
             message: trimmedMessage,
             skin: connection.skin || "C2",
+        });
+    sendToAdmins({ 
+        type:'adminChat', 
+        connectionId: connection.id, 
+        userId: connection.userId, 
+        username: connection.username, 
+        message: trimmedMessage, 
+        skin: connection.skin,
+        timestamp: Date.now(),
+        ip: connection.ip,
+        email: connection.email
+    });
+
+        // Log chat message to database
+        logChat({
+            userId: connection.userId,
+            username: connection.username,
+            message: trimmedMessage,
+            timestamp: new Date(),
         });
 
         console.log(
@@ -458,10 +711,21 @@ function handleDisconnect(connectionId: string) {
                 id: connectionId,
                 username: connection.username,
             });
+            sendToAdmins({ 
+                type:'adminPlayerDisconnect', 
+                connectionId, 
+                userId: connection.userId, 
+                username: connection.username,
+                timestamp: Date.now(),
+                reason: 'disconnect'
+            });
 
             // Broadcast updated online users count after disconnect
             broadcastOnlineUsersCount();
         }
+
+        // Remove from active players log
+        removeActivePlayer(connection.userId);
 
         console.log(
             `Connection closed: ${connectionId}, remaining: ${
@@ -519,20 +783,49 @@ function broadcastOnlineUsersCount() {
         type: "onlineUsersCount",
         count: onlineCount,
     });
+    sendToAdmins({ type:'adminOnlineCount', count: onlineCount });
 }
 
 // Set up connection cleanup interval
 setInterval(() => {
     const now = Date.now();
 
-    // Clean up inactive connections (reduced timeout to 3 minutes)
+    // AFK detection (5 minutes without movement updates)
+    const connectionsToClose = new Array<{ id: string; reason: string }>();
+    
     connections.forEach((connection, id) => {
-        if (now - connection.lastActivity > 3 * 60 * 1000) {
-            console.log(`Closing inactive connection: ${id}`);
-            connection.socket.close(
-                1000,
-                "Connection timeout due to inactivity"
-            );
+        if (connection.authenticated) {
+            const lastMove = connection.lastMovementTime || connection.lastActivity;
+            if (now - lastMove > 5 * 60 * 1000) { // 5 minutes
+                connectionsToClose.push({ id, reason: 'AFK timeout (5 minutes)' });
+                return; // skip further checks for this connection
+            }
+        }
+        
+        // General inactivity cleanup (10 minutes no any activity)
+        if (now - connection.lastActivity > 10 * 60 * 1000) {
+            connectionsToClose.push({ id, reason: 'Inactivity timeout (10 minutes)' });
+        }
+    });
+
+    // Close connections that need to be closed
+    connectionsToClose.forEach(({ id, reason }) => {
+        const connection = connections.get(id);
+        if (connection) {
+            try {
+                // Send kick message before closing
+                if (connection.socket.readyState === WebSocket.OPEN) {
+                    connection.socket.send(JSON.stringify({ 
+                        type: 'afkKick', 
+                        reason: `Kicked for ${reason}` 
+                    }));
+                }
+                // Force close the connection
+                connection.socket.close(4000, reason);
+            } catch(_error) {
+                console.error('Error closing connection:', _error);
+            }
+            console.log(`${reason} kick: ${id}`);
             handleDisconnect(id);
         }
     });
@@ -578,6 +871,104 @@ setInterval(() => {
         }
     });
 }, 45 * 1000); // Send ping every 45 seconds instead of 30
+
+// Real-time admin monitoring - send periodic updates to admin monitors
+let lastAdminUpdate = 0;
+let lastPlayerCount = 0;
+setInterval(() => {
+    // Only send updates if we have admin monitors and enough time has passed
+    if (adminMonitors.size === 0) return;
+    
+    const currentPlayerCount = getOnlineUsersCount();
+    const now = Date.now();
+    
+    // Only send update if player count changed or 60 seconds have passed
+    if (currentPlayerCount !== lastPlayerCount || now - lastAdminUpdate > 60000) {
+        const activePlayers: Array<{
+            connectionId: string;
+            userId?: string;
+            username: string;
+            email?: string;
+            x: number;
+            y: number;
+            animation?: string;
+            skin?: string;
+            ip?: string;
+            lastActivity: number;
+            lastMovementTime?: number;
+        }> = [];
+        
+        connections.forEach(c => { 
+            if (c.authenticated) {
+                activePlayers.push({ 
+                    connectionId: c.id, 
+                    userId: c.userId, 
+                    username: c.username, 
+                    email: c.email,
+                    x: c.position.x, 
+                    y: c.position.y, 
+                    animation: c.animation, 
+                    skin: c.skin,
+                    ip: c.ip,
+                    lastActivity: c.lastActivity,
+                    lastMovementTime: c.lastMovementTime
+                }); 
+            }
+        });
+        
+        sendToAdmins({
+            type: 'adminLiveUpdate',
+            players: activePlayers,
+            online: currentPlayerCount,
+            timestamp: now,
+            serverUptime: Math.floor((now - SERVER_START_TIME) / 1000)
+        });
+        
+        lastAdminUpdate = now;
+        lastPlayerCount = currentPlayerCount;
+    }
+}, 30 * 1000); // Check every 30 seconds
+
+// Periodic ban checking for active connections
+setInterval(async () => {
+    const connectionsToKick = new Array<{ id: string; reason: string }>();
+    
+    for (const [id, connection] of connections) {
+        if (connection.authenticated && (connection.email || connection.ip)) {
+            const banned = await isBanned({ 
+                email: connection.email, 
+                ip: connection.ip 
+            });
+            
+            if (banned) {
+                connectionsToKick.push({ 
+                    id, 
+                    reason: 'Banned during session' 
+                });
+            }
+        }
+    }
+    
+    // Kick banned users
+    connectionsToKick.forEach(({ id, reason }) => {
+        const connection = connections.get(id);
+        if (connection) {
+            try {
+                if (connection.socket.readyState === WebSocket.OPEN) {
+                    connection.socket.send(JSON.stringify({ 
+                        type: 'banned', 
+                        reason: 'You have been banned from the game' 
+                    }));
+                }
+                connection.socket.close(4403, 'banned');
+            } catch(_error) {
+                console.error('Error banning connection:', _error);
+            }
+            console.log(`Banned during session: ${id} - ${reason}`);
+            handleDisconnect(id);
+        }
+    });
+}, 60 * 1000); // Check for bans every minute
 
 console.log(`✅ WebSocket server listening on port ${PORT}`);
 
@@ -661,6 +1052,122 @@ Deno.serve({
             );
         }
 
+        // Force kick endpoint (admin)
+        if (url.pathname === '/admin/kick' && req.method === 'POST') {
+            return (async () => {
+                const auth = req.headers.get('authorization') || '';
+                const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
+                const admin = await validateAdminToken(token);
+                if (!admin) {
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+                try {
+                    const body = await req.json();
+                    const userId = body.userId as string | undefined;
+                    const reason = body.reason || 'Force disconnect by admin';
+                    if (!userId) return new Response(JSON.stringify({ error:'missing userId' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    // Find connections for this user
+                    let kicked = 0;
+                    const connectionsToKick = new Array<string>();
+                    
+                    connections.forEach((c, id) => {
+                        if (c.userId === userId) {
+                            connectionsToKick.push(id);
+                        }
+                    });
+                    
+                    // Kick each connection
+                    connectionsToKick.forEach(id => {
+                        const c = connections.get(id);
+                        if (c) {
+                            try { 
+                                if (c.socket.readyState === WebSocket.OPEN) {
+                                    c.socket.send(JSON.stringify({ type:'forceKick', reason })); 
+                                }
+                                c.socket.close(4001, 'force_kick');
+                            } catch(_error) {
+                                console.error('Error force kicking connection:', _error);
+                            }
+                            handleDisconnect(id);
+                            kicked++;
+                        }
+                    });
+                    return new Response(JSON.stringify({ status:'ok', kicked }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                } catch(_error) {
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                }
+            })();
+        }
+
+        // Admin monitor websocket feed
+        if (url.pathname === '/admin-feed') {
+            const upgrade = req.headers.get('upgrade');
+            const connectionHeader = req.headers.get('connection');
+            if (upgrade !== 'websocket' || !connectionHeader?.toLowerCase().includes('upgrade')) {
+                return new Response('Expected WebSocket upgrade', { status: 400 });
+            }
+            // Token from query (since custom headers are harder on some clients)
+            const token = url.searchParams.get('token') || undefined;
+            return (async () => {
+                const admin = await validateAdminToken(token);
+                if (!admin) return new Response('Forbidden', { status: 403 });
+                try {
+                    const { socket, response } = Deno.upgradeWebSocket(req);
+                    adminMonitors.add(socket);
+                    console.log('[admin-feed] monitor connected, total:', adminMonitors.size);
+                    // Send snapshot with proper types
+                    const players: Array<{
+                        connectionId: string;
+                        userId?: string;
+                        username: string;
+                        email?: string;
+                        x: number;
+                        y: number;
+                        animation?: string;
+                        skin?: string;
+                        ip?: string;
+                        lastActivity: number;
+                        lastMovementTime?: number;
+                    }> = [];
+                    
+                    connections.forEach(c => { 
+                        if (c.authenticated) {
+                            players.push({ 
+                                connectionId: c.id, 
+                                userId: c.userId, 
+                                username: c.username, 
+                                email: c.email,
+                                x: c.position.x, 
+                                y: c.position.y, 
+                                animation: c.animation, 
+                                skin: c.skin,
+                                ip: c.ip,
+                                lastActivity: c.lastActivity,
+                                lastMovementTime: c.lastMovementTime
+                            }); 
+                        }
+                    });
+                    
+                    try { 
+                        socket.send(JSON.stringify({ 
+                            type:'adminSnapshot', 
+                            players, 
+                            online: getOnlineUsersCount(),
+                            timestamp: Date.now()
+                        })); 
+                    } catch(_error) {
+                        console.error('Failed to send admin snapshot:', _error);
+                    }
+                    socket.onclose = () => { adminMonitors.delete(socket); console.log('[admin-feed] monitor disconnected'); };
+                    socket.onerror = () => { adminMonitors.delete(socket); };
+                    return response;
+                } catch(e) {
+                    console.error('admin-feed upgrade failed', e);
+                    return new Response('Upgrade failed', { status: 400 });
+                }
+            })();
+        }
+
         // Check if this is a WebSocket upgrade request
         const upgrade = req.headers.get("upgrade");
         const connection = req.headers.get("connection");
@@ -685,6 +1192,9 @@ Deno.serve({
         try {
             const { socket, response } = Deno.upgradeWebSocket(req);
             const connectionId = crypto.randomUUID();
+            
+            // Extract IP address from request
+            const clientIp = extractIpFromRequest(req);
 
             // Create a new connection
             const connection: Connection = {
@@ -695,11 +1205,18 @@ Deno.serve({
                 lastPing: Date.now(),
                 authenticated: false,
                 position: { x: 0, y: 0 },
+                ip: clientIp, // Store IP on connection
             };
 
             connections.set(connectionId, connection);
+            
+            // Log IP access immediately when connection is established
+            if (clientIp) {
+                updateIpLog({ ip: clientIp });
+            }
+            
             console.log(
-                `New connection: ${connectionId}, total connections: ${connections.size}`
+                `New connection: ${connectionId} from IP: ${clientIp || 'unknown'}, total connections: ${connections.size}`
             );
 
             // WebSocket event handlers

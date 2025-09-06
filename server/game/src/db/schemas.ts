@@ -227,6 +227,58 @@ export interface AchievementDocument extends Document {
   criteria: Record<string, unknown>; // Achievement-specific criteria data
 }
 
+// Administrative / moderation support
+export interface BanRuleDocument extends Document {
+  _id?: ObjectId;
+  type: 'email' | 'internet_identity' | 'ip';
+  value: string; // email, principal, or ip
+  reason?: string;
+  createdAt: Date;
+  createdBy: string; // admin email
+  expiresAt?: Date; // optional expiry
+  active: boolean;
+}
+
+export interface IpLogDocument extends Document {
+  _id?: ObjectId;
+  userId: string;
+  email: string;
+  ip: string;
+  firstSeen: Date;
+  lastSeen: Date;
+  count: number; // number of times observed
+}
+
+export interface SessionLogDocument extends Document {
+  _id?: ObjectId;
+  userId: string;
+  username: string;
+  email?: string;
+  ip?: string;
+  event: 'join' | 'leave';
+  timestamp: Date;
+  position?: { x: number; y: number };
+  skin?: string;
+}
+
+export interface AnnouncementDocument extends Document {
+  _id?: ObjectId;
+  message: string;
+  createdAt: Date;
+  createdBy: string; // admin email
+}
+
+export interface ActivePlayerDocument extends Document {
+  _id?: ObjectId;
+  userId: string;
+  username: string;
+  email?: string;
+  position: { x: number; y: number };
+  animation?: string;
+  skin?: string;
+  updatedAt: Date;
+}
+
 // Collection names as constants
 export const COLLECTIONS = {
   USERS: 'users',
@@ -241,4 +293,9 @@ export const COLLECTIONS = {
   USER_SESSIONS: 'userSessions',
   LEADERBOARDS: 'leaderboards',
   ACHIEVEMENTS: 'achievements',
+  BANS: 'bans',
+  IP_LOGS: 'ipLogs',
+  SESSION_LOGS: 'sessionLogs',
+  ANNOUNCEMENTS: 'announcements',
+  ACTIVE_PLAYERS: 'activePlayers',
 } as const;
