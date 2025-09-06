@@ -15,7 +15,7 @@ const Profile: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [step, setStep] = useState<1 | 2>(2);
+  const [step, setStep] = useState<1 | 2>(1);
   const [editing, setEditing] = useState(false);
   const prefilledOnce = useRef(false); // ensure we only prefill from user one time
 

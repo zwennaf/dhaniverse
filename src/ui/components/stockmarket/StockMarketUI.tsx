@@ -140,6 +140,18 @@ const StockMarketUI: React.FC = () => {
         window.dispatchEvent(new CustomEvent("closeStockMarketUI"));
     };
 
+    // Close on Escape key when the stock market UI is open
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                handleClose();
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isOpen, handleClose]);
+
     // Render nothing if the stock market UI is closed
     if (!isOpen) return null;
 
