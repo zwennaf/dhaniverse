@@ -46,8 +46,8 @@ export class BankNPCManager {
     // Initialize bank onboarding manager
     this.bankOnboardingManager = new BankOnboardingManager(scene);
     
-    // Check if we should start in onboarding mode based on configuration
-    this.isOnboardingMode = shouldShowBankOnboarding() && this.bankOnboardingManager.shouldShowOnboarding();
+    // Initialize onboarding mode asynchronously
+    this.initializeOnboardingMode();
     
     // Setup interaction key with null check
     if (scene.input.keyboard) {
@@ -60,7 +60,9 @@ export class BankNPCManager {
       if (spaceKey) {
         spaceKey.on('down', () => {
           if (this.isPlayerNearBanker && !this.activeDialog) {
-            this.startBankingInteraction();
+            this.startBankingInteraction().catch(error => {
+              console.error("Error starting bank interaction:", error);
+            });
           }
         });
       }
@@ -68,7 +70,9 @@ export class BankNPCManager {
       if (enterKey) {
         enterKey.on('down', () => {
           if (this.isPlayerNearBanker && !this.activeDialog) {
-            this.startBankingInteraction();
+            this.startBankingInteraction().catch(error => {
+              console.error("Error starting bank interaction:", error);
+            });
           }
         });
       }
@@ -152,6 +156,20 @@ export class BankNPCManager {
   private handleConversationEnded(): void {
     console.log("🏦 Bank conversation ended - resetting interaction state");
     this.endBankingInteraction();
+  }
+  
+  /**
+   * Initialize onboarding mode asynchronously
+   */
+  private async initializeOnboardingMode(): Promise<void> {
+    try {
+      const shouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
+      this.isOnboardingMode = shouldShowBankOnboarding() && shouldShow;
+      console.log("Bank onboarding mode initialized:", this.isOnboardingMode);
+    } catch (error) {
+      console.error("Failed to initialize bank onboarding mode:", error);
+      this.isOnboardingMode = false;
+    }
   }
   
   private setupSpeechBubbleAnimations(): void {
@@ -241,7 +259,9 @@ export class BankNPCManager {
       
       // Check for interaction key press
       if (this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) {
-        this.startBankingInteraction();
+        this.startBankingInteraction().catch(error => {
+          console.error("Error starting bank interaction:", error);
+        });
       }
     } else if (!this.isPlayerNearBanker && wasNearBanker) {
       // Player just left interaction zone
@@ -262,7 +282,7 @@ export class BankNPCManager {
   /**
    * Start the bank manager interaction - only onboarding or simple dialogue
    */
-  private startBankingInteraction(): void {
+  private async startBankingInteraction(): Promise<void> {
     if (this.activeDialog) return;
     
     console.log("🏦 Starting bank manager interaction");
@@ -278,11 +298,12 @@ export class BankNPCManager {
     }
     
     // Check if we should start bank onboarding (check dynamically each time)
-    const shouldStartOnboarding = shouldShowBankOnboarding() && this.bankOnboardingManager.shouldShowOnboarding();
+    const managerShouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
+    const shouldStartOnboarding = shouldShowBankOnboarding() && managerShouldShow;
     
     console.log("🏦 Onboarding check:", {
       configEnabled: shouldShowBankOnboarding(),
-      managerShouldShow: this.bankOnboardingManager.shouldShowOnboarding(),
+      managerShouldShow,
       finalDecision: shouldStartOnboarding
     });
     
@@ -291,9 +312,9 @@ export class BankNPCManager {
       this.bankOnboardingManager.startOnboarding();
       return;
     }
-  // Onboarding complete or not needed: always delegate to bank manager conversation (returning greeting + options)
-  console.log("🏦 Bank onboarding already completed - showing returning greeting");
-  this.bankOnboardingManager.startConversation();
+    // Onboarding complete or not needed: always delegate to bank manager conversation (returning greeting + options)
+    console.log("🏦 Bank onboarding already completed - showing returning greeting");
+    this.bankOnboardingManager.startConversation();
   }
   
   /**

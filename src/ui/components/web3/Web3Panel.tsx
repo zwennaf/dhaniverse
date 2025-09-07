@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { LocalStorageManager } from '../../../utils/LocalStorageManager';
 import { 
     Wallet, 
     Globe, 
@@ -98,7 +97,12 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                 const balance = await icpIntegration.getDualBalance();
                 setDualBalance(balance);
                 
-                LocalStorageManager.setItem('WALLET_ADDRESS', status.walletAddress || 'ii-authenticated-user');
+                try {
+                    localStorage.setItem('wallet_address', status.walletAddress || 'ii-authenticated-user');
+                } catch (e) {
+                    // localStorage may be unavailable in some environments (SSR or restricted browsers)
+                    console.warn('Unable to persist wallet address to localStorage', e);
+                }
                 showNotification('success', 'Wallet connected successfully!');
             } else {
                 showNotification('error', 'Failed to connect wallet');
