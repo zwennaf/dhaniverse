@@ -163,12 +163,58 @@ export class BankNPCManager {
    */
   private async initializeOnboardingMode(): Promise<void> {
     try {
-      const shouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
-      this.isOnboardingMode = shouldShowBankOnboarding() && shouldShow;
-      console.log("Bank onboarding mode initialized:", this.isOnboardingMode);
+      // Prefer a backend check: if the player already has a bank account or non-zero balance
+      // then onboarding should not be shown. Fall back to the onboarding manager's check.
+      const accountOrBalanceExists = await this.checkAccountExistsOrHasBalance();
+      if (accountOrBalanceExists) {
+        this.isOnboardingMode = false;
+        console.log('Bank onboarding disabled because account/balance exists in backend');
+      } else {
+        const shouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
+        this.isOnboardingMode = shouldShowBankOnboarding() && shouldShow;
+        console.log("Bank onboarding mode initialized:", this.isOnboardingMode);
+      }
     } catch (error) {
       console.error("Failed to initialize bank onboarding mode:", error);
       this.isOnboardingMode = false;
+    }
+  }
+
+  /**
+   * Check backend for existing bank account or non-zero balance.
+   * Returns true if account exists or has balance > 0.
+   */
+  private async checkAccountExistsOrHasBalance(): Promise<boolean> {
+    type BankingApiLike = {
+      getAccount: () => Promise<{ success: boolean; data: any }>;
+      getOnboardingStatus: () => Promise<{ success: boolean; data: any }>;
+    };
+
+    try {
+      const { bankingApi } = (await import('../../utils/api')) as { bankingApi: BankingApiLike };
+
+      // First try to get the full account
+      const accountResp = await bankingApi.getAccount();
+      if (accountResp && accountResp.success && accountResp.data) {
+        const acc = accountResp.data;
+        // If account exists and has positive balance, treat as existing
+        if (typeof acc.balance === 'number' && acc.balance > 0) return true;
+        // If account object exists (even zero balance) consider it an existing account
+        return true;
+      }
+
+      // Fallback: query onboarding status which may indicate hasBankAccount
+      const statusResp = await bankingApi.getOnboardingStatus();
+      if (statusResp && statusResp.success && statusResp.data) {
+        if (statusResp.data.hasBankAccount) return true;
+      }
+
+      return false;
+    } catch (e) {
+      console.warn('Failed to check backend bank account status:', e);
+      // Conservative behavior: if we can't reach the backend, assume account exists
+      // to avoid presenting onboarding that may fail or create inconsistent local-only state.
+      return true;
     }
   }
   
@@ -297,6 +343,14 @@ export class BankNPCManager {
       tm.completeTask('enter-bank-speak-teller');
     }
     
+    // Prefer backend check at interaction time as well: if an account exists or has balance, skip onboarding
+    const backendHasAccount = await this.checkAccountExistsOrHasBalance();
+    if (backendHasAccount) {
+      console.log('Bank onboarding skipped: account or balance exists in backend at interaction time');
+      this.bankOnboardingManager.startConversation();
+      return;
+    }
+
     // Check if we should start bank onboarding (check dynamically each time)
     const managerShouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
     const shouldStartOnboarding = shouldShowBankOnboarding() && managerShouldShow;
