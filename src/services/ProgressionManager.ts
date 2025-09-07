@@ -29,13 +29,54 @@ const DEFAULT_STATE: OnboardingState = {
 class ProgressionManager {
   private state: OnboardingState = { ...DEFAULT_STATE };
   private syncing = false;
+  private initialized = false;
 
-  initializeFromPlayerState(playerState: any) {
-    const incoming = playerState?.onboarding || {};
-    this.state = { ...DEFAULT_STATE, ...incoming, unlockedBuildings: { ...DEFAULT_STATE.unlockedBuildings, ...(incoming.unlockedBuildings||{}) } };
+  async initializeFromPlayerState(playerState?: any) {
+    if (this.initialized) return;
+    
+    // Always try to load from database first
+    try {
+      const response = await playerStateApi.get();
+      if (response.success && response.data?.onboarding) {
+        const dbState = response.data.onboarding;
+        this.state = { 
+          ...DEFAULT_STATE, 
+          ...dbState, 
+          unlockedBuildings: { 
+            ...DEFAULT_STATE.unlockedBuildings, 
+            ...(dbState.unlockedBuildings || {}) 
+          } 
+        };
+        this.initialized = true;
+        console.log('✅ ProgressionManager loaded from database');
+        return;
+      }
+    } catch (error) {
+      console.warn('Failed to load progression from database, using fallback:', error);
+    }
+    
+    // Fallback to provided player state (from localStorage or initial load)
+    if (playerState?.onboarding) {
+      const incoming = playerState.onboarding;
+      this.state = { 
+        ...DEFAULT_STATE, 
+        ...incoming, 
+        unlockedBuildings: { 
+          ...DEFAULT_STATE.unlockedBuildings, 
+          ...(incoming.unlockedBuildings || {}) 
+        } 
+      };
+    }
+    
+    this.initialized = true;
   }
 
-  getState(): OnboardingState { return this.state; }
+  getState(): OnboardingState { 
+    if (!this.initialized) {
+      console.warn('ProgressionManager not initialized, using default state');
+    }
+    return this.state; 
+  }
 
   private async persist() {
     if (this.syncing) return; // simple throttle

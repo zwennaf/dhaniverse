@@ -68,8 +68,29 @@ export class BankOnboardingManager {
 
   constructor(scene: MainScene) {
     this.scene = scene;
-    // Check if player has spoken before
-    this.hasSpokenBefore = localStorage.getItem('dhaniverse_bank_conversation_started') === 'true';
+    // Check database for conversation state on initialization
+    this.initializeFromDatabase();
+  }
+
+  private async initializeFromDatabase(): Promise<void> {
+    try {
+      const { bankingApi } = await import('../../../utils/api');
+      const response = await bankingApi.getOnboardingStatus();
+      
+      if (response.success && response.data) {
+        // Set conversation state based on database
+        this.hasSpokenBefore = response.data.hasCompletedOnboarding || false;
+      }
+    } catch (error) {
+      console.warn('Failed to initialize from database:', error);
+      // Default to false if database unavailable
+      this.hasSpokenBefore = false;
+    }
+    
+    // Initialize by checking database state immediately to ensure consistency
+    this.checkOnboardingStatusFromDatabase().catch(e => {
+      console.warn('Failed to sync onboarding status on initialization:', e);
+    });
   }
 
   public startConversation(): void {
@@ -79,21 +100,30 @@ export class BankOnboardingManager {
       dialogueManager.closeDialogue();
     }
 
-    // Completed previously – lightweight return greeting
-    if (this.hasCompletedBankOnboarding()) {
-      this.showReturningGreeting();
-      return;
-    }
-
-    // First time (or not completed) -> start new streamlined flow
-    this.startIntroFlow();
+    // Check database status first to ensure we have the latest state
+    this.checkOnboardingStatusFromDatabase().then(async () => {
+      // After database check, determine what to show
+      if (await this.hasCompletedBankOnboarding()) {
+        this.showReturningGreeting();
+      } else {
+        // First time (or not completed) -> start new streamlined flow
+        this.startIntroFlow();
+      }
+    }).catch(async () => {
+      // If database check fails, fall back to localStorage check
+      if (await this.hasCompletedBankOnboarding()) {
+        this.showReturningGreeting();
+      } else {
+        this.startIntroFlow();
+      }
+    });
   }
 
   // ---------- New Streamlined Flow ----------
 
   private startIntroFlow(): void {
     this.hasSpokenBefore = true;
-    localStorage.setItem('dhaniverse_bank_conversation_started', 'true');
+    // No localStorage - rely on database persistence via progression manager
     this.conversationStage = 'INTRO';
     this.currentDialogueStep = 0;
     this.showIntroSegment();
@@ -296,8 +326,7 @@ export class BankOnboardingManager {
   }
 
   private startFullOnboarding(): void {
-    // Mark that conversation has started
-    localStorage.setItem('dhaniverse_bank_conversation_started', 'true');
+    // Mark that conversation has started - database will persist this
     this.hasSpokenBefore = true;
 
     dialogueManager.showDialogue({
@@ -355,18 +384,15 @@ export class BankOnboardingManager {
 
   private showAccountCreated(): void { /* deprecated */ }
 
-  public shouldShowOnboarding(): boolean {
+  public async shouldShowOnboarding(): Promise<boolean> {
     // Check configuration first - if disabled globally, don't show onboarding
     if (!configShouldShowBankOnboarding()) {
       console.log("Bank onboarding disabled via config");
       return false;
     }
     
-    // We'll check database status asynchronously
-    this.checkOnboardingStatusFromDatabase();
-    
-    // For now, fall back to localStorage check (will be updated by async call)
-    const bankOnboardingCompleted = this.hasCompletedBankOnboarding();
+    // Check if onboarding is completed based on database state first
+    const bankOnboardingCompleted = await this.hasCompletedBankOnboarding();
     
     console.log("Bank onboarding check:", {
       bankOnboardingCompleted,
@@ -385,17 +411,21 @@ export class BankOnboardingManager {
       if (response.success && response.data) {
         const { hasCompletedOnboarding, hasBankAccount } = response.data;
         
-        // Update localStorage to match database state
-        if (hasCompletedOnboarding) {
-          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
-        } else {
-          localStorage.removeItem('dhaniverse_bank_onboarding_completed');
-        }
-        
         console.log("Bank onboarding status from database:", {
           hasCompletedOnboarding,
           hasBankAccount
         });
+        
+        // Sync ProgressionManager with database state
+        if (hasCompletedOnboarding) {
+          try {
+            const { progressionManager } = await import('../../../services/ProgressionManager');
+            progressionManager.markBankOnboardingCompleted();
+            console.log('✅ ProgressionManager synchronized with database');
+          } catch (e) {
+            console.warn('Failed to sync progression manager with database:', e);
+          }
+        }
       }
     } catch (error) {
       console.warn("Failed to check bank onboarding status from database:", error);
@@ -406,9 +436,21 @@ export class BankOnboardingManager {
     return this.isOnboardingActive;
   }
 
-  private hasCompletedBankOnboarding(): boolean {
-    const saved = localStorage.getItem('dhaniverse_bank_onboarding_completed');
-    return saved === 'true';
+  private async hasCompletedBankOnboarding(): Promise<boolean> {
+    // Always check database first - it's the source of truth
+    try {
+      const { bankingApi } = await import('../../../utils/api');
+      const response = await bankingApi.getOnboardingStatus();
+      
+      if (response.success && response.data) {
+        return response.data.hasCompletedOnboarding;
+      }
+    } catch (error) {
+      console.warn('Failed to check database onboarding status:', error);
+    }
+    
+    // Default to false if database unavailable
+    return false;
   }
 
   public startOnboarding(): void {
@@ -441,13 +483,8 @@ export class BankOnboardingManager {
     console.log('🏦 Completing onboarding...');
     this.isOnboardingActive = false;
     
-    // Mark onboarding as completed in localStorage for immediate UI updates
-    localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
-    
-    // Store account data
-    if (this.bankAccount) {
-      localStorage.setItem('dhaniverse_bank_account', JSON.stringify(this.bankAccount));
-    }
+    // No localStorage - database is the source of truth
+    // ProgressionManager will handle persistence to database
     
     // Save progress to backend (in a real app)
     this.saveBankOnboardingProgress();
@@ -499,15 +536,11 @@ export class BankOnboardingManager {
       balance: 0
     };
 
-    // Save to localStorage
-    localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify(this.bankAccount));
+    // No localStorage - account creation will be handled by database
     console.log('Bank account created:', this.bankAccount);
     // Apply initial deposit if provided and valid
     if (this.initialDeposit && this.initialDeposit > 0) {
-      try {
-        this.bankAccount.balance = this.initialDeposit;
-        localStorage.setItem('dhaniverse_bank_account_details', JSON.stringify(this.bankAccount));
-      } catch {}
+      this.bankAccount.balance = this.initialDeposit;
     }
   }
 
@@ -527,7 +560,8 @@ export class BankOnboardingManager {
       steps: this.onboardingSteps
     };
     
-    localStorage.setItem('dhaniverse_bank_onboarding_progress', JSON.stringify(progress));
+    // No localStorage - progress saved to database via API
+    console.log('Bank onboarding progress saved:', progress);
   }
 
   private enableNormalBanking(): void {
