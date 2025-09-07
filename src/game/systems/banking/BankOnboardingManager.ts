@@ -240,7 +240,7 @@ export class BankOnboardingManager {
   this.notifyConversationEnded();
   }
 
-  private showReturningGreeting(): void {
+  public showReturningGreeting(): void {
     const storedName = this.getStoredPlayerName();
     const acc = this.getBankAccount();
     const shortAcc = acc ? acc.accountNumber.slice(-4) : '----';
@@ -268,8 +268,16 @@ export class BankOnboardingManager {
       // Keep interaction available after UI closes (end event still dispatched elsewhere)
       this.notifyConversationEnded();
         } else if (optionId === 'later') {
-          dialogueManager.closeDialogue();
-          this.notifyConversationEnded();
+          dialogueManager.showDialogue({
+            text: 'Alright, no issues — come back whenever you feel like it.',
+            characterName: 'Bank Manager',
+            showBackdrop: true
+          }, {
+            onAdvance: () => {
+              dialogueManager.closeDialogue();
+              this.notifyConversationEnded();
+            }
+          });
         }
       }
     });
@@ -443,7 +451,13 @@ export class BankOnboardingManager {
       const response = await bankingApi.getOnboardingStatus();
       
       if (response.success && response.data) {
-        return response.data.hasCompletedOnboarding;
+        const { hasCompletedOnboarding, hasBankAccount, bankAccount } = response.data;
+        const balance = bankAccount?.balance;
+        const derivedCompletion = !!(hasCompletedOnboarding || hasBankAccount || (typeof balance === 'number' && balance > 0));
+        if (!hasCompletedOnboarding && derivedCompletion) {
+          console.log('[BankOnboarding] Treating existing account/balance as completed onboarding');
+        }
+        return derivedCompletion;
       }
     } catch (error) {
       console.warn('Failed to check database onboarding status:', error);

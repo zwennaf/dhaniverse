@@ -35,10 +35,17 @@ export class BankNPCManager {
   private bankOnboardingManager: BankOnboardingManager;
   private isPlayerNearBanker: boolean = false;
   private activeDialog: boolean = false;
+  private interactionInProgress: boolean = false; // debounce guard
   private speechBubble: GameObjects.Sprite | null = null;
   private playerBankAccount: BankAccount;
   private handleBankingClosedBound = this.handleBankingClosed.bind(this);
   private handleConversationEndedBound = this.handleConversationEnded.bind(this);
+  private spaceKey?: Input.Keyboard.Key;
+  private enterKey?: Input.Keyboard.Key;
+  // Simple cache for backend account existence to reduce rapid duplicate hits
+  private lastBackendCheckAt: number = 0;
+  private lastBackendCheckResult: boolean | null = null;
+  private readonly backendCheckTTL = 5000; // ms
 
   constructor(scene: MainScene) {
     this.scene = scene;
@@ -53,29 +60,19 @@ export class BankNPCManager {
     if (scene.input.keyboard) {
       this.interactionKey = scene.input.keyboard.addKey('E');
       // Add SPACE and ENTER as alternative interaction keys
-      const spaceKey = scene.input.keyboard.addKey('SPACE');
-      const enterKey = scene.input.keyboard.addKey('ENTER');
+  this.spaceKey = scene.input.keyboard.addKey('SPACE');
+  this.enterKey = scene.input.keyboard.addKey('ENTER');
       
       // Make these keys also trigger the interaction
-      if (spaceKey) {
-        spaceKey.on('down', () => {
-          if (this.isPlayerNearBanker && !this.activeDialog) {
-            this.startBankingInteraction().catch(error => {
-              console.error("Error starting bank interaction:", error);
-            });
-          }
-        });
-      }
-      
-      if (enterKey) {
-        enterKey.on('down', () => {
-          if (this.isPlayerNearBanker && !this.activeDialog) {
-            this.startBankingInteraction().catch(error => {
-              console.error("Error starting bank interaction:", error);
-            });
-          }
-        });
-      }
+      const altTrigger = () => {
+        if (this.isPlayerNearBanker && !this.activeDialog) {
+          this.startBankingInteraction().catch(error => {
+            console.error("Error starting bank interaction:", error);
+          });
+        }
+      };
+      this.spaceKey?.on('down', altTrigger);
+      this.enterKey?.on('down', altTrigger);
     }
     
     // Initialize the player's bank account
@@ -190,6 +187,11 @@ export class BankNPCManager {
       getOnboardingStatus: () => Promise<{ success: boolean; data: any }>;
     };
 
+    const now = Date.now();
+    if (this.lastBackendCheckResult !== null && (now - this.lastBackendCheckAt) < this.backendCheckTTL) {
+      return this.lastBackendCheckResult;
+    }
+
     try {
       const { bankingApi } = (await import('../../utils/api')) as { bankingApi: BankingApiLike };
 
@@ -209,12 +211,16 @@ export class BankNPCManager {
         if (statusResp.data.hasBankAccount) return true;
       }
 
-      return false;
+  this.lastBackendCheckAt = Date.now();
+  this.lastBackendCheckResult = false;
+  return this.lastBackendCheckResult;
     } catch (e) {
       console.warn('Failed to check backend bank account status:', e);
       // Conservative behavior: if we can't reach the backend, assume account exists
       // to avoid presenting onboarding that may fail or create inconsistent local-only state.
-      return true;
+  this.lastBackendCheckAt = Date.now();
+  this.lastBackendCheckResult = true;
+  return this.lastBackendCheckResult;
     }
   }
   
@@ -329,7 +335,8 @@ export class BankNPCManager {
    * Start the bank manager interaction - only onboarding or simple dialogue
    */
   private async startBankingInteraction(): Promise<void> {
-    if (this.activeDialog) return;
+  if (this.activeDialog || this.interactionInProgress) return;
+  this.interactionInProgress = true;
     
     console.log("🏦 Starting bank manager interaction");
     this.activeDialog = true;
@@ -347,7 +354,9 @@ export class BankNPCManager {
     const backendHasAccount = await this.checkAccountExistsOrHasBalance();
     if (backendHasAccount) {
       console.log('Bank onboarding skipped: account or balance exists in backend at interaction time');
-      this.bankOnboardingManager.startConversation();
+      // Directly show returning greeting (dashboard prompt)
+      this.bankOnboardingManager.showReturningGreeting();
+      this.interactionInProgress = false;
       return;
     }
 
@@ -364,11 +373,13 @@ export class BankNPCManager {
     if (shouldStartOnboarding) {
       console.log("🏦 Starting bank onboarding...");
       this.bankOnboardingManager.startOnboarding();
+      this.interactionInProgress = false;
       return;
     }
     // Onboarding complete or not needed: always delegate to bank manager conversation (returning greeting + options)
     console.log("🏦 Bank onboarding already completed - showing returning greeting");
     this.bankOnboardingManager.startConversation();
+    this.interactionInProgress = false;
   }
   
   /**
@@ -485,5 +496,9 @@ export class BankNPCManager {
     
     this.banker.destroy();
     this.interactionText.destroy();
+  // Remove key listeners explicitly (defensive)
+  this.spaceKey?.removeAllListeners();
+  this.enterKey?.removeAllListeners();
+  this.interactionKey?.removeAllListeners();
   }
 }
