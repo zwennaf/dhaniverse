@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LocalStorageManager } from '../../../utils/LocalStorageManager';
 import { 
     Wallet, 
     Globe, 
@@ -97,7 +98,7 @@ const Web3Panel: React.FC<Web3PanelProps> = ({ isOpen = false, onClose }) => {
                 const balance = await icpIntegration.getDualBalance();
                 setDualBalance(balance);
                 
-                localStorage.setItem('wallet_address', status.walletAddress || 'ii-authenticated-user');
+                LocalStorageManager.setItem('WALLET_ADDRESS', status.walletAddress || 'ii-authenticated-user');
                 showNotification('success', 'Wallet connected successfully!');
             } else {
                 showNotification('error', 'Failed to connect wallet');

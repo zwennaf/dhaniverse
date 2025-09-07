@@ -13,7 +13,7 @@ const ProtectedGameRoute: React.FC = () => {
   const { isSignedIn, isLoaded, user } = useAuth();
   const navigate = useNavigate();
   const [banStatus, setBanStatus] = useState<BanCheckResponse | null>(null);
-  const [isCheckingBan, setIsCheckingBan] = useState(true);
+  const [isCheckingBan, setIsCheckingBan] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -23,7 +23,7 @@ const ProtectedGameRoute: React.FC = () => {
       return;
     }
 
-    // Check ban status
+    // Check ban status quickly without blocking
     const checkBanStatus = async () => {
       setIsCheckingBan(true);
       try {
@@ -78,13 +78,13 @@ const ProtectedGameRoute: React.FC = () => {
     };
   }, [banStatus?.banned, isCheckingBan, isSignedIn]);
 
-  // Loading state
-  if (!isLoaded || isCheckingBan) {
+  // Loading state - only show loader for auth, not ban checking
+  if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="w-16 h-16 border-t-4 border-dhani-gold border-solid rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="font-vcr">Checking access permissions...</div>
+          <div className="font-vcr">Loading...</div>
         </div>
       </div>
     );

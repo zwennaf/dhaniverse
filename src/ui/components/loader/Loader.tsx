@@ -3,6 +3,7 @@ import { cacheAssets, resolveAsset } from '../../utils/assetCache';
 import { initChunkCache, preloadAndCacheChunks } from '../../../game/cache/mapChunkCache.ts';
 import { NumberCounter } from '../common';
 import { playerStateApi } from '../../../utils/api';
+import { banCheckService } from '../../../services/BanCheckService';
 
 interface LoaderProps {
   onLoadingComplete: () => void;
@@ -25,11 +26,12 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   const forcedSlowIncrementRef = useRef(0);
 
   const loadingSteps = [
-    { progress: 10, status: 'Loading Game Assets...' },
-    { progress: 25, status: 'Loading Map Data...' },
-    { progress: 45, status: 'Loading Buildings...' },
-    { progress: 65, status: 'Loading Characters...' },
-    { progress: 80, status: 'Connecting to Server...' },
+    { progress: 5, status: 'Checking access permissions...' },
+    { progress: 15, status: 'Loading Game Assets...' },
+    { progress: 30, status: 'Loading Map Data...' },
+    { progress: 50, status: 'Loading Buildings...' },
+    { progress: 70, status: 'Loading Characters...' },
+    { progress: 85, status: 'Connecting to Server...' },
     { progress: 95, status: 'Finalizing...' },
     { progress: 100, status: 'Ready!' }
   ];
@@ -50,8 +52,27 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
   // Decide if tutorial should be shown by querying backend player state instead of localStorage
   useEffect(() => {
     let cancelled = false;
+    
+    // Check ban status first
     (async () => {
       try {
+        setCurrentStatus('Checking access permissions...');
+        const banInfo = await banCheckService.checkCurrentUserBan();
+        
+        if (banInfo.banned) {
+          // User is banned, handle it via the ban service
+          banCheckService.handleBanDetected(banInfo);
+          return; // Don't proceed with loading
+        }
+        
+        if (cancelled) return;
+        
+        // Start periodic ban checking for the game session
+        import('../../../main').then(({ startPeriodicBanCheck }) => {
+          startPeriodicBanCheck();
+        }).catch(console.error);
+        
+        // Now check tutorial status
         const resp = await playerStateApi.get();
         if (cancelled) return;
         const needsTutorial = !resp?.data?.hasCompletedTutorial;
@@ -62,10 +83,14 @@ const Loader: React.FC<LoaderProps> = ({ onLoadingComplete }) => {
           setTutorialAssetsLoaded(true);
         }
       } catch (e) {
+        console.error('Error checking access or tutorial status:', e);
+        // On ban check error, allow access (fail open)
         // Fallback: show tutorial if backend fails (better to educate than skip)
         if (!cancelled) setShouldPreloadTutorial(true);
       }
     })();
+    
+    // Debug mode no longer needed - removed OnboardingDebugger
 
   const tutorialImages: string[] = [
       '/game/first-tutorial/w1.png',
