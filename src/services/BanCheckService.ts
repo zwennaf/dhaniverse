@@ -12,7 +12,10 @@ interface BanCheckResponse {
 
 class BanCheckService {
   private static instance: BanCheckService;
-  private readonly API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  private readonly API_BASE = import.meta.env.VITE_API_BASE_URL || 
+    ((typeof window !== "undefined" && window.location.hostname === "localhost")
+      ? "http://localhost:8000"
+      : "https://api.dhaniverse.in");
 
   static getInstance(): BanCheckService {
     if (!BanCheckService.instance) {

@@ -90,15 +90,15 @@ interface Summary {
     activePlayers: number;
 }
 
-const API_BASE =
-    typeof window !== "undefined" && window.location.hostname === "localhost"
+const API_BASE = import.meta.env.VITE_API_BASE_URL ||
+    ((typeof window !== "undefined" && window.location.hostname === "localhost")
         ? "http://localhost:8000"
-        : "https://api.dhaniverse.in";
+        : "https://api.dhaniverse.in");
 
-const WEBSOCKET_BASE =
-    typeof window !== "undefined" && window.location.hostname === "localhost"
+const WEBSOCKET_BASE = import.meta.env.VITE_WS_BASE_URL ||
+    ((typeof window !== "undefined" && window.location.hostname === "localhost")
         ? "http://localhost:8001"
-        : "https://dhaniverse-ws.azurewebsites.net";
+        : "https://dhaniverse-ws.azurewebsites.net");
 
 // ------------- Modern UI Components ---------------
 const PixelButton: React.FC<{

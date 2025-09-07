@@ -1206,9 +1206,10 @@ export class MayaNPCManager {
             // Use unified auth token key used across app (see AuthContext & api utils)
             const token = window.localStorage.getItem('dhaniverse_token');
             // Backend game routes are mounted at root (e.g. /game/...), NOT under /api
-            const baseUrl = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+            const baseUrl = (window as any).__viteDefinedEnv?.VITE_API_BASE_URL ||
+                ((typeof window !== 'undefined' && window.location.hostname === 'localhost')
                 ? 'http://localhost:8000'
-                : 'https://api.dhaniverse.in';
+                : 'https://api.dhaniverse.in');
             let claimed = false;
             try {
                 if (!token) {

@@ -1,8 +1,8 @@
 // API utility functions for backend communication
-const API_BASE =
-  (typeof window !== "undefined" && window.location.hostname === "localhost")
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 
+  ((typeof window !== "undefined" && window.location.hostname === "localhost")
     ? "http://localhost:8000"
-    : "https://api.dhaniverse.in";
+    : "https://api.dhaniverse.in");
    
 
 // Helper function to get auth headers
