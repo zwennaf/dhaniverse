@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
 import SEO from './SEO';
+import DesktopWarning from './DesktopWarning';
 // Onboarding wrapper intentionally not imported – we currently always skip slides.
 import { playerStateApi } from '../../utils/api';
 import BankOnboardingUI from './banking/onboarding/BankOnboardingUI';
@@ -217,6 +218,8 @@ const GamePage: React.FC = () => {
   // The game will be rendered by Phaser in the game-container div
   return (
     <div className="game-page">
+  {/* Show desktop-only warning overlay on /game for non-desktop devices */}
+  <DesktopWarning />
       <SEO 
         title="Play Dhaniverse Game - Financial RPG | Learn Money Management Online"
         description="Play Dhaniverse, the immersive 2D RPG that teaches real financial skills. Explore buildings, trade stocks, manage budgets, and level up your money knowledge through interactive gameplay."
