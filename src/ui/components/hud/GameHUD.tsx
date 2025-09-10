@@ -763,19 +763,34 @@ const GameHUD: React.FC<GameHUDProps> = ({
         }
     }, []);
 
-    // Auto-scroll chat messages (smooth if user is already near bottom)
+    // Auto-scroll chat messages (only if user is near bottom)
     useEffect(() => {
         const el = messagesRef.current;
         if (!el) return;
+        
+        // Check if user is near the bottom before auto-scrolling
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        const behavior: ScrollBehavior = distanceFromBottom < 120 ? 'smooth' : 'auto';
-        try {
-            el.scrollTo({ top: el.scrollHeight, behavior });
-        } catch {
-            // Fallback for older browsers
-            el.scrollTop = el.scrollHeight;
+        const isNearBottom = distanceFromBottom < 120;
+        
+        // Only auto-scroll if user is already near the bottom
+        if (isNearBottom) {
+            try {
+                el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+            } catch {
+                // Fallback for older browsers
+                el.scrollTop = el.scrollHeight;
+            }
         }
     }, [chatMessages]);
+
+    // Scroll to bottom on initial load
+    useEffect(() => {
+        const el = messagesRef.current;
+        if (el && chatMessages.length > 0) {
+            // Scroll to bottom without animation on initial load
+            el.scrollTop = el.scrollHeight;
+        }
+    }, []);
 
     // Handle clicks outside the chat to unfocus it
     useEffect(() => {
@@ -1040,7 +1055,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             >
                 {/* Chat messages area */}
                 <div
-                    className="h-[36vh] relative overflow-y-scroll  break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent flex flex-col justify-end scroll-smooth pr-1"
+                    className="h-[36vh] relative overflow-y-auto break-words scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent scroll-smooth pr-1"
                     ref={messagesRef}
                     style={{
                         scrollbarGutter: 'stable both-edges' as any,
