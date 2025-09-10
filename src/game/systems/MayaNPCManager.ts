@@ -569,8 +569,8 @@ export class MayaNPCManager {
         const wasNearNPC = this.isPlayerNearNPC;
         this.isPlayerNearNPC = distance < this.interactionDistance;
 
-        // Always show interaction text if player is near Maya and no dialog is active
-        if (this.isPlayerNearNPC && !this.activeDialog) {
+        // Show interaction text only if player is near Maya, no dialog is active, and Maya is not moving
+        if (this.isPlayerNearNPC && !this.activeDialog && !this.movingToTarget && !this.guidedSequenceActive) {
             this.interactionText.setAlpha(1);
         } else {
             this.interactionText.setAlpha(0);
@@ -597,12 +597,14 @@ export class MayaNPCManager {
             }
         }
 
-        // Check for interaction key press when near Maya
+        // Check for interaction key press when near Maya (only if Maya is not moving)
         if (
             this.isPlayerNearNPC &&
             this.interactionKey &&
             Phaser.Input.Keyboard.JustDown(this.interactionKey) &&
-            !this.activeDialog
+            !this.activeDialog &&
+            !this.movingToTarget &&
+            !this.guidedSequenceActive
         ) {
                         (async () => {
                             try {
@@ -992,12 +994,12 @@ export class MayaNPCManager {
         locationTrackerManager.setTargetEnabled('maya', false);
         console.log("MayaNPCManager: Disabled Maya tracker as she arrived at the bank");
 
-        // Restore interaction text if player is near Maya and no dialog is active
+        // Restore interaction text if player is near Maya, no dialog is active, and Maya is not moving
         const player = this.scene.getPlayer && this.scene.getPlayer();
         if (player) {
             const playerSprite = player.getSprite();
             const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
-            if (distance < this.interactionDistance && !this.activeDialog) {
+            if (distance < this.interactionDistance && !this.activeDialog && !this.movingToTarget && !this.guidedSequenceActive) {
                 this.interactionText.setAlpha(1);
             }
         }
@@ -1116,12 +1118,12 @@ export class MayaNPCManager {
             locationTrackerManager.setTargetEnabled('maya', false);
             console.log("🚀 Maya: Disabled Maya tracker as she arrived at the stock market");
             
-            // Restore interaction text if player is near Maya and no dialog is active
+            // Restore interaction text if player is near Maya, no dialog is active, and Maya is not moving
             const player = this.scene.getPlayer && this.scene.getPlayer();
             if (player) {
                 const playerSprite = player.getSprite();
                 const distance = Phaser.Math.Distance.Between(playerSprite.x, playerSprite.y, this.maya.x, this.maya.y);
-                if (distance < this.interactionDistance && !this.activeDialog) {
+                if (distance < this.interactionDistance && !this.activeDialog && !this.movingToTarget && !this.guidedSequenceActive) {
                     this.interactionText.setAlpha(1);
                 }
             }
