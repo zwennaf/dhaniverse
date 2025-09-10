@@ -10,6 +10,10 @@ import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 import { AuthProvider } from './ui/contexts/AuthContext.tsx';
 import { banCheckService } from './services/BanCheckService.ts';
 
+// Optional: Vercel Speed Insights (Next.js component). If package isn't installed this import will be ignored by TypeScript with the ts-ignore below.
+
+import { SpeedInsights } from '@vercel/speed-insights/react';
+
 import { ATMInterface } from './ui/ATMInterface.ts';
 import { FontUtils } from './game/utils/FontUtils.ts';
 import { balanceManager } from './services/BalanceManager.ts';
@@ -37,8 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         React.createElement(
           React.Fragment,
           null,
-          React.createElement(GlobalIntro, null),
-          React.createElement(App, null)
+            React.createElement(GlobalIntro, null),
+            React.createElement(App, null),
+            React.createElement(SpeedInsights, null)
         )
       )
     );
