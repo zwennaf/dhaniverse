@@ -4,7 +4,7 @@ import { useUser } from '../contexts/AuthContext';
 import { startGame, stopGame } from '../../game/game';
 import SEO from './SEO';
 import DesktopWarning from './DesktopWarning';
-// Onboarding wrapper intentionally not imported – we currently always skip slides.
+import OnboardingWrapper from './onboarding/OnboardingWrapper';
 import { playerStateApi } from '../../utils/api';
 import BankOnboardingUI from './banking/onboarding/BankOnboardingUI';
 import Loader from './loader/Loader';
@@ -15,8 +15,7 @@ const GamePage: React.FC = () => {
   const { user, isLoaded, isSignedIn } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [showLoader, setShowLoader] = useState(false);
-  // Onboarding disabled (we always skip). Kept state placeholder in case we re-enable quickly.
-  const [showOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [hasCompletedTutorial, setHasCompletedTutorial] = useState(false);
   // Ref to avoid duplicate tracker activation
   const trackerActivatedRef = useRef(false);
@@ -45,21 +44,16 @@ const GamePage: React.FC = () => {
         console.log("GamePage: Fetching player state for tutorial status...");
         const resp = await playerStateApi.get();
         const completed = !!resp?.data?.hasCompletedTutorial;
+        console.log("GamePage: Tutorial completion status:", completed, "Raw value:", resp?.data?.hasCompletedTutorial);
         setHasCompletedTutorial(completed);
         (window as any).__tutorialCompleted = completed;
 
         // Always show loader briefly for consistent experience
         setShowLoader(true);
-        // Regardless of completion we skip showing the onboarding UI.
-        setTimeout(() => {
-          setIsLoading(false);
-          if (!gameStartedRef.current && user?.gameUsername) {
-            startGameFlow(user.gameUsername);
-            gameStartedRef.current = true;
-          }
-        }, 700);
       } catch (e) {
-        console.error('GamePage: Failed to fetch player state, defaulting to showing onboarding', e);
+        console.error('GamePage: Failed to fetch player state, defaulting to showing onboarding for safety', e);
+        // If we can't check tutorial status, assume new user and show onboarding
+        setHasCompletedTutorial(false);
         setShowLoader(true);
       }
     };
@@ -87,47 +81,42 @@ const GamePage: React.FC = () => {
   };
 
   const handleLoaderComplete = () => {
-    console.log("GamePage: Loader completed (skipping onboarding)");
+    console.log("GamePage: Loader completed, hasCompletedTutorial:", hasCompletedTutorial);
     setShowLoader(false);
     setIsLoading(false);
-    // If backend had not marked completion, mark it now silently so slides never appear later.
+    
+    // Check if user has completed tutorial - if not, they need onboarding slides
     if (!hasCompletedTutorial) {
-      (async () => {
-        try {
-          await playerStateApi.update({ hasCompletedTutorial: true });
-          setHasCompletedTutorial(true);
-          (window as any).__tutorialCompleted = true;
-          console.log('GamePage: Forced tutorial completion to skip onboarding');
-        } catch (e) {
-          console.warn('GamePage: Failed to force-complete tutorial (continuing anyway)', e);
-        }
-      })();
-    }
-    if (user?.gameUsername && !gameStartedRef.current) {
-      startGameFlow(user.gameUsername);
-      gameStartedRef.current = true;
+      console.log('GamePage: New user detected - showing onboarding slides');
+      setShowOnboarding(true);
+    } else {
+      console.log('GamePage: Returning user - skipping onboarding');
+      if (user?.gameUsername && !gameStartedRef.current) {
+        startGameFlow(user.gameUsername);
+        gameStartedRef.current = true;
+      }
     }
   };
 
   const handleContinueToGame = async () => {
-    console.log("GamePage: User clicked continue to game");
+    console.log("GamePage: User completed onboarding slides, starting game");
     
-    try {
-      await playerStateApi.update({ hasCompletedTutorial: true });
-      setHasCompletedTutorial(true);
-      (window as any).__tutorialCompleted = true;
-      console.log('GamePage: Tutorial marked complete in backend');
-    } catch (e) {
-      console.error('GamePage: Failed to persist tutorial completion, proceeding anyway', e);
-    }
+    // Don't mark tutorial as completed here - let Maya's guidance complete the tutorial
+    // The onboarding slides are just an introduction, the actual tutorial is Maya's guidance
+    
     // Hide onboarding and start game
+    setShowOnboarding(false);
     if (user?.gameUsername && !gameStartedRef.current) {
       startGameFlow(user.gameUsername);
       gameStartedRef.current = true;
     }
-    // Assign first task only for brand new players
+    
+    // Assign first task for new players to guide them to Maya
     (window as any).__assignFirstTaskPending = true;
-    setTimeout(() => window.dispatchEvent(new CustomEvent('assign-first-task')), 400);
+    setTimeout(() => {
+      console.log('GamePage: Assigning first task for new player after onboarding');
+      window.dispatchEvent(new CustomEvent('assign-first-task'));
+    }, 1000); // Give game time to load
   };
 
   // Helper to enable Maya tracker once Maya target exists in manager
@@ -213,7 +202,9 @@ const GamePage: React.FC = () => {
   }
 
   // Show onboarding for first-time players (only if tutorial not completed)
-  // Onboarding wrapper suppressed.
+  if (showOnboarding) {
+    return <OnboardingWrapper onContinueToGame={handleContinueToGame} />;
+  }
    
   // The game will be rendered by Phaser in the game-container div
   return (

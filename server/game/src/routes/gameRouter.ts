@@ -137,6 +137,7 @@ gameRouter.get("/game/player-state", async (ctx) => {
                     musicEnabled: true,
                     autoSave: true,
                 },
+                hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date(),
             };
 
@@ -147,6 +148,13 @@ gameRouter.get("/game/player-state", async (ctx) => {
         // Backfill onboarding defaults if missing (for legacy players)
         let needsUpdate = false;
     const claimedLegacy = (playerState as (PlayerStateDocument & { starterClaimed?: boolean })).starterClaimed === true || playerState.progress?.completedTutorials?.includes('starter-claimed');
+        
+        // Backfill hasCompletedTutorial for existing players
+        if (typeof playerState.hasCompletedTutorial === 'undefined') {
+            playerState.hasCompletedTutorial = claimedLegacy; // Legacy players who claimed starter are considered to have completed tutorial
+            needsUpdate = true;
+        }
+        
         if (!playerState.onboarding) {
             playerState.onboarding = {
                 hasMetMaya: claimedLegacy, // if legacy claimed, treat as completed
@@ -317,6 +325,7 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
                 onboarding: { hasMetMaya: false, hasFollowedMaya: false, hasClaimedMoney: false, onboardingStep: 'not_started', unlockedBuildings: { bank: false, atm: false, stockmarket: false } },
                 // extended flags will be added lazily later if missing
                 settings: { soundEnabled: true, musicEnabled: true, autoSave: true },
+                hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date()
             };
             const insertRes = await playerStates.insertOne(newPlayerState);

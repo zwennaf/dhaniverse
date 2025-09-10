@@ -109,6 +109,18 @@ class ProgressionManager {
       // Unlock bank only at this stage (others stay false for future quests)
       this.state.unlockedBuildings.bank = true;
       this.persist();
+      
+      // Also mark the main tutorial as completed when user claims starter money
+      // This is the point where the basic Maya tutorial is considered complete
+      (async () => {
+        try {
+          const { playerStateApi } = await import('../utils/api');
+          await playerStateApi.update({ hasCompletedTutorial: true });
+          console.log('✅ Main tutorial marked as completed after claiming starter money');
+        } catch (error) {
+          console.warn('Failed to mark main tutorial as completed:', error);
+        }
+      })();
     }
   }
 

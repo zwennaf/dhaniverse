@@ -160,16 +160,34 @@ export class BankNPCManager {
    */
   private async initializeOnboardingMode(): Promise<void> {
     try {
-      // Prefer a backend check: if the player already has a bank account or non-zero balance
-      // then onboarding should not be shown. Fall back to the onboarding manager's check.
-      const accountOrBalanceExists = await this.checkAccountExistsOrHasBalance();
+      // Check if onboarding should be shown based on progression and completion status
+      const shouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
+      
+      // Only check account/balance for players who have already started onboarding
+      // New players who haven't met Maya should always see onboarding
+      let accountOrBalanceExists = false;
+      try {
+        const { progressionManager } = await import('../../services/ProgressionManager');
+        const progressState = progressionManager.getState();
+        
+        // For completely new players, don't check account - always show onboarding
+        if (progressState.onboardingStep !== 'not_started' || progressState.hasMetMaya) {
+          accountOrBalanceExists = await this.checkAccountExistsOrHasBalance();
+        }
+      } catch (error) {
+        console.warn("Failed to check progression state, falling back to account check:", error);
+        accountOrBalanceExists = await this.checkAccountExistsOrHasBalance();
+      }
+      
       if (accountOrBalanceExists) {
         this.isOnboardingMode = false;
-        console.log('Bank onboarding disabled because account/balance exists in backend');
+        console.log('Bank onboarding disabled because valid account/balance exists');
       } else {
-        const shouldShow = await this.bankOnboardingManager.shouldShowOnboarding();
         this.isOnboardingMode = shouldShowBankOnboarding() && shouldShow;
-        console.log("Bank onboarding mode initialized:", this.isOnboardingMode);
+        console.log("Bank onboarding mode initialized:", this.isOnboardingMode, {
+          configEnabled: shouldShowBankOnboarding(),
+          shouldShow
+        });
       }
     } catch (error) {
       console.error("Failed to initialize bank onboarding mode:", error);

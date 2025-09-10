@@ -77,10 +77,15 @@ export class MayaNPCManager {
             
             // Check if progression manager has been initialized with player state
             const state = progressionManager.getState();
-            if (!state || (state.onboardingStep === 'not_started' && !state.hasMetMaya && !state.hasFollowedMaya && !state.hasClaimedMoney)) {
-                // Progression manager hasn't been initialized with player state yet
+            
+            // For completely new players (all values false), Maya should be at default position
+            const isCompletelyNew = state.onboardingStep === 'not_started' && 
+                                   !state.hasMetMaya && !state.hasFollowedMaya && !state.hasClaimedMoney;
+            
+            if (!state || (isCompletelyNew && !this.initializationComplete)) {
+                // For new players or if progression manager hasn't been initialized with player state yet
                 // Retry after a delay (only once more to prevent infinite recursion)
-                console.log('🚀 Maya: Progression manager not ready, retrying once in 1000ms...');
+                console.log('🚀 Maya: Progression manager not ready or new player detected, retrying once in 1000ms...');
                 this.isInitializing = false; // Reset flag to allow retry
                 this.scene.time.delayedCall(1000, () => {
                     if (!this.initializationComplete) {
@@ -111,7 +116,8 @@ export class MayaNPCManager {
                 
                 console.log('🚀 Maya: Updated position from progression state:', { x: this.x, y: this.y });
             } else {
-                console.log('🚀 Maya: Using default position for new player');
+                console.log('🚀 Maya: Using default position for new player:', { x: this.x, y: this.y });
+                console.log('🚀 Maya: Player progression state:', state);
             }
             
             // Set Maya's state flags based on progression

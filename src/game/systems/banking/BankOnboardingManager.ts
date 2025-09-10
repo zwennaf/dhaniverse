@@ -100,18 +100,27 @@ export class BankOnboardingManager {
       dialogueManager.closeDialogue();
     }
 
+    console.log('🏦 Bank conversation starting...');
+
     // Check database status first to ensure we have the latest state
     this.checkOnboardingStatusFromDatabase().then(async () => {
       // After database check, determine what to show
-      if (await this.hasCompletedBankOnboarding()) {
+      const hasCompleted = await this.hasCompletedBankOnboarding();
+      console.log('🏦 Bank onboarding status check result:', hasCompleted);
+      
+      if (hasCompleted) {
+        console.log('🏦 Showing returning greeting for completed user');
         this.showReturningGreeting();
       } else {
+        console.log('🏦 Starting intro flow for new/incomplete user');
         // First time (or not completed) -> start new streamlined flow
         this.startIntroFlow();
       }
     }).catch(async () => {
+      console.warn('🏦 Database check failed, using fallback logic');
       // If database check fails, fall back to localStorage check
-      if (await this.hasCompletedBankOnboarding()) {
+      const hasCompleted = await this.hasCompletedBankOnboarding();
+      if (hasCompleted) {
         this.showReturningGreeting();
       } else {
         this.startIntroFlow();
@@ -399,7 +408,21 @@ export class BankOnboardingManager {
       return false;
     }
     
-    // Check if onboarding is completed based on database state first
+    // For new players who haven't met Maya yet, always show onboarding when they enter bank
+    try {
+      const { progressionManager } = await import('../../../services/ProgressionManager');
+      const progressState = progressionManager.getState();
+      
+      // If player is completely new (hasn't met Maya), show onboarding
+      if (progressState.onboardingStep === 'not_started' && !progressState.hasMetMaya) {
+        console.log("Bank onboarding: New player detected (hasn't met Maya), showing onboarding");
+        return true;
+      }
+    } catch (error) {
+      console.warn("Failed to check progression state:", error);
+    }
+    
+    // Check if onboarding is completed based on database state
     const bankOnboardingCompleted = await this.hasCompletedBankOnboarding();
     
     console.log("Bank onboarding check:", {
@@ -452,18 +475,37 @@ export class BankOnboardingManager {
       
       if (response.success && response.data) {
         const { hasCompletedOnboarding, hasBankAccount, bankAccount } = response.data;
+        
+        // Check if we have a properly created bank account with valid account holder name
+        const hasValidBankAccount = hasBankAccount && bankAccount?.accountHolder && 
+                                   bankAccount.accountHolder.trim().length >= 2;
+        
         const balance = bankAccount?.balance;
-        const derivedCompletion = !!(hasCompletedOnboarding || hasBankAccount || (typeof balance === 'number' && balance > 0));
+        
+        // Only consider onboarding complete if:
+        // 1. Explicitly marked as completed OR
+        // 2. Has a valid bank account with proper account holder name OR  
+        // 3. Has a non-zero balance (indicating they've used the account)
+        const derivedCompletion = !!(hasCompletedOnboarding || hasValidBankAccount || (typeof balance === 'number' && balance > 0));
+        
         if (!hasCompletedOnboarding && derivedCompletion) {
-          console.log('[BankOnboarding] Treating existing account/balance as completed onboarding');
+          console.log('[BankOnboarding] Treating existing valid account/balance as completed onboarding');
         }
+        
+        // If they have a bank account but it's invalid (e.g., missing account holder name),
+        // don't consider onboarding complete - they need to redo it properly
+        if (hasBankAccount && !hasValidBankAccount && !hasCompletedOnboarding) {
+          console.log('[BankOnboarding] Found invalid bank account (missing/invalid account holder), requiring onboarding');
+          return false;
+        }
+        
         return derivedCompletion;
       }
     } catch (error) {
       console.warn('Failed to check database onboarding status:', error);
     }
     
-    // Default to false if database unavailable
+    // Default to false if database unavailable - better to show onboarding than skip it
     return false;
   }
 
