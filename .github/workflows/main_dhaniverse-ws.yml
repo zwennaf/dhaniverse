@@ -2,7 +2,10 @@ name: Deploy WebSocket Server to Azure
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - "server/ws/**"
   workflow_dispatch:
 
 jobs:
