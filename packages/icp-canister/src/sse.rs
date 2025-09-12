@@ -286,6 +286,27 @@ pub fn get_room_stats(room_id: &str) -> Result<(usize, usize), CanisterError> {
     Ok((room.connections.len(), room.event_buffer.len()))
 }
 
+/// Get room events for SSE streaming
+pub fn get_room_events(room_id: &str, last_event_id: Option<u64>) -> Result<(Vec<SseEvent>, usize), CanisterError> {
+    let room = storage::get_sse_room(room_id)
+        .ok_or(CanisterError::NotFound("Room not found".to_string()))?;
+    
+    let mut events: Vec<SseEvent> = room.event_buffer.into_iter().collect();
+    
+    // Filter events if last_event_id is provided
+    if let Some(last_id) = last_event_id {
+        events.retain(|event| event.id > last_id);
+    }
+    
+    // Sort by timestamp (newest first)
+    events.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    
+    // Limit to last 50 events to prevent large responses
+    events.truncate(50);
+    
+    Ok((events, room.connections.len()))
+}
+
 /// Get global SSE statistics
 pub fn get_global_stats() -> (usize, usize, usize) {
     let room_count = storage::get_all_sse_room_ids().len();

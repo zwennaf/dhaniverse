@@ -223,4 +223,92 @@ service : {
   sse_get_room_stats: (text) -> (variant { Ok: record { nat; nat }; Err: text }) query;
   sse_get_global_stats: () -> (record { nat; nat; nat }) query;
   sse_cleanup_connections: () -> (variant { Ok: nat; Err: text });
+
+  // Stock Exchange SSE Methods
+  get_stock_data: (text) -> (variant { Ok: record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  }; Err: text }) query;
+  subscribe_stock_updates: (text) -> (variant { Ok: text; Err: text });
+  broadcast_stock_update: (text) -> (variant { Ok: nat; Err: text });
+  broadcast_stock_news: (text, vec text) -> (variant { Ok: nat; Err: text });
+  broadcast_market_summary: () -> (variant { Ok: nat; Err: text });
+  get_market_summary: () -> (variant { Ok: vec record { text; record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  } }; Err: text }) query;
+  refresh_stock_cache: (text) -> (variant { Ok: record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  }; Err: text });
+  cleanup_stock_cache: () -> (variant { Ok: nat; Err: text });
 }

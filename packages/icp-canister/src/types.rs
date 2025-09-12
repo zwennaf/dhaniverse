@@ -441,3 +441,81 @@ impl Storable for SseRoom {
         is_fixed_size: false,
     };
 }
+
+// Stock-related types for SSE streaming
+#[derive(Debug, Clone, CandidType, Deserialize, Serialize)]
+pub struct StockPrice {
+    pub timestamp: u64,
+    pub price: f64,
+    pub volume: u64,
+    pub high: f64,
+    pub low: f64,
+    pub open: f64,
+    pub close: f64,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize, Serialize)]
+pub struct StockMetrics {
+    pub market_cap: f64,
+    pub pe_ratio: f64,
+    pub eps: f64,
+    pub debt_equity_ratio: f64,
+    pub business_growth: f64,
+    pub industry_avg_pe: f64,
+    pub outstanding_shares: u64,
+    pub volatility: f64,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize, Serialize)]
+pub struct Stock {
+    pub id: String,
+    pub name: String,
+    pub symbol: String,
+    pub current_price: f64,
+    pub price_history: Vec<StockPrice>, // Last week of data
+    pub metrics: StockMetrics,
+    pub news: Vec<String>,
+    pub last_update: u64,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize, Serialize)]
+pub struct StockCache {
+    pub stock_id: String,
+    pub stock_data: Stock,
+    pub cached_at: u64,
+    pub expiry_time: u64, // Cache expires after this timestamp
+    pub access_count: u32,
+    pub last_access: u64,
+}
+
+#[derive(Debug, Clone, CandidType, Deserialize, Serialize)]
+pub struct StockSubscription {
+    pub connection_id: String,
+    pub stock_id: String,
+    pub subscribed_at: u64,
+    pub last_event_id: Option<String>,
+}
+
+impl Storable for StockCache {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+impl Storable for StockSubscription {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}

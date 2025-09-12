@@ -1,5 +1,5 @@
 use ic_cdk::export_candid;
-use ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
+use ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs, HttpHeader};
 use std::collections::HashMap;
 
 mod types;
@@ -13,6 +13,7 @@ mod monitoring;
 mod http_client;
 mod price_feed;
 mod sse;
+mod stock_sse;
 
 #[cfg(test)]
 mod tests;
@@ -430,6 +431,30 @@ fn http_request(req: ic_http_certification::HttpRequest) -> HttpResponse {
         return handle_sse_subscription(req, room_id, query_params);
     }
     
+    // Check if this is a stock SSE endpoint
+    if path.starts_with("/sse/stocks/") && path.ends_with("/subscribe") {
+        // Extract stock ID from path: /sse/stocks/{stock_id}/subscribe
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.len() != 5 {
+            return HttpResponse {
+                status: 400u16.into(),
+                headers: vec![],
+                body: b"Invalid stock SSE endpoint path".to_vec(),
+            };
+        }
+        
+        let stock_id = parts[3];
+        let stock_room_id = format!("stock_{}", stock_id);
+        
+        // Handle stock SSE subscription
+        return handle_stock_sse_subscription(&req, &stock_room_id, stock_id, query_params);
+    }
+    
+    // Check if this is a market SSE endpoint
+    if path == "/sse/market/subscribe" {
+        return handle_market_sse_subscription(&req, query_params);
+    }
+    
     // Default 404 response
     HttpResponse {
         status: 404u16.into(),
@@ -609,6 +634,153 @@ fn authenticate_sse_request(auth_token: &Option<String>, _room_id: &str) -> Resu
     Ok(peer_id)
 }
 
+// Stock SSE subscription handlers
+fn handle_stock_sse_subscription(
+    req: &ic_http_certification::HttpRequest,
+    room_id: &str,
+    stock_id: &str,
+    query_params: HashMap<String, String>
+) -> HttpResponse {
+    let auth_token = extract_auth_token(req, &query_params);
+    let last_event_id = extract_last_event_id(req);
+    
+    // For stock subscriptions, we can be more lenient with authentication
+    // since stock data is generally public information
+    let connection_id = match auth_token {
+        Some(token) => match authenticate_sse_request(&Some(token), room_id) {
+            Ok(peer_id) => format!("stock_{}_{}", peer_id, ic_cdk::api::time()),
+            Err(_) => format!("anonymous_{}_{}", stock_id, ic_cdk::api::time()),
+        },
+        None => format!("anonymous_{}_{}", stock_id, ic_cdk::api::time()),
+    };
+    
+    // Subscribe to stock updates
+    if let Err(e) = stock_sse::subscribe_to_stock_updates(&connection_id, stock_id) {
+        return HttpResponse {
+            status: 500u16.into(),
+            headers: vec![],
+            body: format!("Failed to subscribe: {:?}", e).as_bytes().to_vec(),
+        };
+    }
+    
+    // Get stock room and recent events
+    let (events, _connection_count) = match sse::get_room_events(room_id, last_event_id) {
+        Ok(data) => data,
+        Err(e) => {
+            return HttpResponse {
+                status: 500u16.into(),
+                headers: vec![],
+                body: format!("Failed to get room events: {:?}", e).as_bytes().to_vec(),
+            };
+        }
+    };
+    
+    // Ensure stock data is available and fresh
+    if let Ok(stock_data) = stock_sse::get_cached_stock_data(stock_id) {
+        // Broadcast current stock data to the new subscriber
+        let _ = stock_sse::broadcast_stock_update(stock_id, &stock_data);
+    }
+    
+    // Format SSE response
+    let mut response_body = String::new();
+    
+    // Send retry interval
+    response_body.push_str("retry: 10000\n\n");
+    
+    // Send recent events
+    for event in events {
+        response_body.push_str(&sse::format_sse_event(&event));
+    }
+    
+    HttpResponse {
+        status: 200u16.into(),
+        headers: vec![
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "text/event-stream".to_string(),
+            },
+            HttpHeader {
+                name: "Cache-Control".to_string(),
+                value: "no-cache".to_string(),
+            },
+            HttpHeader {
+                name: "Connection".to_string(),
+                value: "keep-alive".to_string(),
+            },
+            HttpHeader {
+                name: "Access-Control-Allow-Origin".to_string(),
+                value: "*".to_string(),
+            },
+        ],
+        body: response_body.as_bytes().to_vec(),
+    }
+}
+
+// Market SSE subscription handler
+fn handle_market_sse_subscription(
+    req: &ic_http_certification::HttpRequest,
+    query_params: HashMap<String, String>
+) -> HttpResponse {
+    let auth_token = extract_auth_token(req, &query_params);
+    let last_event_id = extract_last_event_id(req);
+    
+    let _connection_id = format!("market_{}_{}", 
+        auth_token.as_deref().unwrap_or("anonymous"), 
+        ic_cdk::api::time()
+    );
+    
+    let room_id = "market_global";
+    
+    // Get market room and recent events
+    let (events, _connection_count) = match sse::get_room_events(room_id, last_event_id) {
+        Ok(data) => data,
+        Err(e) => {
+            return HttpResponse {
+                status: 500u16.into(),
+                headers: vec![],
+                body: format!("Failed to get market events: {:?}", e).as_bytes().to_vec(),
+            };
+        }
+    };
+    
+    // Broadcast current market summary
+    let _ = stock_sse::broadcast_market_summary();
+    
+    // Format SSE response
+    let mut response_body = String::new();
+    
+    // Send retry interval
+    response_body.push_str("retry: 30000\n\n"); // Longer retry for market data
+    
+    // Send recent events
+    for event in events {
+        response_body.push_str(&sse::format_sse_event(&event));
+    }
+    
+    HttpResponse {
+        status: 200u16.into(),
+        headers: vec![
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "text/event-stream".to_string(),
+            },
+            HttpHeader {
+                name: "Cache-Control".to_string(),
+                value: "no-cache".to_string(),
+            },
+            HttpHeader {
+                name: "Connection".to_string(),
+                value: "keep-alive".to_string(),
+            },
+            HttpHeader {
+                name: "Access-Control-Allow-Origin".to_string(),
+                value: "*".to_string(),
+            },
+        ],
+        body: response_body.as_bytes().to_vec(),
+    }
+}
+
 // SSE management endpoints
 #[ic_cdk::update]
 async fn sse_broadcast_peer_joined(room_id: String, peer_id: String, meta: std::collections::HashMap<String, String>) -> Result<usize, String> {
@@ -663,6 +835,65 @@ fn sse_get_global_stats() -> (usize, usize, usize) {
 #[ic_cdk::update]
 async fn sse_cleanup_connections() -> Result<usize, String> {
     Ok(sse::cleanup_expired_connections())
+}
+
+// Stock SSE Methods
+#[ic_cdk::query]
+fn get_stock_data(stock_id: String) -> Result<types::Stock, String> {
+    stock_sse::get_cached_stock_data(&stock_id)
+        .map_err(|e| format!("Failed to get stock data: {:?}", e))
+}
+
+#[ic_cdk::update]
+async fn subscribe_stock_updates(stock_id: String) -> Result<String, String> {
+    let connection_id = format!("stock_{}_{}", stock_id, ic_cdk::api::time());
+    
+    stock_sse::subscribe_to_stock_updates(&connection_id, &stock_id)
+        .map_err(|e| format!("Failed to subscribe: {:?}", e))?;
+    
+    Ok(connection_id)
+}
+
+#[ic_cdk::update]
+async fn broadcast_stock_update(stock_id: String) -> Result<usize, String> {
+    let stock_data = stock_sse::get_cached_stock_data(&stock_id)
+        .map_err(|e| format!("Failed to get stock data: {:?}", e))?;
+    
+    stock_sse::broadcast_stock_update(&stock_id, &stock_data)
+        .map_err(|e| format!("Failed to broadcast: {:?}", e))
+}
+
+#[ic_cdk::update]
+async fn broadcast_stock_news(stock_id: String, news: Vec<String>) -> Result<usize, String> {
+    stock_sse::broadcast_stock_news(&stock_id, &news)
+        .map_err(|e| format!("Failed to broadcast news: {:?}", e))
+}
+
+#[ic_cdk::update]
+async fn broadcast_market_summary() -> Result<usize, String> {
+    stock_sse::broadcast_market_summary()
+        .map_err(|e| format!("Failed to broadcast market summary: {:?}", e))
+}
+
+#[ic_cdk::query]
+fn get_market_summary() -> Result<std::collections::HashMap<String, types::Stock>, String> {
+    stock_sse::get_market_summary()
+        .map_err(|e| format!("Failed to get market summary: {:?}", e))
+}
+
+#[ic_cdk::update]
+async fn refresh_stock_cache(stock_id: String) -> Result<types::Stock, String> {
+    // Force refresh by removing existing cache
+    storage::remove_stock_cache(&stock_id);
+    
+    stock_sse::get_cached_stock_data(&stock_id)
+        .map_err(|e| format!("Failed to refresh stock cache: {:?}", e))
+}
+
+#[ic_cdk::update]
+async fn cleanup_stock_cache() -> Result<usize, String> {
+    stock_sse::cleanup_stock_cache()
+        .map_err(|e| format!("Failed to cleanup cache: {:?}", e))
 }
 
 // Export Candid interface (placed at end so all above methods are included)

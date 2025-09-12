@@ -51,6 +51,20 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)))
         )
     );
+    
+    // Stock cache storage
+    static STOCK_CACHE_STORAGE: RefCell<StableBTreeMap<String, StockCache, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))
+        )
+    );
+    
+    // Stock subscription storage
+    static STOCK_SUBSCRIPTION_STORAGE: RefCell<StableBTreeMap<String, StockSubscription, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7)))
+        )
+    );
 }
 
 // Initialize the canister state
@@ -399,5 +413,64 @@ pub fn remove_sse_connection(connection_id: &str) {
 pub fn get_all_sse_connection_ids() -> Vec<String> {
     SSE_CONNECTION_STORAGE.with(|storage| {
         storage.borrow().iter().map(|(k, _)| k).collect()
+    })
+}
+
+// Stock cache storage functions
+pub fn set_stock_cache(stock_id: &str, cache: &StockCache) {
+    STOCK_CACHE_STORAGE.with(|storage| {
+        storage.borrow_mut().insert(stock_id.to_string(), cache.clone());
+    });
+}
+
+pub fn get_stock_cache(stock_id: &str) -> Option<StockCache> {
+    STOCK_CACHE_STORAGE.with(|storage| {
+        storage.borrow().get(&stock_id.to_string())
+    })
+}
+
+pub fn remove_stock_cache(stock_id: &str) {
+    STOCK_CACHE_STORAGE.with(|storage| {
+        storage.borrow_mut().remove(&stock_id.to_string());
+    });
+}
+
+pub fn get_all_cached_stock_ids() -> Vec<String> {
+    STOCK_CACHE_STORAGE.with(|storage| {
+        storage.borrow().iter().map(|(k, _)| k).collect()
+    })
+}
+
+// Stock subscription storage functions
+pub fn set_stock_subscription(connection_id: &str, subscription: &StockSubscription) {
+    STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
+        storage.borrow_mut().insert(connection_id.to_string(), subscription.clone());
+    });
+}
+
+pub fn get_stock_subscription(connection_id: &str) -> Option<StockSubscription> {
+    STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
+        storage.borrow().get(&connection_id.to_string())
+    })
+}
+
+pub fn remove_stock_subscription(connection_id: &str) {
+    STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
+        storage.borrow_mut().remove(&connection_id.to_string());
+    });
+}
+
+pub fn get_stock_subscriptions_for_stock(stock_id: &str) -> Vec<StockSubscription> {
+    STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
+        storage.borrow()
+            .iter()
+            .filter_map(|(_, sub)| {
+                if sub.stock_id == stock_id {
+                    Some(sub)
+                } else {
+                    None
+                }
+            })
+            .collect()
     })
 }
