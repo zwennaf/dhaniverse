@@ -39,8 +39,11 @@ export class DefaultLocationTrackerManager implements ILocationTrackerManager {
     setTargetEnabled(id: string, enabled: boolean): void {
         const target = this.targets.get(id);
         if (target) {
-            target.enabled = enabled;
-            this.notifyListeners();
+            // Only update and notify if state actually changes
+            if (target.enabled !== enabled) {
+                target.enabled = enabled;
+                this.notifyListeners();
+            }
         }
     }
     getTargets(): TrackingTarget[] {
@@ -55,8 +58,11 @@ export class DefaultLocationTrackerManager implements ILocationTrackerManager {
     updateTargetPosition(id: string, position: { x: number; y: number }): void {
         const target = this.targets.get(id);
         if (target) {
-            target.position = position;
-            this.notifyListeners();
+            // Only update and notify if position changed meaningfully
+            if (target.position.x !== position.x || target.position.y !== position.y) {
+                target.position = position;
+                this.notifyListeners();
+            }
         }
     }
     subscribe(listener: () => void): () => void {
