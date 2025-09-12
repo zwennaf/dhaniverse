@@ -1049,7 +1049,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             {/* Chat window - always visible */}
             <div
                 ref={chatContainerRef}
-                className={`absolute bottom-4 w-[40ch] max-h-[35vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
+                className={`absolute bottom-4 w-[40ch] max-h-[45vh] flex flex-col p-2 text-[14px] pointer-events-auto transition-all duration-300 ${
                     isChatFocused ? "opacity-100" : "opacity-95"
                 }`}
             >
@@ -1063,61 +1063,69 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 8%, #000 18%, #000 100%)'
                     }}
                 >
-                    <AnimatePresence initial={false}>
-                        {chatMessages.map((msg) => (
-                            <motion.div
-                                key={msg.id}
-                                layout="position"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.6 }}
-                                className="flex items-start gap-3 mb-3 will-change-transform w-full"
-                            >
-                                {/* avatar */}
-                                <div className="w-8 h-8 rounded-full  flex-shrink-0">
-                                    <div
-                                        className="w-8 h-8 rounded-full backdrop-blur-sm bg-cover border-2 border-black shadow-sm"
-                                        style={{
-                                            backgroundImage: `url('/characters/${(msg.skin || 'C1')}-Preview.png')`,
-                                            backgroundPosition: 'center -25px',
-                                            backgroundSize: '400%',
-                                            backgroundColor: msg.color || '#B2EEE6',
+                    {/* Flex column wrapper with top spacer so messages stick to bottom but scrolling still works */}
+                    <div className="flex flex-col h-full">
+                        <div style={{ flex: 1 }} />
+                        <AnimatePresence initial={false}>
+                            {chatMessages.map((msg) => (
+                                <motion.div
+                                        key={msg.id}
+                                        layout="position"
+                                        initial={{ opacity: 0, y: 20, scale: 0.985 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                                        transition={{
+                                            y: { type: 'spring', stiffness: 520, damping: 34 },
+                                            scale: { type: 'spring', stiffness: 360, damping: 28 },
+                                            opacity: { duration: 0.08 }
                                         }}
-                                    />
-                                </div>
-                                {/* bubble */}
-                                <div className="relative">
-                                    <div className="bg-black/75 text-white rounded-2xl px-4 py-3 w-full border border-black/30 backdrop-blur-sm shadow-md">
-                                        <div className="flex items-start justify-between gap-2">
-                        <div 
-                                                className="text-[12px] font-['Tickerbit',Arial,sans-serif]"
-                                                style={{
-                            color: msg.color || '#B2EEE6'
-                                                }}
-                                            >
-                                                {msg.username}
-                                            </div>
-                                            <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
-                                                {msg.timestamp
-                                                    ? new Date(msg.timestamp).toLocaleTimeString([], {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })
-                                                    : ''}
-                                            </div>
-                                        </div>
+                                        className="flex items-end gap-3 mb-2 will-change-transform w-full"
+                                    >
+                                    {/* avatar */}
+                                    <div className="w-8 h-8 rounded-full  flex-shrink-0">
                                         <div
-                                            className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] whitespace-pre-wrap break-words break-all"
-                                            style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
-                                        >
-                                            {msg.message}
+                                            className="w-8 h-8 rounded-full backdrop-blur-sm bg-cover border-2 border-black shadow-sm"
+                                            style={{
+                                                backgroundImage: `url('/characters/${(msg.skin || 'C1')}-Preview.png')`,
+                                                backgroundPosition: 'center -25px',
+                                                backgroundSize: '400%',
+                                                backgroundColor: msg.color || '#B2EEE6',
+                                            }}
+                                        />
+                                    </div>
+                                    {/* bubble */}
+                                    <div className="relative">
+                                        <div className="bg-black/75 text-white rounded-2xl px-4 py-3 border border-black/30 backdrop-blur-sm shadow-md">
+                                            <div className="flex items-start justify-between gap-2">
+                        <div 
+                                                    className="text-[12px] font-['Tickerbit',Arial,sans-serif]"
+                                                    style={{
+                                                        color: msg.color || '#B2EEE6'
+                                                    }}
+                                                >
+                                                    {msg.username}
+                                                </div>
+                                                <div className="text-[11px] text-white/80 ml-2 flex-shrink-0">
+                                                    {msg.timestamp
+                                                        ? new Date(msg.timestamp).toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })
+                                                        : ''}
+                                                </div>
+                                            </div>
+                                            <div
+                                                className="mt-2 text-white text-sm leading-[1.25] font-['Tickerbit',Arial,sans-serif] whitespace-pre-wrap break-words break-all"
+                                                style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                                            >
+                                                {msg.message}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
                 </div>
 
                 {/* Voice headphone + mic controls extracted to component */}
