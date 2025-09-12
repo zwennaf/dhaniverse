@@ -313,3 +313,131 @@ impl Storable for Web3Session {
         is_fixed_size: false,
     };
 }
+
+// Server-Sent Events (SSE) Types
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SseEvent {
+    pub id: u64,
+    pub event_type: String,
+    pub data: String,
+    pub timestamp: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub enum SseEventType {
+    PeerJoined,
+    PeerLeft,
+    Offer,
+    Answer,
+    IceCandidate,
+    RoomState,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct PeerJoinedEvent {
+    pub peer_id: String,
+    pub meta: HashMap<String, String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct PeerLeftEvent {
+    pub peer_id: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct OfferEvent {
+    pub from: String,
+    pub to: String,
+    pub sdp: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct AnswerEvent {
+    pub from: String,
+    pub to: String,
+    pub sdp: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct IceCandidateEvent {
+    pub from: String,
+    pub to: String,
+    pub candidate: HashMap<String, String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct RoomStateEvent {
+    pub peers: Vec<String>,
+    pub meta: HashMap<String, String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SseConnection {
+    pub connection_id: String,
+    pub room_id: String,
+    pub peer_id: String,
+    pub last_event_id: Option<u64>,
+    pub connected_at: u64,
+    pub last_activity: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SseRoom {
+    pub room_id: String,
+    pub connections: Vec<String>, // connection IDs
+    pub event_buffer: Vec<SseEvent>,
+    pub max_buffer_size: usize,
+    pub created_at: u64,
+    pub last_activity: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SseConfig {
+    pub max_connections_per_room: usize,
+    pub max_buffer_size_per_room: usize,
+    pub connection_timeout_ms: u64,
+    pub max_event_age_ms: u64,
+    pub cleanup_interval_ms: u64,
+}
+
+impl Default for SseConfig {
+    fn default() -> Self {
+        Self {
+            max_connections_per_room: 100,
+            max_buffer_size_per_room: 1000,
+            connection_timeout_ms: 5 * 60 * 1000, // 5 minutes
+            max_event_age_ms: 10 * 60 * 1000, // 10 minutes
+            cleanup_interval_ms: 60 * 1000, // 1 minute
+        }
+    }
+}
+
+impl Storable for SseConnection {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 1024,
+        is_fixed_size: false,
+    };
+}
+
+impl Storable for SseRoom {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(candid::encode_one(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        candid::decode_one(&bytes).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 8192, // Large enough for event buffer
+        is_fixed_size: false,
+    };
+}

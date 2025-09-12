@@ -4,7 +4,7 @@
     "dhaniverse_backend": {
       "type": "rust",
       "package": "rust-icp-canister",
-      "candid": "rust_icp_canister.did"
+      "candid": "dhaniverse_backend.did"
     }
   },
   "defaults": {

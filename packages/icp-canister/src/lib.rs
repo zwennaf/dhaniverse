@@ -1,5 +1,6 @@
 use ic_cdk::export_candid;
 use ic_cdk::api::management_canister::http_request::{HttpResponse, TransformArgs};
+use std::collections::HashMap;
 
 mod types;
 mod auth;
@@ -11,6 +12,7 @@ mod error;
 mod monitoring;
 mod http_client;
 mod price_feed;
+mod sse;
 
 #[cfg(test)]
 mod tests;
@@ -381,6 +383,286 @@ async fn update_prices_from_external() -> Result<usize, String> {
 fn get_balance_no_auth(wallet_address: String) -> Result<DualBalance, String> {
     let user_data = storage::get_or_create_user_data(&wallet_address);
     Ok(user_data.dual_balance)
+}
+
+// SSE HTTP endpoint handler
+#[ic_cdk::query]
+fn http_request(req: ic_http_certification::HttpRequest) -> HttpResponse {
+    use ic_cdk::api::management_canister::http_request::HttpHeader;
+    use url::Url;
+    
+    // Parse the request URL
+    let url_str = &req.url;
+    let parsed_url = match Url::parse(&format!("http://dummy.com{}", url_str)) {
+        Ok(url) => url,
+        Err(_) => {
+            return HttpResponse {
+                status: 400u16.into(),
+                headers: vec![],
+                body: b"Invalid URL".to_vec(),
+            };
+        }
+    };
+    
+    let path = parsed_url.path();
+    
+    // Parse query parameters
+    let query_params: HashMap<String, String> = parsed_url
+        .query_pairs()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    
+    // Check if this is an SSE endpoint
+    if path.starts_with("/sse/rooms/") && path.ends_with("/subscribe") {
+        // Extract room ID from path
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.len() != 5 {
+            return HttpResponse {
+                status: 400u16.into(),
+                headers: vec![],
+                body: b"Invalid SSE endpoint path".to_vec(),
+            };
+        }
+        
+        let room_id = parts[3];
+        
+        // Handle SSE subscription
+        return handle_sse_subscription(req, room_id, query_params);
+    }
+    
+    // Default 404 response
+    HttpResponse {
+        status: 404u16.into(),
+        headers: vec![
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "text/plain".to_string(),
+            }
+        ],
+        body: b"Not Found".to_vec(),
+    }
+}
+
+fn handle_sse_subscription(
+    req: ic_http_certification::HttpRequest,
+    room_id: &str,
+    query_params: HashMap<String, String>
+) -> HttpResponse {
+    use ic_cdk::api::management_canister::http_request::HttpHeader;
+    
+    // Extract authentication token from headers or query params
+    let auth_token = extract_auth_token(&req, &query_params);
+    
+    // Extract Last-Event-ID from headers
+    let last_event_id = extract_last_event_id(&req);
+    
+    // Authenticate the request
+    let peer_id = match authenticate_sse_request(&auth_token, room_id) {
+        Ok(id) => id,
+        Err(err) => {
+            return HttpResponse {
+                status: 401u16.into(),
+                headers: vec![
+                    HttpHeader {
+                        name: "Content-Type".to_string(),
+                        value: "text/plain".to_string(),
+                    }
+                ],
+                body: format!("Unauthorized: {}", err).as_bytes().to_vec(),
+            };
+        }
+    };
+    
+    // Generate a unique connection ID
+    let connection_id = format!("sse-{}-{}", ic_cdk::api::time(), room_id);
+    
+    // Add connection to room
+    if let Err(err) = sse::add_connection_to_room(room_id, &connection_id, &peer_id, last_event_id) {
+        return HttpResponse {
+            status: 500u16.into(),
+            headers: vec![
+                HttpHeader {
+                    name: "Content-Type".to_string(),
+                    value: "text/plain".to_string(),
+                }
+            ],
+            body: format!("Failed to create SSE connection: {}", err).as_bytes().to_vec(),
+        };
+    }
+    
+    // Get events since last_event_id
+    let events = match sse::get_events_since(room_id, last_event_id) {
+        Ok(events) => events,
+        Err(_) => Vec::new(),
+    };
+    
+    // Format events for SSE
+    let mut response_body = String::new();
+    
+    // Send initial connection event
+    response_body.push_str(&format!(
+        "id: {}\nevent: connected\ndata: {{\"connectionId\": \"{}\", \"roomId\": \"{}\"}}\n\n",
+        ic_cdk::api::time() / 1_000_000, // Convert to milliseconds
+        connection_id,
+        room_id
+    ));
+    
+    // Send buffered events
+    for event in events {
+        response_body.push_str(&sse::format_sse_event(&event));
+    }
+    
+    // Send current room state
+    if let Ok((connection_count, _)) = sse::get_room_stats(room_id) {
+        let room_state_data = sse::create_room_state_event(
+            vec![], // We'd need to implement peer listing
+            [("connectionCount".to_string(), connection_count.to_string())].iter().cloned().collect()
+        );
+        
+        response_body.push_str(&format!(
+            "id: {}\nevent: room-state\ndata: {}\n\n",
+            ic_cdk::api::time() / 1_000_000,
+            room_state_data
+        ));
+    }
+    
+    HttpResponse {
+        status: 200u16.into(),
+        headers: vec![
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "text/event-stream".to_string(),
+            },
+            HttpHeader {
+                name: "Cache-Control".to_string(),
+                value: "no-cache".to_string(),
+            },
+            HttpHeader {
+                name: "Connection".to_string(),
+                value: "keep-alive".to_string(),
+            },
+            HttpHeader {
+                name: "Access-Control-Allow-Origin".to_string(),
+                value: "*".to_string(),
+            },
+        ],
+        body: response_body.as_bytes().to_vec(),
+    }
+}
+
+fn extract_auth_token(
+    req: &ic_http_certification::HttpRequest,
+    query_params: &HashMap<String, String>
+) -> Option<String> {
+    // First check Authorization header
+    for (name, value) in &req.headers {
+        if name.to_lowercase() == "authorization" {
+            if value.starts_with("Bearer ") {
+                return Some(value[7..].to_string());
+            }
+        }
+    }
+    
+    // Then check query parameter
+    query_params.get("token").cloned()
+}
+
+fn extract_last_event_id(
+    req: &ic_http_certification::HttpRequest
+) -> Option<u64> {
+    for (name, value) in &req.headers {
+        if name.to_lowercase() == "last-event-id" {
+            return value.parse().ok();
+        }
+    }
+    None
+}
+
+fn authenticate_sse_request(auth_token: &Option<String>, _room_id: &str) -> Result<String, String> {
+    let token = auth_token.as_ref().ok_or("Missing authentication token")?;
+    
+    if token.is_empty() {
+        return Err("Empty authentication token".to_string());
+    }
+    
+    // Try to decode a simple token format: wallet_address:session_token
+    let parts: Vec<&str> = token.split(':').collect();
+    if parts.len() != 2 {
+        return Err("Invalid token format. Expected 'wallet_address:session_token'".to_string());
+    }
+    
+    let wallet_address = parts[0];
+    let session_token = parts[1];
+    
+    // Validate the session using existing auth system
+    if let Err(e) = auth::verify_session_token(wallet_address, session_token) {
+        return Err(format!("Session validation failed: {}", e));
+    }
+    
+    // Check if the user has access to this room
+    // For now, we'll allow any authenticated user to access any room
+    // In a real implementation, you'd check room permissions here
+    
+    // Generate peer ID from wallet address
+    let peer_id = format!("peer-{}", &wallet_address[2..10]); // Use part of wallet address
+    
+    Ok(peer_id)
+}
+
+// SSE management endpoints
+#[ic_cdk::update]
+async fn sse_broadcast_peer_joined(room_id: String, peer_id: String, meta: std::collections::HashMap<String, String>) -> Result<usize, String> {
+    let data = sse::create_peer_joined_event(&peer_id, meta);
+    let connections = sse::broadcast_event(&room_id, SseEventType::PeerJoined, data)
+        .map_err(|e| e.to_string())?;
+    Ok(connections.len())
+}
+
+#[ic_cdk::update]
+async fn sse_broadcast_peer_left(room_id: String, peer_id: String) -> Result<usize, String> {
+    let data = sse::create_peer_left_event(&peer_id);
+    let connections = sse::broadcast_event(&room_id, SseEventType::PeerLeft, data)
+        .map_err(|e| e.to_string())?;
+    Ok(connections.len())
+}
+
+#[ic_cdk::update]
+async fn sse_broadcast_offer(room_id: String, from: String, to: String, sdp: String) -> Result<usize, String> {
+    let data = sse::create_offer_event(&from, &to, &sdp);
+    let connections = sse::broadcast_event(&room_id, SseEventType::Offer, data)
+        .map_err(|e| e.to_string())?;
+    Ok(connections.len())
+}
+
+#[ic_cdk::update]
+async fn sse_broadcast_answer(room_id: String, from: String, to: String, sdp: String) -> Result<usize, String> {
+    let data = sse::create_answer_event(&from, &to, &sdp);
+    let connections = sse::broadcast_event(&room_id, SseEventType::Answer, data)
+        .map_err(|e| e.to_string())?;
+    Ok(connections.len())
+}
+
+#[ic_cdk::update]
+async fn sse_broadcast_ice_candidate(room_id: String, from: String, to: String, candidate: std::collections::HashMap<String, String>) -> Result<usize, String> {
+    let data = sse::create_ice_candidate_event(&from, &to, candidate);
+    let connections = sse::broadcast_event(&room_id, SseEventType::IceCandidate, data)
+        .map_err(|e| e.to_string())?;
+    Ok(connections.len())
+}
+
+#[ic_cdk::query]
+fn sse_get_room_stats(room_id: String) -> Result<(usize, usize), String> {
+    sse::get_room_stats(&room_id).map_err(|e| e.to_string())
+}
+
+#[ic_cdk::query]
+fn sse_get_global_stats() -> (usize, usize, usize) {
+    sse::get_global_stats()
+}
+
+#[ic_cdk::update]
+async fn sse_cleanup_connections() -> Result<usize, String> {
+    Ok(sse::cleanup_expired_connections())
 }
 
 // Export Candid interface (placed at end so all above methods are included)

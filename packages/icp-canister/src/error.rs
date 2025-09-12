@@ -38,6 +38,8 @@ pub enum CanisterError {
     
     // General Errors
     UserNotFound,
+    NotFound(String),
+    RateLimited(String),
     InvalidInput(String),
     InternalError(String),
     StateNotInitialized,
@@ -83,6 +85,8 @@ impl fmt::Display for CanisterError {
             
             // General Errors
             CanisterError::UserNotFound => write!(f, "User not found"),
+            CanisterError::NotFound(msg) => write!(f, "Not found: {}", msg),
+            CanisterError::RateLimited(msg) => write!(f, "Rate limited: {}", msg),
             CanisterError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             CanisterError::InternalError(msg) => write!(f, "Internal error: {}", msg),
             CanisterError::StateNotInitialized => write!(f, "Canister state not initialized"),
@@ -139,7 +143,9 @@ impl CanisterError {
             CanisterError::InsufficientBalance |
             // staking errors removed
             CanisterError::TransactionNotFound |
-            CanisterError::SignatureVerificationFailed => false,
+            CanisterError::SignatureVerificationFailed |
+            CanisterError::NotFound(_) |
+            CanisterError::RateLimited(_) => false,
         }
     }
     
@@ -180,11 +186,13 @@ impl CanisterError {
             
             // General Errors (1500-1599)
             CanisterError::UserNotFound => 1501,
-            CanisterError::InvalidInput(_) => 1502,
-            CanisterError::InternalError(_) => 1503,
-            CanisterError::StateNotInitialized => 1504,
-            CanisterError::SerializationError => 1505,
-            CanisterError::DeserializationError => 1506,
+            CanisterError::NotFound(_) => 1502,
+            CanisterError::RateLimited(_) => 1503,
+            CanisterError::InvalidInput(_) => 1504,
+            CanisterError::InternalError(_) => 1505,
+            CanisterError::StateNotInitialized => 1506,
+            CanisterError::SerializationError => 1507,
+            CanisterError::DeserializationError => 1508,
         }
     }
 }

@@ -72,6 +72,256 @@ dfx canister --network ic status dhaniverse_backend
 - **Backend API**: https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/
 - **Candid UI**: https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai
 
+## 📡 Server-Sent Events (SSE) API
+
+### Overview
+The canister provides Server-Sent Events (SSE) support for real-time communication. This allows clients to subscribe to streams of updates for rooms, peer connections, and WebRTC signaling.
+
+### SSE Endpoints
+
+#### Subscribe to Room Events
+```
+GET /sse/rooms/{roomId}/subscribe
+```
+
+**Headers:**
+- `Authorization: Bearer {wallet_address}:{session_token}` (required)
+- `Last-Event-ID: {eventId}` (optional, for reconnection)
+
+**Query Parameters:**
+- `token={wallet_address}:{session_token}` (alternative to Authorization header)
+
+**Response:**
+- Content-Type: `text/event-stream`
+- Connection: `keep-alive`
+- Cache-Control: `no-cache`
+
+### Event Types
+
+#### 1. Peer Joined
+```
+event: peer-joined
+data: {"peerId": "peer-123", "meta": {"username": "alice"}}
+```
+
+#### 2. Peer Left
+```
+event: peer-left
+data: {"peerId": "peer-123"}
+```
+
+#### 3. WebRTC Offer
+```
+event: offer
+data: {"from": "peer-1", "to": "peer-2", "sdp": "v=0\r\n..."}
+```
+
+#### 4. WebRTC Answer
+```
+event: answer
+data: {"from": "peer-2", "to": "peer-1", "sdp": "v=0\r\n..."}
+```
+
+#### 5. ICE Candidate
+```
+event: ice-candidate
+data: {"from": "peer-1", "to": "peer-2", "candidate": {"candidate": "...", "sdpMid": "0"}}
+```
+
+#### 6. Room State
+```
+event: room-state
+data: {"peers": ["peer-1", "peer-2"], "meta": {"connectionCount": "2"}}
+```
+
+### Client Examples
+
+#### Browser (JavaScript)
+```javascript
+// Create EventSource connection
+const eventSource = new EventSource(
+  `https://canister-id.icp0.io/sse/rooms/room123/subscribe?token=${walletAddress}:${sessionToken}`
+);
+
+// Handle connection events
+eventSource.onopen = () => {
+  console.log('SSE connection opened');
+};
+
+eventSource.onerror = (error) => {
+  console.error('SSE connection error:', error);
+  // EventSource will automatically reconnect
+};
+
+// Handle specific event types
+eventSource.addEventListener('peer-joined', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Peer joined:', data.peerId, data.meta);
+});
+
+eventSource.addEventListener('offer', (event) => {
+  const data = JSON.parse(event.data);
+  if (data.to === myPeerId) {
+    handleIncomingOffer(data.from, data.sdp);
+  }
+});
+
+// Handle all events
+eventSource.onmessage = (event) => {
+  console.log('Event:', event.type, JSON.parse(event.data));
+};
+
+// Clean up
+// eventSource.close();
+```
+
+#### Node.js
+```javascript
+const EventSource = require('eventsource');
+
+const eventSource = new EventSource(
+  `https://canister-id.icp0.io/sse/rooms/room123/subscribe`,
+  {
+    headers: {
+      'Authorization': `Bearer ${walletAddress}:${sessionToken}`
+    }
+  }
+);
+
+eventSource.on('peer-joined', (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Peer joined:', data);
+});
+
+eventSource.on('error', (error) => {
+  console.error('SSE error:', error);
+});
+```
+
+#### React Hook
+```javascript
+import { useEffect, useState } from 'react';
+
+function useSSERoom(roomId, auth) {
+  const [events, setEvents] = useState([]);
+  const [connectionState, setConnectionState] = useState('connecting');
+
+  useEffect(() => {
+    if (!roomId || !auth) return;
+
+    const eventSource = new EventSource(
+      `/sse/rooms/${roomId}/subscribe?token=${auth.walletAddress}:${auth.sessionToken}`
+    );
+
+    eventSource.onopen = () => setConnectionState('connected');
+    eventSource.onerror = () => setConnectionState('error');
+
+    eventSource.onmessage = (event) => {
+      const eventData = {
+        id: event.lastEventId,
+        type: event.type,
+        data: JSON.parse(event.data),
+        timestamp: Date.now()
+      };
+      setEvents(prev => [...prev, eventData]);
+    };
+
+    return () => {
+      eventSource.close();
+      setConnectionState('disconnected');
+    };
+  }, [roomId, auth]);
+
+  return { events, connectionState };
+}
+```
+
+### Broadcasting Events (Canister Methods)
+
+#### Peer Lifecycle
+```rust
+// Broadcast when peer joins
+await canister.sse_broadcast_peer_joined(roomId, peerId, meta);
+
+// Broadcast when peer leaves
+await canister.sse_broadcast_peer_left(roomId, peerId);
+```
+
+#### WebRTC Signaling
+```rust
+// Broadcast WebRTC offer
+await canister.sse_broadcast_offer(roomId, fromPeer, toPeer, sdp);
+
+// Broadcast WebRTC answer
+await canister.sse_broadcast_answer(roomId, fromPeer, toPeer, sdp);
+
+// Broadcast ICE candidate
+await canister.sse_broadcast_ice_candidate(roomId, fromPeer, toPeer, candidate);
+```
+
+### Configuration
+
+#### Default Limits
+```rust
+SseConfig {
+    max_connections_per_room: 100,
+    max_buffer_size_per_room: 1000,
+    connection_timeout_ms: 300_000,    // 5 minutes
+    max_event_age_ms: 600_000,         // 10 minutes
+    cleanup_interval_ms: 60_000,       // 1 minute
+}
+```
+
+#### Monitoring
+```rust
+// Get room statistics
+let (connections, events) = canister.sse_get_room_stats(roomId);
+
+// Get global statistics
+let (rooms, connections, total_events) = canister.sse_get_global_stats();
+
+// Cleanup expired connections
+let cleaned = canister.sse_cleanup_connections();
+```
+
+### Authentication
+
+SSE endpoints use the same authentication system as other canister methods:
+
+1. **Session Token Format**: `{wallet_address}:{session_token}`
+2. **Validation**: Checks existing session validity
+3. **Authorization**: Authenticated users can access any room (configurable)
+
+### Reconnection
+
+Clients automatically reconnect with `Last-Event-ID` header:
+- Browser `EventSource` handles this automatically
+- Manual reconnection sends `Last-Event-ID: {lastEventId}`
+- Server replays missed events from circular buffer
+
+### Error Handling
+
+#### HTTP Status Codes
+- `200`: Successful connection
+- `400`: Invalid URL or request format
+- `401`: Authentication failed
+- `403`: Access denied to room
+- `429`: Too many connections (rate limited)
+- `500`: Internal server error
+
+#### Connection Limits
+- Max 100 connections per room (configurable)
+- Connections timeout after 5 minutes of inactivity
+- Old events are cleaned up after 10 minutes
+
+### Best Practices
+
+1. **Handle Reconnection**: Use EventSource for automatic reconnection
+2. **Store Last Event ID**: For manual reconnection scenarios
+3. **Validate Events**: Check event types and data structure
+4. **Rate Limiting**: Don't spam broadcast methods
+5. **Cleanup**: Close connections when component unmounts
+
 ## 👥 Team Setup
 
 ### For New Team Members

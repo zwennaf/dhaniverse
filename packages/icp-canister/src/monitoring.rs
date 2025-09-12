@@ -409,6 +409,9 @@ pub fn heartbeat_tasks() {
     crate::storage::cleanup_expired_sessions();
     crate::auth::cleanup_expired_sessions(); // Also cleanup auth-specific expired sessions
     crate::monitoring::optimize_memory();
+    
+    // Cleanup expired SSE connections
+    crate::sse::cleanup_expired_connections();
 
     // Update metrics timestamp
     METRICS_STORE.with(|store| {

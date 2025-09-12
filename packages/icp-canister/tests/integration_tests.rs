@@ -523,3 +523,220 @@ fn test_concurrent_operations() {
         assert_eq!(balance.token_balance, 100.0); // 1000 * 0.1
     }
 }
+
+// SSE Integration Tests
+#[test]
+fn test_sse_global_stats() {
+    let (pic, canister_id) = setup_canister();
+    
+    // Test getting global SSE stats
+    let result = pic.query_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_get_global_stats",
+        Encode!().unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let stats: (usize, usize, usize) = Decode!(result.unwrap().bytes(), (usize, usize, usize)).unwrap();
+    
+    // Initially should have no rooms, connections, or events
+    assert_eq!(stats, (0, 0, 0));
+}
+
+#[test] 
+fn test_sse_broadcast_peer_joined() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-1".to_string();
+    let peer_id = "peer-123".to_string();
+    let mut meta = std::collections::HashMap::new();
+    meta.insert("username".to_string(), "alice".to_string());
+    
+    // Test broadcasting peer joined event
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_peer_joined",
+        Encode!(room_id, peer_id, meta).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let broadcast_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(broadcast_count.is_ok());
+    // Should return 0 since no connections are subscribed yet
+    assert_eq!(broadcast_count.unwrap(), 0);
+}
+
+#[test]
+fn test_sse_broadcast_peer_left() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-2".to_string();
+    let peer_id = "peer-456".to_string();
+    
+    // Test broadcasting peer left event
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_peer_left",
+        Encode!(room_id, peer_id).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let broadcast_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(broadcast_count.is_ok());
+    assert_eq!(broadcast_count.unwrap(), 0);
+}
+
+#[test]
+fn test_sse_broadcast_offer() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-3".to_string();
+    let from = "peer-1".to_string();
+    let to = "peer-2".to_string();
+    let sdp = "v=0\r\no=alice 2890844526 2890844526 IN IP4 host.atlanta.com".to_string();
+    
+    // Test broadcasting offer event
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_offer",
+        Encode!(room_id, from, to, sdp).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let broadcast_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(broadcast_count.is_ok());
+    assert_eq!(broadcast_count.unwrap(), 0);
+}
+
+#[test]
+fn test_sse_broadcast_answer() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-4".to_string();
+    let from = "peer-2".to_string();
+    let to = "peer-1".to_string();
+    let sdp = "v=0\r\no=bob 2890844527 2890844527 IN IP4 host.biloxi.com".to_string();
+    
+    // Test broadcasting answer event
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_answer",
+        Encode!(room_id, from, to, sdp).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let broadcast_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(broadcast_count.is_ok());
+    assert_eq!(broadcast_count.unwrap(), 0);
+}
+
+#[test]
+fn test_sse_broadcast_ice_candidate() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-5".to_string();
+    let from = "peer-1".to_string();
+    let to = "peer-2".to_string();
+    let mut candidate = std::collections::HashMap::new();
+    candidate.insert("candidate".to_string(), "candidate:foundation udp 2130706431 192.168.1.1 54400 typ host generation 0".to_string());
+    candidate.insert("sdpMid".to_string(), "0".to_string());
+    candidate.insert("sdpMLineIndex".to_string(), "0".to_string());
+    
+    // Test broadcasting ICE candidate event
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_ice_candidate",
+        Encode!(room_id, from, to, candidate).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let broadcast_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(broadcast_count.is_ok());
+    assert_eq!(broadcast_count.unwrap(), 0);
+}
+
+#[test]
+fn test_sse_room_stats() {
+    let (pic, canister_id) = setup_canister();
+    
+    let room_id = "test-room-6".to_string();
+    
+    // Test getting room stats for non-existent room
+    let result = pic.query_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_get_room_stats",
+        Encode!(room_id.clone()).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let stats_result: Result<(usize, usize), String> = 
+        Decode!(result.unwrap().bytes(), Result<(usize, usize), String>).unwrap();
+    
+    // Should return error for non-existent room
+    assert!(stats_result.is_err());
+    
+    // Create a room by broadcasting an event
+    let peer_id = "peer-123".to_string();
+    let meta = std::collections::HashMap::new();
+    
+    let _broadcast_result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_broadcast_peer_joined",
+        Encode!(room_id.clone(), peer_id, meta).unwrap(),
+    );
+    
+    // Now try getting room stats again
+    let result = pic.query_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_get_room_stats",
+        Encode!(room_id).unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let stats_result: Result<(usize, usize), String> = 
+        Decode!(result.unwrap().bytes(), Result<(usize, usize), String>).unwrap();
+    
+    assert!(stats_result.is_ok());
+    let (connections, events) = stats_result.unwrap();
+    assert_eq!(connections, 0); // No connections yet
+    assert_eq!(events, 1); // One event was broadcast
+}
+
+#[test]
+fn test_sse_cleanup_connections() {
+    let (pic, canister_id) = setup_canister();
+    
+    // Test cleanup with no connections
+    let result = pic.update_call(
+        canister_id,
+        Principal::anonymous(),
+        "sse_cleanup_connections",
+        Encode!().unwrap(),
+    );
+    
+    assert!(result.is_ok());
+    let cleanup_count: Result<usize, String> = 
+        Decode!(result.unwrap().bytes(), Result<usize, String>).unwrap();
+    
+    assert!(cleanup_count.is_ok());
+    assert_eq!(cleanup_count.unwrap(), 0); // No connections to clean up
+}

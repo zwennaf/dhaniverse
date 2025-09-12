@@ -21,6 +21,8 @@ ic-stable-structures = "0.6"
 getrandom = { version = "0.2", features = ["custom"] }
 ic-http-certification = "2.5"
 num-traits = "0.2"
+url = "2.4"
+base64 = "0.21"
 
 [dev-dependencies]
 pocket-ic = "4.0"
@@ -35,7 +37,3 @@ panic = "abort"
 
 [profile.dev]
 panic = "abort"
-
-[[bin]]
-name = "generate_candid"
-path = "src/generate_candid.rs"

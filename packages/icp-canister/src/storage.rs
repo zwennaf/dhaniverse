@@ -38,6 +38,19 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
         )
     );
+    
+    // SSE storage
+    static SSE_ROOM_STORAGE: RefCell<StableBTreeMap<String, SseRoom, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))
+        )
+    );
+    
+    static SSE_CONNECTION_STORAGE: RefCell<StableBTreeMap<String, SseConnection, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)))
+        )
+    );
 }
 
 // Initialize the canister state
@@ -337,5 +350,54 @@ pub fn get_active_sessions_count() -> usize {
             .values()
             .filter(|session| now - session.last_activity < timeout)
             .count()
+    })
+}
+
+// SSE storage operations
+pub fn set_sse_room(room_id: &str, room: SseRoom) {
+    SSE_ROOM_STORAGE.with(|storage| {
+        storage.borrow_mut().insert(room_id.to_string(), room);
+    });
+}
+
+pub fn get_sse_room(room_id: &str) -> Option<SseRoom> {
+    SSE_ROOM_STORAGE.with(|storage| {
+        storage.borrow().get(&room_id.to_string())
+    })
+}
+
+pub fn remove_sse_room(room_id: &str) {
+    SSE_ROOM_STORAGE.with(|storage| {
+        storage.borrow_mut().remove(&room_id.to_string());
+    });
+}
+
+pub fn get_all_sse_room_ids() -> Vec<String> {
+    SSE_ROOM_STORAGE.with(|storage| {
+        storage.borrow().iter().map(|(k, _)| k).collect()
+    })
+}
+
+pub fn set_sse_connection(connection_id: &str, connection: SseConnection) {
+    SSE_CONNECTION_STORAGE.with(|storage| {
+        storage.borrow_mut().insert(connection_id.to_string(), connection);
+    });
+}
+
+pub fn get_sse_connection(connection_id: &str) -> Option<SseConnection> {
+    SSE_CONNECTION_STORAGE.with(|storage| {
+        storage.borrow().get(&connection_id.to_string())
+    })
+}
+
+pub fn remove_sse_connection(connection_id: &str) {
+    SSE_CONNECTION_STORAGE.with(|storage| {
+        storage.borrow_mut().remove(&connection_id.to_string());
+    });
+}
+
+pub fn get_all_sse_connection_ids() -> Vec<String> {
+    SSE_CONNECTION_STORAGE.with(|storage| {
+        storage.borrow().iter().map(|(k, _)| k).collect()
     })
 }

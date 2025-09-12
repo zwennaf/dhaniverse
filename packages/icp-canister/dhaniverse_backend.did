@@ -213,4 +213,14 @@ service : {
 
   // Health check
   health_check: () -> (text) query;
+
+  // Server-Sent Events Methods
+  sse_broadcast_peer_joined: (text, text, vec record { text; text }) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_peer_left: (text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_offer: (text, text, text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_answer: (text, text, text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_ice_candidate: (text, text, text, vec record { text; text }) -> (variant { Ok: nat; Err: text });
+  sse_get_room_stats: (text) -> (variant { Ok: record { nat; nat }; Err: text }) query;
+  sse_get_global_stats: () -> (record { nat; nat; nat }) query;
+  sse_cleanup_connections: () -> (variant { Ok: nat; Err: text });
 }
