@@ -25,6 +25,27 @@ const characters = [
   { id: 'C4', label: 'Sea', color: '#87CEEB', preview: '/characters/C4-Preview.png', full: '/characters/C4.png' },
 ];
 
+// Singleton helper function to get character color
+const getCharacterColor = (characterIdentifier: string | null | undefined, fallbackName?: string): string => {
+  if (characterIdentifier) {
+    // Normalize the character ID (remove path, extension, -Preview suffix)
+    const charId = String(characterIdentifier).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
+    const character = characters.find(c => c.id === charId);
+    if (character) {
+      return character.color;
+    }
+  }
+  
+  // Fallback to hash-based color if no character found
+  if (fallbackName) {
+    const hash = Array.from(fallbackName).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return characters[hash % characters.length].color;
+  }
+  
+  // Final fallback
+  return '#B2EEE6';
+};
+
 interface GameHUDProps {
     rupees?: number;
     username?: string;
@@ -94,6 +115,67 @@ const GameHUD: React.FC<GameHUDProps> = ({
         width: window.innerWidth,
         height: window.innerHeight,
     });
+
+    // Minimap / world dimensions (original asset size)
+    const WORLD_WIDTH = 12094;
+    const WORLD_HEIGHT = 8744;
+    // Minimap container size - make it bigger and circular
+    const MINIMAP_CONTAINER_PX = 200; // Increased from 128 to 200px
+    
+    // Calculate reasonable zoom scale
+    // Base scale to fit entire world in container (decide whether width or height limits)
+    const baseScaleX = MINIMAP_CONTAINER_PX / WORLD_WIDTH;
+    const baseScaleY = MINIMAP_CONTAINER_PX / WORLD_HEIGHT;
+    const fitByWidth = baseScaleX <= baseScaleY; // true if width is limiting
+    const baseFitScale = Math.min(baseScaleX, baseScaleY);
+
+    // Apply zoom multiplier (configurable)
+    const zoomMultiplier = 3.0; // 3x zoom from base fit
+    const minimapScale = baseFitScale * zoomMultiplier;
+
+    // Actual pixel size of the zoomed map
+    const scaledMapWidth = Math.round(WORLD_WIDTH * minimapScale);
+    const scaledMapHeight = Math.round(WORLD_HEIGHT * minimapScale);
+
+    // Debug log the values (can remove later)
+    console.log('Minimap Debug:', {
+        WORLD_WIDTH,
+        WORLD_HEIGHT,
+        MINIMAP_CONTAINER_PX,
+        baseScaleX,
+        baseScaleY,
+        fitByWidth,
+        baseFitScale,
+        zoomMultiplier,
+        minimapScale,
+        scaledMapWidth,
+        scaledMapHeight,
+        playerPosition
+    });
+
+    // Compute desired translation so player's world pos sits at container center
+    const desiredTranslateX = MINIMAP_CONTAINER_PX / 2 - (playerPosition.x * minimapScale);
+    const desiredTranslateY = MINIMAP_CONTAINER_PX / 2 - (playerPosition.y * minimapScale);
+
+    const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+    // When the scaled map is smaller than the container, center it; otherwise clamp so no empty gaps
+    const translateX = scaledMapWidth <= MINIMAP_CONTAINER_PX
+        ? (MINIMAP_CONTAINER_PX - scaledMapWidth) / 2
+        : clamp(desiredTranslateX, MINIMAP_CONTAINER_PX - scaledMapWidth, 0);
+
+    const translateY = scaledMapHeight <= MINIMAP_CONTAINER_PX
+        ? (MINIMAP_CONTAINER_PX - scaledMapHeight) / 2
+        : clamp(desiredTranslateY, MINIMAP_CONTAINER_PX - scaledMapHeight, 0);
+
+    // Convert world coords -> local minimap coords (uses final translate + scale)
+    const worldToLocal = (wx: number, wy: number) => ({
+        x: wx * minimapScale + translateX,
+        y: wy * minimapScale + translateY,
+    });
+
+    // Debug: Log actual zoom percentage (can remove later)
+    // console.log(`Minimap zoom: ${(minimapScale * 100).toFixed(1)}% of original image size`);
 
     const chatInputRef = useRef<HTMLInputElement | null>(null);
     const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -372,7 +454,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             // Normalize skin string: strip path, extension and '-Preview' suffix
             const raw = (skin || 'C1');
             const skinId = String(raw).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
-            const characterColor = characters.find(c => c.id === skinId)?.color || '#B2EEE6';
+            const characterColor = getCharacterColor(skinId, username);
 
             setChatMessages((prev) => {
                 const newMessages = [
@@ -950,6 +1032,111 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     will-change: transform, opacity;
                 }
             `}</style>
+
+            {/* Minimap - Top Left */}
+            <div className="absolute top-5 left-5 z-[1001]">
+                <div 
+                    className="bg-black/70 border border-white/20 backdrop-blur-sm overflow-hidden"
+                    style={{
+                        width: `${MINIMAP_CONTAINER_PX}px`,
+                        height: `${MINIMAP_CONTAINER_PX}px`,
+                        borderRadius: '50%', // Circular minimap
+                    }}
+                >
+                    {/* Actual map background with proper scaling */}
+                    <div className="w-full h-full relative overflow-hidden">
+                        <img
+                            src="/maps/minimap.png"
+                            alt="Game Map"
+                            className="absolute top-0 left-0"
+                            onLoad={() => console.log('Minimap image loaded successfully')}
+                            onError={(e) => console.error('Minimap image failed to load:', e)}
+                            style={{
+                                // Set only one dimension to preserve aspect ratio depending on fit axis
+                                ...(fitByWidth ? { width: `${MINIMAP_CONTAINER_PX * zoomMultiplier}px` } : { height: `${MINIMAP_CONTAINER_PX * zoomMultiplier}px` }),
+                                transform: `translate(${translateX}px, ${translateY}px) scale(${minimapScale / (fitByWidth ? baseScaleX : baseScaleY)})`,
+                                transformOrigin: 'top left',
+                                transition: 'transform 0.1s ease-out',
+                                imageRendering: 'pixelated',
+                            }}
+                        />
+
+                        {/* Player position indicator (moves when map is clamped) */}
+                        {(() => {
+                            const markerSize = 12; // px (bigger, matches previous w-3 h-3)
+                            const localSelf = worldToLocal(playerPosition.x, playerPosition.y);
+
+                            // Clamp marker inside circular container (radius - marker half)
+                            const radius = MINIMAP_CONTAINER_PX / 2;
+                            const cx = radius;
+                            const cy = radius;
+                            const dx = localSelf.x - cx;
+                            const dy = localSelf.y - cy;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const maxDist = radius - markerSize / 2 - 2; // padding
+
+                            let markerX = localSelf.x;
+                            let markerY = localSelf.y;
+
+                            if (dist > maxDist) {
+                                const ratio = maxDist / dist;
+                                markerX = cx + dx * ratio;
+                                markerY = cy + dy * ratio;
+                            }
+
+                            return (
+                                <div
+                                    className="absolute rounded-full z-10"
+                                    style={{
+                                        width: `${markerSize}px`,
+                                        height: `${markerSize}px`,
+                                        left: `${markerX}px`,
+                                        top: `${markerY}px`,
+                                        transform: 'translate(-50%, -50%)',
+                                        backgroundColor: getCharacterColor(user?.selectedCharacter, username),
+                                        border: '2px solid rgba(255,255,255,0.95)',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.5), inset 0 0 6px rgba(255,255,255,0.08)',
+                                    }}
+                                    title="Your position"
+                                />
+                            );
+                        })()}
+
+                        {/* Other players */}
+                        {connectedPlayers.slice(0, 8).map((player, index) => {
+                            // Use the worldToLocal helper to get proper positioning
+                            const localPos = worldToLocal((player as any).x || 0, (player as any).y || 0);
+
+                            // Only show if within minimap bounds (inside container)
+                            if (localPos.x >= 0 && localPos.x <= MINIMAP_CONTAINER_PX && localPos.y >= 0 && localPos.y <= MINIMAP_CONTAINER_PX) {
+                                return (
+                                    <div
+                                        key={player.id}
+                                        className="absolute w-2 h-2 bg-blue-400 rounded-full border border-white/50 transform -translate-x-1/2 -translate-y-1/2 z-10"
+                                        style={{
+                                            left: `${localPos.x}px`,
+                                            top: `${localPos.y}px`,
+                                        }}
+                                        title={`${player.username} (nearby)`}
+                                    />
+                                );
+                            }
+                            return null;
+                        })}
+
+                        {/* Minimap border and label */}
+                        <div className="text-center translate-y-6 text-xs text-white/90 font-['Tickerbit',Arial,sans-serif] select-none px-1 rounded z-30">
+                            MAP
+                        </div>
+
+                        {/* Coordinates display */}
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-white font-['Tickerbit',Arial,sans-serif] select-none bg-black/50 px-1 rounded z-30">
+                            {Math.round(playerPosition.x)}, {Math.round(playerPosition.y)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Top right status area */}
             <div className="absolute top-5 right-9 flex flex-col items-end space-y-2" style={{ lineHeight: 1 }}>
                 {/* Blockchain status indicator */}
@@ -1050,16 +1237,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                     {connectedPlayers && connectedPlayers.length > 0 ? (
                                         <div className="inline-flex items-center gap-2 truncate min-w-0">
                                             {connectedPlayers.slice(-6).map((p) => {
-                                                let color = (p as any).color;
                                                 const skinId = (p as any).skin || (p as any).selectedCharacter || null;
-                                                if (!color && skinId) {
-                                                    const cleaned = String(skinId).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
-                                                    color = characters.find(c => c.id === cleaned)?.color;
-                                                }
-                                                if (!color) {
-                                                    const hash = Array.from(p.username).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-                                                    color = characters[hash % characters.length].color;
-                                                }
+                                                const color = getCharacterColor(skinId, p.username);
                                                 const isLocal = user && (user.gameUsername as string) === p.username;
                                                 return <span key={p.id} className="text-sm font-['Tickerbit',Arial,sans-serif] truncate" style={{ color }} aria-hidden>{p.username}{isLocal ? ' (you)' : ''}</span>;
                                             })}
@@ -1077,16 +1256,8 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                 {connectedPlayers && connectedPlayers.length > 0 ? (
                                     <ul className="space-y-1">
                                         {connectedPlayers.slice().reverse().map((p) => {
-                                            let color = (p as any).color;
                                             const skinId = (p as any).skin || (p as any).selectedCharacter || null;
-                                            if (!color && skinId) {
-                                                const cleaned = String(skinId).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
-                                                color = characters.find(c => c.id === cleaned)?.color;
-                                            }
-                                            if (!color) {
-                                                const hash = Array.from(p.username).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-                                                color = characters[hash % characters.length].color;
-                                            }
+                                            const color = getCharacterColor(skinId, p.username);
                                             const isLocal = user && (user.gameUsername as string) === p.username;
                                             return <li key={p.id} className="truncate" style={{ color }} aria-hidden>{p.username}{isLocal ? ' (you)' : ''}</li>;
                                         })}
@@ -1096,15 +1267,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                                         <div className="text-sm" aria-hidden>
                                             {(() => {
                                                 const displayName = (user && (user.gameUsername as string)) || username || 'You';
-                                                let color: string | null = null;
-                                                if (user && (user.selectedCharacter as any)) {
-                                                    const cleaned = String((user as any).selectedCharacter).replace(/^.*[\\/]/, '').replace(/\..*$/, '').replace(/-Preview$/i, '');
-                                                    color = characters.find(c => c.id === cleaned)?.color || null;
-                                                }
-                                                if (!color) {
-                                                    const hash = Array.from(displayName).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-                                                    color = characters[hash % characters.length].color;
-                                                }
+                                                const color = getCharacterColor(user?.selectedCharacter, displayName);
                                                 return <span style={{ color }}>{displayName} (you)</span>;
                                             })()}
                                         </div>
