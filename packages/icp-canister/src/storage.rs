@@ -435,6 +435,7 @@ pub fn remove_stock_cache(stock_id: &str) {
     });
 }
 
+#[allow(dead_code)]
 pub fn get_all_cached_stock_ids() -> Vec<String> {
     STOCK_CACHE_STORAGE.with(|storage| {
         storage.borrow().iter().map(|(k, _)| k).collect()
@@ -448,18 +449,21 @@ pub fn set_stock_subscription(connection_id: &str, subscription: &StockSubscript
     });
 }
 
+#[allow(dead_code)]
 pub fn get_stock_subscription(connection_id: &str) -> Option<StockSubscription> {
     STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
         storage.borrow().get(&connection_id.to_string())
     })
 }
 
+#[allow(dead_code)]
 pub fn remove_stock_subscription(connection_id: &str) {
     STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
         storage.borrow_mut().remove(&connection_id.to_string());
     });
 }
 
+#[allow(dead_code)]
 pub fn get_stock_subscriptions_for_stock(stock_id: &str) -> Vec<StockSubscription> {
     STOCK_SUBSCRIPTION_STORAGE.with(|storage| {
         storage.borrow()

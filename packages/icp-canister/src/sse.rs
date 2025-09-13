@@ -4,15 +4,13 @@ use crate::error::CanisterError;
 use ic_cdk::api::time;
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 // Global counter for SSE event IDs (monotonically increasing)
-static mut GLOBAL_EVENT_ID: u64 = 0;
+static GLOBAL_EVENT_ID: AtomicU64 = AtomicU64::new(0);
 
 fn next_event_id() -> u64 {
-    unsafe {
-        GLOBAL_EVENT_ID += 1;
-        GLOBAL_EVENT_ID
-    }
+    GLOBAL_EVENT_ID.fetch_add(1, Ordering::SeqCst) + 1
 }
 
 /// Create a new SSE room if it doesn't exist
@@ -162,6 +160,7 @@ pub fn get_events_since(
 }
 
 /// Format an SSE event for transmission
+#[allow(dead_code)]
 pub fn format_sse_event(event: &SseEvent) -> String {
     format!(
         "id: {}\nevent: {}\ndata: {}\n\n",
@@ -172,6 +171,7 @@ pub fn format_sse_event(event: &SseEvent) -> String {
 }
 
 /// Create a peer-joined event
+#[allow(dead_code)]
 pub fn create_peer_joined_event(peer_id: &str, meta: HashMap<String, String>) -> serde_json::Value {
     json!({
         "peerId": peer_id,
@@ -180,6 +180,7 @@ pub fn create_peer_joined_event(peer_id: &str, meta: HashMap<String, String>) ->
 }
 
 /// Create a peer-left event
+#[allow(dead_code)]
 pub fn create_peer_left_event(peer_id: &str) -> serde_json::Value {
     json!({
         "peerId": peer_id
@@ -187,6 +188,7 @@ pub fn create_peer_left_event(peer_id: &str) -> serde_json::Value {
 }
 
 /// Create an offer event
+#[allow(dead_code)]
 pub fn create_offer_event(from: &str, to: &str, sdp: &str) -> serde_json::Value {
     json!({
         "from": from,
@@ -196,6 +198,7 @@ pub fn create_offer_event(from: &str, to: &str, sdp: &str) -> serde_json::Value 
 }
 
 /// Create an answer event
+#[allow(dead_code)]
 pub fn create_answer_event(from: &str, to: &str, sdp: &str) -> serde_json::Value {
     json!({
         "from": from,
@@ -205,6 +208,7 @@ pub fn create_answer_event(from: &str, to: &str, sdp: &str) -> serde_json::Value
 }
 
 /// Create an ICE candidate event
+#[allow(dead_code)]
 pub fn create_ice_candidate_event(from: &str, to: &str, candidate: HashMap<String, String>) -> serde_json::Value {
     json!({
         "from": from,
@@ -214,6 +218,7 @@ pub fn create_ice_candidate_event(from: &str, to: &str, candidate: HashMap<Strin
 }
 
 /// Create a room state event
+#[allow(dead_code)]
 pub fn create_room_state_event(peers: Vec<String>, meta: HashMap<String, String>) -> serde_json::Value {
     json!({
         "peers": peers,

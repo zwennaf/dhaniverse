@@ -781,6 +781,13 @@ fn handle_market_sse_subscription(
     }
 }
 
+// Diagnostic: return current canister cycles/balance
+#[ic_cdk::query]
+fn canister_cycles() -> String {
+    let balance = ic_cdk::api::canister_balance();
+    format!("{} cycles", balance)
+}
+
 // SSE management endpoints
 #[ic_cdk::update]
 async fn sse_broadcast_peer_joined(room_id: String, peer_id: String, meta: std::collections::HashMap<String, String>) -> Result<usize, String> {

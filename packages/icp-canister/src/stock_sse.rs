@@ -1,5 +1,5 @@
 use crate::storage::{get_stock_cache, set_stock_cache, set_stock_subscription, get_sse_room, set_sse_room};
-use crate::types::{Stock, StockCache, StockPrice, StockMetrics, StockSubscription, SseEvent, SseEventType};
+use crate::types::{Stock, StockCache, StockPrice, StockMetrics, StockSubscription};
 use crate::error::CanisterError;
 use ic_cdk::api::time;
 use std::collections::HashMap;

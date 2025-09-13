@@ -5,7 +5,7 @@ use ic_cdk::api::management_canister::http_request::{
     TransformContext,
 };
 
-// Transform function for HTTP responses
+// Transform function for HTTP responses (kept for compatibility with ic-cdk v0.13)
 #[ic_cdk::query]
 fn transform(args: TransformArgs) -> HttpResponse {
     let mut response = args.response;
@@ -72,7 +72,10 @@ pub async fn fetch_price(token_ids: &str) -> Result<Vec<(String, f64)>, String> 
                 Err(format!("HTTP request failed with status: {}", status_code))
             }
         }
-        Err((code, msg)) => Err(format!("HTTP request error: {:?} - {}", code, msg)),
+        Err((code, msg)) => {
+            ic_cdk::println!("http_request failed: {:?} - {}", code, msg);
+            Err(format!("HTTP request error: {:?} - {}", code, msg))
+        },
     }
 }
 
@@ -122,6 +125,9 @@ pub async fn fetch_stock_prices(symbols: &str) -> Result<Vec<(String, f64)>, Str
                 Err(format!("HTTP request failed with status: {}", status_code))
             }
         }
-        Err((code, msg)) => Err(format!("HTTP request error: {:?} - {}", code, msg)),
+        Err((code, msg)) => {
+            ic_cdk::println!("http_request failed (stock): {:?} - {}", code, msg);
+            Err(format!("HTTP request error: {:?} - {}", code, msg))
+        },
     }
 }
