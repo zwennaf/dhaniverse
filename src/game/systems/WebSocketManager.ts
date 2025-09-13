@@ -646,6 +646,12 @@ export class WebSocketManager {
     private handlePlayerUpdate(player: PlayerData): void {
         if (player.id !== this.playerId) {
             this.updateOtherPlayer(player);
+            // Dispatch a DOM event so UI components (like HUD) can react to other players' position updates
+            try {
+                window.dispatchEvent(new CustomEvent("playerUpdate", { detail: { player } }));
+            } catch (e) {
+                // ignore
+            }
         }
     }
 

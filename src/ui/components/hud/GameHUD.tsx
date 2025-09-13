@@ -116,6 +116,59 @@ const GameHUD: React.FC<GameHUDProps> = ({
         height: window.innerHeight,
     });
 
+    // Smooth render positions for other players to reduce jitter
+    const renderPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
+    const [, setRenderTick] = useState(0); // used to force re-render when smoothed positions update
+
+    useEffect(() => {
+        let raf = 0;
+        let last = performance.now();
+
+        const loop = (now: number) => {
+            const dt = Math.max(0, (now - last) / 1000);
+            last = now;
+            const next = { ...renderPositionsRef.current };
+            let changed = false;
+
+            // smoothing factor - smaller = smoother/slower, larger = snappier
+            const lerpFactor = 0.12;
+
+            connectedPlayers.forEach((p: any) => {
+                const id = p.id;
+                const targetX = typeof p.x === 'number' ? p.x : 0;
+                const targetY = typeof p.y === 'number' ? p.y : 0;
+                const cur = next[id] ?? { x: targetX, y: targetY };
+
+                const nx = cur.x + (targetX - cur.x) * lerpFactor;
+                const ny = cur.y + (targetY - cur.y) * lerpFactor;
+
+                if (!next[id] || Math.abs(nx - cur.x) > 0.001 || Math.abs(ny - cur.y) > 0.001) {
+                    changed = true;
+                }
+
+                next[id] = { x: nx, y: ny };
+            });
+
+            // Remove stale entries
+            Object.keys(next).forEach((id) => {
+                if (!connectedPlayers.find((p) => p.id === id)) {
+                    delete next[id];
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                renderPositionsRef.current = next;
+                setRenderTick((t) => t + 1);
+            }
+
+            raf = requestAnimationFrame(loop);
+        };
+
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, [connectedPlayers]);
+
     // Minimap / world dimensions (original asset size)
     const WORLD_WIDTH = 12094;
     const WORLD_HEIGHT = 8744;
@@ -275,11 +328,11 @@ const GameHUD: React.FC<GameHUDProps> = ({
     useEffect(() => {
         console.log('[GameHUD] mounting - registering player connection listeners');
         // Read any existing snapshot provided by WebSocketManager (in case it fired before HUD mounted)
-        try {
+            try {
             const snapPlayers = (window as any).__ws_players;
             if (Array.isArray(snapPlayers)) {
                 setConnectedPlayers(
-                    snapPlayers.map((p: any) => ({ id: p.id, username: p.username, joinedAt: Date.now() }))
+                    snapPlayers.map((p: any) => ({ id: p.id, username: p.username, joinedAt: Date.now(), x: p.x, y: p.y, skin: p.skin }))
                 );
             }
             const snapCount = (window as any).__ws_onlineCount;
@@ -303,6 +356,9 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             id: player.id,
                             username: player.username,
                             joinedAt: Date.now(),
+                            x: player.x,
+                            y: player.y,
+                            skin: player.skin,
                         },
                     ];
                 });
@@ -363,12 +419,30 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         id: player.id,
                         username: player.username,
                         joinedAt: Date.now(),
+                        x: player.x,
+                        y: player.y,
+                        skin: player.skin,
                     }))
                 );
             }
         };
 
+        const handlePlayerUpdate = (e: any) => {
+            const { player } = e.detail || {};
+            if (!player || !player.id) return;
+
+            setConnectedPlayers((prev) => {
+                const exists = prev.find((p) => p.id === player.id);
+                if (exists) {
+                    return prev.map((p) => (p.id === player.id ? { ...p, x: player.x, y: player.y, skin: player.skin } : p));
+                }
+                // If it's a new player, add them
+                return [...prev, { id: player.id, username: player.username, joinedAt: Date.now(), x: player.x, y: player.y, skin: player.skin }];
+            });
+        };
+
         window.addEventListener("playerJoined" as any, handlePlayerJoined);
+        window.addEventListener("playerUpdate" as any, handlePlayerUpdate);
         window.addEventListener(
             "playerDisconnect" as any,
             handlePlayerDisconnect
@@ -388,6 +462,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                 "playerJoined" as any,
                 handlePlayerJoined
             );
+            window.removeEventListener("playerUpdate" as any, handlePlayerUpdate);
             window.removeEventListener(
                 "playerDisconnect" as any,
                 handlePlayerDisconnect
@@ -1104,8 +1179,12 @@ const GameHUD: React.FC<GameHUDProps> = ({
 
                         {/* Other players */}
                         {connectedPlayers.slice(0, 8).map((player, index) => {
+                            // Use smoothed render positions when available
+                            const rp = renderPositionsRef.current[player.id];
+                            const px = rp ? rp.x : (player as any).x || 0;
+                            const py = rp ? rp.y : (player as any).y || 0;
                             // Use the worldToLocal helper to get proper positioning
-                            const localPos = worldToLocal((player as any).x || 0, (player as any).y || 0);
+                            const localPos = worldToLocal(px, py);
 
                             // Only show if within minimap bounds (inside container)
                             if (localPos.x >= 0 && localPos.x <= MINIMAP_CONTAINER_PX && localPos.y >= 0 && localPos.y <= MINIMAP_CONTAINER_PX) {
