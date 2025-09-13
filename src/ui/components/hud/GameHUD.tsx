@@ -190,21 +190,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
     const scaledMapWidth = Math.round(WORLD_WIDTH * minimapScale);
     const scaledMapHeight = Math.round(WORLD_HEIGHT * minimapScale);
 
-    // Debug log the values (can remove later)
-    console.log('Minimap Debug:', {
-        WORLD_WIDTH,
-        WORLD_HEIGHT,
-        MINIMAP_CONTAINER_PX,
-        baseScaleX,
-        baseScaleY,
-        fitByWidth,
-        baseFitScale,
-        zoomMultiplier,
-        minimapScale,
-        scaledMapWidth,
-        scaledMapHeight,
-        playerPosition
-    });
+    // Debug logging removed to avoid console spam in production
 
     // Compute desired translation so player's world pos sits at container center
     const desiredTranslateX = MINIMAP_CONTAINER_PX / 2 - (playerPosition.x * minimapScale);
@@ -1124,7 +1110,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
                             src="/maps/minimap.png"
                             alt="Game Map"
                             className="absolute top-0 left-0"
-                            onLoad={() => console.log('Minimap image loaded successfully')}
+                            
                             onError={(e) => console.error('Minimap image failed to load:', e)}
                             style={{
                                 // Set only one dimension to preserve aspect ratio depending on fit axis
@@ -1214,6 +1200,19 @@ const GameHUD: React.FC<GameHUDProps> = ({
                         </div>
                     </div>
                 </div>
+                {/* Overlay placed outside the clipped container to avoid flicker */}
+                {/* <img
+                    src="/maps/minimap-border.png"
+                    alt="Minimap Border"
+                    className="pointer-events-none absolute top-0 left-0"
+                    style={{
+                        width: `${MINIMAP_CONTAINER_PX + 55}px`,
+                        aspectRatio: '1 / 1',
+                        scale: 1.05,
+                        zIndex: 1010,
+                        transform: 'translate(0, 0)'
+                    }}
+                /> */}
             </div>
 
             {/* Top right status area */}
