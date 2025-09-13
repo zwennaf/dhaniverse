@@ -6,6 +6,10 @@
       "package": "rust-icp-canister",
       "package_path": "packages/icp-canister",
       "candid": "packages/icp-canister/rust_icp_canister.did"
+    },
+    "frontend_assets": {
+      "type": "assets",
+      "source": ["dist"]
     }
   },
   "networks": {

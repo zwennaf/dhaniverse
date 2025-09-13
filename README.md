@@ -197,3 +197,33 @@ Experience Dhaniverse in action: **https://dhaniverse.in**
 ---
 
 Built with dedication for the next generation of financially savvy individuals.
+
+## Deploying the Frontend to Internet Computer (ICP)
+
+This project includes a ready-to-deploy `assets` canister that can serve the `dist` frontend build.
+
+1. Build the frontend (if you have Node.js installed):
+
+	npm ci
+	npm run build
+
+2. Start dfx (local):
+
+	dfx start --clean --background
+
+3. Deploy the assets canister locally:
+
+	dfx deploy frontend_assets
+
+4. Deploy to the IC network (mainnet/testnet):
+
+	dfx build --network ic
+	dfx deploy --network ic
+
+Or use the helper script:
+
+	bash scripts/deploy-assets.sh
+
+Notes:
+- The canister is defined in `dfx.json` as `frontend_assets` and serves files from `./dist`.
+- If `npm` is missing, ensure `dist` is present and up-to-date before deploying.
