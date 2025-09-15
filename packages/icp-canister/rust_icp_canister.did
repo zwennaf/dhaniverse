@@ -229,7 +229,6 @@ service : {
   // Returns Ok(new_history_length) or Err(text)
   // CoinGecko API endpoints for historical data
   fetch_coin_market_chart_range: (text, text, nat64, nat64) -> (variant { Ok: vec record { text; vec record { nat64; float64 } }; Err: text });
-  fetch_coin_market_chart: (text, text, nat32) -> (variant { Ok: vec record { text; vec record { nat64; float64 } }; Err: text });
   fetch_coin_ohlc: (text, text, nat32) -> (variant { Ok: vec record { nat64; float64; float64; float64; float64 }; Err: text });
   fetch_coin_history: (text, text) -> (variant { Ok: vec record { text; float64 }; Err: text });
 

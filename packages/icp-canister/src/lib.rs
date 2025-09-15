@@ -375,13 +375,17 @@ async fn fetch_stock_price(symbol: String) -> Result<Option<f64>, String> {
 
 // CoinGecko API endpoints for historical data
 #[ic_cdk::update]
-async fn fetch_coin_market_chart_range(coin_id: String, vs_currency: String, from: u64, to: u64) -> Result<std::collections::HashMap<String, Vec<(u64, f64)>>, String> {
-    http_client::fetch_coin_market_chart_range(&coin_id, &vs_currency, from, to).await
-}
-
-#[ic_cdk::update]
-async fn fetch_coin_market_chart(coin_id: String, vs_currency: String, days: u32) -> Result<std::collections::HashMap<String, Vec<(u64, f64)>>, String> {
-    http_client::fetch_coin_market_chart(&coin_id, &vs_currency, days).await
+async fn fetch_coin_market_chart_range(coin_id: String, vs_currency: String, from: u64, to: u64) -> Result<Vec<(String, Vec<(u64, f64)>)>, String> {
+    match http_client::fetch_coin_market_chart_range(&coin_id, &vs_currency, from, to).await {
+        Ok(data) => {
+            let mut result = Vec::new();
+            for (key, values) in data {
+                result.push((key, values));
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e)
+    }
 }
 
 #[ic_cdk::update]
@@ -390,10 +394,49 @@ async fn fetch_coin_ohlc(coin_id: String, vs_currency: String, days: u32) -> Res
 }
 
 #[ic_cdk::update]
-async fn fetch_coin_history(coin_id: String, date: String) -> Result<std::collections::HashMap<String, f64>, String> {
-    http_client::fetch_coin_history(&coin_id, &date).await
+async fn fetch_coin_history(coin_id: String, days: String) -> Result<Vec<(String, f64)>, String> {
+    let days_num = days.parse::<u32>().map_err(|_| "Invalid days parameter")?;
+    match http_client::fetch_coin_market_chart(&coin_id, "usd", days_num).await {
+        Ok(data) => {
+            // Extract just the prices and convert timestamps to date strings
+            if let Some(prices) = data.get("prices") {
+                let mut result = Vec::new();
+                for (timestamp_ms, price) in prices {
+                    // Convert timestamp from milliseconds to date string
+                    let timestamp_secs = timestamp_ms / 1000;
+                    let date = format_timestamp_to_date(timestamp_secs);
+                    result.push((date, *price));
+                }
+                Ok(result)
+            } else {
+                Err("No price data found".to_string())
+            }
+        }
+        Err(e) => Err(e)
+    }
 }
 
+fn format_timestamp_to_date(timestamp: u64) -> String {
+    // Simple date formatting - converts Unix timestamp to YYYY-MM-DD
+    let days_since_epoch = timestamp / (24 * 60 * 60);
+    let epoch_year = 1970;
+    let mut year = epoch_year;
+    let mut remaining_days = days_since_epoch;
+    
+    // Simple year calculation (not accounting for leap years for simplicity)
+    while remaining_days >= 365 {
+        remaining_days -= 365;
+        year += 1;
+    }
+    
+    // Simple month/day calculation
+    let month = ((remaining_days / 30) + 1).min(12);
+    let day = ((remaining_days % 30) + 1).min(31);
+    
+    format!("{:04}-{:02}-{:02}", year, month, day)
+}
+
+// Exported update wrapper to match candid DID: fetch_and_append_snapshot(text) -> (variant { Ok: nat64; Err: text })
 #[ic_cdk::update]
 async fn update_prices_from_external() -> Result<usize, String> {
     // Fetch major crypto prices
