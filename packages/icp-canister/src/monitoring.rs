@@ -50,8 +50,8 @@ pub struct ErrorEvent {
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct PriceSnapshot {
     pub timestamp: u64,
-    /// Mapping from symbol (e.g. "BTC") to price in rupees/fiat (or native unit returned by feed)
-    pub prices: HashMap<String, f64>,
+    /// Vector of price entries with symbol and price
+    pub prices: Vec<crate::types::PriceEntry>,
 }
 
 // Max entries to keep in memory = 24 hours / 10 minutes = 144
@@ -453,7 +453,7 @@ pub fn heartbeat_tasks() {
                         crate::storage::set_price_feed(symbol, *price);
                     }
                     // Build a snapshot and push into PRICE_HISTORY
-                    let mut snapshot_map: HashMap<String, f64> = HashMap::new();
+                    let mut price_entries = Vec::new();
                     for (token_id, price) in prices.iter() {
                         let symbol = match token_id.as_str() {
                             "bitcoin" => "BTC".to_string(),
@@ -461,12 +461,15 @@ pub fn heartbeat_tasks() {
                             "internet-computer" => "ICP".to_string(),
                             other => other.to_uppercase(),
                         };
-                        snapshot_map.insert(symbol, *price);
+                        price_entries.push(crate::types::PriceEntry {
+                            symbol,
+                            price: *price,
+                        });
                     }
 
                     let snapshot = PriceSnapshot {
                         timestamp: ic_cdk::api::time(),
-                        prices: snapshot_map,
+                        prices: price_entries,
                     };
 
                     PRICE_HISTORY.with(|hist| {
@@ -496,7 +499,7 @@ pub fn get_price_history() -> Vec<PriceSnapshot> {
 pub async fn fetch_and_append_snapshot(token_ids: &str) -> Result<usize, String> {
     match crate::http_client::fetch_price(token_ids).await {
         Ok(prices) => {
-            let mut snapshot_map: HashMap<String, f64> = HashMap::new();
+            let mut price_entries = Vec::new();
             for (token_id, price) in prices.iter() {
                 let symbol = match token_id.as_str() {
                     "bitcoin" => "BTC".to_string(),
@@ -504,12 +507,15 @@ pub async fn fetch_and_append_snapshot(token_ids: &str) -> Result<usize, String>
                     "internet-computer" => "ICP".to_string(),
                     other => other.to_uppercase(),
                 };
-                snapshot_map.insert(symbol, *price);
+                price_entries.push(crate::types::PriceEntry {
+                    symbol,
+                    price: *price,
+                });
             }
 
             let snapshot = PriceSnapshot {
                 timestamp: ic_cdk::api::time(),
-                prices: snapshot_map,
+                prices: price_entries,
             };
 
             PRICE_HISTORY.with(|hist| {
@@ -586,8 +592,10 @@ mod tests {
 
         // Insert MAX_PRICE_HISTORY_ENTRIES + 5 snapshots
         for i in 0..(MAX_PRICE_HISTORY_ENTRIES + 5) {
-            let mut prices = HashMap::new();
-            prices.insert("BTC".to_string(), i as f64);
+            let prices = vec![crate::types::PriceEntry {
+                symbol: "BTC".to_string(),
+                price: i as f64,
+            }];
             let snap = PriceSnapshot { timestamp: i as u64, prices };
             PRICE_HISTORY.with(|h| h.borrow_mut().push_back(snap));
         }

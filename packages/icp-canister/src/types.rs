@@ -49,6 +49,13 @@ pub struct DualBalance {
     pub last_updated: u64,
 }
 
+// Price feed types for buffer API
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct PriceEntry {
+    pub symbol: String,
+    pub price: f64,
+}
+
 // Staking feature removed: StakingStatus and StakingPool types deleted
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
