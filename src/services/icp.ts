@@ -1,5 +1,6 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
+import NetworkConfig from '../config/network';
 
 // Import the generated declarations
 // Note: Run 'dfx generate --network ic dhaniverse_backend' first in packages/icp-canister directory
@@ -89,7 +90,7 @@ export class ICPService {
 
     return new Promise<boolean>((resolve) => {
       this.authClient!.login({
-        identityProvider: 'https://identity.ic0.app/#authorize',
+        identityProvider: NetworkConfig.getIdentityProviderUrl(),
         onSuccess: () => {
           console.log('Login successful');
           resolve(true);

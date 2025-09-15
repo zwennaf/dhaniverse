@@ -8,7 +8,8 @@ export const ICP_CONFIG = {
   LOCAL_HOST: 'http://127.0.0.1:4943',
   
   // Internet Identity Configuration
-  INTERNET_IDENTITY_URL: 'https://identity.ic0.app/#authorize',
+  // Use Internet Identity v2 authorize URL
+  INTERNET_IDENTITY_URL: 'https://identity.internetcomputer.org/#authorize',
   INTERNET_IDENTITY_CANISTER_ID: 'rdmx6-jaaaa-aaaah-qcaiq-cai',
   
   // Canister URLs

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AuthClient } from "@dfinity/auth-client";
+import NetworkConfig from "../../../config/network";
 import PixelButton from "../atoms/PixelButton";
 
 interface InternetIdentityButtonProps {
@@ -33,8 +34,8 @@ const InternetIdentityButton: React.FC<InternetIdentityButtonProps> = ({
             // Start the login process with better error handling
             await new Promise<void>((resolve, reject) => {
                 authClient.login({
-                    // Use the Internet Identity URL
-                    identityProvider: "https://identity.ic0.app/#authorize",
+                    // Use the Internet Identity URL (v2)
+                    identityProvider: NetworkConfig.getIdentityProviderUrl(),
                     // Maximum session time (8 hours)
                     maxTimeToLive: BigInt(8 * 60 * 60 * 1000 * 1000 * 1000),
                     // Window options for better UX

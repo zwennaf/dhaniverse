@@ -24,7 +24,8 @@ export const NetworkConfig = {
 
   // Always use IC mainnet Identity Provider
   getIdentityProviderUrl(): string {
-    return 'https://identity.ic0.app/#authorize';
+    // Use Internet Identity v2 authorize endpoint
+    return 'https://identity.internetcomputer.org/#authorize';
   },
 
   // Log current configuration

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ICPActorService } from '../../../services/ICPActorService';
+import NetworkConfig from '../../../config/network';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LeaderboardEntry {
@@ -44,7 +45,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
       const authClient = await AuthClient.create();
       
       await authClient.login({
-        identityProvider: "https://identity.ic0.app",
+        identityProvider: NetworkConfig.getIdentityProviderUrl(),
         windowOpenerFeatures: "width=500,height=600,left=200,top=200",
         onSuccess: async () => {
           const identity = authClient.getIdentity();
