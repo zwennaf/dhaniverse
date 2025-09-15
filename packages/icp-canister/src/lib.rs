@@ -416,6 +416,27 @@ fn http_request(req: ic_http_certification::HttpRequest) -> HttpResponse {
     };
     
     let path = parsed_url.path();
+
+    // Quick JSON endpoint for testing price history
+    if path == "/price-history" {
+        // Return JSON serialized price history (most-recent last)
+        match serde_json::to_string(&crate::monitoring::get_price_history()) {
+            Ok(body_str) => {
+                return HttpResponse {
+                    status: 200u16.into(),
+                    headers: vec![HttpHeader { name: "Content-Type".to_string(), value: "application/json".to_string() }],
+                    body: body_str.into_bytes(),
+                };
+            }
+            Err(_) => {
+                return HttpResponse {
+                    status: 500u16.into(),
+                    headers: vec![HttpHeader { name: "Content-Type".to_string(), value: "text/plain".to_string() }],
+                    body: b"Failed to serialize price history".to_vec(),
+                };
+            }
+        }
+    }
     
     // Parse query parameters
     let query_params: HashMap<String, String> = parsed_url
