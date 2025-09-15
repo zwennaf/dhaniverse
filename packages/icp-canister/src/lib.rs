@@ -395,7 +395,27 @@ async fn fetch_coin_ohlc(coin_id: String, vs_currency: String, days: u32) -> Res
 
 #[ic_cdk::update]
 async fn fetch_coin_history(coin_id: String, days: String) -> Result<Vec<(String, f64)>, String> {
-    let days_num = days.parse::<u32>().map_err(|_| "Invalid days parameter")?;
+    // Validate and parse the days parameter with better error handling
+    let days_num = match days.trim().parse::<u32>() {
+        Ok(num) => {
+            if num == 0 {
+                return Err("Days parameter must be greater than 0".to_string());
+            }
+            if num > 365 {
+                return Err("Days parameter cannot exceed 365".to_string());
+            }
+            num
+        }
+        Err(_) => {
+            return Err(format!(
+                "Invalid days parameter '{}'. Expected a number between 1 and 365 (e.g., '7', '30', '90')", 
+                days
+            ));
+        }
+    };
+
+    ic_cdk::println!("Fetching {} days of price history for {}", days_num, coin_id);
+
     match http_client::fetch_coin_market_chart(&coin_id, "usd", days_num).await {
         Ok(data) => {
             // Extract just the prices and convert timestamps to date strings
@@ -407,12 +427,21 @@ async fn fetch_coin_history(coin_id: String, days: String) -> Result<Vec<(String
                     let date = format_timestamp_to_date(timestamp_secs);
                     result.push((date, *price));
                 }
-                Ok(result)
+                
+                if result.is_empty() {
+                    Err("No price data found in response".to_string())
+                } else {
+                    ic_cdk::println!("Successfully fetched {} price points", result.len());
+                    Ok(result)
+                }
             } else {
-                Err("No price data found".to_string())
+                Err("No 'prices' field found in API response".to_string())
             }
         }
-        Err(e) => Err(e)
+        Err(e) => {
+            ic_cdk::println!("API error: {}", e);
+            Err(e)
+        }
     }
 }
 

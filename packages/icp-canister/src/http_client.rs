@@ -15,6 +15,15 @@ fn transform(args: TransformArgs) -> HttpResponse {
     response
 }
 
+// Transform function for responses (compatible version)
+#[ic_cdk::query]
+fn transform_response(args: TransformArgs) -> HttpResponse {
+    let mut response = args.response;
+    // Remove unnecessary headers to reduce response size and avoid issues
+    response.headers = vec![];
+    response
+}
+
 // Fetch price from CoinGecko API with API key
 pub async fn fetch_price(token_ids: &str) -> Result<Vec<(String, f64)>, String> {
     // Build URL with percent-encoding for query parameters to avoid invalid URI characters
@@ -141,9 +150,11 @@ pub async fn fetch_stock_prices(symbols: &str) -> Result<Vec<(String, f64)>, Str
 
 // Fetch historical chart data for a coin within a time range
 pub async fn fetch_coin_market_chart_range(coin_id: &str, vs_currency: &str, from: u64, to: u64) -> Result<HashMap<String, Vec<(u64, f64)>>, String> {
-    let base = &format!("https://api.coingecko.com/api/v3/coins/{}/market_chart/range", coin_id);
+    // Construct the URL path with coin_id embedded
+    let url_path = format!("https://api.coingecko.com/api/v3/coins/{}/market_chart/range", coin_id);
+    
     let url = match url::Url::parse_with_params(
-        base,
+        &url_path,
         &[
             ("vs_currency", vs_currency),
             ("from", &from.to_string()),
@@ -154,20 +165,18 @@ pub async fn fetch_coin_market_chart_range(coin_id: &str, vs_currency: &str, fro
         Err(e) => return Err(format!("Failed to construct market chart range URL: {}", e)),
     };
 
+    ic_cdk::println!("Fetching market chart range from URL: {}", url);
+
     let request = CanisterHttpRequestArgument {
         url: url.clone(),
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: Some(16384), // Increased for chart data
+        max_response_bytes: Some(32768), // Increased for range data
         transform: Some(TransformContext::from_name("transform".to_string(), vec![])),
         headers: vec![
             HttpHeader {
                 name: "User-Agent".to_string(),
                 value: "Dhaniverse-ICP-Canister/1.0".to_string(),
-            },
-            HttpHeader {
-                name: "x-cg-demo-api-key".to_string(),
-                value: "CG-tLtUCAv5EG2KQuPp4XvAWTnM".to_string(),
             },
             HttpHeader {
                 name: "Accept".to_string(),
@@ -224,32 +233,33 @@ pub async fn fetch_coin_market_chart_range(coin_id: &str, vs_currency: &str, fro
 
 // Fetch historical chart data for a coin for a defined duration
 pub async fn fetch_coin_market_chart(coin_id: &str, vs_currency: &str, days: u32) -> Result<HashMap<String, Vec<(u64, f64)>>, String> {
-    let base = &format!("https://api.coingecko.com/api/v3/coins/{}/market_chart", coin_id);
+    // Construct the URL path with coin_id embedded
+    let url_path = format!("https://api.coingecko.com/api/v3/coins/{}/market_chart", coin_id);
+    
     let url = match url::Url::parse_with_params(
-        base,
+        &url_path,
         &[
             ("vs_currency", vs_currency),
             ("days", &days.to_string()),
+            ("interval", if days <= 1 { "hourly" } else if days <= 90 { "daily" } else { "daily" }),
         ],
     ) {
         Ok(u) => u.to_string(),
         Err(e) => return Err(format!("Failed to construct market chart URL: {}", e)),
     };
 
+    ic_cdk::println!("Fetching market chart from URL: {}", url);
+
     let request = CanisterHttpRequestArgument {
         url: url.clone(),
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: Some(16384),
+        max_response_bytes: Some(32768), // Increased for historical data
         transform: Some(TransformContext::from_name("transform".to_string(), vec![])),
         headers: vec![
             HttpHeader {
                 name: "User-Agent".to_string(),
                 value: "Dhaniverse-ICP-Canister/1.0".to_string(),
-            },
-            HttpHeader {
-                name: "x-cg-demo-api-key".to_string(),
-                value: "CG-tLtUCAv5EG2KQuPp4XvAWTnM".to_string(),
             },
             HttpHeader {
                 name: "Accept".to_string(),
@@ -305,9 +315,11 @@ pub async fn fetch_coin_market_chart(coin_id: &str, vs_currency: &str, days: u32
 
 // Fetch OHLC chart data for a coin
 pub async fn fetch_coin_ohlc(coin_id: &str, vs_currency: &str, days: u32) -> Result<Vec<(u64, f64, f64, f64, f64)>, String> {
-    let base = &format!("https://api.coingecko.com/api/v3/coins/{}/ohlc", coin_id);
+    // Construct the URL path with coin_id embedded
+    let url_path = format!("https://api.coingecko.com/api/v3/coins/{}/ohlc", coin_id);
+    
     let url = match url::Url::parse_with_params(
-        base,
+        &url_path,
         &[
             ("vs_currency", vs_currency),
             ("days", &days.to_string()),
@@ -317,20 +329,18 @@ pub async fn fetch_coin_ohlc(coin_id: &str, vs_currency: &str, days: u32) -> Res
         Err(e) => return Err(format!("Failed to construct OHLC URL: {}", e)),
     };
 
+    ic_cdk::println!("Fetching OHLC from URL: {}", url);
+
     let request = CanisterHttpRequestArgument {
         url: url.clone(),
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: Some(8192),
+        max_response_bytes: Some(16384),
         transform: Some(TransformContext::from_name("transform".to_string(), vec![])),
         headers: vec![
             HttpHeader {
                 name: "User-Agent".to_string(),
                 value: "Dhaniverse-ICP-Canister/1.0".to_string(),
-            },
-            HttpHeader {
-                name: "x-cg-demo-api-key".to_string(),
-                value: "CG-tLtUCAv5EG2KQuPp4XvAWTnM".to_string(),
             },
             HttpHeader {
                 name: "Accept".to_string(),
@@ -391,29 +401,29 @@ pub async fn fetch_coin_ohlc(coin_id: &str, vs_currency: &str, days: u32) -> Res
 
 // Fetch historical data for a coin at a given date
 pub async fn fetch_coin_history(coin_id: &str, date: &str) -> Result<HashMap<String, f64>, String> {
-    let base = &format!("https://api.coingecko.com/api/v3/coins/{}/history", coin_id);
+    // Construct the URL path with coin_id embedded
+    let url_path = format!("https://api.coingecko.com/api/v3/coins/{}/history", coin_id);
+    
     let url = match url::Url::parse_with_params(
-        base,
-        &[("date", date)],
+        &url_path,
+        &[("date", date), ("localization", "false")],
     ) {
         Ok(u) => u.to_string(),
         Err(e) => return Err(format!("Failed to construct history URL: {}", e)),
     };
 
+    ic_cdk::println!("Fetching coin history from URL: {}", url);
+
     let request = CanisterHttpRequestArgument {
         url: url.clone(),
         method: HttpMethod::GET,
         body: None,
-        max_response_bytes: Some(4096),
+        max_response_bytes: Some(8192),
         transform: Some(TransformContext::from_name("transform".to_string(), vec![])),
         headers: vec![
             HttpHeader {
                 name: "User-Agent".to_string(),
                 value: "Dhaniverse-ICP-Canister/1.0".to_string(),
-            },
-            HttpHeader {
-                name: "x-cg-demo-api-key".to_string(),
-                value: "CG-tLtUCAv5EG2KQuPp4XvAWTnM".to_string(),
             },
             HttpHeader {
                 name: "Accept".to_string(),
