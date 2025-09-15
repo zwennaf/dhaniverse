@@ -199,6 +199,15 @@ async fn force_append_price_snapshot(token_ids: String) -> Result<usize, String>
     monitoring::fetch_and_append_snapshot(&token_ids).await
 }
 
+// Exported update wrapper to match candid DID: fetch_and_append_snapshot(text) -> (variant { Ok: nat64; Err: text })
+#[ic_cdk::update]
+async fn fetch_and_append_snapshot(token_ids: String) -> Result<u64, String> {
+    match monitoring::fetch_and_append_snapshot(&token_ids).await {
+        Ok(n) => Ok(n as u64),
+        Err(e) => Err(e),
+    }
+}
+
 #[ic_cdk::update]
 async fn optimize_memory() -> Result<(), String> {
     monitoring::optimize_memory();
