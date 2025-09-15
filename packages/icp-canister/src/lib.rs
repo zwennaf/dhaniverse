@@ -373,6 +373,27 @@ async fn fetch_stock_price(symbol: String) -> Result<Option<f64>, String> {
     Ok(prices.into_iter().find(|(s, _)| s == &symbol).map(|(_, p)| p))
 }
 
+// CoinGecko API endpoints for historical data
+#[ic_cdk::update]
+async fn fetch_coin_market_chart_range(coin_id: String, vs_currency: String, from: u64, to: u64) -> Result<std::collections::HashMap<String, Vec<(u64, f64)>>, String> {
+    http_client::fetch_coin_market_chart_range(&coin_id, &vs_currency, from, to).await
+}
+
+#[ic_cdk::update]
+async fn fetch_coin_market_chart(coin_id: String, vs_currency: String, days: u32) -> Result<std::collections::HashMap<String, Vec<(u64, f64)>>, String> {
+    http_client::fetch_coin_market_chart(&coin_id, &vs_currency, days).await
+}
+
+#[ic_cdk::update]
+async fn fetch_coin_ohlc(coin_id: String, vs_currency: String, days: u32) -> Result<Vec<(u64, f64, f64, f64, f64)>, String> {
+    http_client::fetch_coin_ohlc(&coin_id, &vs_currency, days).await
+}
+
+#[ic_cdk::update]
+async fn fetch_coin_history(coin_id: String, date: String) -> Result<std::collections::HashMap<String, f64>, String> {
+    http_client::fetch_coin_history(&coin_id, &date).await
+}
+
 #[ic_cdk::update]
 async fn update_prices_from_external() -> Result<usize, String> {
     // Fetch major crypto prices
