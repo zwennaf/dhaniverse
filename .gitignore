@@ -32,3 +32,5 @@ public/maps/fullmap
 # Rust
 target/
 *.pdb
+
+web/.next
