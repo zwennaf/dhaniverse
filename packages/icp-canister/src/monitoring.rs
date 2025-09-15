@@ -1,4 +1,3 @@
-dfx canister call dhaniverse_backend get_price_history// Removed unused import
 use crate::storage;
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
