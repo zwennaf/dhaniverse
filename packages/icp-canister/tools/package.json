@@ -1,0 +1,17 @@
+{
+  "name": "ic-query-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Helpers to query canister and decode CBOR/Candid",
+  "dependencies": {
+    "cbor": "^8.1.0",
+    "node-fetch": "^3.3.2",
+  "@dfinity/candid": "^0.14.1",
+    "@dfinity/agent": "^0.14.0",
+    "@dfinity/principal": "^0.10.0"
+  },
+  "type": "module",
+  "scripts": {
+    "query-price-history": "node query_price_history.js"
+  }
+}
