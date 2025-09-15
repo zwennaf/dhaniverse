@@ -195,6 +195,11 @@ fn get_price_history() -> Vec<monitoring::PriceSnapshot> {
 }
 
 #[ic_cdk::update]
+async fn force_append_price_snapshot(token_ids: String) -> Result<usize, String> {
+    monitoring::fetch_and_append_snapshot(&token_ids).await
+}
+
+#[ic_cdk::update]
 async fn optimize_memory() -> Result<(), String> {
     monitoring::optimize_memory();
     Ok(())

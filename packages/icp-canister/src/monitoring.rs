@@ -1,4 +1,4 @@
-// Removed unused import
+dfx canister call dhaniverse_backend get_price_history// Removed unused import
 use crate::storage;
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
@@ -490,6 +490,41 @@ pub fn heartbeat_tasks() {
 /// Returns the in-memory price history (most-recent last). This clones the data to avoid holding locks.
 pub fn get_price_history() -> Vec<PriceSnapshot> {
     PRICE_HISTORY.with(|hist| hist.borrow().iter().cloned().collect())
+}
+
+/// Fetch prices for token IDs (comma-separated) and append a snapshot to the in-memory history.
+/// Returns the new history length on success.
+pub async fn fetch_and_append_snapshot(token_ids: &str) -> Result<usize, String> {
+    match crate::http_client::fetch_price(token_ids).await {
+        Ok(prices) => {
+            let mut snapshot_map: HashMap<String, f64> = HashMap::new();
+            for (token_id, price) in prices.iter() {
+                let symbol = match token_id.as_str() {
+                    "bitcoin" => "BTC".to_string(),
+                    "ethereum" => "ETH".to_string(),
+                    "internet-computer" => "ICP".to_string(),
+                    other => other.to_uppercase(),
+                };
+                snapshot_map.insert(symbol, *price);
+            }
+
+            let snapshot = PriceSnapshot {
+                timestamp: ic_cdk::api::time(),
+                prices: snapshot_map,
+            };
+
+            PRICE_HISTORY.with(|hist| {
+                let mut hist = hist.borrow_mut();
+                hist.push_back(snapshot);
+                while hist.len() > MAX_PRICE_HISTORY_ENTRIES {
+                    hist.pop_front();
+                }
+            });
+
+            Ok(PRICE_HISTORY.with(|h| h.borrow().len()))
+        }
+        Err(e) => Err(format!("price fetch failed: {:?}", e)),
+    }
 }
 
 // Macro for easy performance tracking
