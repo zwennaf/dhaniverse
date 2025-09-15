@@ -2,7 +2,7 @@
 use crate::storage;
 use candid::{CandidType, Deserialize};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct CanisterMetrics {
@@ -46,6 +46,21 @@ pub struct ErrorEvent {
     pub error_message: String,
     pub timestamp: u64,
     pub user_address: Option<String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct PriceSnapshot {
+    pub timestamp: u64,
+    /// Mapping from symbol (e.g. "BTC") to price in rupees/fiat (or native unit returned by feed)
+    pub prices: HashMap<String, f64>,
+}
+
+// Max entries to keep in memory = 24 hours / 10 minutes = 144
+const MAX_PRICE_HISTORY_ENTRIES: usize = 24 * 60 / 10; // 144
+
+// In-memory rolling store for price snapshots
+thread_local! {
+    static PRICE_HISTORY: std::cell::RefCell<VecDeque<PriceSnapshot>> = std::cell::RefCell::new(VecDeque::with_capacity(MAX_PRICE_HISTORY_ENTRIES));
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
@@ -428,15 +443,41 @@ pub fn heartbeat_tasks() {
         ic_cdk::spawn(async {
             match crate::http_client::fetch_price("bitcoin,ethereum,internet-computer").await {
                 Ok(prices) => {
-                    for (token_id, price) in prices {
+                    // prices is a Vec<(String, f64)>; iterate by reference to avoid moving it
+                    for (token_id, price) in prices.iter() {
                         let symbol = match token_id.as_str() {
                             "bitcoin" => "BTC",
                             "ethereum" => "ETH",
                             "internet-computer" => "ICP",
-                            _ => &token_id,
+                            _ => token_id.as_str(),
                         };
-                        crate::storage::set_price_feed(symbol, price);
+                        crate::storage::set_price_feed(symbol, *price);
                     }
+                    // Build a snapshot and push into PRICE_HISTORY
+                    let mut snapshot_map: HashMap<String, f64> = HashMap::new();
+                    for (token_id, price) in prices.iter() {
+                        let symbol = match token_id.as_str() {
+                            "bitcoin" => "BTC".to_string(),
+                            "ethereum" => "ETH".to_string(),
+                            "internet-computer" => "ICP".to_string(),
+                            other => other.to_uppercase(),
+                        };
+                        snapshot_map.insert(symbol, *price);
+                    }
+
+                    let snapshot = PriceSnapshot {
+                        timestamp: ic_cdk::api::time(),
+                        prices: snapshot_map,
+                    };
+
+                    PRICE_HISTORY.with(|hist| {
+                        let mut hist = hist.borrow_mut();
+                        hist.push_back(snapshot);
+                        // Enforce max capacity by popping from front
+                        while hist.len() > MAX_PRICE_HISTORY_ENTRIES {
+                            hist.pop_front();
+                        }
+                    });
                 }
                 Err(_) => {
                     // Silently continue on price fetch errors in heartbeat
@@ -444,6 +485,11 @@ pub fn heartbeat_tasks() {
             }
         });
     }
+}
+
+/// Returns the in-memory price history (most-recent last). This clones the data to avoid holding locks.
+pub fn get_price_history() -> Vec<PriceSnapshot> {
+    PRICE_HISTORY.with(|hist| hist.borrow().iter().cloned().collect())
 }
 
 // Macro for easy performance tracking
@@ -497,5 +543,29 @@ mod tests {
     fn test_optimization_suggestions() {
         let suggestions = get_optimization_suggestions();
         assert!(!suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_price_history_capacity_and_append() {
+        // Clear any existing history
+        PRICE_HISTORY.with(|h| h.borrow_mut().clear());
+
+        // Insert MAX_PRICE_HISTORY_ENTRIES + 5 snapshots
+        for i in 0..(MAX_PRICE_HISTORY_ENTRIES + 5) {
+            let mut prices = HashMap::new();
+            prices.insert("BTC".to_string(), i as f64);
+            let snap = PriceSnapshot { timestamp: i as u64, prices };
+            PRICE_HISTORY.with(|h| h.borrow_mut().push_back(snap));
+        }
+
+        // Now history length should be MAX_PRICE_HISTORY_ENTRIES
+        PRICE_HISTORY.with(|h| {
+            let h = h.borrow();
+            assert_eq!(h.len(), MAX_PRICE_HISTORY_ENTRIES);
+            // The first element should have timestamp = 5 (popped 5)
+            assert_eq!(h.front().unwrap().timestamp, 5u64);
+            // Last element timestamp should be MAX_PRICE_HISTORY_ENTRIES + 4
+            assert_eq!(h.back().unwrap().timestamp, (MAX_PRICE_HISTORY_ENTRIES + 4) as u64);
+        });
     }
 }

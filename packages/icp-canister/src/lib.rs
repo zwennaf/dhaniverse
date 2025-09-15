@@ -189,6 +189,11 @@ fn get_transaction_metrics() -> monitoring::TransactionMetrics {
     monitoring::get_transaction_metrics()
 }
 
+#[ic_cdk::query]
+fn get_price_history() -> Vec<monitoring::PriceSnapshot> {
+    monitoring::get_price_history()
+}
+
 #[ic_cdk::update]
 async fn optimize_memory() -> Result<(), String> {
     monitoring::optimize_memory();
