@@ -1,0 +1,37 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://dhaniverse.in/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
+
+# Allow important images for social media and SEO only
+Allow: /og-image.jpg
+Allow: /android-chrome-*.png
+Allow: /apple-touch-icon.png
+Allow: /favicon*.png
+Allow: /favicon.ico
+
+# Block access to sensitive areas and game assets
+Disallow: /api/
+Disallow: /.env
+Disallow: /server/
+Disallow: /node_modules/
+Disallow: /dist/
+Disallow: /.git/
+Disallow: /tools/
+Disallow: /deps/
+Disallow: /maps/
+Disallow: /characters/
+Disallow: /collisions/
+
+# Allow important pages
+Allow: /
+Allow: /game
+Allow: /sign-up
+Allow: /sign-in
+
+# Block auth-protected pages from indexing
+Disallow: /profile

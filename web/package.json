@@ -1,0 +1,25 @@
+{
+  "name": "dhaniverse-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && next export",
+    "start": "next start"
+  },
+  "dependencies": {
+    "lucide-react": "0.264.0",
+    "motion": "^12.23.12",
+    "next": "^14.2.32",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.14",
+    "postcss": "^8.5.6",
+    "tailwind-merge": "^3.2.1",
+    "tailwindcss": "^3.4.11",
+    "tailwindcss-animate": "1.0.7",
+    "typescript": "5.8.3"
+  }
+}
