@@ -1,4 +1,4 @@
-import { realStockService } from './RealStockService';
+import { getRealStockService } from './RealStockService';
 
 export interface Stock {
     id: string;
@@ -93,6 +93,7 @@ class StockService {
         let results = [] as any[];
 
         try {
+            const realStockService = getRealStockService();
             results = await realStockService.getMultipleStocks(symbols);
         } catch (err) {
             console.error('RealStockService batch fetch failed, falling back to local generation:', err);

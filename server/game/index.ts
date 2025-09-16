@@ -3,7 +3,6 @@ if (!Deno.env.get("NODE_ENV")) {
 }
 
 import { Application, Router } from "oak";
-import { oakCors } from "cors";
 import { mongodb } from "./src/db/mongo.ts";
 import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
@@ -65,15 +64,45 @@ app.use(async (ctx, next) => {
     }
 });
 
-// Global CORS - allow all origins for localhost development
-app.use(
-    oakCors({
-        origin: "*",
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "Accept", "Origin"],
-    })
-);
+// Custom CORS middleware: echo allowed Origin and enable credentials for dev
+app.use(async (ctx, next) => {
+    const envAllowed = Deno.env.get('ALLOWED_ORIGINS');
+    const defaultOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'https://dhaniverse.in',
+        'https://game.dhaniverse.in'
+    ];
+
+    // Parse env-provided origins and merge with defaults, removing duplicates
+    const envList = envAllowed
+        ? envAllowed.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+    const allowedOrigins = Array.from(
+        new Set([
+            ...defaultOrigins,
+            ...envList,
+        ])
+    );
+
+    const origin = ctx.request.headers.get('origin');
+    if (origin && allowedOrigins.includes(origin)) {
+        ctx.response.headers.set('Access-Control-Allow-Origin', origin);
+        ctx.response.headers.set('Access-Control-Allow-Credentials', 'true');
+        ctx.response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+        ctx.response.headers.set('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,Origin');
+    }
+
+    // Handle preflight
+    if (ctx.request.method === 'OPTIONS') {
+        ctx.response.status = 204;
+        return;
+    }
+
+    await next();
+});
 
 // CSP header middleware to allow framing of specific domains
 app.use(async (ctx, next) => {

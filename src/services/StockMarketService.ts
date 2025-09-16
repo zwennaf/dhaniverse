@@ -1,7 +1,7 @@
 // Stock Market Service for UI components
 // This service provides access to stock data without requiring Phaser scene context
 
-import { realStockService } from './RealStockService';
+import { getRealStockService } from './RealStockService';
 
 export interface Stock {
   id: string;
@@ -56,7 +56,7 @@ class StockMarketService {
       console.log('💰 Using optimized batch calls to save ICP cycles!');
       
       // Start background batch loading from ICP canister
-      const realStocks = await realStockService.initializeRealStocks();
+  const realStocks = await getRealStockService().initializeRealStocks();
       
       if (!realStocks || realStocks.length === 0) {
         throw new Error('Failed to load real stock data from ICP canister');
@@ -152,7 +152,7 @@ class StockMarketService {
         
         // Use batch refresh to get updated prices from APIs
         const symbols = this.stockData.map(s => s.id.toUpperCase());
-        const updatedStocks = await realStockService.getMultipleStocks(symbols);
+  const updatedStocks = await getRealStockService().getMultipleStocks(symbols);
         
         if (updatedStocks.length > 0) {
           // Refresh our local stock data with updated prices
@@ -187,7 +187,7 @@ class StockMarketService {
    */
   async refreshStockData(): Promise<void> {
     try {
-      const updatedStocks = await realStockService.initializeRealStocks();
+  const updatedStocks = await getRealStockService().initializeRealStocks();
       
       if (updatedStocks && updatedStocks.length > 0) {
         updatedStocks.forEach((realStock: any) => {

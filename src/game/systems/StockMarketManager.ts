@@ -3,7 +3,7 @@ import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
 import { canisterService } from '../../services/CanisterService';
 import { balanceManager } from '../../services/BalanceManager';
-import { realStockService, type StockMapping } from '../../services/RealStockService';
+import { getRealStockService, type StockMapping } from '../../services/RealStockService';
 import { realStocks as stockConfig } from '../../config/RealStocks';
 
 interface NPCSprite extends GameObjects.Sprite {
@@ -567,7 +567,7 @@ export class StockMarketManager {
     console.log('Loading real stock market data from ICP canister...');
     
     // ONLY use RealStockService - NO FALLBACK to mock data
-    const realStocks = await realStockService.initializeRealStocks();
+  const realStocks = await getRealStockService().initializeRealStocks();
     
     if (!realStocks || realStocks.length === 0) {
       throw new Error('Failed to load real stock data from ICP canister. Cannot proceed without real stock prices.');

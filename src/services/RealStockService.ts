@@ -683,6 +683,11 @@ class RealStockService {
   }
 }
 
-// Export singleton instance
-export const realStockService = new RealStockService();
-export default realStockService;
+// Lazily create singleton instance to avoid initialization side-effects during pages that don't need stock data
+let _realStockService: RealStockService | null = null;
+export function getRealStockService(): RealStockService {
+  if (!_realStockService) _realStockService = new RealStockService();
+  return _realStockService;
+}
+
+export default getRealStockService;

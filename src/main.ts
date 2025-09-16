@@ -98,6 +98,15 @@ function initializeStockMarketUI() {
   const stockMarketUIContainer = document.getElementById('stock-market-ui-container');
   
   if (stockMarketUIContainer) {
+    // Avoid mounting the stock market UI on pages that don't need it (e.g., /signin, /profile)
+    const path = window.location.pathname || '/';
+    const shouldMount = path.endsWith('/game');
+
+    if (!shouldMount) {
+      console.log(`Skipping Stock Market UI mount on path=${path}`);
+      return;
+    }
+
     // Create a root and explicitly render the StockMarketUI component wrapped in AuthProvider
     const stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
     stockMarketUIRoot.render(
@@ -105,10 +114,10 @@ function initializeStockMarketUI() {
         React.createElement(StockMarketUI)
       )
     );
-    
+
     // Make sure the stock market container is visible
     stockMarketUIContainer.style.display = 'block';
-    
+
     console.log("Stock Market UI initialized and mounted with AuthProvider");
   } else {
     console.error("Could not find stock-market-ui-container element");
