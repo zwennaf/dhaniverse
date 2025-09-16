@@ -2,7 +2,13 @@ import { Router, Context } from "oak";
 import { config } from "../config/config.ts";
 import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
-import { createToken, verifyToken } from "../auth/jwt.ts";
+import { 
+  createToken, 
+  verifyToken, 
+  setCrossDomainAuthCookie,
+  clearCrossDomainAuthCookie,
+  getCrossDomainAuthToken
+} from "../auth/jwt.ts";
 import type { UserDocument, IpLogDocument } from "../db/schemas.ts";
 import { EmailService } from "../services/EmailService.ts";
 import { OTPService } from "../services/OTPService.ts";
@@ -331,16 +337,19 @@ authRouter.get("/auth/verify-magic-link", async (ctx: Context) => {
             });
             
             ctx.response.status = 200;
-            // Try to set session cookie for cross-subdomain SSO
+            // Try to set cross-domain auth cookie
             try {
                 if (result.authToken) {
+                    setCrossDomainAuthCookie(ctx, result.authToken);
+                    
+                    // Also set legacy session cookie for backward compatibility
                     const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
                     const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
                     const cookie = `session=${encodeURIComponent(result.authToken)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
                     ctx.response.headers.append('Set-Cookie', cookie);
                 }
-            } catch (_err) {
-                console.warn('Failed to set session cookie on magic-link verify:', _err);
+            } catch (err) {
+                console.warn('Failed to set session cookie on magic-link verify:', err);
             }
 
             ctx.response.body = {
@@ -428,58 +437,118 @@ authRouter.get("/auth/me", async (ctx: Context) => {
 // Session endpoint for cross-subdomain check (returns user if session cookie present)
 authRouter.get("/session", async (ctx: Context) => {
     try {
-        // Try to read bearer token first from Authorization header
-        const authHeader = ctx.request.headers.get("Authorization");
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-            const token = authHeader.substring(7);
+        const token = getCrossDomainAuthToken(ctx);
+        
+        if (token) {
             const verified = await verifyToken(token);
-            if (verified && verified.userId && typeof verified.userId === 'string') {
+            if (verified && verified.userId) {
                 const users = mongodb.getCollection<UserDocument>("users");
                 const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
                 if (userDoc) {
-                    ctx.response.body = { user: { id: userDoc._id?.toString() || "", email: userDoc.email, gameUsername: userDoc.gameUsername, selectedCharacter: userDoc.selectedCharacter || "C4" } };
+                    ctx.response.body = { 
+                        success: true,
+                        user: { 
+                            id: userDoc._id?.toString() || "", 
+                            email: userDoc.email, 
+                            gameUsername: userDoc.gameUsername, 
+                            selectedCharacter: userDoc.selectedCharacter || "C4",
+                            provider: verified.provider || 'magic-link',
+                            createdAt: userDoc.createdAt?.toISOString() || new Date().toISOString(),
+                            lastLoginAt: userDoc.lastLoginAt?.toISOString() || new Date().toISOString()
+                        } 
+                    };
                     return;
                 }
             }
         }
 
-        // If no Authorization, check for session cookie (legacy support)
-        const cookieHeader = ctx.request.headers.get("cookie") || "";
-        const match = cookieHeader.match(/session=([^;]+)/);
-        if (match) {
-            const token = decodeURIComponent(match[1]);
-            const verified = await verifyToken(token);
-            if (verified && verified.userId && typeof verified.userId === 'string') {
-                const users = mongodb.getCollection<UserDocument>("users");
-                const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
-                if (userDoc) {
-                    ctx.response.body = { user: { id: userDoc._id?.toString() || "", email: userDoc.email, gameUsername: userDoc.gameUsername, selectedCharacter: userDoc.selectedCharacter || "C4" } };
-                    return;
-                }
-            }
-        }
-
-        // No session
-        ctx.response.body = { user: null };
-    } catch (_err) {
+        // No valid session
+        ctx.response.status = 401;
+        ctx.response.body = { success: false, error: "Not authenticated" };
+    } catch (err) {
         ctx.response.status = 500;
-        ctx.response.body = { error: "Internal server error" };
-        console.error("Session endpoint error:", _err);
+        ctx.response.body = { success: false, error: "Internal server error" };
+        console.error("Session endpoint error:", err);
+    }
+});
+
+// Updated auth/session endpoint (standardized path)
+authRouter.get("/auth/session", async (ctx: Context) => {
+    try {
+        const token = getCrossDomainAuthToken(ctx);
+        
+        if (token) {
+            const verified = await verifyToken(token);
+            if (verified && verified.userId) {
+                const users = mongodb.getCollection<UserDocument>("users");
+                const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+                if (userDoc) {
+                    ctx.response.body = { 
+                        success: true,
+                        user: { 
+                            id: userDoc._id?.toString() || "", 
+                            email: userDoc.email, 
+                            gameUsername: userDoc.gameUsername, 
+                            selectedCharacter: userDoc.selectedCharacter || "C4",
+                            provider: verified.provider || 'magic-link',
+                            createdAt: userDoc.createdAt?.toISOString() || new Date().toISOString(),
+                            lastLoginAt: userDoc.lastLoginAt?.toISOString() || new Date().toISOString()
+                        } 
+                    };
+                    return;
+                }
+            }
+        }
+
+        // No valid session
+        ctx.response.status = 401;
+        ctx.response.body = { success: false, error: "Not authenticated" };
+    } catch (err) {
+        ctx.response.status = 500;
+        ctx.response.body = { success: false, error: "Internal server error" };
+        console.error("Auth session endpoint error:", err);
     }
 });
 
 // Signout endpoint to clear session cookie across subdomains
 authRouter.post("/signout", (ctx: Context) => {
     try {
-        const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
-        const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
-        const cookie = `session=; Domain=${String(domain)}; Path=/; HttpOnly; Max-Age=0${secureFlag}`;
-        ctx.response.headers.append("Set-Cookie", cookie);
+        clearCrossDomainAuthCookie(ctx);
+        
+        // Also clear legacy session cookie for backward compatibility
+        const domain = config.isDev ? 'localhost' : '.dhaniverse.in';
+        const secure = config.isDev ? '' : '; Secure';
+        const sameSite = config.isDev ? '; SameSite=Lax' : '; SameSite=Lax';
+        const legacyCookie = `session=; Domain=${domain}; Path=/; HttpOnly; Max-Age=0${secure}${sameSite}`;
+        ctx.response.headers.append("Set-Cookie", legacyCookie);
+        
         ctx.response.status = 200;
-        ctx.response.body = { success: true };
-    } catch (_err) {
+        ctx.response.body = { success: true, message: "Signed out successfully" };
+    } catch (err) {
         ctx.response.status = 500;
-        ctx.response.body = { error: "Failed to sign out" };
+        ctx.response.body = { success: false, error: "Failed to sign out" };
+        console.error("Signout error:", err);
+    }
+});
+
+// Updated auth/signout endpoint (standardized path)
+authRouter.post("/auth/signout", (ctx: Context) => {
+    try {
+        clearCrossDomainAuthCookie(ctx);
+        
+        // Also clear legacy session cookie for backward compatibility
+        const domain = config.isDev ? 'localhost' : '.dhaniverse.in';
+        const secure = config.isDev ? '' : '; Secure';
+        const sameSite = config.isDev ? '; SameSite=Lax' : '; SameSite=Lax';
+        const legacyCookie = `session=; Domain=${domain}; Path=/; HttpOnly; Max-Age=0${secure}${sameSite}`;
+        ctx.response.headers.append("Set-Cookie", legacyCookie);
+        
+        ctx.response.status = 200;
+        ctx.response.body = { success: true, message: "Signed out successfully" };
+    } catch (err) {
+        ctx.response.status = 500;
+        ctx.response.body = { success: false, error: "Failed to sign out" };
+        console.error("Auth signout error:", err);
     }
 });
 
@@ -551,6 +620,33 @@ authRouter.post("/auth/validate-token", async (ctx: Context) => {
             error: "Internal server error",
         };
         console.error("Token validation error:", error);
+    }
+});
+
+// Standardized verify-token endpoint for Next.js middleware
+authRouter.post("/auth/verify-token", async (ctx: Context) => {
+    try {
+        const body = await ctx.request.body.json();
+        const { token } = body;
+
+        if (!token) {
+            ctx.response.body = { valid: false, error: "Token is required" };
+            return;
+        }
+
+        const payload = await verifyToken(token);
+        
+        if (payload && payload.userId) {
+            ctx.response.body = {
+                valid: true,
+                payload,
+            };
+        } else {
+            ctx.response.body = { valid: false, error: "Invalid token" };
+        }
+    } catch (error) {
+        console.error("Token verification error:", error);
+        ctx.response.body = { valid: false, error: "Token verification failed" };
     }
 });
 
@@ -743,7 +839,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                 return;
             }
             // User exists, sign them in (preserves balances and profile)
-            const token = await createToken(user.id);
+            const token = await createToken(user.id, user.email, user.gameUsername, 'google');
             
             // Log IP access
             const clientIp = (ctx.state as { clientIp?: string }).clientIp;
@@ -753,16 +849,19 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                 ip: clientIp
             });
             
-            // Set session cookie for cross-subdomain SSO
+            // Set cross-domain auth cookie
             try {
                 if (token) {
+                    setCrossDomainAuthCookie(ctx, token);
+                    
+                    // Also set legacy session cookie for backward compatibility
                     const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
                     const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
                     const cookie = `session=${encodeURIComponent(token)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
                     ctx.response.headers.append('Set-Cookie', cookie);
                 }
-            } catch (_err) {
-                console.warn('Failed to set session cookie on google-auth existing user:', _err);
+            } catch (err) {
+                console.warn('Failed to set session cookie on google-auth existing user:', err);
             }
 
             ctx.response.body = {
@@ -809,7 +908,7 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         }; 
         return; 
     }
-    const token = await createToken(newUser.id);
+    const token = await createToken(newUser.id, newUser.email, newUser.gameUsername, 'google');
     
     // Log IP access for new user
     const clientIp = (ctx.state as { clientIp?: string }).clientIp;
@@ -819,16 +918,19 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         ip: clientIp
     });
     
-        // Set session cookie for new user
+        // Set cross-domain auth cookie for new user
         try {
             if (token) {
+                setCrossDomainAuthCookie(ctx, token);
+                
+                // Also set legacy session cookie for backward compatibility
                 const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
                 const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
                 const cookie = `session=${encodeURIComponent(token)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
                 ctx.response.headers.append('Set-Cookie', cookie);
             }
-        } catch (_err) {
-            console.warn('Failed to set session cookie on google-auth new user:', _err);
+        } catch (err) {
+            console.warn('Failed to set session cookie on google-auth new user:', err);
         }
 
         ctx.response.status = 201;
@@ -896,7 +998,7 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
                 { $set: { lastLoginAt: new Date() } }
             );
 
-            const token = await createToken(user._id!.toString());
+            const token = await createToken(user._id!.toString(), user.email || `${user._id!.toString()}@ic`, user.gameUsername, 'internet-identity');
             
             // Log IP access
             const clientIp = (ctx.state as { clientIp?: string }).clientIp;
@@ -952,7 +1054,7 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
             selectedCharacter: "C2",
         };
 
-        const token = await createToken(newUser.id);
+        const token = await createToken(newUser.id, `${newUser.id}@ic`, newUser.gameUsername, 'internet-identity');
         
         // Log IP access for new user
         const clientIp = (ctx.state as { clientIp?: string }).clientIp;

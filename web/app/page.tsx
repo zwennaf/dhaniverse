@@ -12,7 +12,7 @@ import ScrollVelocityTestimonials from './atoms/ScrollVelocityTestimonials';
 import RevealOnScroll from './atoms/RevealOnScroll';
 import VideoPlayer from './atoms/VideoPlayer';
 import GlobalIntro from './atoms/GlobalIntro';
-import SEO from './SEO';
+// SEO is handled by layout metadata and server-side metadata exports; remove client-side SEO component
 
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import LeafIcon from './icons/LeafIcon';
@@ -158,13 +158,7 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen relative flex flex-col text-white bg-black">
-      <SEO 
-        title="Dhaniverse - Learn Finance Through Gaming | Financial Literacy Game"
-        description="Master money management through India's first financial literacy RPG game. Learn investing, budgeting & personal finance skills. Free to play, built for Gen Z & millennials."
-        keywords="dhaniverse, financial literacy game, money management game, investing game, budgeting game, personal finance education, financial RPG, stock market simulator, Gen Z finance, millennial finance, gamified learning, financial education India, learn finance through gaming, money skills game, investment simulator, budget simulator, financial planning game, wealth building game, banking simulation, financial wisdom, money management skills, personal finance app, financial learning platform, interactive finance education"
-        url="https://dhaniverse.in/"
-        type="website"
-      />
+      {/* Page-specific SEO is handled in layout metadata; remove client-side SEO component */}
 
       <GlobalIntro />
 

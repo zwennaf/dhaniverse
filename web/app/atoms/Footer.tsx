@@ -26,6 +26,7 @@ const Footer = ({ className }: FooterProps) => {
             <Link href="https://gursimran.me" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Gursimran Singh</Link>
             <a href="https://www.linkedin.com/in/jashanjotsingh01" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Jashanjot Singh</a>
             <a href="https://www.linkedin.com/in/aagam-jain0" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Aagam Jain</a>
+            <a href="https://ekas.site" target='_blank' className="hover:text-dhani-gold transition-colors text-xs sm:text-sm md:text-base whitespace-nowrap px-2">Ekaspreet Singh</a>
           </div>
         </div>
         

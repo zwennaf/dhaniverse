@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
-import { navigateToProfile } from '../utils/navigation';
+import { navigateToProfile, getCurrentEnvironment } from '../utils/navigation';
 
 export default function ProfileRedirectPage() {
   useEffect(() => {
-    // Redirect to game client for profile
+    // Redirect to game client for profile (environment-aware)
+    if (process.env.NODE_ENV === 'development') {
+      // In dev, prefer local game dev server if available
+      const env = getCurrentEnvironment();
+      console.log('Profile redirect env:', env);
+    }
     navigateToProfile();
   }, []);
 

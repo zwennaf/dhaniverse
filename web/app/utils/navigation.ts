@@ -9,17 +9,24 @@ const port = isClient ? window.location.port : '';
 const isDevelopment = isClient && (hostname === 'localhost' || hostname === '127.0.0.1');
 const isProduction = !isDevelopment;
 
-// Base URLs for different environments
+// Allow runtime overrides via env vars (useful in CI/containers)
+const OVERRIDES = {
+  web: process.env.NEXT_PUBLIC_WEB_URL,
+  game: process.env.NEXT_PUBLIC_GAME_URL,
+  api: process.env.NEXT_PUBLIC_API_BASE_URL,
+};
+
+// Base URLs for different environments (fallbacks)
 const URLS = {
   development: {
-    web: `http://localhost:3000`,           // Landing page (Next.js)
-    game: `http://localhost:5173`,          // Game client (Vite)
-    api: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000',
+    web: OVERRIDES.web || `http://localhost:3000`,           // Landing page (Next.js)
+    game: OVERRIDES.game || `http://localhost:5173`,        // Game client (Vite)
+    api: OVERRIDES.api || 'http://localhost:8000',
   },
   production: {
-    web: 'https://dhaniverse.in',           // Landing page
-    game: 'https://game.dhaniverse.in',     // Game client  
-    api: 'https://api.dhaniverse.in',       // API server
+    web: OVERRIDES.web || 'https://dhaniverse.in',
+    game: OVERRIDES.game || 'https://game.dhaniverse.in',
+    api: OVERRIDES.api || 'https://api.dhaniverse.in',
   },
 };
 
@@ -31,7 +38,14 @@ export const navigationUrls = {
   // Auth pages (handled by game client)
   signIn: `${urls.game}/sign-in`,
   signUp: `${urls.game}/sign-up`, 
-  profile: `${urls.game}/profile`,
+  // Profile should point to the game client in production, but use the dev game server in development.
+  profile: (() => {
+    // If an explicit override is set, use that
+    if (OVERRIDES.game) return `${OVERRIDES.game.replace(/\/$/, '')}/profile`;
+    // If running on the game dev server already, use a relative path
+    if (isClient && (hostname === 'localhost' && port === '5173')) return '/profile';
+    return `${urls.game}/profile`;
+  })(),
   
   // Game (on game domain, but route to /play)
   game: `${urls.game}/play`,

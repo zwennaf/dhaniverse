@@ -1,14 +1,7 @@
 // Email Service using Nodemailer for OTP functionality
 import nodemailer from "nodemailer";
 
-// Declare Deno global for TypeScript
-declare global {
-    var Deno: {
-        env: {
-            get(key: string): string | undefined;
-        };
-    };
-}
+
 
 interface EmailConfig {
     host?: string;
@@ -138,7 +131,7 @@ export class EmailService {
         }
     }
 
-    private async sendEmailWithRetry(mailOptions: any, retries: number = 0): Promise<boolean> {
+    private async sendEmailWithRetry(mailOptions: nodemailer.SendMailOptions, retries: number = 0): Promise<boolean> {
         try {
             const info = await this.transporter.sendMail(mailOptions);
             console.log(`✅ Email sent successfully:`, info.messageId);
@@ -165,7 +158,7 @@ export class EmailService {
         }
     }
 
-    private async reconfigureWithAlternative(): Promise<void> {
+    private reconfigureWithAlternative(): Promise<void> {
         try {
             console.log("🔄 Trying alternative email configuration...");
             
@@ -191,6 +184,7 @@ export class EmailService {
         } catch (error) {
             console.error("❌ Failed to reconfigure transporter:", error);
         }
+        return Promise.resolve();
     }
 
     /**
