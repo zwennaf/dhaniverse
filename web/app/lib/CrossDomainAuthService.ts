@@ -32,6 +32,7 @@ export interface AuthResponse {
   user?: DhaniverseUser;
   error?: string;
   isNewUser?: boolean;
+  message?: string;
 }
 
 export class CrossDomainAuthService {
