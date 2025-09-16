@@ -9,6 +9,7 @@ import { initializeBankAccountCreationFlow } from './ui/components/banking/BankA
 import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
 import { AuthProvider } from './ui/contexts/AuthContext.tsx';
 import { banCheckService } from './services/BanCheckService.ts';
+import { initializeRouting } from './utils/navigation.ts';
 
 // Optional: Vercel Speed Insights (Next.js component). If package isn't installed this import will be ignored by TypeScript with the ts-ignore below.
 
@@ -23,6 +24,10 @@ let hudRootRef: ReactDOM.Root | null = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize routing system first (handles cross-domain redirects)
+  // NOTE: Commented out to let React Router handle routing instead
+  // initializeRouting();
+  
   // Suppress Google FedCM warnings early
   suppressFedCMWarnings();
   

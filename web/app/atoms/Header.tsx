@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PixelButton from './PixelButton';
 import { cn } from '../lib/utils';
 import CoinIcon from '../icons/CoinIcon';
+import { navigateToGame, navigateToSignIn, navigationUrls } from '../utils/navigation';
 
 interface HeaderProps { 
   className?: string;
@@ -28,12 +29,17 @@ const Header = ({ className, isSignedIn = false, onProfile, onSignOut }: HeaderP
   }, []);
 
   const handleSignOut = () => {
-    // For simple auth, just clear localStorage and redirect
+    // For simple auth, prefer a provided handler (page-level) so it can
+    // manage routing and analytics. Fallback to clearing token and redirect.
+    if (onSignOut) {
+      onSignOut();
+      return;
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('dhaniverse_token');
-      window.location.href = 'https://dhaniverse.in/sign-in';
+      // Use navigation utility for environment-aware URLs
+      navigateToSignIn();
     }
-    if (onSignOut) onSignOut();
   };
 
   return (
@@ -45,14 +51,14 @@ const Header = ({ className, isSignedIn = false, onProfile, onSignOut }: HeaderP
       )}
     >
       <div className={introActive ? 'invisible' : 'visible'}>
-        <a href="/" data-brand-anchor className="flex gap-4 items-center">
+        <a href={navigationUrls.home} data-brand-anchor className="flex gap-4 items-center">
           <CoinIcon className="h-6 w-6 mr-2 text-dhani-gold" />
           <span className="font-vcr text-dhani-text text-2xl sm:text-3xl lg:text-4xl">Dhaniverse</span>
         </a>
       </div>
       {isSignedIn ? (
         <div className={cn('flex gap-3 transition-opacity duration-300', introActive ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
-          <PixelButton size='lg' className="hover:bg-dhani-gold/50" onClick={() => window.location.href = 'https://dhaniverse.in/game'}>
+          <PixelButton size='lg' className="hover:bg-dhani-gold/50" onClick={navigateToGame}>
             Play Now
           </PixelButton>
           <PixelButton variant="signout" className="hover:bg-red-400/70" onClick={handleSignOut}>
@@ -63,7 +69,7 @@ const Header = ({ className, isSignedIn = false, onProfile, onSignOut }: HeaderP
         <PixelButton 
           size='lg' 
           className={cn('hover:bg-dhani-gold/50 transition-opacity duration-300', introActive ? 'opacity-0 pointer-events-none' : 'opacity-100')}
-          onClick={() => window.location.href = 'https://dhaniverse.in/sign-in'}
+          onClick={navigateToSignIn}
         >
           Sign In
         </PixelButton>

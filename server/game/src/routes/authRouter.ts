@@ -1,4 +1,5 @@
 import { Router, Context } from "oak";
+import { config } from "../config/config.ts";
 import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
 import { createToken, verifyToken } from "../auth/jwt.ts";
@@ -330,6 +331,18 @@ authRouter.get("/auth/verify-magic-link", async (ctx: Context) => {
             });
             
             ctx.response.status = 200;
+            // Try to set session cookie for cross-subdomain SSO
+            try {
+                if (result.authToken) {
+                    const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
+                    const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
+                    const cookie = `session=${encodeURIComponent(result.authToken)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
+                    ctx.response.headers.append('Set-Cookie', cookie);
+                }
+            } catch (_err) {
+                console.warn('Failed to set session cookie on magic-link verify:', _err);
+            }
+
             ctx.response.body = {
                 success: true,
                 message: result.message,
@@ -409,6 +422,64 @@ authRouter.get("/auth/me", async (ctx: Context) => {
         ctx.response.status = 500;
         ctx.response.body = { error: "Internal server error" };
         console.error("Get user error:", error);
+    }
+});
+
+// Session endpoint for cross-subdomain check (returns user if session cookie present)
+authRouter.get("/session", async (ctx: Context) => {
+    try {
+        // Try to read bearer token first from Authorization header
+        const authHeader = ctx.request.headers.get("Authorization");
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            const token = authHeader.substring(7);
+            const verified = await verifyToken(token);
+            if (verified && verified.userId && typeof verified.userId === 'string') {
+                const users = mongodb.getCollection<UserDocument>("users");
+                const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+                if (userDoc) {
+                    ctx.response.body = { user: { id: userDoc._id?.toString() || "", email: userDoc.email, gameUsername: userDoc.gameUsername, selectedCharacter: userDoc.selectedCharacter || "C4" } };
+                    return;
+                }
+            }
+        }
+
+        // If no Authorization, check for session cookie (legacy support)
+        const cookieHeader = ctx.request.headers.get("cookie") || "";
+        const match = cookieHeader.match(/session=([^;]+)/);
+        if (match) {
+            const token = decodeURIComponent(match[1]);
+            const verified = await verifyToken(token);
+            if (verified && verified.userId && typeof verified.userId === 'string') {
+                const users = mongodb.getCollection<UserDocument>("users");
+                const userDoc = await users.findOne({ _id: new ObjectId(verified.userId) });
+                if (userDoc) {
+                    ctx.response.body = { user: { id: userDoc._id?.toString() || "", email: userDoc.email, gameUsername: userDoc.gameUsername, selectedCharacter: userDoc.selectedCharacter || "C4" } };
+                    return;
+                }
+            }
+        }
+
+        // No session
+        ctx.response.body = { user: null };
+    } catch (_err) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Internal server error" };
+        console.error("Session endpoint error:", _err);
+    }
+});
+
+// Signout endpoint to clear session cookie across subdomains
+authRouter.post("/signout", (ctx: Context) => {
+    try {
+        const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
+        const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
+        const cookie = `session=; Domain=${String(domain)}; Path=/; HttpOnly; Max-Age=0${secureFlag}`;
+        ctx.response.headers.append("Set-Cookie", cookie);
+        ctx.response.status = 200;
+        ctx.response.body = { success: true };
+    } catch (_err) {
+        ctx.response.status = 500;
+        ctx.response.body = { error: "Failed to sign out" };
     }
 });
 
@@ -682,6 +753,18 @@ authRouter.post("/auth/google", async (ctx: Context) => {
                 ip: clientIp
             });
             
+            // Set session cookie for cross-subdomain SSO
+            try {
+                if (token) {
+                    const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
+                    const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
+                    const cookie = `session=${encodeURIComponent(token)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
+                    ctx.response.headers.append('Set-Cookie', cookie);
+                }
+            } catch (_err) {
+                console.warn('Failed to set session cookie on google-auth existing user:', _err);
+            }
+
             ctx.response.body = {
                 success: true,
                 token,
@@ -736,6 +819,18 @@ authRouter.post("/auth/google", async (ctx: Context) => {
         ip: clientIp
     });
     
+        // Set session cookie for new user
+        try {
+            if (token) {
+                const domain = Deno.env.get('SERVER_DOMAIN') || (config.isDev ? 'localhost' : '.dhaniverse.in');
+                const secureFlag = config.isDev ? '' : '; Secure; SameSite=None';
+                const cookie = `session=${encodeURIComponent(token)}; Path=/; HttpOnly; Domain=${String(domain)}; Max-Age=${7 * 24 * 60 * 60}${secureFlag}`;
+                ctx.response.headers.append('Set-Cookie', cookie);
+            }
+        } catch (_err) {
+            console.warn('Failed to set session cookie on google-auth new user:', _err);
+        }
+
         ctx.response.status = 201;
         ctx.response.body = {
             success: true,

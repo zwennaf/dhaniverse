@@ -11,10 +11,10 @@ Founded: 2025
 Location: India
 
 /* CONTACT */
-Website: https://dhaniverse.in/
+Website: /
 GitHub: @Gursimrxn
 Twitter: @dhaniverse
-Email: hello@dhaniverse.in
+Email: support@dhaniverse.in
 
 /* TECHNOLOGY */
 Frontend: React, TypeScript, Tailwind CSS, Vite

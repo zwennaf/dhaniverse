@@ -7,9 +7,12 @@
       "package_path": "packages/icp-canister",
       "candid": "packages/icp-canister/rust_icp_canister.did"
     },
-    "frontend_assets": {
+    "landing_page": {
       "type": "assets",
-      "source": ["dist"]
+      "source": ["web/out"],
+      "declarations": {
+        "node_compatibility": true
+      }
     }
   },
   "networks": {

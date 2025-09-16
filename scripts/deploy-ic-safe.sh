@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Safe IC Network Deployment Script for Dhaniverse Frontend Assets
-# This script includes cycle checking and cost estimation to prevent overspending
+# Safe IC Network Deployment Script for Dhaniverse Landing Page
+# This script deploys the web client (Next.js landing page) to IC with custom domain support
 
 set -euo pipefail
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CANISTER_NAME="frontend_assets"
+CANISTER_NAME="landing_page"
 IDENTITY_NAME="dhaniverse-deploy"
 MIN_CYCLES_REQUIRED=5000000000000  # 5T cycles (conservative estimate)
 SAFETY_BUFFER=2000000000000        # 2T cycles safety buffer

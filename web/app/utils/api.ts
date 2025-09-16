@@ -1,8 +1,9 @@
 // API utility functions for backend communication
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 
-  ((typeof window !== "undefined" && window.location.hostname === "localhost")
-    ? "http://localhost:8000"
-    : "https://api.dhaniverse.in");
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ||
+    (typeof window !== "undefined" ? (
+        // If running on localhost use local backend; otherwise derive API host from origin
+        window.location.hostname === 'localhost' ? 'http://localhost:8000' : `${window.location.origin.replace(/^https?:/, '') ? window.location.origin.replace(/(^https?:)/, '') : window.location.origin}`
+    ) : 'https://api.dhaniverse.in');
    
 
 // Helper function to get auth headers

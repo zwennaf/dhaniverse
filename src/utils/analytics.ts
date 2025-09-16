@@ -103,6 +103,16 @@ export const analytics = {
             });
         }
     },
+
+    // Sign-out event
+    trackSignOut: (reason?: string) => {
+        if (typeof window !== "undefined" && window.gtag) {
+            window.gtag("event", "sign_out", {
+                event_category: "authentication",
+                event_label: reason || "user_initiated",
+            });
+        }
+    },
 };
 
 export default analytics;

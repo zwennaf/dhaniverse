@@ -10,14 +10,16 @@ interface SEOProps {
     noIndex?: boolean;
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://dhaniverse.in');
+
 const defaultSEO = {
     title: "Dhaniverse - Learn Finance Through Gaming | Financial Literacy Game",
     description:
         "Master money management through India's first financial literacy RPG game. Learn investing, budgeting & personal finance skills. Free to play, built for Gen Z & millennials.",
     keywords:
         "dhaniverse, financial literacy game, money management game, investing game, budgeting game, personal finance education, financial RPG, stock market simulator, Gen Z finance, millennial finance, gamified learning, financial education India, learn finance through gaming, money skills game, investment simulator, budget simulator, financial planning game, wealth building game, banking simulation, financial wisdom, money management skills, personal finance app, financial learning platform, interactive finance education",
-    image: "https://dhaniverse.in/og-image.jpg",
-    url: "https://dhaniverse.in/",
+    image: `${SITE_URL}/og-image.jpg`,
+    url: SITE_URL,
     type: "website",
 };
 

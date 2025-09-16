@@ -34,3 +34,4 @@ target/
 *.pdb
 
 web/.next
+web/out
