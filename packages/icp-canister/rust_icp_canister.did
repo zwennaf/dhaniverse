@@ -178,6 +178,16 @@ type Result_12 = variant {
   Err: text;
 };
 
+type PriceEntry = record {
+  symbol: text;
+  price: float64;
+};
+
+type PriceSnapshot = record {
+  timestamp: nat64;
+  prices: vec PriceEntry;
+};
+
 service : {
   // Authentication Methods
   authenticate_with_signature: (text, text) -> (Result);
@@ -210,6 +220,19 @@ service : {
   fetch_multiple_crypto_prices: (text) -> (Result_11);
   fetch_stock_price: (text) -> (Result_10);
   update_prices_from_external: () -> (Result_12);
+
+  // In-memory price buffer endpoints (monitoring.rs)
+  // Returns the in-memory price history (most-recent last)
+  get_price_history: () -> (vec PriceSnapshot) query;
+
+  // Fetches prices for comma-separated token ids and appends a snapshot.
+  // Returns Ok(new_history_length) or Err(text)
+  // CoinGecko API endpoints for historical data
+  fetch_coin_market_chart_range: (text, text, nat64, nat64) -> (variant { Ok: vec record { text; vec record { nat64; float64 } }; Err: text });
+  fetch_coin_ohlc: (text, text, nat32) -> (variant { Ok: vec record { nat64; float64; float64; float64; float64 }; Err: text });
+  fetch_coin_history: (text, text) -> (variant { Ok: vec record { text; float64 }; Err: text });
+
+  fetch_and_append_snapshot: (text) -> (variant { Ok: nat64; Err: text });
 
   // Health check
   health_check: () -> (text) query;

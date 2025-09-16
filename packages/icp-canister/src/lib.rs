@@ -199,6 +199,15 @@ async fn force_append_price_snapshot(token_ids: String) -> Result<usize, String>
     monitoring::fetch_and_append_snapshot(&token_ids).await
 }
 
+// Exported update wrapper to match candid DID: fetch_and_append_snapshot(text) -> (variant { Ok: nat64; Err: text })
+#[ic_cdk::update]
+async fn fetch_and_append_snapshot(token_ids: String) -> Result<u64, String> {
+    match monitoring::fetch_and_append_snapshot(&token_ids).await {
+        Ok(n) => Ok(n as u64),
+        Err(e) => Err(e),
+    }
+}
+
 #[ic_cdk::update]
 async fn optimize_memory() -> Result<(), String> {
     monitoring::optimize_memory();
@@ -364,6 +373,99 @@ async fn fetch_stock_price(symbol: String) -> Result<Option<f64>, String> {
     Ok(prices.into_iter().find(|(s, _)| s == &symbol).map(|(_, p)| p))
 }
 
+// CoinGecko API endpoints for historical data
+#[ic_cdk::update]
+async fn fetch_coin_market_chart_range(coin_id: String, vs_currency: String, from: u64, to: u64) -> Result<Vec<(String, Vec<(u64, f64)>)>, String> {
+    match http_client::fetch_coin_market_chart_range(&coin_id, &vs_currency, from, to).await {
+        Ok(data) => {
+            let mut result = Vec::new();
+            for (key, values) in data {
+                result.push((key, values));
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e)
+    }
+}
+
+#[ic_cdk::update]
+async fn fetch_coin_ohlc(coin_id: String, vs_currency: String, days: u32) -> Result<Vec<(u64, f64, f64, f64, f64)>, String> {
+    http_client::fetch_coin_ohlc(&coin_id, &vs_currency, days).await
+}
+
+#[ic_cdk::update]
+async fn fetch_coin_history(coin_id: String, days: String) -> Result<Vec<(String, f64)>, String> {
+    // Validate and parse the days parameter with better error handling
+    let days_num = match days.trim().parse::<u32>() {
+        Ok(num) => {
+            if num == 0 {
+                return Err("Days parameter must be greater than 0".to_string());
+            }
+            if num > 365 {
+                return Err("Days parameter cannot exceed 365".to_string());
+            }
+            num
+        }
+        Err(_) => {
+            return Err(format!(
+                "Invalid days parameter '{}'. Expected a number between 1 and 365 (e.g., '7', '30', '90')", 
+                days
+            ));
+        }
+    };
+
+    ic_cdk::println!("Fetching {} days of price history for {}", days_num, coin_id);
+
+    match http_client::fetch_coin_market_chart(&coin_id, "usd", days_num).await {
+        Ok(data) => {
+            // Extract just the prices and convert timestamps to date strings
+            if let Some(prices) = data.get("prices") {
+                let mut result = Vec::new();
+                for (timestamp_ms, price) in prices {
+                    // Convert timestamp from milliseconds to date string
+                    let timestamp_secs = timestamp_ms / 1000;
+                    let date = format_timestamp_to_date(timestamp_secs);
+                    result.push((date, *price));
+                }
+                
+                if result.is_empty() {
+                    Err("No price data found in response".to_string())
+                } else {
+                    ic_cdk::println!("Successfully fetched {} price points", result.len());
+                    Ok(result)
+                }
+            } else {
+                Err("No 'prices' field found in API response".to_string())
+            }
+        }
+        Err(e) => {
+            ic_cdk::println!("API error: {}", e);
+            Err(e)
+        }
+    }
+}
+
+fn format_timestamp_to_date(timestamp: u64) -> String {
+    // Simple date formatting - converts Unix timestamp to YYYY-MM-DD
+    let days_since_epoch = timestamp / (24 * 60 * 60);
+    let epoch_year = 1970;
+    let mut year = epoch_year;
+    let mut remaining_days = days_since_epoch;
+    
+    // Simple year calculation (not accounting for leap years for simplicity)
+    while remaining_days >= 365 {
+        remaining_days -= 365;
+        year += 1;
+    }
+    
+    // Simple month/day calculation
+    let month = ((remaining_days / 30) + 1).min(12);
+    let day = ((remaining_days % 30) + 1).min(31);
+    
+    format!("{:04}-{:02}-{:02}", year, month, day)
+}
+
+// Exported update wrapper to match candid DID: fetch_and_append_snapshot(text) -> (variant { Ok: nat64; Err: text })
 #[ic_cdk::update]
 async fn update_prices_from_external() -> Result<usize, String> {
     // Fetch major crypto prices
