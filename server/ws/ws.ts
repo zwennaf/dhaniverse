@@ -143,6 +143,36 @@ const SERVER_START_TIME = Date.now();
 const PORT = parseInt(Deno.env.get("PORT") || "8000");
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",");
 
+function buildCorsHeaders(req: Request, extraHeaders?: Record<string, string>) {
+    const origin = req.headers.get('Origin') || req.headers.get('origin') || '';
+    const defaultOrigins = [
+        'https://dhaniverse.in',
+        'https://game.dhaniverse.in',
+        'https://www.dhaniverse.in',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://localhost:8000',
+    ];
+    const envAllowed = ALLOWED_ORIGINS.map(s => s.trim()).filter(Boolean);
+    const allowed = new Set([...defaultOrigins, ...envAllowed]);
+    const headers: Record<string, string> = {};
+
+    if (origin && (allowed.has(origin) || Deno.env.get('DENO_ENV') === 'development')) {
+        headers['Access-Control-Allow-Origin'] = origin;
+        headers['Access-Control-Allow-Credentials'] = 'true';
+        headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+        headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Upgrade, Connection';
+    } else {
+        headers['Access-Control-Allow-Origin'] = '*';
+    }
+
+    if (extraHeaders) {
+        Object.assign(headers, extraHeaders);
+    }
+
+    return headers;
+}
+
 // Player data interface
 interface PlayerData {
     id: string;
@@ -1072,10 +1102,7 @@ Deno.serve({
                     uptime: Math.floor((Date.now() - SERVER_START_TIME) / 1000), // in seconds
                 }),
                 {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                    },
+                    headers: buildCorsHeaders(req, { 'Content-Type': 'application/json' }),
                 }
             );
         }
@@ -1089,10 +1116,7 @@ Deno.serve({
                     environment: Deno.env.get("DENO_ENV") || "development",
                 }),
                 {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                    },
+                    headers: buildCorsHeaders(req, { 'Content-Type': 'application/json' }),
                 }
             );
         }
@@ -1106,11 +1130,7 @@ Deno.serve({
                     timestamp: Date.now(),
                 }),
                 {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                    },
+                    headers: buildCorsHeaders(req, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store, must-revalidate' }),
                 }
             );
         }
@@ -1122,7 +1142,7 @@ Deno.serve({
                 const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
                 const admin = await validateAdminToken(token);
                 if (!admin) {
-                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
                 try {
                     const body = await req.json();
@@ -1130,8 +1150,8 @@ Deno.serve({
                     const email = body.email as string | undefined;
                     const reason = body.reason || 'Force disconnect by admin';
                     
-                    if (!userId && !email) {
-                        return new Response(JSON.stringify({ error:'missing userId or email' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                        if (!userId && !email) {
+                        return new Response(JSON.stringify({ error:'missing userId or email' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                     }
                     
                     // Find connections for this user
@@ -1171,9 +1191,9 @@ Deno.serve({
                         timestamp: Date.now()
                     });
                     
-                    return new Response(JSON.stringify({ status:'ok', kicked }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ status:'ok', kicked }), { status: 200, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 } catch(_error) {
-                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
             })();
         }
@@ -1185,13 +1205,13 @@ Deno.serve({
                 const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
                 const admin = await validateAdminToken(token);
                 if (!admin) {
-                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
                 try {
                     const body = await req.json();
                     const message = body.message as string;
                     if (!message?.trim()) {
-                        return new Response(JSON.stringify({ error:'missing message' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                        return new Response(JSON.stringify({ error:'missing message' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                     }
                     
                     // Broadcast announcement to all connected players
@@ -1210,9 +1230,9 @@ Deno.serve({
                         timestamp: Date.now()
                     });
                     
-                    return new Response(JSON.stringify({ status:'ok', broadcasted: getOnlineUsersCount() }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ status:'ok', broadcasted: getOnlineUsersCount() }), { status: 200, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 } catch(_error) {
-                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
             })();
         }
@@ -1224,13 +1244,13 @@ Deno.serve({
                 const token = auth.startsWith('Bearer ') ? auth.slice(7) : undefined;
                 const admin = await validateAdminToken(token);
                 if (!admin) {
-                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
                 try {
                     const body = await req.json();
                     const { type, value, reason, expiresAt } = body;
                     if (!type || !value) {
-                        return new Response(JSON.stringify({ error:'missing type or value' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                        return new Response(JSON.stringify({ error:'missing type or value' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                     }
                     
                     // Find and kick matching connections immediately
@@ -1285,9 +1305,9 @@ Deno.serve({
                         timestamp: Date.now()
                     });
                     
-                    return new Response(JSON.stringify({ status:'ok', banned: value, kicked }), { status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ status:'ok', banned: value, kicked }), { status: 200, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 } catch(_error) {
-                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' } });
+                    return new Response(JSON.stringify({ error:'bad_request' }), { status: 400, headers: buildCorsHeaders(req, { 'Content-Type':'application/json' }) });
                 }
             })();
         }
@@ -1297,7 +1317,7 @@ Deno.serve({
             const upgrade = req.headers.get('upgrade');
             const connectionHeader = req.headers.get('connection');
             if (upgrade !== 'websocket' || !connectionHeader?.toLowerCase().includes('upgrade')) {
-                return new Response('Expected WebSocket upgrade', { status: 400 });
+                return new Response('Expected WebSocket upgrade', { status: 400, headers: buildCorsHeaders(req, { 'Content-Type': 'text/plain' }) });
             }
             // Token from query (since custom headers are harder on some clients)
             const token = url.searchParams.get('token') || undefined;
@@ -1373,10 +1393,7 @@ Deno.serve({
                 "WebSocket endpoint - use WebSocket connection",
                 {
                     status: 400,
-                    headers: {
-                        "Content-Type": "text/plain",
-                        "Access-Control-Allow-Origin": "*",
-                    },
+                    headers: buildCorsHeaders(req, { 'Content-Type': 'text/plain' }),
                 }
             );
         }

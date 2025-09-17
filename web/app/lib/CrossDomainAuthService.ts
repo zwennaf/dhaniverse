@@ -41,8 +41,8 @@ export class CrossDomainAuthService {
   private isInitialized = false;
   private authListeners: ((user: DhaniverseUser | null) => void)[] = [];
 
-  // API base URL with environment detection
-  private apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ||
+  // API base URL with environment detection (prefer public env var set at build/runtime)
+  private apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_API_BASE_URL ||
     ((typeof window !== "undefined" && window.location.hostname === "localhost")
       ? "http://localhost:8000"
       : "https://api.dhaniverse.in");

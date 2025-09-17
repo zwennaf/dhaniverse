@@ -76,13 +76,25 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
 authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
     // Read allowed origins from environment (comma-separated)
     const raw = Deno.env.get("ALLOWED_ORIGINS") || "";
-    const allowed = raw.split(",").map((s: string) => (s || "").trim()).filter(Boolean);
+    const envAllowed = raw.split(",").map((s: string) => (s || "").trim()).filter(Boolean);
+
+    // Default allowed origins (include production game domain)
+    const defaultOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'https://dhaniverse.in',
+        'https://www.dhaniverse.in',
+        'https://game.dhaniverse.in'
+    ];
+
+    const allowed = Array.from(new Set([...defaultOrigins, ...envAllowed]));
 
     // Get request origin
     const origin = ctx.request.headers.get("origin") || ctx.request.headers.get("Origin");
 
     // If origin is allowed, echo it back. Otherwise, do not set Access-Control-Allow-Origin.
-    if (origin && (allowed.length === 0 || allowed.includes(origin))) {
+    if (origin && allowed.includes(origin)) {
         ctx.response.headers.set("Access-Control-Allow-Origin", origin);
     } else if (origin && !allowed.includes(origin)) {
         // Origin not allowed - for preflight, return 403; for other requests, proceed without CORS header
@@ -91,8 +103,8 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
             ctx.response.body = { error: "CORS origin not allowed" };
             return;
         }
-    } else if (!origin && allowed.length === 0) {
-        // No Origin header (e.g., server-to-server) and no allowed list configured -> allow
+    } else if (!origin) {
+        // No Origin header (e.g., server-to-server) -> allow
         ctx.response.headers.set("Access-Control-Allow-Origin", "*");
     }
 
@@ -667,14 +679,21 @@ authRouter.post("/auth/verify-token", async (ctx: Context) => {
 // Update user profile endpoint
 authRouter.put("/auth/profile", async (ctx: Context) => {
     try {
+        // Prefer Authorization header, fallback to cross-domain session cookie
+        let token: string | null = null;
         const authHeader = ctx.request.headers.get("Authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            token = getCrossDomainAuthToken(ctx) || null;
+        }
+
+        if (!token) {
             ctx.response.status = 401;
             ctx.response.body = { error: "No valid token provided" };
             return;
         }
 
-        const token = authHeader.substring(7);
         const verified = await verifyToken(token);
 
         if (!verified || !verified.userId || typeof verified.userId !== 'string') {

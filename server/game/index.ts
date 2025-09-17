@@ -72,6 +72,7 @@ app.use(async (ctx, next) => {
         'http://localhost:3000',
         'http://127.0.0.1:5173',
         'https://dhaniverse.in',
+        'https://www.dhaniverse.in',
         'https://game.dhaniverse.in'
     ];
 
