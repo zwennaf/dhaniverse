@@ -768,6 +768,7 @@ authRouter.put("/auth/profile", async (ctx: Context) => {
         });
 
         ctx.response.body = {
+            success: true,
             user: {
                 id: updatedUser?._id?.toString() || "",
                 email: updatedUser?.email || "",

@@ -296,11 +296,15 @@ export class CrossDomainAuthService {
 
       const data = await response.json();
       
-      if (data.success && data.user) {
+      if (response.ok && data.success && data.user) {
         this.setUser(data.user);
+        return { success: true, user: data.user };
+      } else {
+        return {
+          success: false,
+          error: data.error || 'Failed to update profile',
+        };
       }
-
-      return data;
     } catch (error) {
       console.error('Profile update failed:', error);
       return {
