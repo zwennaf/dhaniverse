@@ -10,20 +10,51 @@ const getAuthHeaders = () => {
     const token = localStorage.getItem("dhaniverse_token");
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
-    console.log('Auth headers:', { hasToken: !!token, tokenStart: token ? token.substring(0, 20) + '...' : null });
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    if (process.env.NODE_ENV === 'development') {
+        console.log('Auth headers:', { hasToken: !!token, tokenStart: token ? token.substring(0, 20) + '...' : null });
+    }
     return headers;
 };
 
 // Wrapper around fetch that ensures credentials are included for cookie-based auth
 const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const opts: RequestInit = { ...(init || {}) };
-    // Merge headers
-    opts.headers = { ...(opts.headers as Record<string, string> || {}), ...getAuthHeaders() };
-    // Default to include credentials so HTTP-only cookies are sent
-    if (!opts.credentials) opts.credentials = 'include';
-    return fetch(input, opts);
+    // Set up base headers and merge with any provided headers
+    const baseHeaders = getAuthHeaders();
+    opts.headers = { ...baseHeaders, ...(opts.headers as Record<string, string> || {}) };
+    // Always include credentials for cookie auth
+    opts.credentials = 'include';
+    // Send the request
+    const response = await fetch(input, opts);
+    // Handle 401 Unauthorized and attempt to refresh session
+    if (response.status === 401) {
+        try {
+            // Try to refresh the session
+            const refreshResponse = await fetch(`${API_BASE}/auth/session`, {
+                credentials: 'include'
+            });
+            if (refreshResponse.ok) {
+                const refreshData = await refreshResponse.json();
+                if (refreshData.token) {
+                    localStorage.setItem('dhaniverse_token', refreshData.token);
+                    // Retry original request with new token
+                    opts.headers = { 
+                        ...baseHeaders, 
+                        ...getAuthHeaders(), 
+                        ...(opts.headers as Record<string, string> || {}) 
+                    };
+                    return fetch(input, opts);
+                }
+            }
+        } catch (error) {
+            console.warn('Session refresh failed:', error);
+        }
+    }
+    return response;
 };
 
 // Helper function to handle API responses
