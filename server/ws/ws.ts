@@ -201,6 +201,7 @@ interface Connection {
     lastMovementTime?: number; // for AFK detection
     ip?: string; // Store IP address
     email?: string; // Store email for ban checking
+    cookieHeader?: string | null; // store initial cookie header from upgrade request
 }
 
 // Message types
@@ -346,31 +347,48 @@ async function handleAuthentication(
 
         console.log(`Validating token with auth server: ${authServerUrl}`);
 
-        // Validate token with the main backend server
-        const response = await fetch(`${authServerUrl}/auth/validate-token`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ token: message.token }),
-        });
+        // Validate token with the main backend server or fallback to cookie-session
+        let userId: string | undefined;
+        let gameUsername: string | undefined;
+        let email: string | undefined;
 
-        const data = await response.json();
-
-        if (!response.ok || !data.valid) {
-            connection.socket.send(
-                JSON.stringify({
-                    type: "error",
-                    error: "authentication_failed",
-                    message: "Invalid token",
-                })
-            );
+        if (message.token) {
+            const response = await fetch(`${authServerUrl}/auth/validate-token`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: message.token }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.valid) {
+                connection.socket.send(JSON.stringify({ type: "error", error: "authentication_failed", message: "Invalid token" }));
+                return;
+            }
+            userId = data.userId;
+            gameUsername = message.gameUsername || data.gameUsername;
+            email = data.email?.toLowerCase();
+        } else if (connection.cookieHeader) {
+            // Try cookie-based session
+            try {
+                const sessionResp = await fetch(`${authServerUrl}/auth/session`, { method: 'GET', headers: { 'Cookie': connection.cookieHeader } });
+                if (sessionResp.ok) {
+                    const sessionData = await sessionResp.json();
+                    if (sessionData && sessionData.success && sessionData.user) {
+                        userId = sessionData.user.id;
+                        gameUsername = message.gameUsername || sessionData.user.gameUsername;
+                        email = sessionData.user.email?.toLowerCase();
+                    }
+                }
+            } catch (err) {
+                console.warn('Cookie-based session check failed:', err);
+            }
+            if (!userId) {
+                connection.socket.send(JSON.stringify({ type: "error", error: "authentication_failed", message: "No valid session" }));
+                return;
+            }
+        } else {
+            connection.socket.send(JSON.stringify({ type: "error", error: "authentication_failed", message: "No token provided" }));
             return;
         }
-
-        const userId = data.userId;
-        const gameUsername = message.gameUsername || data.gameUsername;
-        const email: string | undefined = data.email?.toLowerCase();
         const ip = connection.ip; // Use IP stored on connection
 
         // Store email on connection for ban checking
@@ -1405,6 +1423,8 @@ Deno.serve({
             
             // Extract IP address from request
             const clientIp = extractIpFromRequest(req);
+            // Capture cookie header from the upgrade request so we can use it for cookie-based auth
+            const cookieHeader = req.headers.get('cookie') || null;
 
             // Create a new connection
             const connection: Connection = {
@@ -1416,6 +1436,7 @@ Deno.serve({
                 authenticated: false,
                 position: { x: 0, y: 0 },
                 ip: clientIp, // Store IP on connection
+                cookieHeader,
             };
 
             connections.set(connectionId, connection);

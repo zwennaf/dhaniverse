@@ -128,6 +128,12 @@ export class CrossDomainAuthService {
       }
 
       const data = await response.json();
+      // Legacy fallback: store client-accessible token if server provided one
+      try {
+        if (data && data.token) {
+          localStorage.setItem('dhaniverse_token', data.token);
+        }
+      } catch (_e) { }
       if (data.success && data.user) {
         this.setUser(data.user);
         return data.user;
@@ -163,6 +169,7 @@ export class CrossDomainAuthService {
       
       if (data.success && data.user) {
         this.setUser(data.user);
+        try { if (data.token) localStorage.setItem('dhaniverse_token', data.token); } catch(_e) {}
       }
 
       return data;
@@ -220,6 +227,7 @@ export class CrossDomainAuthService {
       
       if (data.success && data.user) {
         this.setUser(data.user);
+        try { if (data.token) localStorage.setItem('dhaniverse_token', data.token); } catch(_e) {}
       }
 
       return data;
@@ -256,6 +264,7 @@ export class CrossDomainAuthService {
       
       if (data.success && data.user) {
         this.setUser(data.user);
+        try { if (data.token) localStorage.setItem('dhaniverse_token', data.token); } catch(_e) {}
       }
 
       return data;
