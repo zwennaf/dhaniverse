@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     siteName: 'Dhaniverse',
     images: [
       {
-        url: `${SITE_URL}og-image.jpg`,
+        url: `${SITE_URL}/og-image.jpg`,
         width: 1200,
         height: 630,
         alt: 'Dhaniverse - Financial Literacy Game',
