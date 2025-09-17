@@ -74,21 +74,35 @@ authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
 
 // Manual CORS middleware for auth routes
 authRouter.use(async (ctx: Context, next: () => Promise<unknown>) => {
-    // Set CORS headers
-    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-    ctx.response.headers.set(
-        "Access-Control-Allow-Methods",
-        "GET, POST, PUT, DELETE, OPTIONS"
-    );
-    ctx.response.headers.set(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, Accept"
-    );
+    // Read allowed origins from environment (comma-separated)
+    const raw = Deno.env.get("ALLOWED_ORIGINS") || "";
+    const allowed = raw.split(",").map((s: string) => (s || "").trim()).filter(Boolean);
+
+    // Get request origin
+    const origin = ctx.request.headers.get("origin") || ctx.request.headers.get("Origin");
+
+    // If origin is allowed, echo it back. Otherwise, do not set Access-Control-Allow-Origin.
+    if (origin && (allowed.length === 0 || allowed.includes(origin))) {
+        ctx.response.headers.set("Access-Control-Allow-Origin", origin);
+    } else if (origin && !allowed.includes(origin)) {
+        // Origin not allowed - for preflight, return 403; for other requests, proceed without CORS header
+        if (ctx.request.method === "OPTIONS") {
+            ctx.response.status = 403;
+            ctx.response.body = { error: "CORS origin not allowed" };
+            return;
+        }
+    } else if (!origin && allowed.length === 0) {
+        // No Origin header (e.g., server-to-server) and no allowed list configured -> allow
+        ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+    }
+
+    ctx.response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
     ctx.response.headers.set("Access-Control-Allow-Credentials", "true");
 
-    // Handle preflight requests
+    // Handle preflight
     if (ctx.request.method === "OPTIONS") {
-        ctx.response.status = 200;
+        ctx.response.status = ctx.response.status || 200;
         return;
     }
 
