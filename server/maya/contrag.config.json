@@ -1,0 +1,32 @@
+{
+  "database": {
+    "plugin": "mongodb",
+    "config": {
+      "url": "",
+      "database": "dhaniverse"
+    }
+  },
+  "vectorStore": {
+    "plugin": "pgvector",
+    "config": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "dhaniverse_vector",
+      "user": "postgres",
+      "password": "password",
+      "dimensions": 768
+    }
+  },
+  "embedder": {
+    "plugin": "gemini",
+    "config": {
+      "apiKey": "AIzaSyA7H_6tVhqA1pPzrN82kwjO_xo5R7vOiwU",
+      "model": "embedding-001",
+      "dimensions": 768
+    }
+  },
+  "contextBuilder": {
+    "chunkSize": 1000,
+    "overlap": 200
+  }
+}

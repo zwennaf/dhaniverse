@@ -1,0 +1,38 @@
+{
+  "name": "maya-rag-server",
+  "version": "1.0.0",
+  "description": "RAG-powered chat server for Maya using Contrag",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "introspect": "npx contrag introspect",
+    "build-context": "npx contrag build --entity User --uid",
+    "chat": "node maya-chat-cli.js",
+    "chat-web": "open maya-chat-client.html"
+  },
+  "dependencies": {
+    "contrag": "1.2.0",
+    "ws": "^8.14.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "mongodb": "^6.1.0",
+    "uuid": "^9.0.1",
+    "node-fetch": "^3.3.2",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/ws": "^8.5.5",
+    "@types/express": "^4.17.17",
+    "@types/cors": "^2.8.14",
+    "@types/uuid": "^9.0.4",
+    "tsx": "^3.12.7",
+    "typescript": "^5.2.2"
+  }
+}

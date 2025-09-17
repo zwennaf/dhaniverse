@@ -1,0 +1,16 @@
+version: '3.4'
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: dhaniverse_vector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    restart: on-failure:0
+
+volumes:
+  postgres_data:
