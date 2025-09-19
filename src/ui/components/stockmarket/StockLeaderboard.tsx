@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ICPActorService } from '../../../services/ICPActorService';
 import NetworkConfig from '../../../config/network';
 import { useAuth } from '../../contexts/AuthContext';
+import canisterService from '../../../services/CanisterService';
 
 interface LeaderboardEntry {
   principal: string;
@@ -13,7 +14,7 @@ interface LeaderboardEntry {
 }
 
 interface StockLeaderboardProps {
-  icpService: ICPActorService;
+  icpService?: any;
   onClose: () => void;
 }
 
@@ -74,18 +75,48 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
       setLoading(true);
       setError(null);
 
-      // Load leaderboard data
-      const leaderboardResult = await icpService.getLeaderboard(); // No parameter needed
-      if (leaderboardResult.success && leaderboardResult.data) {
-        setLeaderboard(leaderboardResult.data);
+      // Try high-level ICPActorService first (may use web3 fallback)
+      let service = icpService;
+      if (!service) {
+        try {
+          service = ICPActorService.getInstance();
+        } catch (e) {
+          console.warn('ICPActorService not available, will fallback to canisterService', e);
+          service = null as any;
+        }
       }
 
-      // Get user's rank if connected and user exists
-      if (user?.id) {
-        const rankResult = await icpService.getUserRank(user.id);
-        if (rankResult.success && rankResult.rank !== undefined) {
-          setUserRank(rankResult.rank);
+      if (service && service.getLeaderboard) {
+        try {
+          const res = await service.getLeaderboard();
+          if (res && res.success && res.data) {
+            const mapped = res.data.map((r: any, idx: number) => ({
+              principal: r.principal || String(idx),
+              displayName: r.displayName || r.principal || `Trader ${idx + 1}`,
+              totalProfit: r.totalProfit || r.trades || 0,
+              tradeCount: r.trades || 0,
+              rank: r.rank || idx + 1,
+              badges: []
+            }));
+            setLeaderboard(mapped);
+          }
+        } catch (e) {
+          console.warn('ICPActorService.getLeaderboard failed, continuing to fallback', e);
         }
+      }
+
+      // Fallback: build leaderboard from canister transaction history and achievements
+      try {
+        const txs = await canisterService.getTransactionHistory(user?.id || '');
+        const ach = await canisterService.getAchievements(user?.id || '');
+
+        const totalProfit = Array.isArray(txs) ? txs.reduce((acc: number, t: any) => acc + (t.amount || 0), 0) : 0;
+        const tradeCount = Array.isArray(txs) ? txs.length : 0;
+
+  setLeaderboard([{ principal: user?.id || 'unknown', displayName: user?.gameUsername || (user as any)?.game_username || 'Player', totalProfit, tradeCount, rank: tradeCount > 0 ? 1 : 0, badges: Array.isArray(ach) ? ach.map((a: any) => a.title) : [] }]);
+        setUserRank(tradeCount > 0 ? 1 : 0);
+      } catch (e) {
+        console.warn('canisterService fallback failed', e);
       }
     } catch (error) {
       console.error('Failed to load leaderboard:', error);
@@ -101,13 +132,18 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
     }
 
     try {
-      const success = await icpService.recordTrade(profit, stockSymbol);
-      if (success) {
-        // Refresh leaderboard after recording trade
-        await loadLeaderboard();
+      // Prefer canister createTransaction if available
+      if (canisterService && canisterService.createTransaction) {
+        await canisterService.createTransaction(user?.id || '', 'Exchange', profit);
+      } else if (icpService && icpService.recordTrade) {
+        await icpService.recordTrade(profit, stockSymbol);
       } else {
-        throw new Error('Failed to record trade');
+        const mod = ICPActorService.getInstance();
+        if (mod && mod.recordTrade) await mod.recordTrade(profit, stockSymbol);
+        else throw new Error('No available method to record trade');
       }
+
+      await loadLeaderboard();
     } catch (error) {
       console.error('Failed to record trade:', error);
       throw error;
@@ -119,9 +155,8 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
     // For now, we'll just check if the user has any trades recorded
     try {
       if (!user?.id) return false;
-      
-      const rankResult = await icpService.getUserRank(user.id);
-      return rankResult.success && rankResult.rank !== undefined && rankResult.rank > 0; // If user has a rank, they have trades
+      const txs = await canisterService.getTransactionHistory(user.id);
+      return Array.isArray(txs) && txs.length > 0;
     } catch (error) {
       console.error('Trade verification failed:', error);
       return false;

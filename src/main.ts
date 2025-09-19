@@ -6,7 +6,9 @@ import GlobalIntro from './ui/components/GlobalIntro';
 import GameHUD from './ui/components/hud/GameHUD.tsx';
 import BankingUI from './ui/components/banking/BankingUI.tsx';
 import { initializeBankAccountCreationFlow } from './ui/components/banking/BankAccountCreationFlow.tsx';
-import StockMarketUI from './ui/components/stockmarket/StockMarketUI.tsx';
+// Lazily load StockMarketUI when needed to avoid eager network/canister calls
+// Note: component will be dynamically imported when the player unlocks stock market
+// See `initializeStockMarketUI` below which performs the dynamic import.
 import { AuthProvider } from './ui/contexts/AuthContext.tsx';
 import { banCheckService } from './services/BanCheckService.ts';
 import { initializeRouting } from './utils/navigation.ts';
@@ -59,14 +61,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Mount the bank account creation flow root (hidden until event)
   initializeBankAccountCreationFlow();
   
-  // Initialize the stock market UI separately
-  initializeStockMarketUI();
+    // Stock market UI must NOT be initialized eagerly. It will be mounted
+    // when the player reaches/unlocks the Stock Market (see ProgressionManager).
   
 
   
   // Initialize the ATM interface
   initializeATMInterface();
 
+  // Listen for progression unlock that should mount stock market UI lazily
+  window.addEventListener('stockMarketUnlocked', () => {
+    console.log('stockMarketUnlocked event received — mounting Stock Market UI');
+    try { initializeStockMarketUI(); } catch (e) { console.error('Failed to initialize stock market UI:', e); }
+  });
   // Listen for game initialization errors (e.g., WebGL unsupported) and show overlay
   setupGameErrorOverlay();
 });
@@ -107,18 +114,21 @@ function initializeStockMarketUI() {
       return;
     }
 
-    // Create a root and explicitly render the StockMarketUI component wrapped in AuthProvider
+    // Dynamically import and mount `StockMarketUI` only when needed
     const stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
-    stockMarketUIRoot.render(
-      React.createElement(AuthProvider, null,
-        React.createElement(StockMarketUI)
-      )
-    );
-
-    // Make sure the stock market container is visible
-    stockMarketUIContainer.style.display = 'block';
-
-    console.log("Stock Market UI initialized and mounted with AuthProvider");
+    import('./ui/components/stockmarket/StockMarketUI.tsx').then(({ default: StockMarketUI }) => {
+      stockMarketUIRoot.render(
+        React.createElement(AuthProvider, null,
+          React.createElement(StockMarketUI)
+        )
+      );
+      // Make sure the stock market container is visible after mount
+      stockMarketUIContainer.style.display = 'block';
+      console.log('StockMarketUI dynamically imported and mounted');
+    }).catch(err => {
+      console.error('Failed to dynamically load StockMarketUI:', err);
+    });
+    console.log("Stock Market UI mount initiated (dynamic import)");
   } else {
     console.error("Could not find stock-market-ui-container element");
   }

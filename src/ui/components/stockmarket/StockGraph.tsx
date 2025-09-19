@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import canisterService from '../../../services/CanisterService';
 
 interface Stock {
   id: string;
@@ -55,6 +56,48 @@ const StockGraph: React.FC<StockGraphProps> = ({
     return 'text-blue-300'; // Moderate debt
   };
   
+  const [liveStock, setLiveStock] = useState<Stock | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    // Try to fetch latest stock data from canister if available
+    (async () => {
+      try {
+        if (canisterService && (canisterService as any).get_stock_data) {
+          const res = await (canisterService as any).get_stock_data(stock.id);
+          // canister methods may return { Ok: ... } or raw; support both
+          const data = res && res.Ok ? res.Ok : res;
+          if (data && mounted) {
+            // Map canister data shape to local Stock shape conservatively
+            const mapped: Stock = {
+              id: data.symbol || data.id || stock.id,
+              name: data.name || stock.name,
+              currentPrice: data.current_price || data.price || stock.currentPrice,
+              priceHistory: Array.isArray(data.price_history) ? data.price_history.map((p: any) => p.price || p.close || Number(p)) : stock.priceHistory,
+              debtEquityRatio: data.metrics?.debt_equity_ratio ?? stock.debtEquityRatio,
+              businessGrowth: data.metrics?.business_growth ?? stock.businessGrowth,
+              news: data.news || stock.news,
+              marketCap: data.metrics?.market_cap ?? stock.marketCap,
+              peRatio: data.metrics?.pe_ratio ?? stock.peRatio,
+              eps: data.metrics?.eps ?? stock.eps,
+              industryAvgPE: data.metrics?.industry_avg_pe ?? stock.industryAvgPE,
+              outstandingShares: Number(data.metrics?.outstanding_shares ?? stock.outstandingShares),
+              volatility: data.metrics?.volatility ?? stock.volatility,
+              lastUpdate: data.last_update ? Number(data.last_update) : stock.lastUpdate
+            };
+            setLiveStock(mapped);
+          }
+        }
+      } catch (e) {
+        console.warn('StockGraph: failed to fetch live stock from canister', e);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [stock.id]);
+
+  const displayStock = liveStock || stock;
+
   useEffect(() => {
     if (!canvasRef.current) return;
     
@@ -66,7 +109,7 @@ const StockGraph: React.FC<StockGraphProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // Get price history data
-    const prices = [...stock.priceHistory];
+  const prices = [...displayStock.priceHistory];
     if (prices.length === 0) return;
     
     // Find min and max values
@@ -178,8 +221,8 @@ const StockGraph: React.FC<StockGraphProps> = ({
     });
     
     // Add price change percentage label
-    const firstPrice = prices[0];
-    const lastPrice = prices[prices.length - 1];
+  const firstPrice = prices[0];
+  const lastPrice = prices[prices.length - 1];
     const changePercent = ((lastPrice - firstPrice) / firstPrice) * 100;
     
     ctx.font = '14px Arial';

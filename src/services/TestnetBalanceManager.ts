@@ -3,7 +3,7 @@
  * Manages ICP-based token balances, transactions, and canister interactions
  */
 
-import { dhaniverse_backend, createActor } from '../../packages/icp-canister/src/declarations/dhaniverse_backend';
+import { dhaniverse_backend, createActor } from '../declarations/dhaniverse_backend';
 import { AuthClient } from '@dfinity/auth-client';
 import { Actor, HttpAgent } from '@dfinity/agent';
 
