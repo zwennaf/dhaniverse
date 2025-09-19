@@ -37,8 +37,8 @@ async function initializeDatabase() {
 }
 
 // Graceful shutdown
-async function gracefulShutdown() {
-    await mongodb.disconnect();
+function gracefulShutdown() {
+    mongodb.disconnect();
     Deno.exit(0);
 }
 

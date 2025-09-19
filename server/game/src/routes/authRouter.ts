@@ -1,6 +1,6 @@
 import { Router, Context } from "oak";
 import { config } from "../config/config.ts";
-import { ObjectId } from "mongodb";
+import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
 import { mongodb } from "../db/mongo.ts";
 import { 
   createToken, 
@@ -29,7 +29,7 @@ async function getBanDetails(email?: string): Promise<BanRuleDocument | null> {
     // expire old bans first
     await bans.updateMany({ active: true, expiresAt: { $lte: now } }, { $set: { active: false } });
     const match = await bans.findOne({ active: true, type: 'email', value: email.toLowerCase() });
-    return match;
+    return match || null;
 }
 
 // Rate limiting helper
@@ -1078,11 +1078,11 @@ authRouter.post("/auth/internet-identity", async (ctx: Context) => {
             }
         };
 
-        const result = await usersCol.insertOne(newUserDoc as UserDocument);
-        console.log('Internet Identity: New user created with ID:', result.insertedId.toString());
+        const insertedId = await usersCol.insertOne(newUserDoc as UserDocument);
+        console.log('Internet Identity: New user created with ID:', insertedId.toString());
         
         const newUser = {
-            id: result.insertedId.toString(),
+            id: insertedId.toString(),
             email: "",
             gameUsername: "",
             selectedCharacter: "C2",

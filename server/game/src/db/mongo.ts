@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection, ObjectId, Document } from "mongodb";
+import { MongoClient, Database, Collection, ObjectId, Document } from "mongodb";
 import { config } from "../config/config.ts";
 import type {
     UserDocument,
@@ -20,7 +20,7 @@ export interface User {
 
 class MongoDatabase {
     private client: MongoClient | null = null;
-    private db: Db | null = null;
+    private db: Database | null = null;
     private isConnected = false;
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
@@ -41,15 +41,15 @@ class MongoDatabase {
 
                 // Close existing connection if any
                 if (this.client) {
-                    await this.client.close();
+                    this.client.close();
                 }
 
                 // Create client with connection options
-                this.client = new MongoClient(config.mongodb.url);
+                this.client = new MongoClient();
 
                 console.log("⏳ Attempting connection...");
                 await Promise.race([
-                    this.client.connect(),
+                    this.client.connect(config.mongodb.url),
                     new Promise((_, reject) =>
                         setTimeout(
                             () =>
@@ -64,10 +64,10 @@ class MongoDatabase {
                 ]);
 
                 // Set database instance
-                this.db = this.client.db(config.mongodb.dbName);
+                this.db = this.client.database(config.mongodb.dbName);
 
                 // Test the connection by performing a simple operation
-                await this.db.admin().ping();
+                await this.db.listCollectionNames();
 
                 this.isConnected = true;
                 this.reconnectAttempts = 0; // Reset on successful connection
@@ -77,13 +77,11 @@ class MongoDatabase {
 
                 // List collections (optional)
                 try {
-                    const collections = await this.db
-                        .listCollections()
-                        .toArray();
+                    const collections = await this.db.listCollectionNames();
                     console.log(
                         `📊 Collections: ${
                             collections.length > 0
-                                ? collections.map((c) => c.name).join(", ")
+                                ? collections.join(", ")
                                 : "None (new database)"
                         }`
                     );
@@ -141,10 +139,10 @@ class MongoDatabase {
             }
         }
     }
-    async disconnect(): Promise<void> {
+    disconnect(): void {
         if (this.client) {
             console.log("🔌 Disconnecting from MongoDB Atlas...");
-            await this.client.close();
+            this.client.close();
             this.isConnected = false;
             console.log("✅ MongoDB Atlas disconnected");
         }
@@ -180,8 +178,7 @@ class MongoDatabase {
                 isActive: true,
             };
             const users = this.getCollection<UserDocument>(COLLECTIONS.USERS);
-            const result = await users.insertOne(userDoc);
-            const insertedId = result.insertedId;
+            const insertedId = await users.insertOne(userDoc);
 
             // Create initial player state
             await this.createInitialPlayerState(insertedId.toString());

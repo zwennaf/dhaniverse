@@ -3,7 +3,7 @@ import { oakCors } from "cors";
 import { config } from "../config/config.ts";
 import { mongodb } from "../db/mongo.ts";
 import { verifyToken } from "../auth/jwt.ts";
-import { ObjectId } from "mongodb";
+import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
 import {
     PlayerStateDocument,
     BankAccountDocument,
@@ -141,8 +141,8 @@ gameRouter.get("/game/player-state", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const result = await playerStates.insertOne(newPlayerState);
-            playerState = { ...newPlayerState, _id: result.insertedId };
+            const insertedId = await playerStates.insertOne(newPlayerState);
+            playerState = { ...newPlayerState, _id: insertedId };
         }
 
         // Backfill onboarding defaults if missing (for legacy players)
@@ -328,8 +328,8 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
                 hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date()
             };
-            const insertRes = await playerStates.insertOne(newPlayerState);
-            playerState = { ...newPlayerState, _id: insertRes.insertedId } as PlayerStateDocument & { _id: ObjectId };
+            const insertedId = await playerStates.insertOne(newPlayerState);
+            playerState = { ...newPlayerState, _id: insertedId } as PlayerStateDocument & { _id: ObjectId };
         }
 
         const STARTER_AMOUNT = 100000; // 1 lakh starter money for real stock trading
@@ -455,7 +455,7 @@ gameRouter.post("/game/bank-account/create", async (ctx) => {
             lastUpdated: new Date(),
         };
 
-        const result = await bankAccounts.insertOne(newBankAccount);
+        const insertedId = await bankAccounts.insertOne(newBankAccount);
 
         // Deduct rupees from player if initial deposit
         if (initialDeposit > 0) {
@@ -471,7 +471,7 @@ gameRouter.post("/game/bank-account/create", async (ctx) => {
             );
         }
 
-        const createdAccount = { ...newBankAccount, _id: result.insertedId };
+        const createdAccount = { ...newBankAccount, _id: insertedId };
 
         ctx.response.body = {
             success: true,
@@ -767,7 +767,7 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
         const fixedDeposits = mongodb.getCollection<FixedDepositDocument>(
             COLLECTIONS.FIXED_DEPOSITS
         );
-        const result = await fixedDeposits.insertOne(fixedDeposit);
+        const insertedId = await fixedDeposits.insertOne(fixedDeposit);
 
         // Deduct from bank balance
         await bankAccounts.updateOne(
@@ -790,7 +790,7 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
         ctx.response.body = {
             success: true,
             message: `Fixed deposit created successfully`,
-            data: { ...fixedDeposit, _id: result.insertedId },
+            data: { ...fixedDeposit, _id: insertedId },
         };
     } catch (error) {
         ctx.response.status = 500;
@@ -926,8 +926,8 @@ gameRouter.get("/game/stock-portfolio", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const result = await stockPortfolios.insertOne(newPortfolio);
-            portfolio = { ...newPortfolio, _id: result.insertedId };
+            const insertedId = await stockPortfolios.insertOne(newPortfolio);
+            portfolio = { ...newPortfolio, _id: insertedId };
             console.log('Created new empty portfolio for user');
         }
 
@@ -1033,8 +1033,8 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const result = await stockPortfolios.insertOne(newPortfolio);
-            portfolio = { ...newPortfolio, _id: result.insertedId };
+            const insertedId = await stockPortfolios.insertOne(newPortfolio);
+            portfolio = { ...newPortfolio, _id: insertedId };
         }
 
         // Update portfolio holdings

@@ -1,8 +1,9 @@
 // OTP Service for managing one-time passwords
 import { MongoDatabase } from '../db/mongo.ts';
+import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
 
 interface OTPDocument {
-  _id?: any;
+  _id?: ObjectId;
   email: string;
   otp: string;
   hashedOTP: string;
@@ -110,7 +111,9 @@ export class OTPService {
 
       // Check if max attempts exceeded
       if (otpDoc.attempts >= this.MAX_ATTEMPTS) {
-        await this.invalidateOTP(otpDoc._id);
+        if (otpDoc._id) {
+          await this.invalidateOTP(otpDoc._id);
+        }
         return {
           valid: false,
           message: 'Too many failed attempts. Please request a new OTP.'
@@ -218,15 +221,15 @@ export class OTPService {
     try {
       const collection = this.mongodb.getCollection('otps');
       
-      const result = await collection.deleteMany({
+      const deletedCount = await collection.deleteMany({
         expiresAt: { $lt: new Date() }
       });
 
-      if (result.deletedCount > 0) {
-        console.log(`Cleaned up ${result.deletedCount} expired OTPs`);
+      if (deletedCount > 0) {
+        console.log(`Cleaned up ${deletedCount} expired OTPs`);
       }
 
-      return result.deletedCount;
+      return deletedCount;
     } catch (error) {
       console.error('Error cleaning up expired OTPs:', error);
       return 0;
@@ -294,7 +297,7 @@ export class OTPService {
   /**
    * Invalidate a specific OTP by ID
    */
-  private async invalidateOTP(otpId: any): Promise<void> {
+  private async invalidateOTP(otpId: ObjectId): Promise<void> {
     try {
       const collection = this.mongodb.getCollection('otps');
       
@@ -347,9 +350,11 @@ export class OTPService {
       ]);
 
       const purposeStats: Record<string, number> = {};
-      byPurpose.forEach((item: any) => {
-        purposeStats[item._id] = item.count;
-      });
+      for (const item of byPurpose) {
+        if (item._id && item.count) {
+          purposeStats[item._id as string] = item.count as number;
+        }
+      }
 
       return {
         totalActive,
