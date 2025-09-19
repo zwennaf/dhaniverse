@@ -143,6 +143,12 @@ class ProgressionManager {
       // Update Maya position to stock market entrance
       this.state.mayaPosition = { x: 2598, y: 3736 };
       this.persist();
+      // Notify UI that stock market unlocked so it can lazily mount
+      try {
+        window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
+      } catch (e) {
+        console.warn('Failed to dispatch stockMarketUnlocked event', e);
+      }
     }
   }
 

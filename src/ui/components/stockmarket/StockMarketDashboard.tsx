@@ -4,14 +4,17 @@ import TradeStockPopup from "./TradeStockPopup.tsx";
 import StockDetail from "./StockDetail.tsx";
 import StockGraph from "./StockGraph.tsx";
 import StockLeaderboard from "./StockLeaderboard.tsx";
+// Lazy-loaded panels to avoid eager canister initialization
+const WalletsAsync = React.lazy(() => import('./WalletList'));
+const AchievementsAsync = React.lazy(() => import('./AchievementsPanel'));
+const MarketSummaryAsync = React.lazy(() => import('./MarketSummary'));
+const OnChainTxAsync = React.lazy(() => import('./OnChainTransactions'));
 import NewsPopup from "./NewsPopup.tsx";
 import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
 import { portfolioAnalytics } from '../../../services/PortfolioAnalyticsService';
-import { stockMarketService, type Stock } from "../../../services/StockMarketService";
-import { ICPActorService } from "../../../services/ICPActorService";
-import { WalletManager } from "../../../services/WalletManager";
+import type { Stock } from "../../../services/StockMarketService";
 
 interface StockHolding {
     stockId: string;
@@ -51,10 +54,11 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     // Auth context for Internet Identity persistence
     const { user, isSignedIn, refreshAuth } = useAuth();
 
-    // Services
-    // Use singleton instance to prevent duplication
-    const icpService = ICPActorService.getInstance();
-    const walletManager = new WalletManager();
+    // Services (lazily created to avoid side-effects during SSR or eager loads)
+    // Lazy getters intentionally return null; components should dynamically import
+    // `ICPActorService` or `WalletManager` when they actually need active instances.
+    const getIcpService = () => null;
+    const getWalletManager = () => null;
     
     // Core UI state
     const [activeTab, setActiveTab] = useState<TabOption>("market");
@@ -64,6 +68,10 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [showGraph, setShowGraph] = useState(false);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [showNews, setShowNews] = useState(false);
+    const [showWallets, setShowWallets] = useState(false);
+    const [showAchievements, setShowAchievements] = useState(false);
+    const [showMarketSummary, setShowMarketSummary] = useState(false);
+    const [showOnChainTx, setShowOnChainTx] = useState(false);
     const [sortField, setSortField] = useState<SortField>("name");
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     const [filterOption, setFilterOption] = useState<FilterOption>("all");
@@ -169,30 +177,40 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Load real stocks data
+    // Load real stocks data only when the dashboard mounts (explicit) and
+    // avoid initializing canister services until the UI requests them.
     useEffect(() => {
         let mounted = true;
         const load = async () => {
             try {
-                setLoadingStage("Loading Real Stock Market Data from ICP Canister");
-                
-                // Initialize real stock data if not already done
+                setLoadingStage("Loading Real Stock Market Data (on-demand)");
+
+                // Dynamically import the stockMarketService to avoid side-effects
+                const { stockMarketService } = await import("../../../services/StockMarketService");
+                const { stockCanisterClient } = await import("../../../services/stockCanister");
+
+                // Ensure canister is initialized (safe, idempotent)
+                await stockCanisterClient.ensureInitialized();
+
+                // Initialize stock market service (fetches batched data once)
                 if (!stockMarketService.isServiceInitialized()) {
                     await stockMarketService.initialize();
                 }
-                
+
+                // Start periodic updates now that UI is active
+                stockMarketService.startPeriodicUpdatesIfNeeded();
+
                 const allStocks = stockMarketService.getStockMarketData();
                 if (!mounted) return;
-                
+
                 if (allStocks && allStocks.length > 0) {
                     setFilteredStocks(allStocks);
-                    console.log(`✅ Successfully loaded ${allStocks.length} REAL stocks from ICP canister:`, 
-                        allStocks.map((s: Stock) => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
+                    console.log(`✅ Loaded ${allStocks.length} stocks on-demand`);
                 } else {
-                    console.warn("❌ No real stocks loaded from canister");
+                    console.warn("No stocks available after on-demand load");
                 }
             } catch (e) {
-                console.error("❌ Failed to load real stocks from ICP canister:", e);
+                console.error("Failed to load stocks on-demand:", e);
             } finally {
                 setIsLoading(false);
             }
@@ -593,6 +611,36 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     >
                                         LEADERBOARD
                                     </button>
+                                    <div className="flex items-center space-x-2">
+                                        <button
+                                            onClick={() => setShowWallets(true)}
+                                            className="bg-gray-800 text-white px-3 py-2 rounded font-medium hover:bg-gray-700 transition-colors duration-200"
+                                            title="Wallets"
+                                        >
+                                            Wallets
+                                        </button>
+                                        <button
+                                            onClick={() => setShowAchievements(true)}
+                                            className="bg-gray-800 text-white px-3 py-2 rounded font-medium hover:bg-gray-700 transition-colors duration-200"
+                                            title="Achievements"
+                                        >
+                                            Achievements
+                                        </button>
+                                        <button
+                                            onClick={() => setShowMarketSummary(true)}
+                                            className="bg-gray-800 text-white px-3 py-2 rounded font-medium hover:bg-gray-700 transition-colors duration-200"
+                                            title="Market Summary"
+                                        >
+                                            Market
+                                        </button>
+                                        <button
+                                            onClick={() => setShowOnChainTx(true)}
+                                            className="bg-gray-800 text-white px-3 py-2 rounded font-medium hover:bg-gray-700 transition-colors duration-200"
+                                            title="On-chain Transactions"
+                                        >
+                                            Tx
+                                        </button>
+                                    </div>
                                     <button onClick={onClose} className="text-gray-400 hover:text-yellow-500 text-2xl transition-colors duration-200">
                                         ×
                                     </button>
@@ -1174,9 +1222,37 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             {/* Leaderboard Popup */}
             {showLeaderboard && (
                 <StockLeaderboard 
-                    icpService={icpService}
+                    icpService={getIcpService()}
                     onClose={closeLeaderboard}
                 />
+            )}
+
+            {/* Wallets Panel (lazy) */}
+            {showWallets && (
+                <React.Suspense fallback={<div className="fixed inset-0 z-60 flex items-center justify-center">Loading wallets…</div>}>
+                    <WalletsAsync onClose={() => setShowWallets(false)} />
+                </React.Suspense>
+            )}
+
+            {/* Achievements Panel (lazy) */}
+            {showAchievements && (
+                <React.Suspense fallback={<div className="fixed inset-0 z-60 flex items-center justify-center">Loading achievements…</div>}>
+                    <AchievementsAsync onClose={() => setShowAchievements(false)} />
+                </React.Suspense>
+            )}
+
+            {/* Market Summary (lazy) */}
+            {showMarketSummary && (
+                <React.Suspense fallback={<div className="fixed inset-0 z-60 flex items-center justify-center">Loading market summary…</div>}>
+                    <MarketSummaryAsync onClose={() => setShowMarketSummary(false)} />
+                </React.Suspense>
+            )}
+
+            {/* On-chain Transactions (lazy) */}
+            {showOnChainTx && (
+                <React.Suspense fallback={<div className="fixed inset-0 z-60 flex items-center justify-center">Loading transactions…</div>}>
+                    <OnChainTxAsync onClose={() => setShowOnChainTx(false)} />
+                </React.Suspense>
             )}
 
             {/* News Popup */}

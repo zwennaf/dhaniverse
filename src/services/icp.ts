@@ -36,7 +36,7 @@ export const createActor = async (canisterId: string, options?: { agentOptions?:
 
   // Dynamic import to avoid module conflicts
   try {
-    const { idlFactory } = await import('../../packages/icp-canister/src/declarations/dhaniverse_backend/dhaniverse_backend.did.js');
+  const { idlFactory } = await import('../declarations/dhaniverse_backend/dhaniverse_backend.did.js');
     
     return Actor.createActor(idlFactory, {
       agent,

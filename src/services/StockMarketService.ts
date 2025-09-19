@@ -40,60 +40,46 @@ class StockMarketService {
   };
 
   constructor() {
-    console.log('StockMarketService initialized for UI components');
+    console.log('StockMarketService constructed for UI components (lazy)');
   }
 
   /**
    * Initialize stock data from ICP canister (BACKGROUND BATCH LOADING)
    */
+  // Initialize is now explicit and returns created stock list
   async initialize(): Promise<void> {
-    if (this.isInitialized) {
+    if (this.isInitialized) return;
+
+    console.log('StockMarketService: explicit initialize called');
+    const realStocks = await getRealStockService().initializeRealStocks();
+
+    if (!realStocks || realStocks.length === 0) {
+      console.warn('StockMarketService: no real stocks returned during initialize');
+      this.isInitialized = true; // mark initialized to avoid repeated eager attempts
       return;
     }
 
-    try {
-      console.log('� StockMarketService: Starting BATCH loading of real stock data...');
-      console.log('💰 Using optimized batch calls to save ICP cycles!');
-      
-      // Start background batch loading from ICP canister
-  const realStocks = await getRealStockService().initializeRealStocks();
-      
-      if (!realStocks || realStocks.length === 0) {
-        throw new Error('Failed to load real stock data from ICP canister');
-      }
+    this.stockData = realStocks.map((realStock: any) => ({
+      id: realStock.symbol.toLowerCase(),
+      symbol: realStock.symbol,
+      name: realStock.companyName || realStock.name || realStock.symbol,
+      sector: realStock.sector,
+      currentPrice: realStock.price,
+      priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
+      debtEquityRatio: 0.5 + Math.random() * 1.5,
+      businessGrowth: realStock.changePercent * 2,
+      news: [],
+      volatility: Math.abs(realStock.changePercent) / 10 + 1,
+      lastUpdate: Date.now(),
+      marketCap: realStock.marketCap,
+      peRatio: realStock.peRatio,
+      eps: realStock.price / (realStock.peRatio || 1),
+      outstandingShares: Math.floor((realStock.marketCap || 0) / (realStock.price || 1)),
+      industryAvgPE: 15 + Math.random() * 10
+    }));
 
-      // Convert RealStockData to Stock interface
-      this.stockData = realStocks.map((realStock: any) => ({
-        id: realStock.symbol.toLowerCase(),
-        symbol: realStock.symbol, // Keep original uppercase symbol for API calls
-        name: realStock.companyName || realStock.name || realStock.symbol,
-        sector: realStock.sector,
-        currentPrice: realStock.price,
-        priceHistory: this.generateRealisticPriceHistory(realStock.price, realStock.changePercent),
-        debtEquityRatio: 0.5 + Math.random() * 1.5,
-        businessGrowth: realStock.changePercent * 2,
-        news: [],
-        volatility: Math.abs(realStock.changePercent) / 10 + 1,
-        lastUpdate: Date.now(),
-        marketCap: realStock.marketCap,
-        peRatio: realStock.peRatio,
-        eps: realStock.price / realStock.peRatio,
-        outstandingShares: Math.floor(realStock.marketCap / realStock.price),
-        industryAvgPE: 15 + Math.random() * 10
-      }));
-
-      this.isInitialized = true;
-      console.log(`✅ StockMarketService BATCH LOADING COMPLETE!`); 
-      console.log(`📊 Loaded ${this.stockData.length} real stocks:`, 
-        this.stockData.map(s => `${s.name} (₹${s.currentPrice.toLocaleString()})`));
-      
-      // Start periodic batch updates in background
-      this.startPeriodicUpdates();
-      
-    } catch (error) {
-      console.error('❌ StockMarketService batch initialization failed:', error);
-      throw error;
-    }
+    this.isInitialized = true;
+    console.log(`StockMarketService: initialized with ${this.stockData.length} stocks`);
   }
 
   /**
@@ -146,7 +132,10 @@ class StockMarketService {
    * Start periodic BATCH updates using timer-based system (saves cycles!)
    */
   private startPeriodicUpdates(): void {
-    setInterval(async () => {
+    if (this.isInitialized === false) return; // don't start updates until explicitly initialized
+    if (this.updateIntervalHandle) return; // already started
+
+    this.updateIntervalHandle = setInterval(async () => {
       try {
         console.log('🔄 Starting periodic BATCH update to save ICP cycles...');
         
@@ -182,6 +171,18 @@ class StockMarketService {
     }, 10 * 60 * 1000); // 10 minutes instead of 5 to save even more cycles
   }
 
+  // Public control to start periodic updates when UI wants them
+  startPeriodicUpdatesIfNeeded(): void {
+    this.startPeriodicUpdates();
+  }
+
+  stopPeriodicUpdates(): void {
+    if (this.updateIntervalHandle) {
+      clearInterval(this.updateIntervalHandle as any);
+      this.updateIntervalHandle = null;
+    }
+  }
+
   /**
    * Force refresh stock data
    */
@@ -206,6 +207,9 @@ class StockMarketService {
       throw error;
     }
   }
+
+  // internal handle for setInterval so we can stop it
+  private updateIntervalHandle: NodeJS.Timeout | null = null;
 }
 
 // Export singleton instance

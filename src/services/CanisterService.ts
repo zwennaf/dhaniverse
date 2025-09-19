@@ -1,7 +1,7 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
-import { idlFactory } from "../../packages/icp-canister/src/declarations/dhaniverse_backend/dhaniverse_backend.did.js"
+import { idlFactory } from "../declarations/dhaniverse_backend/dhaniverse_backend.did.js"
 import NetworkConfig from '../config/network';
 
 export interface DualBalance {

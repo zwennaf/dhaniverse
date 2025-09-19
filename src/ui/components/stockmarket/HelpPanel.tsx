@@ -1,4 +1,5 @@
 import React from 'react';
+import canisterService from '../../../services/CanisterService';
 
 interface HelpPanelProps {
   onClose: () => void;
@@ -7,6 +8,16 @@ interface HelpPanelProps {
 const HelpPanel: React.FC<HelpPanelProps> = ({
   onClose
 }) => {
+  const connectCanister = async () => {
+    try {
+      if ((canisterService as any) && (canisterService as any).authenticateWithII) {
+        const ok = await (canisterService as any).authenticateWithII();
+        if (!ok) console.warn('HelpPanel: canister authentication returned false');
+      }
+    } catch (e) {
+      console.warn('HelpPanel: failed to authenticate with canister', e);
+    }
+  };
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[60]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
@@ -91,6 +102,9 @@ const HelpPanel: React.FC<HelpPanelProps> = ({
             <p>
               Remember: Investing in stocks always carries risk. It's recommended to diversify your investments and research thoroughly before making decisions.
             </p>
+            <div className="mt-3">
+              <button onClick={connectCanister} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Connect for Live Data</button>
+            </div>
           </div>
         </div>
       </div>
