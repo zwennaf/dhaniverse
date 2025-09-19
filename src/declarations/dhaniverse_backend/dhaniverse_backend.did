@@ -1,0 +1,337 @@
+type WalletType = variant {
+  MetaMask;
+  Phantom;
+  Coinbase;
+  WalletConnect;
+  Injected;
+};
+
+type WalletConnection = record {
+  address: text;
+  chain_id: text;
+  wallet_type: WalletType;
+  balance: opt text;
+};
+
+type WalletInfo = record {
+  name: text;
+  wallet_type: WalletType;
+  icon: text;
+  installed: bool;
+  download_url: opt text;
+};
+
+type DualBalance = record {
+  rupees_balance: float64;
+  token_balance: float64;
+  last_updated: nat64;
+};
+
+// Staking types removed
+
+type ExchangeResult = record {
+  success: bool;
+  from_amount: float64;
+  to_amount: float64;
+  rate: float64;
+  transaction: opt Web3Transaction;
+  error: opt text;
+};
+
+type AchievementCategory = variant {
+  Trading;
+  Saving;
+  Learning;
+};
+
+type AchievementRarity = variant {
+  Common;
+  Rare;
+  Epic;
+  Legendary;
+};
+
+type AchievementReward = record {
+  reward_type: text;
+  amount: float64;
+};
+
+type Achievement = record {
+  id: text;
+  title: text;
+  description: text;
+  category: AchievementCategory;
+  rarity: AchievementRarity;
+  unlocked: bool;
+  unlocked_at: opt nat64;
+  reward: opt AchievementReward;
+};
+
+type TransactionType = variant {
+  Deposit;
+  Withdraw;
+  Exchange;
+};
+
+type TransactionStatus = variant {
+  Pending;
+  Confirmed;
+  Failed;
+};
+
+type Web3Transaction = record {
+  id: text;
+  from: text;
+  to: opt text;
+  amount: float64;
+  transaction_type: TransactionType;
+  timestamp: nat64;
+  status: TransactionStatus;
+  hash: opt text;
+};
+
+type Web3Session = record {
+  wallet_address: text;
+  wallet_type: WalletType;
+  chain_id: text;
+  connected_at: nat64;
+  last_activity: nat64;
+};
+
+type User = record {
+  id: text;
+  email: opt text;
+  game_username: text;
+  wallet_address: opt text;
+  auth_method: text;
+  created_at: nat64;
+  updated_at: nat64;
+};
+
+type AuthResult = record {
+  success: bool;
+  user: opt User;
+  token: opt text;
+  is_new_user: opt bool;
+  error: opt text;
+};
+
+type Result = variant {
+  Ok: AuthResult;
+  Err: text;
+};
+
+type Result_1 = variant {
+  Ok: Web3Session;
+  Err: text;
+};
+
+type Result_2 = variant {
+  Ok;
+  Err: text;
+};
+
+type Result_3 = variant {
+  Ok: WalletConnection;
+  Err: text;
+};
+
+type Result_4 = variant {
+  Ok: DualBalance;
+  Err: text;
+};
+
+type Result_5 = variant {
+  Ok: ExchangeResult;
+  Err: text;
+};
+
+// Result_6 (staking) removed
+
+type Result_7 = variant {
+  Ok: float64;
+  Err: text;
+};
+
+type Result_8 = variant {
+  Ok: AchievementReward;
+  Err: text;
+};
+
+type Result_9 = variant {
+  Ok: Web3Transaction;
+  Err: text;
+};
+
+type Result_10 = variant {
+  Ok: opt float64;
+  Err: text;
+};
+
+type Result_11 = variant {
+  Ok: vec record { text; float64 };
+  Err: text;
+};
+
+type Result_12 = variant {
+  Ok: nat64;
+  Err: text;
+};
+
+type PriceEntry = record {
+  symbol: text;
+  price: float64;
+};
+
+type PriceSnapshot = record {
+  timestamp: nat64;
+  prices: vec PriceEntry;
+};
+
+service : {
+  // Authentication Methods
+  authenticate_with_signature: (text, text) -> (Result);
+  create_session: (WalletConnection) -> (Result_1);
+  clear_session: (text) -> (Result_2);
+  get_session: (text) -> (opt Web3Session) query;
+
+  // Wallet Management Methods
+  get_available_wallets: () -> (vec WalletInfo) query;
+  connect_wallet: (WalletType, text, text) -> (Result_3);
+  disconnect_wallet: (text) -> (Result_2);
+  get_wallet_status: (text) -> (opt WalletConnection) query;
+
+  // Banking Methods
+  get_dual_balance: (text) -> (Result_4) query;
+  exchange_currency: (text, text, text, float64) -> (Result_5);
+  get_achievements: (text) -> (vec Achievement) query;
+  claim_achievement_reward: (text, text) -> (Result_8);
+
+  // DeFi Simulation Methods
+  simulate_liquidity_pool: (text, float64) -> (Result_7);
+  simulate_yield_farming: (text, float64) -> (Result_7);
+
+  // Transaction Methods
+  create_transaction: (text, TransactionType, float64, opt text) -> (Result_9);
+  get_transaction_history: (text) -> (vec Web3Transaction) query;
+
+  // Price Feed Methods (CoinGecko Integration)
+  fetch_external_price: (text) -> (Result_10);
+  fetch_multiple_crypto_prices: (text) -> (Result_11);
+  fetch_stock_price: (text) -> (Result_10);
+  update_prices_from_external: () -> (Result_12);
+
+  // In-memory price buffer endpoints (monitoring.rs)
+  // Returns the in-memory price history (most-recent last)
+  get_price_history: () -> (vec PriceSnapshot) query;
+
+  // Fetches prices for comma-separated token ids and appends a snapshot.
+  // Returns Ok(new_history_length) or Err(text)
+  // CoinGecko API endpoints for historical data
+  fetch_coin_market_chart_range: (text, text, nat64, nat64) -> (variant { Ok: vec record { text; vec record { nat64; float64 } }; Err: text });
+  fetch_coin_ohlc: (text, text, nat32) -> (variant { Ok: vec record { nat64; float64; float64; float64; float64 }; Err: text });
+  fetch_coin_history: (text, text) -> (variant { Ok: vec record { text; float64 }; Err: text });
+
+  fetch_and_append_snapshot: (text) -> (variant { Ok: nat64; Err: text });
+
+  // Health check
+  health_check: () -> (text) query;
+
+  // Server-Sent Events Methods
+  sse_broadcast_peer_joined: (text, text, vec record { text; text }) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_peer_left: (text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_offer: (text, text, text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_answer: (text, text, text, text) -> (variant { Ok: nat; Err: text });
+  sse_broadcast_ice_candidate: (text, text, text, vec record { text; text }) -> (variant { Ok: nat; Err: text });
+  sse_get_room_stats: (text) -> (variant { Ok: record { nat; nat }; Err: text }) query;
+  sse_get_global_stats: () -> (record { nat; nat; nat }) query;
+  sse_cleanup_connections: () -> (variant { Ok: nat; Err: text });
+
+  // Stock Exchange SSE Methods
+  get_stock_data: (text) -> (variant { Ok: record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  }; Err: text }) query;
+  subscribe_stock_updates: (text) -> (variant { Ok: text; Err: text });
+  broadcast_stock_update: (text) -> (variant { Ok: nat; Err: text });
+  broadcast_stock_news: (text, vec text) -> (variant { Ok: nat; Err: text });
+  broadcast_market_summary: () -> (variant { Ok: nat; Err: text });
+  get_market_summary: () -> (variant { Ok: vec record { text; record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  } }; Err: text }) query;
+  refresh_stock_cache: (text) -> (variant { Ok: record { 
+    id: text; 
+    name: text; 
+    symbol: text; 
+    current_price: float64; 
+    price_history: vec record { 
+      timestamp: nat64; 
+      price: float64; 
+      volume: nat64; 
+      high: float64; 
+      low: float64; 
+      open: float64; 
+      close: float64 
+    }; 
+    metrics: record {
+      market_cap: float64;
+      pe_ratio: float64;
+      eps: float64;
+      debt_equity_ratio: float64;
+      business_growth: float64;
+      industry_avg_pe: float64;
+      outstanding_shares: nat64;
+      volatility: float64;
+    };
+    news: vec text;
+    last_update: nat64;
+  }; Err: text });
+  cleanup_stock_cache: () -> (variant { Ok: nat; Err: text });
+}
