@@ -35,6 +35,27 @@ function getUrls() {
   return urls;
 }
 
+// Runtime API URL helper that avoids accidentally using localhost in production builds
+export function getApiUrl(endpoint: string) {
+  // If an explicit Vite env var is provided, prefer it
+  const envBase = (import.meta.env && (import.meta.env.VITE_API_BASE_URL as string)) || '';
+  if (envBase && envBase.trim().length > 0) {
+    return `${envBase.replace(/\/$/, '')}${endpoint}`;
+  }
+
+  // Runtime guard: if we're not on a local hostname but the fallback points to localhost,
+  // override to the production API domain to avoid leaking localhost from a build-time fallback.
+  const runtimeBase = urls.api;
+  if (isClient) {
+    const isLocalHostLike = hostname === 'localhost' || hostname === '127.0.0.1' || port === '5173';
+    if (!isLocalHostLike && runtimeBase.startsWith('http://localhost')) {
+      return `https://api.dhaniverse.in${endpoint}`;
+    }
+  }
+
+  return `${runtimeBase.replace(/\/$/, '')}${endpoint}`;
+}
+
 function isGameDomain(): boolean {
   if (!isClient) return false;
   return hostname.includes('game.') || 
@@ -56,11 +77,11 @@ export const navigationUrls = {
   features: `${urls.web}/#features`,
   testimonials: `${urls.web}/#testimonials`,
   
-  // API endpoints
+  // API endpoints - use runtime helper for safety in production
   api: {
-    session: `${urls.api}/session`,
-    signout: `${urls.api}/signout`,
-    auth: `${urls.api}/auth`,
+    session: () => getApiUrl('/auth/session'),
+    signout: () => getApiUrl('/auth/signout'),
+    auth: () => getApiUrl('/auth'),
   },
 };
 

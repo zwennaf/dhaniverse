@@ -21,7 +21,8 @@ const URLS = {
   development: {
     web: OVERRIDES.web || `http://localhost:3000`,           // Landing page (Next.js)
     game: OVERRIDES.game || `http://localhost:5173`,        // Game client (Vite)
-    api: OVERRIDES.api || 'http://localhost:8000',
+    // Keep empty so callers must use getApiUrl which applies proxy rules
+    api: OVERRIDES.api || '',
   },
   production: {
     web: OVERRIDES.web || 'https://dhaniverse.in',
@@ -32,6 +33,8 @@ const URLS = {
 
 const currentEnv = isDevelopment ? 'development' : 'production';
 const urls = URLS[currentEnv];
+
+// (helpers defined earlier)
 
 // Navigation utilities
 export const navigationUrls = {
@@ -57,9 +60,9 @@ export const navigationUrls = {
   
   // API endpoints
   api: {
-    session: `${urls.api}/session`,
-    signout: `${urls.api}/signout`,
-    auth: `${urls.api}/auth`,
+    session: '',
+    signout: '',
+    auth: '',
   },
 };
 
@@ -69,7 +72,18 @@ export const getSignInUrl = () => navigationUrls.signIn;
 export const getSignUpUrl = () => navigationUrls.signUp;
 export const getProfileUrl = () => navigationUrls.profile;
 export const getHomeUrl = () => navigationUrls.home;
-export const getApiUrl = (endpoint: string) => `${urls.api}${endpoint}`;
+export const getApiUrl = (endpoint: string) => {
+  // If running on the Next.js web client, route auth endpoints through the relative proxy so cookies are forwarded.
+  if (isClient && isOnWebDomain() && endpoint.startsWith('/auth')) {
+    return `/api${endpoint}`; // e.g. /api/auth/session
+  }
+  return `${urls.api}${endpoint}`;
+};
+
+// Fill navigationUrls.api with resolved endpoints after getApiUrl is available
+navigationUrls.api.session = getApiUrl('/auth/session');
+navigationUrls.api.signout = getApiUrl('/auth/signout');
+navigationUrls.api.auth = getApiUrl('/auth');
 
 // Navigation functions for external links (cross-domain)
 export const navigateToGame = () => {

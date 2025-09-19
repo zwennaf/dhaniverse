@@ -270,8 +270,18 @@ async function validateAdminToken(token?: string) {
 }
 
 // Helper function to extract IP from request (improved pattern based on PHP)
-function extractIpFromRequest(req: Request): string | undefined {
+function extractIpFromRequest(req: Request, info?: Deno.ServeHandlerInfo): string | undefined {
     let clientIp = "unknown";
+    
+    // First try to get IP from connection info if available
+    if (info?.remoteAddr) {
+        const remoteAddr = info.remoteAddr;
+        if (remoteAddr.transport === "tcp" && remoteAddr.hostname !== "127.0.0.1") {
+            clientIp = remoteAddr.hostname;
+            console.log(`[WS IP Detection] Using connection remote address: ${clientIp}`);
+            return clientIp;
+        }
+    }
     
     // Check for client IP from shared internet (highest priority)
     const clientIpHeader = req.headers.get("http-client-ip");
@@ -298,8 +308,8 @@ function extractIpFromRequest(req: Request): string | undefined {
             } else if (realIp && realIp.trim() !== "") {
                 clientIp = realIp.trim();
             } else {
-                // No valid IP found in headers, check for localhost development
-                return "127.0.0.1"; // Default for local development
+                // No valid IP found in headers, fallback to remote address
+                clientIp = "unknown";
             }
         }
     }
@@ -397,6 +407,18 @@ async function handleAuthentication(
         if (await isBanned({ email, ip })) {
             connection.socket.send(JSON.stringify({ type: 'banned', reason: 'Access denied' }));
             connection.socket.close(4403, 'banned');
+            return;
+        }
+
+        // Ensure userId is defined before proceeding
+        if (!userId) {
+            connection.socket.send(JSON.stringify({ type: "error", error: "authentication_failed", message: "Invalid user ID" }));
+            return;
+        }
+
+        // Ensure gameUsername is defined
+        if (!gameUsername) {
+            connection.socket.send(JSON.stringify({ type: "error", error: "authentication_failed", message: "Invalid username" }));
             return;
         }
 
@@ -505,7 +527,7 @@ async function handleAuthentication(
     upsertActivePlayer({ userId, username: gameUsername, email, position: { x: connection.position.x, y: connection.position.y }, animation: connection.animation, skin: connection.skin, updatedAt: new Date() });
     connection.lastMovementTime = Date.now();
     // Notify admin monitors with enhanced data
-    sendToAdmins({ 
+    const adminJoinData = { 
         type:'adminPlayerJoin', 
         connectionId: connection.id, 
         userId, 
@@ -519,7 +541,9 @@ async function handleAuthentication(
         timestamp: Date.now(),
         lastActivity: connection.lastActivity,
         authenticated: true
-    });
+    };
+    console.log(`[Admin Join] Sending adminPlayerJoin for ${gameUsername} with IP: ${ip} (connection.ip: ${connection.ip})`);
+    sendToAdmins(adminJoinData);
     } catch (error) {
         console.error(`Authentication error: ${error}`);
         connection.socket.send(
@@ -783,6 +807,18 @@ function handleDisconnect(connectionId: string) {
 
         // Notify other players if this was an authenticated connection
         if (connection.authenticated) {
+            // Log session leave event
+            logSession({ 
+                userId: connection.userId, 
+                username: connection.username, 
+                email: connection.email, 
+                ip: connection.ip, 
+                event: 'leave', 
+                timestamp: new Date(), 
+                position: { x: connection.position.x, y: connection.position.y }, 
+                skin: connection.skin 
+            });
+
             broadcastToOthers(connectionId, {
                 type: "playerDisconnect",
                 id: connectionId,
@@ -1086,7 +1122,7 @@ console.log(`✅ WebSocket server listening on port ${PORT}`);
 // Start the server
 Deno.serve({
     port: PORT,
-    handler: (req: Request) => {
+    handler: (req: Request, info: Deno.ServeHandlerInfo) => {
         const url = new URL(req.url);
 
         // Handle CORS preflight requests
@@ -1363,7 +1399,7 @@ Deno.serve({
                     
                     connections.forEach(c => { 
                         if (c.authenticated) {
-                            players.push({ 
+                            const playerData = { 
                                 connectionId: c.id, 
                                 userId: c.userId, 
                                 username: c.username, 
@@ -1375,7 +1411,9 @@ Deno.serve({
                                 ip: c.ip,
                                 lastActivity: c.lastActivity,
                                 lastMovementTime: c.lastMovementTime
-                            }); 
+                            };
+                            console.log(`[Admin Snapshot] Player ${c.username} IP: ${c.ip}`);
+                            players.push(playerData); 
                         }
                     });
                     
@@ -1422,7 +1460,7 @@ Deno.serve({
             const connectionId = crypto.randomUUID();
             
             // Extract IP address from request
-            const clientIp = extractIpFromRequest(req);
+            const clientIp = extractIpFromRequest(req, info);
             // Capture cookie header from the upgrade request so we can use it for cookie-based auth
             const cookieHeader = req.headers.get('cookie') || null;
 

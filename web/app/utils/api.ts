@@ -1,24 +1,38 @@
 // API utility functions for backend communication
 // Prefer NEXT_PUBLIC_API_BASE_URL (exposed to client). Fall back to NEXT_API_BASE_URL if present.
 // If neither is set, use localhost backend for local development, otherwise production API.
-const API_BASE =
+let API_BASE =
     process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_API_BASE_URL ||
     (typeof window !== "undefined"
         ? (window.location.hostname === "localhost" ? "http://localhost:8000" : "https://api.dhaniverse.in")
         : "https://api.dhaniverse.in");
+
+// Safeguard: if we resolved to localhost but we're on a production hostname, override.
+if (typeof window !== 'undefined') {
+    const host = window.location.hostname || '';
+    const isProdHost = !/(^localhost$)|(^127\.0\.0\.1$)|(.+\.local$)/i.test(host);
+    if (isProdHost && API_BASE.startsWith('http://localhost')) {
+        console.warn('Overriding API_BASE localhost fallback on production host to https://api.dhaniverse.in');
+        API_BASE = 'https://api.dhaniverse.in';
+    }
+}
 
 console.debug("API_BASE resolved to:", API_BASE);
    
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
-    const token = localStorage.getItem("dhaniverse_token");
-    const headers = {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-    };
-    console.log('Auth headers:', { hasToken: !!token, tokenStart: token?.substring(0, 20) + '...' });
+    const token = typeof window !== 'undefined' ? localStorage.getItem("dhaniverse_token") : null;
+    const headers: Record<string,string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
+};
+
+// Wrapper that sends credentials by default so HTTP-only cookies are included.
+const apiFetch = (url: string, opts: RequestInit = {}) => {
+    const headers = { ...(opts.headers || {}) } as Record<string,string>;
+    if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    return fetch(url, { credentials: 'include', ...opts, headers });
 };
 
 // Helper function to handle API responses
@@ -40,7 +54,7 @@ export const playerStateApi = {
     // Get player state - creates a new one if it doesn't exist
     get: async () => {
         try {
-            const response = await fetch(`${API_BASE}/game/player-state`, {
+            const response = await apiFetch(`${API_BASE}/game/player-state`, {
                 headers: getAuthHeaders(),
             });
 
@@ -60,7 +74,7 @@ export const playerStateApi = {
                 };
 
                 // Create the player state
-                const createResponse = await fetch(
+                const createResponse = await apiFetch(
                     `${API_BASE}/game/player-state`,
                     {
                         method: "PUT",
@@ -97,7 +111,7 @@ export const playerStateApi = {
         operation: "set" | "add" | "subtract" = "set"
     ) => {
         try {
-            const response = await fetch(
+            const response = await apiFetch(
                 `${API_BASE}/game/player-state/rupees`,
                 {
                     method: "PUT",
@@ -139,7 +153,7 @@ export const playerStateApi = {
     // Update full player state
     update: async (stateData: any) => {
         try {
-            const response = await fetch(`${API_BASE}/game/player-state`, {
+            const response = await apiFetch(`${API_BASE}/game/player-state`, {
                 method: "PUT",
                 headers: getAuthHeaders(),
                 body: JSON.stringify(stateData),
@@ -160,7 +174,7 @@ export const bankingApi = {
     // Check bank onboarding status  
     getOnboardingStatus: async () => {
         try {
-            const response = await fetch(`${API_BASE}/game/bank-onboarding/status`, {
+            const response = await apiFetch(`${API_BASE}/game/bank-onboarding/status`, {
                 headers: getAuthHeaders(),
             });
             return handleApiResponse(response);
@@ -176,7 +190,7 @@ export const bankingApi = {
 
     // Create bank account
     createAccount: async (accountHolder: string, initialDeposit: number = 0) => {
-        const response = await fetch(`${API_BASE}/game/bank-account/create`, {
+        const response = await apiFetch(`${API_BASE}/game/bank-account/create`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({ accountHolder, initialDeposit }),
@@ -187,7 +201,7 @@ export const bankingApi = {
     // Get bank account
     getAccount: async () => {
         try {
-            const response = await fetch(`${API_BASE}/game/bank-account`, {
+            const response = await apiFetch(`${API_BASE}/game/bank-account`, {
                 headers: getAuthHeaders(),
             });
             
@@ -212,7 +226,7 @@ export const bankingApi = {
 
     // Deposit to bank account
     deposit: async (amount: number) => {
-        const response = await fetch(`${API_BASE}/game/bank-account/deposit`, {
+        const response = await apiFetch(`${API_BASE}/game/bank-account/deposit`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({ amount }),
@@ -222,7 +236,7 @@ export const bankingApi = {
 
     // Withdraw from bank account
     withdraw: async (amount: number) => {
-        const response = await fetch(`${API_BASE}/game/bank-account/withdraw`, {
+        const response = await apiFetch(`${API_BASE}/game/bank-account/withdraw`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({ amount }),
@@ -235,7 +249,7 @@ export const bankingApi = {
         // Banking transactions are embedded in the bank account data
         // We'll get them from the account details endpoint instead
         try {
-            const response = await fetch(`${API_BASE}/game/bank-account`, {
+            const response = await apiFetch(`${API_BASE}/game/bank-account`, {
                 headers: getAuthHeaders(),
             });
             
@@ -278,7 +292,7 @@ export const bankingApi = {
 export const fixedDepositApi = {
     // Get all fixed deposits
     getAll: async () => {
-        const response = await fetch(`${API_BASE}/game/fixed-deposits`, {
+        const response = await apiFetch(`${API_BASE}/game/fixed-deposits`, {
             headers: getAuthHeaders(),
         });
         return handleApiResponse(response);
@@ -286,7 +300,7 @@ export const fixedDepositApi = {
 
     // Create fixed deposit
     create: async (amount: number, duration: number) => {
-        const response = await fetch(`${API_BASE}/game/fixed-deposits`, {
+        const response = await apiFetch(`${API_BASE}/game/fixed-deposits`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({ amount, duration }),
@@ -296,7 +310,7 @@ export const fixedDepositApi = {
 
     // Claim matured fixed deposit
     claim: async (depositId: string) => {
-        const response = await fetch(
+        const response = await apiFetch(
             `${API_BASE}/game/fixed-deposits/${depositId}/claim`,
             {
                 method: "POST",
@@ -315,7 +329,7 @@ export const stockApi = {
     // Get stock portfolio
     getPortfolio: async () => {
         console.log('Fetching portfolio from:', `${API_BASE}/game/stock-portfolio`);
-        const response = await fetch(`${API_BASE}/game/stock-portfolio`, {
+        const response = await apiFetch(`${API_BASE}/game/stock-portfolio`, {
             headers: getAuthHeaders(),
         });
         const result = await handleApiResponse(response);
@@ -351,7 +365,7 @@ export const stockApi = {
         console.log('📡 API endpoint:', `${API_BASE}/game/stock-portfolio/buy`);
         console.log('🔑 Headers:', getAuthHeaders());
         
-        const response = await fetch(`${API_BASE}/game/stock-portfolio/buy`, {
+        const response = await apiFetch(`${API_BASE}/game/stock-portfolio/buy`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify(payload),
@@ -386,7 +400,7 @@ export const stockApi = {
 
     // Sell stock
     sellStock: async (stockId: string, quantity: number, price: number) => {
-        const response = await fetch(`${API_BASE}/game/stock-portfolio/sell`, {
+        const response = await apiFetch(`${API_BASE}/game/stock-portfolio/sell`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({ stockId, quantity, price }),
@@ -397,7 +411,7 @@ export const stockApi = {
     // Get stock transactions
     getTransactions: async () => {
         try {
-            const response = await fetch(`${API_BASE}/game/stock-transactions`, {
+            const response = await apiFetch(`${API_BASE}/game/stock-transactions`, {
                 headers: getAuthHeaders(),
             });
             
@@ -440,7 +454,7 @@ export const stockApi = {
 export const syncApi = {
     // Sync local data with backend
     syncData: async (localData: any) => {
-        const response = await fetch(`${API_BASE}/game/sync`, {
+        const response = await apiFetch(`${API_BASE}/game/sync`, {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify(localData),

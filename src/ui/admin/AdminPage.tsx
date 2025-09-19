@@ -368,7 +368,7 @@ const AdminPage: React.FC = () => {
         
         try {
             // Use backend endpoint to avoid CORS issues
-            const response = await fetch(`${API_BASE}/admin/geolocate-ip`, {
+            const response = await fetch(`${API_BASE.replace(/\/$/, '')}/admin/geolocate-ip`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -394,8 +394,9 @@ const AdminPage: React.FC = () => {
 
     const fetcher = useCallback(
         async (path: string) => {
-            const res = await fetch(`${API_BASE}${path}`, {
+            const res = await fetch(`${API_BASE.replace(/\/$/, '')}${path}`, {
                 headers: authHeaders,
+                credentials: 'include',
             });
             if (!res.ok) throw new Error('Network error');
             return res.json();
@@ -516,9 +517,10 @@ const AdminPage: React.FC = () => {
         
         try {
             // Create ban in database - backend will automatically kick active users
-            await fetch(`${API_BASE}/admin/ban`, {
+            await fetch(`${API_BASE.replace(/\/$/, '')}/admin/ban`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
+                credentials: 'include',
                 body: JSON.stringify({
                     ...banForm,
                     durationMinutes: banForm.durationMinutes
@@ -547,9 +549,10 @@ const AdminPage: React.FC = () => {
         if (isLoading) return;
         
         try {
-            await fetch(`${API_BASE}/admin/unban`, {
+            await fetch(`${API_BASE.replace(/\/$/, '')}/admin/unban`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
+                credentials: 'include',
                 body: JSON.stringify({ type, value }),
             });
             if (!isLoading) {
@@ -581,9 +584,10 @@ const AdminPage: React.FC = () => {
         e.preventDefault();
         if (!banCheckValue.trim()) return;
         try {
-            const res = await fetch(`${API_BASE}/admin/check-ban`, {
+            const res = await fetch(`${API_BASE.replace(/\/$/, '')}/admin/check-ban`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", ...authHeaders },
+                credentials: 'include',
                 body: JSON.stringify({
                     email: banCheckValue.includes("@") ? banCheckValue : undefined,
                     ip: !banCheckValue.includes("@") && banCheckValue.includes(".") ? banCheckValue : undefined,
@@ -648,6 +652,11 @@ const AdminPage: React.FC = () => {
                 const msg = JSON.parse(ev.data);
                 switch (msg.type) {
                     case "adminSnapshot":
+                        console.log('[AdminPage] adminSnapshot received:', {
+                            playersCount: (msg.players || []).length,
+                            firstPlayerIp: (msg.players || [])[0]?.ip,
+                            firstPlayerData: (msg.players || [])[0]
+                        });
                         setLivePlayers(msg.players || []);
                         setLiveOnline(msg.online);
                         break;
@@ -676,6 +685,12 @@ const AdminPage: React.FC = () => {
                         });
                         break;
                     case "adminPlayerJoin":
+                        console.log('[AdminPage] adminPlayerJoin received:', {
+                            connectionId: msg.connectionId,
+                            username: msg.username,
+                            ip: msg.ip,
+                            msgType: typeof msg.ip
+                        });
                         setLivePlayers((prev) => [
                             ...prev.filter(
                                 (p) => p.connectionId !== msg.connectionId

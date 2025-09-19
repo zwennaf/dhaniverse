@@ -18,7 +18,7 @@ export const useSimpleAuth = () => {
     if (!isClient) return;
 
     try {
-  const resp = await fetch(getApiUrl('/session'), {
+  const resp = await fetch(getApiUrl('/auth/session'), {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -56,7 +56,7 @@ export const useSimpleAuth = () => {
 
     // Call server signout to clear cookie scoped to .dhaniverse.in
     try {
-  await fetch(getApiUrl('/signout'), {
+  await fetch(getApiUrl('/auth/signout'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

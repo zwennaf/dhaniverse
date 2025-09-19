@@ -42,12 +42,22 @@ export class CrossDomainAuthService {
   private authListeners: ((user: DhaniverseUser | null) => void)[] = [];
 
   // API base URL with environment detection (prefer public env var set at build/runtime)
-  private apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_API_BASE_URL ||
+  private apiBase: string = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_API_BASE_URL ||
     ((typeof window !== "undefined" && window.location.hostname === "localhost")
       ? "http://localhost:8000"
       : "https://api.dhaniverse.in");
 
-  private constructor() {}
+  private constructor() {
+    // Safeguard: if running on a production host but apiBase resolved to localhost, override it
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname || '';
+      const isProdHost = !/(^localhost$)|(^127\.0\.0\.1$)|(.+\.local$)/i.test(host);
+      if (isProdHost && this.apiBase.startsWith('http://localhost')) {
+        console.warn('Overriding CrossDomainAuthService apiBase localhost fallback on production host to https://api.dhaniverse.in');
+        this.apiBase = 'https://api.dhaniverse.in';
+      }
+    }
+  }
 
   public static getInstance(): CrossDomainAuthService {
     if (!CrossDomainAuthService.instance) {
