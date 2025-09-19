@@ -3,7 +3,7 @@ import { oakCors } from "cors";
 import { config } from "../config/config.ts";
 import { mongodb } from "../db/mongo.ts";
 import { verifyToken } from "../auth/jwt.ts";
-import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
+import { ObjectId } from "mongodb";
 import {
     PlayerStateDocument,
     BankAccountDocument,
@@ -141,8 +141,8 @@ gameRouter.get("/game/player-state", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const insertedId = await playerStates.insertOne(newPlayerState);
-            playerState = { ...newPlayerState, _id: insertedId };
+            const result = await playerStates.insertOne(newPlayerState);
+            playerState = { ...newPlayerState, _id: result.insertedId };
         }
 
         // Backfill onboarding defaults if missing (for legacy players)
@@ -328,8 +328,8 @@ gameRouter.post("/game/player-state/claim-starter", async (ctx) => {
                 hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date()
             };
-            const insertedId = await playerStates.insertOne(newPlayerState);
-            playerState = { ...newPlayerState, _id: insertedId } as PlayerStateDocument & { _id: ObjectId };
+            const result = await playerStates.insertOne(newPlayerState);
+            playerState = { ...newPlayerState, _id: result.insertedId } as PlayerStateDocument & { _id: ObjectId };
         }
 
         const STARTER_AMOUNT = 100000; // 1 lakh starter money for real stock trading
@@ -926,15 +926,15 @@ gameRouter.get("/game/stock-portfolio", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const insertedId = await stockPortfolios.insertOne(newPortfolio);
-            portfolio = { ...newPortfolio, _id: insertedId };
+            const result = await stockPortfolios.insertOne(newPortfolio);
+            portfolio = { ...newPortfolio, _id: result.insertedId };
             console.log('Created new empty portfolio for user');
         }
 
         console.log('Returning portfolio to frontend:', {
-            userId: portfolio.userId,
-            holdingsCount: portfolio.holdings?.length || 0,
-            holdings: portfolio.holdings
+            userId: portfolio?.userId || userId,
+            holdingsCount: portfolio?.holdings?.length || 0,
+            holdings: portfolio?.holdings || []
         });
 
         ctx.response.body = {
@@ -1033,8 +1033,15 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
                 lastUpdated: new Date(),
             };
 
-            const insertedId = await stockPortfolios.insertOne(newPortfolio);
-            portfolio = { ...newPortfolio, _id: insertedId };
+            const result = await stockPortfolios.insertOne(newPortfolio);
+            portfolio = { ...newPortfolio, _id: result.insertedId };
+        }
+
+        // Ensure portfolio is not null before proceeding
+        if (!portfolio) {
+            ctx.response.status = 500;
+            ctx.response.body = { error: "Failed to create or retrieve portfolio" };
+            return;
         }
 
         // Update portfolio holdings
@@ -1087,8 +1094,14 @@ gameRouter.post("/game/stock-portfolio/buy", async (ctx) => {
             portfolio.totalValue - portfolio.totalInvested;
         portfolio.lastUpdated = new Date();
 
-        // Update portfolio in database
-        await stockPortfolios.updateOne({ userId }, { $set: portfolio });
+        // Update portfolio in database - Buy Stock Operation
+        await stockPortfolios.updateOne({ userId }, { $set: { 
+            holdings: portfolio.holdings,
+            totalInvested: portfolio.totalInvested,
+            totalValue: portfolio.totalValue,
+            totalGainLoss: portfolio.totalGainLoss,
+            lastUpdated: portfolio.lastUpdated
+        } });
 
         // Create transaction record
         const stockTransactions =

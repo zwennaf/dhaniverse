@@ -1,6 +1,6 @@
 import { Router, Context } from "oak";
 import { config } from "../config/config.ts";
-import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
+import { ObjectId } from "mongodb";
 import { mongodb } from "../db/mongo.ts";
 import { 
   createToken, 

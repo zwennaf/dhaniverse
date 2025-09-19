@@ -1,6 +1,6 @@
 // OTP Service for managing one-time passwords
 import { MongoDatabase } from '../db/mongo.ts';
-import { ObjectId } from "https://deno.land/x/mongo@v0.32.0/mod.ts";
+import { ObjectId } from "mongodb";
 
 interface OTPDocument {
   _id?: ObjectId;
@@ -221,15 +221,15 @@ export class OTPService {
     try {
       const collection = this.mongodb.getCollection('otps');
       
-      const deletedCount = await collection.deleteMany({
+      const result = await collection.deleteMany({
         expiresAt: { $lt: new Date() }
       });
 
-      if (deletedCount > 0) {
-        console.log(`Cleaned up ${deletedCount} expired OTPs`);
+      if (result.deletedCount > 0) {
+        console.log(`Cleaned up ${result.deletedCount} expired OTPs`);
       }
 
-      return deletedCount;
+      return result.deletedCount;
     } catch (error) {
       console.error('Error cleaning up expired OTPs:', error);
       return 0;
