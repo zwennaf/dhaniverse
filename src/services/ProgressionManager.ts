@@ -2,14 +2,14 @@
 import { playerStateApi } from '../utils/api';
 import { dialogueManager } from './DialogueManager';
 
-export type OnboardingStep = 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_completed' | 'reached_stock_market';
+export type OnboardingStep = 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_complete' | 'stock_market_onboarding_complete';
 
 export interface OnboardingState {
   hasMetMaya: boolean;
   hasFollowedMaya: boolean;
   hasClaimedMoney: boolean;
-  hasCompletedBankOnboarding?: boolean;
-  hasReachedStockMarket?: boolean;
+  bankOnboardingComplete: boolean;
+  stockMarketOnboardingComplete: boolean;
   onboardingStep: OnboardingStep;
   unlockedBuildings: Record<string, boolean>;
   mayaPosition?: { x: number; y: number };
@@ -19,8 +19,8 @@ const DEFAULT_STATE: OnboardingState = {
   hasMetMaya: false,
   hasFollowedMaya: false,
   hasClaimedMoney: false,
-  hasCompletedBankOnboarding: false,
-  hasReachedStockMarket: false,
+  bankOnboardingComplete: false,
+  stockMarketOnboardingComplete: false,
   onboardingStep: 'not_started',
   unlockedBuildings: { bank: false, atm: false, stockmarket: false },
   mayaPosition: { x: 7779, y: 3581 } // Default Maya starting position
@@ -31,8 +31,8 @@ class ProgressionManager {
   private syncing = false;
   private initialized = false;
 
-  async initializeFromPlayerState(playerState?: any) {
-    if (this.initialized) return;
+  async initializeFromPlayerState(playerState?: any, forceRefresh = false) {
+    if (this.initialized && !forceRefresh) return;
     
     // Always try to load from database first
     try {
@@ -106,7 +106,7 @@ class ProgressionManager {
     if (!this.state.hasClaimedMoney) {
       this.state.hasClaimedMoney = true;
       this.state.onboardingStep = 'claimed_money';
-      // Unlock bank only at this stage (others stay false for future quests)
+      // Unlock ONLY bank building at this stage (stock market stays locked until bank onboarding complete)
       this.state.unlockedBuildings.bank = true;
       this.persist();
       
@@ -125,20 +125,33 @@ class ProgressionManager {
   }
 
   markBankOnboardingCompleted() {
-    if (!this.state.hasCompletedBankOnboarding) {
-      this.state.hasCompletedBankOnboarding = true;
-      if (this.state.onboardingStep === 'claimed_money') this.state.onboardingStep = 'bank_onboarding_completed';
+    console.log('🏦 ProgressionManager: markBankOnboardingCompleted called. Current state:', this.state.bankOnboardingComplete);
+    if (!this.state.bankOnboardingComplete) {
+      this.state.bankOnboardingComplete = true;
+      if (this.state.onboardingStep === 'claimed_money') this.state.onboardingStep = 'bank_onboarding_complete';
       // Maya remains at bank entrance ready for stock market guidance
       this.state.mayaPosition = { x: 9415, y: 6297 };
+      // Unlock stock market building when bank onboarding is completed
+      this.state.unlockedBuildings.stockmarket = true;
+      console.log('🏦 ProgressionManager: Bank onboarding marked as completed. New state:', this.state);
       this.persist();
+      
+      // Notify UI that stock market unlocked
+      try {
+        window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
+      } catch (e) {
+        console.warn('Failed to dispatch stockMarketUnlocked event', e);
+      }
+    } else {
+      console.log('🏦 ProgressionManager: Bank onboarding was already completed, not marking again');
     }
   }
 
-  markReachedStockMarket() {
-    if (!this.state.hasReachedStockMarket) {
-      this.state.hasReachedStockMarket = true;
-      this.state.onboardingStep = 'reached_stock_market';
-      // Unlock stockmarket building now
+  markStockMarketOnboardingCompleted() {
+    if (!this.state.stockMarketOnboardingComplete) {
+      this.state.stockMarketOnboardingComplete = true;
+      this.state.onboardingStep = 'stock_market_onboarding_complete';
+      // Ensure stockmarket building is unlocked (should already be unlocked from bank completion)
       this.state.unlockedBuildings.stockmarket = true;
       // Update Maya position to stock market entrance
       this.state.mayaPosition = { x: 2598, y: 3736 };
@@ -164,9 +177,9 @@ class ProgressionManager {
     // Override with state-specific positions if stored position is default
     if (storedPosition.x === 7779 && storedPosition.y === 3581) {
       // Use state-specific positioning for better player experience
-      if (this.state.hasReachedStockMarket) {
+      if (this.state.stockMarketOnboardingComplete) {
         return { x: 2598, y: 3736 }; // Stock market entrance
-      } else if (this.state.hasFollowedMaya || this.state.hasClaimedMoney || this.state.hasCompletedBankOnboarding) {
+      } else if (this.state.hasFollowedMaya || this.state.hasClaimedMoney || this.state.bankOnboardingComplete) {
         return { x: 9415, y: 6297 }; // Bank entrance
       }
     }
@@ -181,28 +194,68 @@ class ProgressionManager {
     if (!s.hasFollowedMaya) return { ok: false, message: 'Follow Maya to the bank area first.' };
     if (target !== 'claim_money' && !s.hasClaimedMoney) return { ok: false, message: 'Claim your starter money outside the bank first.' };
     if (target === 'bank_onboarding' && !s.hasClaimedMoney) return { ok: false, message: 'Claim your starter money first.' };
-    if (target === 'stock_market' && !s.hasCompletedBankOnboarding) return { ok: false, message: 'Complete your bank onboarding and create your account before continuing.' };
+    if (target === 'stock_market' && !s.bankOnboardingComplete) return { ok: false, message: 'Complete your bank onboarding and create your account before continuing.' };
     return { ok: true };
   }
 
   canEnterBuilding(buildingId: string): { allowed: boolean; message?: string } {
     const s = this.state;
-    // If onboarding fully completed (claimed money), always allow bank access
-    if (s.hasClaimedMoney && buildingId === 'bank') {
+    
+    // If player is existing and bankOnboardingComplete = true, allow direct entry to bank
+    if (s.bankOnboardingComplete && buildingId === 'bank') {
       return { allowed: true };
     }
-    if (!s.hasMetMaya) return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
-    if (!s.hasFollowedMaya) return { allowed: false, message: 'Access Denied — Go to the bank area with Maya and speak to her there.' };
-    if (!s.hasClaimedMoney) return { allowed: false, message: 'Access Denied — Talk to Maya outside the bank to claim your ₹1000 and begin.' };
-    if (!s.unlockedBuildings[buildingId]) return { allowed: false, message: 'Access Denied — This building unlocks later. Continue your journey.' };
+    
+    // If stockMarketOnboardingComplete = true, allow direct entry to stock market as well
+    if (s.stockMarketOnboardingComplete && buildingId === 'stockmarket') {
+      return { allowed: true };
+    }
+    
+    // For new or mid-onboarding players, check progression flags in order:
+    
+    // Before meeting Maya (hasMetMaya = false)
+    if (!s.hasMetMaya) {
+      return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
+    }
+    
+    // After meeting Maya but not followed to bank (hasMetMaya = true && hasFollowedMaya = false)
+    if (!s.hasFollowedMaya) {
+      return { allowed: false, message: 'Access Denied — Go to the bank area with Maya and speak to her there.' };
+    }
+    
+    // After following Maya but not claimed money (hasFollowedMaya = true && hasClaimedMoney = false)
+    if (!s.hasClaimedMoney) {
+      return { allowed: false, message: 'Access Denied — Talk to Maya outside the bank to claim your ₹1000 and begin.' };
+    }
+    
+    // After claiming money - check specific building access
+    if (!s.unlockedBuildings[buildingId]) {
+      return { allowed: false, message: 'Access Denied — This building unlocks later. Continue your journey.' };
+    }
+    
     return { allowed: true };
   }
 
   showAccessDenied(message: string) {
-  // Silently ignore if player has completed onboarding (avoid showing legacy denials)
-  if (this.state.hasClaimedMoney) return;
-    dialogueManager.showDialogue({ text: message, characterName: 'System', allowSpaceAdvance: true, showBackdrop: false }, { onAdvance: () => dialogueManager.closeDialogue() });
+    dialogueManager.showDialogue({ 
+      text: message, 
+      characterName: 'System', 
+      allowSpaceAdvance: true, 
+      showBackdrop: false,
+      keyboardInputEnabled: true // Enable DialogueBox keyboard handling
+    }, { 
+      onAdvance: () => dialogueManager.closeDialogue() 
+    });
   }
 }
 
 export const progressionManager = new ProgressionManager();
+
+// Debug helper - expose to window for testing
+if (typeof window !== 'undefined') {
+  (window as any).progressionManager = progressionManager;
+  (window as any).debugProgression = () => {
+    console.log('🔍 Progression Debug State:', progressionManager.getState());
+    return progressionManager.getState();
+  };
+}

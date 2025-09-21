@@ -16,6 +16,8 @@ export class MayaNPCManager {
     private interactionKey: Input.Keyboard.Key | null = null;
     private readonly interactionDistance: number = 150;
     private interactionText: GameObjects.Text;
+    private lastInteractionTime: number = 0;
+    private readonly interactionCooldown: number = 500; // 500ms cooldown
     private isPlayerNearNPC: boolean = false;
     private activeDialog: boolean = false;
     private speechBubble: GameObjects.Sprite | null = null;
@@ -57,6 +59,7 @@ export class MayaNPCManager {
     private isInitializing: boolean = false;
     private initializationComplete: boolean = false;
     private eventListenersSetup: boolean = false;
+    private gameControlsEnabled: boolean = true; // Track if game controls are enabled
 
     // Maya's position (determined by player progression state)
     public x: number = 7779; // Default position
@@ -124,7 +127,7 @@ export class MayaNPCManager {
             if (state.hasFollowedMaya) {
                 this.guideCompleted = true;
             }
-            if (state.hasReachedStockMarket) {
+            if (state.stockMarketOnboardingComplete) {
                 this.stockMarketGuideCompleted = true;
             }
             
@@ -167,7 +170,7 @@ export class MayaNPCManager {
             console.log('🚀 Maya: Player met Maya but hasn\'t completed bank journey - ready to guide');
         }
         
-        if (state.hasCompletedBankOnboarding && !state.hasReachedStockMarket) {
+        if (state.bankOnboardingComplete && !state.stockMarketOnboardingComplete) {
             // Player completed bank onboarding but hasn't reached stock market
             // Maya should be ready for stock market guidance
             console.log('🚀 Maya: Player completed bank onboarding - ready for stock market guidance');
@@ -269,6 +272,9 @@ export class MayaNPCManager {
 
         // Set up event listeners for dynamic objective updates
         this.setupObjectiveListeners();
+
+        // Listen for typing events to disable/enable game controls
+        this.setupTypingEventListeners();
     }
 
     /**
@@ -284,6 +290,8 @@ export class MayaNPCManager {
         // Listen for bank onboarding completion to trigger stock market guidance
         const handleBankOnboardingComplete = () => {
             console.log('MayaNPCManager: Bank onboarding completed, updating objective for stock market guidance');
+            // Refresh Maya's interaction state immediately
+            this.refreshMayaState();
             this.updateObjectiveFollowMayaToStockMarket();
         };
 
@@ -297,11 +305,33 @@ export class MayaNPCManager {
         (this as any).bankOnboardingHandler = handleBankOnboardingComplete;
         (this as any).stockMarketArrivalHandler = handleStockMarketArrival;
 
-        window.addEventListener('bank-onboarding-complete' as any, handleBankOnboardingComplete);
+        window.addEventListener('bank-onboarding-completed' as any, handleBankOnboardingComplete);
         window.addEventListener('stock-market-arrival' as any, handleStockMarketArrival);
         
         this.eventListenersSetup = true;
         console.log('🚀 Maya: Event listeners set up successfully');
+    }
+
+    /**
+     * Set up listeners for typing events to disable/enable game controls
+     */
+    private setupTypingEventListeners(): void {
+        const handleTypingStart = () => {
+            this.gameControlsEnabled = false;
+            // Clear dialog key listeners when game controls are disabled
+            this.clearDialogKeyListeners();
+        };
+
+        const handleTypingEnd = () => {
+            this.gameControlsEnabled = true;
+        };
+
+        window.addEventListener('typing-start', handleTypingStart);
+        window.addEventListener('typing-end', handleTypingEnd);
+
+        // Store references for cleanup if needed
+        (this as any).typingStartHandler = handleTypingStart;
+        (this as any).typingEndHandler = handleTypingEnd;
     }
 
     private createMayaAnimations(): void {
@@ -403,7 +433,8 @@ export class MayaNPCManager {
             text: "Hello adventurer! I'm Maya, your quest helper.\nI can guide you on your journey through Dhaniverse!",
             characterName: 'M.A.Y.A',
             showBackdrop: false,
-            allowSpaceAdvance: true
+            allowSpaceAdvance: true,
+            keyboardInputEnabled: true // Enable DialogueBox keyboard handling
         }, {
             onAdvance: () => {
                 // Close local dialog state and cleanup visuals
@@ -424,6 +455,7 @@ export class MayaNPCManager {
         // Create reusable event handlers
         const closeDialogHandler = () => {
             if (this.activeDialog) {
+                this.lastInteractionTime = Date.now(); // Update cooldown when closing dialogue
                 this.closeDialog();
             }
         };
@@ -604,12 +636,24 @@ export class MayaNPCManager {
             Phaser.Input.Keyboard.JustDown(this.interactionKey) &&
             !this.activeDialog &&
             !this.movingToTarget &&
-            !this.guidedSequenceActive
+            !this.guidedSequenceActive &&
+            this.gameControlsEnabled && // Check if game controls are enabled
+            Date.now() - this.lastInteractionTime > this.interactionCooldown // Add cooldown check
         ) {
+            this.lastInteractionTime = Date.now(); // Update interaction time
                         (async () => {
                             try {
                                 const { progressionManager } = await import('../../services/ProgressionManager');
+                                // Always refresh progression state from database to get latest updates
+                                try {
+                                    await progressionManager.initializeFromPlayerState(undefined, true); // Force refresh
+                                } catch (e) {
+                                    console.warn('Failed to refresh progression state:', e);
+                                }
+                                
                                 const ps = progressionManager.getState();
+                                console.log('🚀 Maya: Current progression state:', ps);
+                                
                                 // ORIGINAL CHAIN (unchanged behavior): until claimed money
                                 if (!ps.hasClaimedMoney) {
                                     let completed = ps.hasClaimedMoney; // immediate state
@@ -622,17 +666,19 @@ export class MayaNPCManager {
                                     return;
                                 }
                                 // Failure case: claimed money but bank onboarding not completed
-                                if (ps.hasClaimedMoney && !ps.hasCompletedBankOnboarding) {
+                                if (ps.hasClaimedMoney && !ps.bankOnboardingComplete) {
+                                    // Don't set up custom key listeners, DialogueManager handles this
                                     dialogueManager.showDialogue({
                                         text: 'You need to complete your bank onboarding and create your account before we continue.',
                                         characterName: 'M.A.Y.A',
                                         allowSpaceAdvance: true,
-                                        showBackdrop: false
+                                        showBackdrop: false,
+                                        keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                                     }, { onAdvance: () => dialogueManager.closeDialogue() });
                                     return;
                                 }
                                 // Stock market guidance branch
-                                if (ps.hasCompletedBankOnboarding && !ps.hasReachedStockMarket) {
+                                if (ps.bankOnboardingComplete && !ps.stockMarketOnboardingComplete) {
                                     console.log('🚀 Maya: Bank onboarding completed, checking stock market guidance...');
                                     console.log('🚀 Maya: stockMarketGuideCompleted:', this.stockMarketGuideCompleted, 'stockMarketGuideActive:', this.stockMarketGuideActive);
                                     console.log('🚀 Maya: Current Maya position:', { x: this.maya.x, y: this.maya.y });
@@ -646,13 +692,15 @@ export class MayaNPCManager {
                                     return;
                                 }
                                 // After everything is complete - provide a friendly message
-                                if (ps.hasCompletedBankOnboarding && ps.hasReachedStockMarket) {
+                                if (ps.bankOnboardingComplete && ps.stockMarketOnboardingComplete) {
                                     console.log('🚀 Maya: All guidance completed, showing completion message');
+                                    // Don't set up custom key listeners, DialogueManager handles this
                                     dialogueManager.showDialogue({
                                         text: 'Great job! You\'ve completed the financial onboarding. You now have access to both the bank and stock market. Continue exploring Dhaniverse!',
                                         characterName: 'M.A.Y.A',
                                         allowSpaceAdvance: true,
-                                        showBackdrop: false
+                                        showBackdrop: false,
+                                        keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                                     }, { onAdvance: () => dialogueManager.closeDialogue() });
                                     return;
                                 }
@@ -783,7 +831,8 @@ export class MayaNPCManager {
             text: "Follow me. I'll guide you to the Central Bank.",
             characterName: 'M.A.Y.A',
             showBackdrop: false,
-            allowSpaceAdvance: true
+            allowSpaceAdvance: true,
+            keyboardInputEnabled: true // Enable DialogueBox keyboard handling
         }, {
             onAdvance: () => {
                 console.log('🚀 Maya: DialogueManager onAdvance called, starting movement!');
@@ -924,6 +973,20 @@ export class MayaNPCManager {
         })();
     }
 
+    private refreshMayaState(): void {
+        // Refresh Maya's internal state when progression changes
+        (async () => {
+            try {
+                const { progressionManager } = await import('../../services/ProgressionManager');
+                await progressionManager.initializeFromPlayerState(undefined, true); // Force refresh
+                const state = progressionManager.getState();
+                console.log('🚀 Maya: State refreshed after progression change:', state);
+            } catch (e) {
+                console.warn('Could not refresh Maya state', e);
+            }
+        })();
+    }
+
     private async updateLocationTrackerForProgress(): Promise<void> {
         try {
             const { progressionManager } = await import('../../services/ProgressionManager');
@@ -936,7 +999,7 @@ export class MayaNPCManager {
             }
             
             // If all guidance is complete, disable the tracker
-            if (state.hasReachedStockMarket) {
+            if (state.stockMarketOnboardingComplete) {
                 locationTrackerManager.setTargetEnabled('maya', false);
                 console.log('🚀 Maya: Disabled tracker for completed player');
             }
@@ -1032,7 +1095,8 @@ export class MayaNPCManager {
                 text: 'Follow me, we\'ll now go to the stock market and explore Dhani Stocks.',
                 characterName: 'M.A.Y.A',
                 allowSpaceAdvance: true,
-                showBackdrop: false
+                showBackdrop: false,
+                keyboardInputEnabled: true // Enable DialogueBox keyboard handling
             }, {
                 onAdvance: () => {
                     dialogueManager.closeDialogue();
@@ -1097,17 +1161,18 @@ export class MayaNPCManager {
                 text: 'We have reached Dhani Stocks. This is where you can learn about investing and trading!',
                 characterName: 'M.A.Y.A',
                 allowSpaceAdvance: true,
-                showBackdrop: false
+                showBackdrop: false,
+                keyboardInputEnabled: true // Enable DialogueBox keyboard handling
             }, { onAdvance: () => dialogueManager.closeDialogue() });
             
             // Mark in progression manager
             (async () => { 
                 try { 
                     const { progressionManager } = await import('../../services/ProgressionManager'); 
-                    progressionManager.markReachedStockMarket();
-                    console.log('🚀 Maya: Marked reached stock market in progression');
+                    progressionManager.markStockMarketOnboardingCompleted();
+                    console.log('🚀 Maya: Marked stock market onboarding completed in progression');
                 } catch(e) { 
-                    console.warn('Could not mark stock market reached', e);
+                    console.warn('Could not mark stock market onboarding completed', e);
                 } 
             })();
             
@@ -1242,7 +1307,8 @@ export class MayaNPCManager {
                     text: "This is our Central Bank! Here you can manage your finances and learn about money.",
                     characterName: 'M.A.Y.A',
                     allowSpaceAdvance: true,
-                    showBackdrop: false
+                    showBackdrop: false,
+                    keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                 }, {
                     onAdvance: () => {
                         dialogueManager.closeDialogue();
@@ -1258,7 +1324,8 @@ export class MayaNPCManager {
                     text: "This is our Central Bank! Sign in to claim your starter money and begin your journey.",
                     characterName: 'M.A.Y.A',
                     allowSpaceAdvance: true,
-                    showBackdrop: false
+                    showBackdrop: false,
+                    keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                 }, {
                     onAdvance: () => {
                         dialogueManager.closeDialogue();
@@ -1270,7 +1337,8 @@ export class MayaNPCManager {
                     text: "This is our Central Bank! Here you can manage your finances and learn about money.",
                     characterName: 'M.A.Y.A',
                     allowSpaceAdvance: true,
-                    showBackdrop: false
+                    showBackdrop: false,
+                    keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                 }, {
                     onAdvance: () => {
                         dialogueManager.closeDialogue();
@@ -1280,7 +1348,8 @@ export class MayaNPCManager {
                             allowSpaceAdvance: true,
                             showBackdrop: false,
                             options: [ { id: 'claim', text: 'Claim Money', action: () => this.handleClaimMoney() } ],
-                            showOptions: true
+                            showOptions: true,
+                            keyboardInputEnabled: true // Enable DialogueBox keyboard handling
                         }, {
                             onAdvance: () => { dialogueManager.closeDialogue(); this.closeDialog(); },
                             onOptionSelect: (optionId: string) => { if (optionId === 'claim') this.handleClaimMoney(); }
@@ -1393,7 +1462,7 @@ export class MayaNPCManager {
             const stockHandler = (this as any).stockMarketArrivalHandler;
             
             if (bankHandler) {
-                window.removeEventListener('bank-onboarding-complete' as any, bankHandler);
+                window.removeEventListener('bank-onboarding-completed' as any, bankHandler);
             }
             if (stockHandler) {
                 window.removeEventListener('stock-market-arrival' as any, stockHandler);

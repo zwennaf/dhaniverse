@@ -179,16 +179,16 @@ export class BankOnboardingManager {
         window.dispatchEvent(new CustomEvent('open-bank-account-creation-flow'));
         
         // Listen for completion
-        const finishHandler = (e: CustomEvent) => {
+        const finishHandler = async (e: Event) => {
           window.removeEventListener('bank-account-creation-finished', finishHandler as EventListener);
-          this.handleAccountCreationFinished(e.detail);
+          await this.handleAccountCreationFinished((e as CustomEvent).detail);
         };
         window.addEventListener('bank-account-creation-finished', finishHandler as EventListener);
       }
     });
   }
 
-  private handleAccountCreationFinished(eventDetail?: any): void {
+  private async handleAccountCreationFinished(eventDetail?: any): Promise<void> {
     // Check if this is an existing user who should open banking UI
     if (eventDetail?.openBankingUI) {
       console.log('🏦 Opening banking UI for existing user');
@@ -205,7 +205,7 @@ export class BankOnboardingManager {
         }
       }
       
-      this.completeOnboarding();
+      await this.completeOnboarding();
       return;
     }
 
@@ -225,7 +225,7 @@ export class BankOnboardingManager {
         showBackdrop: true,
         allowSpaceAdvance: true
       }, {
-        onAdvance: () => this.finishConversation()
+        onAdvance: async () => await this.finishConversation()
       });
     }
   }
@@ -242,9 +242,9 @@ export class BankOnboardingManager {
 
   // Removed legacy showAccountCreatedDialogue / launchAccountCreationFlowUI (flow handled inline)
 
-  private finishConversation(): void {
+  private async finishConversation(): Promise<void> {
     this.conversationStage = 'FINISHED';
-    this.completeOnboarding();
+    await this.completeOnboarding();
     dialogueManager.closeDialogue();
   this.notifyConversationEnded();
   }
@@ -535,7 +535,7 @@ export class BankOnboardingManager {
     }
   }
 
-  private completeOnboarding(): void {
+  private async completeOnboarding(): Promise<void> {
     console.log('🏦 Completing onboarding...');
     this.isOnboardingActive = false;
     
@@ -548,22 +548,21 @@ export class BankOnboardingManager {
     // Enable normal banking interactions
     this.enableNormalBanking();
     
-    // Dispatch completion event
-    window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
-    
-    console.log('🏦 Onboarding completed successfully');
-    
-    // Update progression manager (async import to avoid circular)
-    // Note: The database update happens in the bank account creation API
-    (async () => { 
+    // Update progression manager immediately (async import to ensure immediate update)
+    (async () => {
       try { 
         const { progressionManager } = await import('../../../services/ProgressionManager'); 
         progressionManager.markBankOnboardingCompleted(); 
-        console.log('[Progression] Bank onboarding completion persisted:', progressionManager.getState());
+        console.log('[Progression] Bank onboarding completion persisted immediately:', progressionManager.getState());
       } catch(e) { 
         console.warn('Could not mark bank onboarding completion', e);
-      } 
+      }
     })();
+    
+    // Dispatch completion event AFTER progression state is updated
+    window.dispatchEvent(new CustomEvent('bank-onboarding-completed'));
+    
+    console.log('🏦 Onboarding completed successfully');
   }
 
   private endConversation(): void {

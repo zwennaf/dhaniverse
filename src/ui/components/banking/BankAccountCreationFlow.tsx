@@ -68,14 +68,14 @@ const BankAccountCreationFlow: React.FC = () => {
         const progressionState = progressionManager.getState();
         
         console.log('🏦 Bank Account Creation: Checking user state', {
-          hasCompletedBankOnboarding: progressionState.hasCompletedBankOnboarding,
+          bankOnboardingComplete: progressionState.bankOnboardingComplete,
           hasMetMaya: progressionState.hasMetMaya,
           hasClaimedMoney: progressionState.hasClaimedMoney,
           onboardingStep: progressionState.onboardingStep
         });
         
         // Step 2: Check if bank onboarding is already completed in progression
-        if (progressionState.hasCompletedBankOnboarding) {
+        if (progressionState.bankOnboardingComplete) {
           console.log('🏦 Bank onboarding already completed in progression, showing welcome back dialogue');
           
           // Mark localStorage flag as well for consistency

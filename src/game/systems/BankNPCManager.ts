@@ -234,10 +234,10 @@ export class BankNPCManager {
   return this.lastBackendCheckResult;
     } catch (e) {
       console.warn('Failed to check backend bank account status:', e);
-      // Conservative behavior: if we can't reach the backend, assume account exists
-      // to avoid presenting onboarding that may fail or create inconsistent local-only state.
+      // If backend is completely unavailable, don't block onboarding
+      // Let the user proceed with onboarding flow
   this.lastBackendCheckAt = Date.now();
-  this.lastBackendCheckResult = true;
+  this.lastBackendCheckResult = false;
   return this.lastBackendCheckResult;
     }
   }

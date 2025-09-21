@@ -101,6 +101,9 @@ class DialogueManager {
 
       // Re-enable game controls
       window.dispatchEvent(new Event("typing-end"));
+      
+      // Dispatch custom event to reset interaction timers (prevents immediate re-triggering)
+      window.dispatchEvent(new CustomEvent("dialogue-closed", { detail: { timestamp: Date.now() } }));
     }
   }
 

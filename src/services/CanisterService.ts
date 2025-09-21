@@ -374,12 +374,48 @@ class CanisterService {
 
     // Monitoring
     async getCanisterMetrics(): Promise<any> {
-        // Canister metrics functionality not yet implemented in canister
-        // Return mock data for now
-        console.warn('getCanisterMetrics not implemented in canister, using mock data');
+        // If actor exists and exposes a health endpoint, use it to get real metrics
+        try {
+            if (!this.actor) {
+                console.warn('getCanisterMetrics: actor is null or undefined — cannot query canister');
+            } else if (!(this.actor as any).get_system_health) {
+                console.warn('getCanisterMetrics: actor does not expose get_system_health method');
+            } else {
+                console.log('getCanisterMetrics: calling actor.get_system_health()');
+                const metrics = await (this.actor as any).get_system_health();
+                console.log('getCanisterMetrics: raw metrics from actor:', metrics);
+
+                // Attempt to normalize cycles value if present
+                if (metrics && typeof metrics === 'object') {
+                    const normalized: any = { ...metrics };
+                    if ('cycles_balance' in metrics) {
+                        const cb = metrics.cycles_balance;
+                        // Try to parse numeric cycles (support string or bigint)
+                        if (typeof cb === 'string') {
+                            // Remove non-digits
+                            const digits = cb.replace(/[^0-9]/g, '') || '0';
+                            normalized.cycles_balance = Number(digits);
+                        } else if (typeof cb === 'bigint') {
+                            normalized.cycles_balance = Number(cb);
+                        } else {
+                            normalized.cycles_balance = cb;
+                        }
+                    }
+                    console.log('getCanisterMetrics: normalized metrics:', normalized);
+                    return normalized;
+                }
+                return metrics;
+            }
+        } catch (error) {
+            console.error('Error fetching canister metrics from actor:', error);
+            // fall through to return mock
+        }
+
+        // Fallback: return mock data if actor not available or call fails
+        console.warn('getCanisterMetrics not available from canister, using mock data');
         return {
             memory_usage: '27MB',
-            cycles_balance: '218B',
+            cycles_balance: 0,
             requests_count: 260,
             uptime: '24h'
         };

@@ -348,6 +348,31 @@ class RealStockService {
             await canisterService.initialize();
           }
 
+          // Check canister cycles before attempting batch calls to avoid IC0207 errors
+          try {
+            const metrics: any = await canisterService.getCanisterMetrics();
+            const cycles = metrics?.cycles_balance ?? metrics?.cycles ?? 0;
+            const safeThreshold = 1e6; // 1,000,000 cycles (adjustable)
+            if (typeof cycles === 'string') {
+              // Try to parse string numbers
+              const parsed = Number(cycles.replace(/[^0-9]/g, '')) || 0;
+              if (parsed < safeThreshold) {
+                console.warn(`⚠️ Canister cycles low (${parsed}), skipping canister calls and using fallback`);
+                const fallbackStockData = await this.fetchStockPricesFromCoinGecko(stockMappings);
+                results.push(...fallbackStockData);
+                return results;
+              }
+            } else if (typeof cycles === 'number' && cycles < safeThreshold) {
+              console.warn(`⚠️ Canister cycles low (${cycles}), skipping canister calls and using fallback`);
+              const fallbackStockData = await this.fetchStockPricesFromCoinGecko(stockMappings);
+              results.push(...fallbackStockData);
+              return results;
+            }
+          } catch (metricsError) {
+            console.warn('Could not read canister metrics, proceeding cautiously:', metricsError);
+            // continue: we'll still attempt canister call but be ready to fallback on error
+          }
+
           const actor = (canisterService as any).actor;
           if (!actor) {
             console.error('Canister actor not available, trying CoinGecko for stocks');
@@ -400,7 +425,7 @@ class RealStockService {
               const isOutOfCycles = errorMsg.includes('out of cycles') || errorMsg.includes('IC0207');
               
               if (isOutOfCycles) {
-                console.warn('🔄 Canister out of cycles, falling back to CoinGecko API for stock prices');
+                console.warn('🔄 Canister out of cycles detected during batch call, falling back to CoinGecko API for stock prices');
                 
                 // Fall back to CoinGecko API for stock prices
                 try {

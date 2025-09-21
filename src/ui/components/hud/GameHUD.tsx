@@ -716,7 +716,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             }
 
             // 4. After claiming money: Show "Go inside the bank and interact with bank manager"
-            if (state.hasClaimedMoney && !state.hasCompletedBankOnboarding && !activeTasks.some(t => t.id === 'enter-bank-speak-manager')) {
+            if (state.hasClaimedMoney && !state.bankOnboardingComplete && !activeTasks.some(t => t.id === 'enter-bank-speak-manager')) {
                 // Remove claim bonus task if still present
                 if (activeTasks.some(t => t.id === 'claim-joining-bonus')) {
                     tasksToRemove.push('claim-joining-bonus');
@@ -732,7 +732,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             }
 
             // 5. After bank onboarding: Show "Go back to Maya and follow her to stock market"
-            if (state.hasCompletedBankOnboarding && !state.hasReachedStockMarket && !activeTasks.some(t => t.id === 'return-to-maya-stock-market')) {
+            if (state.bankOnboardingComplete && !state.stockMarketOnboardingComplete && !activeTasks.some(t => t.id === 'return-to-maya-stock-market')) {
                 // Remove bank task if still present
                 if (activeTasks.some(t => t.id === 'enter-bank-speak-manager')) {
                     tasksToRemove.push('enter-bank-speak-manager');
@@ -748,7 +748,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             }
 
             // 6. After reaching stock market: Show "Go inside and explore Dhani stocks"
-            if (state.hasReachedStockMarket && !activeTasks.some(t => t.id === 'explore-dhani-stocks')) {
+            if (state.stockMarketOnboardingComplete && !activeTasks.some(t => t.id === 'explore-dhani-stocks')) {
                 // Clean up ALL Maya onboarding tasks when stock market is reached
                 const mayaOnboardingTaskIds = [
                     'meet-maya',
@@ -794,7 +794,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             });
 
                         // Final cleanup: once player is truly free (stock market reached & explore task completed or claimed money & bank onboarding complete), remove all trackers & tasks
-                        const freed = state.hasReachedStockMarket && state.hasCompletedBankOnboarding;
+                        const freed = state.stockMarketOnboardingComplete && state.bankOnboardingComplete;
                         if (freed) {
                             const leftover = tm.getActiveTasks().filter(t => ['meet-maya','follow-maya-to-bank','claim-joining-bonus','enter-bank-speak-manager','return-to-maya-stock-market','explore-dhani-stocks'].includes(t.id));
                             leftover.forEach(t => {

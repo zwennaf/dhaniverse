@@ -22,6 +22,8 @@ export class BuildingManager {
   private isNearBuilding: boolean = false;
   private isNearStockMarket: boolean = false;
   private transitionInProgress: boolean = false;
+  private lastInteractionTime: number = 0;
+  private interactionCooldown: number = 300; // 300ms cooldown between interactions
 
   constructor(scene: MainGameScene) {
     this.scene = scene;
@@ -67,6 +69,12 @@ export class BuildingManager {
     }
     
     this.setupBuilding();
+    
+    // Listen for dialogue close events to reset interaction timer
+    window.addEventListener('dialogue-closed', (event: any) => {
+      console.log('BuildingManager: Dialogue closed, resetting interaction timer');
+      this.lastInteractionTime = event.detail.timestamp;
+    });
   }
 
   update(): void {
@@ -95,8 +103,15 @@ export class BuildingManager {
     // Get player position
     const playerPos = player.getPosition();
     
-    // If player is in building, check for ESC to exit (but not if dialogue is active)
-    if (mapManager.isPlayerInBuilding() && this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey) && !dialogueManager.isDialogueActive()) {
+    // If player is in building, check for ESC to exit (even if dialogue is active - force exit)
+    if (mapManager.isPlayerInBuilding() && this.escKey && Phaser.Input.Keyboard.JustDown(this.escKey)) {
+      console.log('BuildingManager: ESC key pressed while in building');
+      // Close any active dialogues before exiting
+      if (dialogueManager.isDialogueActive()) {
+        dialogueManager.forceCloseAll();
+        console.log('BuildingManager: Forced dialogue close on ESC exit');
+      }
+      console.log('BuildingManager: Calling exitBuilding()');
       this.exitBuilding();
       return;
     }
@@ -193,13 +208,30 @@ export class BuildingManager {
       }
     }
     
-    // Check for key press to enter building when near (now supports E, Space, or Enter)
+    // Ensure interaction text is visible when near and not in building (fallback check)
+    if (this.isNearBuilding && !mapManager.isPlayerInBuilding() && this.buildingInteractionText.alpha === 0) {
+      this.buildingInteractionText.setAlpha(1);
+    }
+    
+    // Check for key press to enter building when near (now supports E, Space, or Enter with cooldown)
+    const currentTime = Date.now();
     if (this.isNearBuilding && 
         !mapManager.isPlayerInBuilding() && 
+        !dialogueManager.isDialogueActive() && // Don't trigger when dialogue is active
+        currentTime - this.lastInteractionTime > this.interactionCooldown && // Add cooldown
         ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
          (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
          (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
+      console.log('BuildingManager: Attempting to enter bank building');
+      this.lastInteractionTime = currentTime;
       this.enterBuilding('bank');
+    }
+    
+    // Debug logging when space is pressed but entry is blocked
+    if (this.isNearBuilding && 
+        !mapManager.isPlayerInBuilding() && 
+        this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      console.log('BuildingManager: Space pressed near building, dialogue active:', dialogueManager.isDialogueActive(), 'cooldown remaining:', Math.max(0, this.interactionCooldown - (currentTime - this.lastInteractionTime)));
     }
     
     // Update interaction text position to follow entrance point
@@ -266,12 +298,21 @@ export class BuildingManager {
       }
     }
     
+    // Ensure interaction text is visible when near and not in building (fallback check)
+    if (this.isNearStockMarket && !mapManager.isPlayerInBuilding() && this.stockMarketInteractionText.alpha === 0) {
+      this.stockMarketInteractionText.setAlpha(1);
+    }
+    
     // Check for key press to enter stock market when near
+    const currentTime = Date.now();
     if (this.isNearStockMarket && 
         !mapManager.isPlayerInBuilding() && 
+        !dialogueManager.isDialogueActive() && // Don't trigger when dialogue is active
+        currentTime - this.lastInteractionTime > this.interactionCooldown && // Add cooldown
         ((this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) ||
          (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
          (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)))) {
+      this.lastInteractionTime = currentTime;
       this.enterBuilding('stockmarket');
     }
     
@@ -291,6 +332,7 @@ export class BuildingManager {
     try {
       const check = progressionManager.canEnterBuilding(buildingType === 'bank' ? 'bank' : 'stockmarket');
       if (!check.allowed) {
+        this.lastInteractionTime = Date.now(); // Update interaction time to prevent spam
         progressionManager.showAccessDenied(check.message!);
         return;
       }
@@ -438,6 +480,12 @@ export class BuildingManager {
     
     // Set transition in progress
     this.transitionInProgress = true;
+    
+    // Clean up any active dialogues when exiting buildings
+    if (dialogueManager.isDialogueActive()) {
+      dialogueManager.forceCloseAll();
+      console.log('BuildingManager: Cleaned up dialogues on building exit');
+    }
     
     // Exit building through map manager
     const outdoorPosition = mapManager.exitBuilding();

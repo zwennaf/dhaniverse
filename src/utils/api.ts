@@ -181,13 +181,28 @@ export const playerStateApi = {
 // ======================
 
 export const bankingApi = {
+    // Debug function to test server connectivity
+    testConnection: async () => {
+        try {
+            console.log('🔍 Testing API connection to:', API_BASE);
+            const response = await apiFetch('/api/health');
+            console.log('🔍 Health check response:', response.status, response.statusText);
+            return { success: response.ok, status: response.status };
+        } catch (error) {
+            console.error("🔍 API connection test failed:", error);
+            return { success: false, error: String(error) };
+        }
+    },
+
     // Check bank onboarding status
     getOnboardingStatus: async () => {
         try {
+            console.log('🏦 Banking API: Getting onboarding status from:', `${API_BASE}/game/bank-onboarding/status`);
             const response = await apiFetch('/game/bank-onboarding/status');
+            console.log('🏦 Banking API: Onboarding status response:', response.status);
             return handleApiResponse(response);
         } catch (error) {
-            console.error("Error checking bank onboarding status:", error);
+            console.error("🏦 Banking API: Error checking bank onboarding status:", error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
@@ -205,18 +220,21 @@ export const bankingApi = {
     // Get bank account
     getAccount: async () => {
         try {
+            console.log('🏦 Banking API: Getting account from:', `${API_BASE}/game/bank-account`);
             const response = await apiFetch('/game/bank-account');
             
             if (response.status === 404) {
+                console.log('🏦 Banking API: No bank account found (404)');
                 return {
                     success: false,
                     error: "No bank account found",
                     data: null
                 };
             }
+            console.log('🏦 Banking API: Account request successful');
             return handleApiResponse(response);
         } catch (error) {
-            console.error("Error getting bank account:", error);
+            console.error("🏦 Banking API: Error getting bank account:", error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
@@ -426,3 +444,9 @@ export const syncApi = {
 };
 
 export { API_BASE };
+
+// Expose debug functions globally in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    (window as any).testBankingAPI = bankingApi.testConnection;
+    (window as any).debugAPI = { API_BASE, bankingApi };
+}
