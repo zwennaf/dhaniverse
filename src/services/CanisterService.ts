@@ -4,11 +4,21 @@ import { Principal } from '@dfinity/principal';
 import { idlFactory } from "../declarations/dhaniverse_backend/dhaniverse_backend.did.js"
 import NetworkConfig from '../config/network';
 
-export interface DualBalance {
-    rupees_balance: number;
-    token_balance: number;
-    last_updated: bigint;
-}
+// Import types from the canister declarations
+import type { 
+    DualBalance, 
+    Achievement, 
+    AchievementReward,
+    Web3Transaction,
+    ExchangeResult,
+    WalletConnection,
+    WalletInfo,
+    WalletType,
+    TransactionType,
+    TransactionStatus,
+    PriceSnapshot,
+    AuthResult
+} from '../declarations/dhaniverse_backend/dhaniverse_backend.did.d.ts';
 
 export interface TransactionResult {
     success: boolean;
@@ -21,15 +31,34 @@ export interface PriceData {
     price: number;
 }
 
-export interface Achievement {
+// Stock data interface based on canister structure
+export interface StockData {
     id: string;
-    title: string;
-    description: string;
-    category: 'Trading' | 'Saving' | 'Learning';
-    rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
-    unlocked: boolean;
-    unlocked_at?: number;
-    reward?: { reward_type: string; amount: number };
+    symbol: string;
+    name: string;
+    current_price: number;
+    price_history: Array<{
+        timestamp: bigint;
+        price: number;
+        open: number;
+        high: number;
+        low: number;
+        close: number;
+        volume: bigint;
+    }>;
+    metrics: {
+        market_cap: number;
+        pe_ratio: number;
+        eps: number;
+        volatility: number;
+        business_growth: number;
+        debt_equity_ratio: number;
+        outstanding_shares: bigint;
+        industry_avg_pe: number;
+    };
+    news: string[];
+    last_update: bigint;
+    sector?: string;
 }
 
 class CanisterService {
@@ -238,15 +267,25 @@ class CanisterService {
         return await this.actor.health_check();
     }
 
-    // Balance operations (no auth required for test)
+    // Balance operations - using only methods that exist in declarations
     async getBalanceNoAuth(walletAddress: string): Promise<DualBalance> {
         if (!this.actor) throw new Error('Actor not initialized');
         
-        const result = await this.actor.get_balance_no_auth(walletAddress);
-        if ('Ok' in result) {
-            return result.Ok;
-        } else {
-            throw new Error(result.Err);
+        try {
+            // get_balance_no_auth doesn't exist, use get_dual_balance instead
+            const result = await this.actor.get_dual_balance(walletAddress);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.warn('getBalanceNoAuth fallback: using mock data');
+            return {
+                rupees_balance: 0,
+                token_balance: 0,
+                last_updated: BigInt(Date.now())
+            };
         }
     }
 
@@ -265,11 +304,14 @@ class CanisterService {
     async getFormattedBalance(walletAddress: string): Promise<string> {
         if (!this.actor) throw new Error('Actor not initialized');
         
-        const result = await this.actor.get_formatted_balance(walletAddress);
-        if ('Ok' in result) {
-            return result.Ok;
-        } else {
-            throw new Error(result.Err);
+        try {
+            // get_formatted_balance doesn't exist, calculate from dual balance
+            const dualBalance = await this.getDualBalance(walletAddress);
+            const total = dualBalance.rupees_balance + dualBalance.token_balance;
+            return `₹${total.toFixed(2)}`;
+        } catch (error) {
+            console.warn('getFormattedBalance error:', error);
+            return "₹0.00";
         }
     }
 
@@ -319,20 +361,64 @@ class CanisterService {
         }
     }
 
-    // Price feed operations
+    // Price feed operations - now using real canister methods
     async getAllPriceFeeds(): Promise<[string, number][]> {
-        // Price feeds functionality not yet implemented in canister
-        // Return mock data for now
-        console.warn('getAllPriceFeeds not implemented in canister, using mock data');
-        const mockTokens = ['BTC', 'ETH', 'SOL', 'USDC', 'USDT', 'ICP', 'MATIC', 'AVAX'];
-        return mockTokens.map(token => [token, this.getMockPrice(token)]);
+        if (!this.isConnected()) {
+            console.warn('getAllPriceFeeds: Canister not connected, using mock data');
+            const mockTokens = ['BTC', 'ETH', 'SOL', 'USDC', 'USDT', 'ICP', 'MATIC', 'AVAX'];
+            return mockTokens.map(token => [token, this.getMockPrice(token)]);
+        }
+
+        try {
+            // Try to get price history first
+            const priceHistory = await this.actor.get_price_history();
+            if (priceHistory && priceHistory.length > 0) {
+                const latestSnapshot = priceHistory[priceHistory.length - 1];
+                return latestSnapshot.prices.map((entry: any) => [entry.symbol, entry.price]);
+            }
+
+            // Fallback: trigger price update and return mock data
+            await this.updatePricesFromExternal();
+            const mockTokens = ['BTC', 'ETH', 'SOL', 'ICP', 'LINK', 'UNI'];
+            return mockTokens.map(token => [token, this.getMockPrice(token)]);
+        } catch (error) {
+            console.error('getAllPriceFeeds error:', error);
+            const mockTokens = ['BTC', 'ETH', 'SOL', 'USDC', 'USDT', 'ICP', 'MATIC', 'AVAX'];
+            return mockTokens.map(token => [token, this.getMockPrice(token)]);
+        }
     }
 
     async getPriceFeed(symbol: string): Promise<number | null> {
-        // Price feed functionality not yet implemented in canister
-        // Return mock data for now
-        console.warn('getPriceFeed not implemented in canister, using mock data');
-        return this.getMockPrice(symbol);
+        if (!this.isConnected()) {
+            console.warn('getPriceFeed: Canister not connected, using mock data');
+            return this.getMockPrice(symbol);
+        }
+
+        try {
+            // First try to get from price history
+            const priceHistory = await this.actor.get_price_history();
+            if (priceHistory && priceHistory.length > 0) {
+                const latestSnapshot = priceHistory[priceHistory.length - 1];
+                const priceEntry = latestSnapshot.prices.find((entry: any) => 
+                    entry.symbol.toUpperCase() === symbol.toUpperCase()
+                );
+                if (priceEntry) {
+                    return priceEntry.price;
+                }
+            }
+
+            // Try to fetch external price
+            const result = await this.actor.fetch_external_price(symbol);
+            if ('Ok' in result && result.Ok) {
+                return result.Ok;
+            }
+
+            // Fallback to mock price
+            return this.getMockPrice(symbol);
+        } catch (error) {
+            console.error(`getPriceFeed error for ${symbol}:`, error);
+            return this.getMockPrice(symbol);
+        }
     }
 
     private getMockPrice(symbol: string): number {
@@ -351,28 +437,323 @@ class CanisterService {
     }
 
     async updatePricesFromExternal(): Promise<number> {
-        // Price update functionality not yet implemented in canister
-        // Return mock count for now
-        console.warn('updatePricesFromExternal not implemented in canister, using mock response');
-        return 8; // Mock: updated 8 prices
+        if (!this.isConnected()) {
+            console.warn('updatePricesFromExternal: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.update_prices_from_external();
+            if ('Ok' in result) {
+                console.log(`Updated ${result.Ok} prices from external sources`);
+                return Number(result.Ok);
+            } else {
+                console.error('updatePricesFromExternal error:', result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error('updatePricesFromExternal error:', error);
+            return 0;
+        }
     }
 
     async fetchExternalPrice(symbol: string): Promise<number | null> {
-        // External price fetching not yet implemented in canister
-        // Return mock price for now
-        console.warn('fetchExternalPrice not implemented in canister, using mock data');
-        return this.getMockPrice(symbol);
+        if (!this.isConnected()) {
+            console.warn('fetchExternalPrice: Canister not connected, using mock data');
+            return this.getMockPrice(symbol);
+        }
+
+        try {
+            const result = await this.actor.fetch_external_price(symbol);
+            if ('Ok' in result && result.Ok) {
+                return result.Ok;
+            }
+            return this.getMockPrice(symbol);
+        } catch (error) {
+            console.error(`fetchExternalPrice error for ${symbol}:`, error);
+            return this.getMockPrice(symbol);
+        }
     }
 
     async fetchMultipleCryptoPrices(tokenIds: string): Promise<[string, number][]> {
-        // Multiple crypto prices functionality not yet implemented in canister
-        // Return mock data for now
-        console.warn('fetchMultipleCryptoPrices not implemented in canister, using mock data');
-        const tokens = tokenIds.split(',');
-        return tokens.map(token => [token.trim(), this.getMockPrice(token.trim())]);
+        if (!this.isConnected()) {
+            console.warn('fetchMultipleCryptoPrices: Canister not connected, using mock data');
+            const tokens = tokenIds.split(',');
+            return tokens.map(token => [token.trim(), this.getMockPrice(token.trim())]);
+        }
+
+        try {
+            const result = await this.actor.fetch_multiple_crypto_prices(tokenIds);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                console.error('fetchMultipleCryptoPrices error:', result.Err);
+                const tokens = tokenIds.split(',');
+                return tokens.map(token => [token.trim(), this.getMockPrice(token.trim())]);
+            }
+        } catch (error) {
+            console.error('fetchMultipleCryptoPrices error:', error);
+            const tokens = tokenIds.split(',');
+            return tokens.map(token => [token.trim(), this.getMockPrice(token.trim())]);
+        }
     }
 
-    // Monitoring
+    // Stock data methods using canister
+    async getStockData(symbol: string): Promise<StockData | null> {
+        if (!this.isConnected()) {
+            console.warn('getStockData: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.get_stock_data(symbol.toUpperCase());
+            if ('Ok' in result) {
+                return result.Ok as StockData;
+            } else {
+                console.warn(`getStockData error for ${symbol}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`getStockData error for ${symbol}:`, error);
+            return null;
+        }
+    }
+
+    async getMarketSummary(): Promise<Map<string, StockData> | null> {
+        if (!this.isConnected()) {
+            console.warn('getMarketSummary: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.get_market_summary();
+            if ('Ok' in result) {
+                // Convert the result to a Map
+                const summaryMap = new Map<string, StockData>();
+                const entries = result.Ok as Array<[string, StockData]>;
+                entries.forEach(([key, value]) => {
+                    summaryMap.set(key, value);
+                });
+                return summaryMap;
+            } else {
+                console.warn('getMarketSummary error:', result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error('getMarketSummary error:', error);
+            return null;
+        }
+    }
+
+    async fetchStockPrice(symbol: string): Promise<number | null> {
+        if (!this.isConnected()) {
+            console.warn('fetchStockPrice: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.fetch_stock_price(symbol.toUpperCase());
+            if ('Ok' in result && result.Ok) {
+                return result.Ok;
+            }
+            return null;
+        } catch (error) {
+            console.error(`fetchStockPrice error for ${symbol}:`, error);
+            return null;
+        }
+    }
+
+    async refreshStockCache(symbol: string): Promise<StockData | null> {
+        if (!this.isConnected()) {
+            console.warn('refreshStockCache: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.refresh_stock_cache(symbol.toUpperCase());
+            if ('Ok' in result) {
+                return result.Ok as StockData;
+            } else {
+                console.warn(`refreshStockCache error for ${symbol}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`refreshStockCache error for ${symbol}:`, error);
+            return null;
+        }
+    }
+
+    // Historical data methods
+    async getPriceHistory(): Promise<PriceSnapshot[]> {
+        if (!this.isConnected()) {
+            console.warn('getPriceHistory: Canister not connected');
+            return [];
+        }
+
+        try {
+            return await this.actor.get_price_history();
+        } catch (error) {
+            console.error('getPriceHistory error:', error);
+            return [];
+        }
+    }
+
+    async fetchCoinHistory(coinId: string, days: string): Promise<Array<[string, number]> | null> {
+        if (!this.isConnected()) {
+            console.warn('fetchCoinHistory: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.fetch_coin_history(coinId, days);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                console.warn(`fetchCoinHistory error for ${coinId}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`fetchCoinHistory error for ${coinId}:`, error);
+            return null;
+        }
+    }
+
+    async fetchCoinMarketChartRange(
+        coinId: string, 
+        vsCurrency: string, 
+        from: number, 
+        to: number
+    ): Promise<Array<[string, Array<[number, number]>]> | null> {
+        if (!this.isConnected()) {
+            console.warn('fetchCoinMarketChartRange: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.fetch_coin_market_chart_range(
+                coinId, 
+                vsCurrency, 
+                BigInt(from), 
+                BigInt(to)
+            );
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                console.warn(`fetchCoinMarketChartRange error for ${coinId}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`fetchCoinMarketChartRange error for ${coinId}:`, error);
+            return null;
+        }
+    }
+
+    async fetchCoinOHLC(
+        coinId: string, 
+        vsCurrency: string, 
+        days: number
+    ): Promise<Array<[number, number, number, number, number]> | null> {
+        if (!this.isConnected()) {
+            console.warn('fetchCoinOHLC: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.fetch_coin_ohlc(coinId, vsCurrency, days);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                console.warn(`fetchCoinOHLC error for ${coinId}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`fetchCoinOHLC error for ${coinId}:`, error);
+            return null;
+        }
+    }
+
+    // Stock SSE and broadcasting methods
+    async subscribeStockUpdates(stockId: string): Promise<string | null> {
+        if (!this.isConnected()) {
+            console.warn('subscribeStockUpdates: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.subscribe_stock_updates(stockId);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                console.warn(`subscribeStockUpdates error for ${stockId}:`, result.Err);
+                return null;
+            }
+        } catch (error) {
+            console.error(`subscribeStockUpdates error for ${stockId}:`, error);
+            return null;
+        }
+    }
+
+    async broadcastStockUpdate(stockId: string): Promise<number> {
+        if (!this.isConnected()) {
+            console.warn('broadcastStockUpdate: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.broadcast_stock_update(stockId);
+            if ('Ok' in result) {
+                return Number(result.Ok);
+            } else {
+                console.warn(`broadcastStockUpdate error for ${stockId}:`, result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error(`broadcastStockUpdate error for ${stockId}:`, error);
+            return 0;
+        }
+    }
+
+    async broadcastStockNews(stockId: string, news: string[]): Promise<number> {
+        if (!this.isConnected()) {
+            console.warn('broadcastStockNews: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.broadcast_stock_news(stockId, news);
+            if ('Ok' in result) {
+                return Number(result.Ok);
+            } else {
+                console.warn(`broadcastStockNews error for ${stockId}:`, result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error(`broadcastStockNews error for ${stockId}:`, error);
+            return 0;
+        }
+    }
+
+    async broadcastMarketSummary(): Promise<number> {
+        if (!this.isConnected()) {
+            console.warn('broadcastMarketSummary: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.broadcast_market_summary();
+            if ('Ok' in result) {
+                return Number(result.Ok);
+            } else {
+                console.warn('broadcastMarketSummary error:', result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error('broadcastMarketSummary error:', error);
+            return 0;
+        }
+    }
+
+    // SSE Stream Endpoints
     async getCanisterMetrics(): Promise<any> {
         // If actor exists and exposes a health endpoint, use it to get real metrics
         try {
@@ -455,6 +836,7 @@ class CanisterService {
     }
 
     // Wallet connection and management
+    /* TEMPORARY: Commented out duplicate method - will fix after canister deployment
     async connectWallet(walletType: string, address: string, chainId?: string): Promise<any> {
         if (!this.actor) throw new Error('Actor not initialized');
         
@@ -476,20 +858,9 @@ class CanisterService {
             throw new Error(result.Err);
         }
     }
+    */
 
-    async disconnectWallet(address: string): Promise<boolean> {
-        if (!this.actor) throw new Error('Actor not initialized');
-        
-        try {
-            // This would call a disconnect function if it exists in the canister
-            // For now, we'll clear the session
-            await this.logout();
-            return true;
-        } catch (error) {
-            console.error('Error disconnecting wallet:', error);
-            return false;
-        }
-    }
+    // REMOVED DUPLICATE: disconnectWallet - using the properly typed version later in the file
 
     async getWalletBalance(address: string): Promise<DualBalance> {
         if (!this.actor) throw new Error('Actor not initialized');
@@ -647,68 +1018,7 @@ class CanisterService {
         };
     }
 
-    // Achievement methods
-    async getAchievements(walletAddress: string): Promise<Achievement[]> {
-        if (!this.actor) throw new Error('Actor not initialized');
-        
-        try {
-            const achievements = await this.actor.get_achievements(walletAddress);
-            return achievements || [];
-        } catch (error) {
-            console.error('Get achievements failed:', error);
-            return [];
-        }
-    }
-
-    async claimAchievementReward(walletAddress: string, achievementId: string): Promise<any> {
-        if (!this.actor) throw new Error('Actor not initialized');
-        
-        try {
-            const result = await this.actor.claim_achievement_reward(walletAddress, achievementId);
-            if ('Ok' in result) {
-                return result.Ok;
-            } else {
-                throw new Error(result.Err);
-            }
-        } catch (error) {
-            console.error('Claim achievement reward failed:', error);
-            throw error;
-        }
-    }
-
-    // Transaction methods
-    async getTransactionHistory(walletAddress: string): Promise<any[]> {
-        if (!this.actor) throw new Error('Actor not initialized');
-        
-        try {
-            const transactions = await this.actor.get_transaction_history(walletAddress);
-            return transactions || [];
-        } catch (error) {
-            console.error('Get transaction history failed:', error);
-            return [];
-        }
-    }
-
-    async createTransaction(walletAddress: string, transactionType: string, amount: number, to?: string): Promise<any> {
-        if (!this.actor) throw new Error('Actor not initialized');
-        
-        try {
-            const result = await this.actor.create_transaction(
-                walletAddress,
-                { [transactionType]: null }, // Convert string to variant
-                amount,
-                to ? [to] : []
-            );
-            if ('Ok' in result) {
-                return result.Ok;
-            } else {
-                throw new Error(result.Err);
-            }
-        } catch (error) {
-            console.error('Create transaction failed:', error);
-            throw error;
-        }
-    }
+    // REMOVED DUPLICATES: Achievement and Transaction methods - using properly typed versions later in file
 
     // DeFi simulation methods
     async simulateLiquidityPool(walletAddress: string, amount: number): Promise<number> {
@@ -740,6 +1050,203 @@ class CanisterService {
         } catch (error) {
             console.error('Simulate yield farming failed:', error);
             return amount * 1.15; // 15% fallback return
+        }
+    }
+
+    // Additional methods available in canister declarations
+    
+    // Authentication methods
+    async authenticateWithSignature(message: string, signature: string): Promise<AuthResult> {
+        if (!this.isConnected()) {
+            throw new Error('Canister not connected');
+        }
+
+        try {
+            const result = await this.actor.authenticate_with_signature(message, signature);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('Authentication failed:', error);
+            throw error;
+        }
+    }
+
+    // Achievement methods
+    async getAchievements(walletAddress: string): Promise<Achievement[]> {
+        if (!this.isConnected()) {
+            console.warn('getAchievements: Canister not connected');
+            return [];
+        }
+
+        try {
+            return await this.actor.get_achievements(walletAddress);
+        } catch (error) {
+            console.error('getAchievements error:', error);
+            return [];
+        }
+    }
+
+    async claimAchievementReward(walletAddress: string, achievementId: string): Promise<AchievementReward> {
+        if (!this.isConnected()) {
+            throw new Error('Canister not connected');
+        }
+
+        try {
+            const result = await this.actor.claim_achievement_reward(walletAddress, achievementId);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('claimAchievementReward error:', error);
+            throw error;
+        }
+    }
+
+    // Wallet management methods
+    async connectWallet(walletType: WalletType, address: string, chainId: string): Promise<WalletConnection> {
+        if (!this.isConnected()) {
+            throw new Error('Canister not connected');
+        }
+
+        try {
+            const result = await this.actor.connect_wallet(walletType, address, chainId);
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('connectWallet error:', error);
+            throw error;
+        }
+    }
+
+    async disconnectWallet(walletAddress: string): Promise<void> {
+        if (!this.isConnected()) {
+            throw new Error('Canister not connected');
+        }
+
+        try {
+            const result = await this.actor.disconnect_wallet(walletAddress);
+            if ('Err' in result) {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('disconnectWallet error:', error);
+            throw error;
+        }
+    }
+
+    async getAvailableWallets(): Promise<WalletInfo[]> {
+        if (!this.isConnected()) {
+            console.warn('getAvailableWallets: Canister not connected');
+            return [];
+        }
+
+        try {
+            return await this.actor.get_available_wallets();
+        } catch (error) {
+            console.error('getAvailableWallets error:', error);
+            return [];
+        }
+    }
+
+    async getWalletStatus(walletAddress: string): Promise<WalletConnection | null> {
+        if (!this.isConnected()) {
+            console.warn('getWalletStatus: Canister not connected');
+            return null;
+        }
+
+        try {
+            const result = await this.actor.get_wallet_status(walletAddress);
+            return result.length > 0 ? result[0] : null;
+        } catch (error) {
+            console.error('getWalletStatus error:', error);
+            return null;
+        }
+    }
+
+    // Transaction methods
+    async createTransaction(walletAddress: string, transactionType: TransactionType, amount: number, toAddress?: string): Promise<Web3Transaction> {
+        if (!this.isConnected()) {
+            throw new Error('Canister not connected');
+        }
+
+        try {
+            const result = await this.actor.create_transaction(
+                walletAddress, 
+                transactionType, 
+                amount, 
+                toAddress ? [toAddress] : []
+            );
+            if ('Ok' in result) {
+                return result.Ok;
+            } else {
+                throw new Error(result.Err);
+            }
+        } catch (error) {
+            console.error('createTransaction error:', error);
+            throw error;
+        }
+    }
+
+    async getTransactionHistory(walletAddress: string): Promise<Web3Transaction[]> {
+        if (!this.isConnected()) {
+            console.warn('getTransactionHistory: Canister not connected');
+            return [];
+        }
+
+        try {
+            return await this.actor.get_transaction_history(walletAddress);
+        } catch (error) {
+            console.error('getTransactionHistory error:', error);
+            return [];
+        }
+    }
+
+    // Cache management
+    async cleanupStockCache(): Promise<number> {
+        if (!this.isConnected()) {
+            console.warn('cleanupStockCache: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.cleanup_stock_cache();
+            if ('Ok' in result) {
+                return Number(result.Ok);
+            } else {
+                console.warn('cleanupStockCache error:', result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error('cleanupStockCache error:', error);
+            return 0;
+        }
+    }
+
+    async fetchAndAppendSnapshot(symbol: string): Promise<number> {
+        if (!this.isConnected()) {
+            console.warn('fetchAndAppendSnapshot: Canister not connected');
+            return 0;
+        }
+
+        try {
+            const result = await this.actor.fetch_and_append_snapshot(symbol);
+            if ('Ok' in result) {
+                return Number(result.Ok);
+            } else {
+                console.warn(`fetchAndAppendSnapshot error for ${symbol}:`, result.Err);
+                return 0;
+            }
+        } catch (error) {
+            console.error(`fetchAndAppendSnapshot error for ${symbol}:`, error);
+            return 0;
         }
     }
 }

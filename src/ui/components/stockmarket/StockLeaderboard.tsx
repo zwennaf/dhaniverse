@@ -134,7 +134,7 @@ const StockLeaderboard: React.FC<StockLeaderboardProps> = ({
     try {
       // Prefer canister createTransaction if available
       if (canisterService && canisterService.createTransaction) {
-        await canisterService.createTransaction(user?.id || '', 'Exchange', profit);
+        await canisterService.createTransaction(user?.id || '', { 'Exchange': null }, profit);
       } else if (icpService && icpService.recordTrade) {
         await icpService.recordTrade(profit, stockSymbol);
       } else {

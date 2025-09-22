@@ -1,4 +1,5 @@
 import { getRealStockService } from './RealStockService';
+import { canisterService } from './CanisterService';
 
 export interface Stock {
     id: string;
@@ -87,16 +88,50 @@ class StockService {
     }
 
     async getAllStocks(): Promise<Stock[]> {
-        console.log('Loading all stocks via RealStockService (batch) ...');
+        console.log('Loading all stocks via canister and RealStockService (batch) ...');
 
         const symbols = this.stocks.map(s => s.symbol);
         let results = [] as any[];
 
         try {
-            const realStockService = getRealStockService();
-            results = await realStockService.getMultipleStocks(symbols);
+            // First try to get market summary from canister
+            console.log('🚀 Trying canister market summary first...');
+            const marketSummary = await canisterService.getMarketSummary();
+            
+            if (marketSummary && marketSummary.size > 0) {
+                console.log(`📊 Got ${marketSummary.size} stocks from canister market summary`);
+                
+                // Convert canister stock data to our format
+                const canisterStocks = [];
+                for (const [symbol, stockData] of marketSummary.entries()) {
+                    const mapping = this.stocks.find(s => s.symbol === symbol);
+                    if (mapping) {
+                        canisterStocks.push({
+                            symbol: stockData.symbol,
+                            companyName: stockData.name,
+                            price: stockData.current_price,
+                            marketCap: stockData.metrics.market_cap,
+                            peRatio: stockData.metrics.pe_ratio,
+                            sector: stockData.sector || mapping.sector,
+                            isRealTime: true
+                        });
+                    }
+                }
+                
+                if (canisterStocks.length > 0) {
+                    results = canisterStocks;
+                    console.log(`✅ Using ${canisterStocks.length} stocks from canister`);
+                }
+            }
+            
+            // If canister didn't provide enough data, fallback to RealStockService
+            if (results.length === 0) {
+                console.log('📈 Falling back to RealStockService...');
+                const realStockService = getRealStockService();
+                results = await realStockService.getMultipleStocks(symbols);
+            }
         } catch (err) {
-            console.error('RealStockService batch fetch failed, falling back to local generation:', err);
+            console.error('Stock data fetch failed, falling back to local generation:', err);
             results = [];
         }
 
@@ -154,8 +189,50 @@ class StockService {
     }
 
     async getStock(symbol: string): Promise<Stock | null> {
+        // First try to get directly from canister for faster response
+        try {
+            const stockData = await canisterService.getStockData(symbol);
+            if (stockData) {
+                const mapping = this.stocks.find(s => s.symbol === symbol.toUpperCase());
+                return {
+                    id: stockData.symbol.toLowerCase(),
+                    name: stockData.name,
+                    currentPrice: stockData.current_price,
+                    priceHistory: stockData.price_history.map(p => p.price).slice(-15),
+                    debtEquityRatio: stockData.metrics.debt_equity_ratio,
+                    businessGrowth: stockData.metrics.business_growth,
+                    news: stockData.news,
+                    marketCap: stockData.metrics.market_cap,
+                    peRatio: stockData.metrics.pe_ratio,
+                    eps: stockData.metrics.eps,
+                    industryAvgPE: stockData.metrics.industry_avg_pe,
+                    outstandingShares: Number(stockData.metrics.outstanding_shares),
+                    volatility: stockData.metrics.volatility,
+                    lastUpdate: Number(stockData.last_update),
+                    sector: stockData.sector || mapping?.sector || 'Unknown'
+                };
+            }
+        } catch (error) {
+            console.warn(`Failed to get individual stock ${symbol} from canister:`, error);
+        }
+        
+        // Fallback to getAllStocks approach
         const stocks = await this.getAllStocks();
         return stocks.find(s => s.id === symbol.toLowerCase()) || null;
+    }
+
+    // Method to refresh a specific stock's data in the canister
+    async refreshStock(symbol: string): Promise<Stock | null> {
+        try {
+            const refreshedData = await canisterService.refreshStockCache(symbol);
+            if (refreshedData) {
+                console.log(`✅ Refreshed ${symbol} data in canister`);
+                return await this.getStock(symbol);
+            }
+        } catch (error) {
+            console.warn(`Failed to refresh ${symbol} in canister:`, error);
+        }
+        return null;
     }
 }
 

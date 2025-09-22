@@ -2,8 +2,29 @@
  * RealStockService - Hybrid API integration for real-time stock and crypto prices
  * 
  * Strategy:
- * 1. Crypto prices: Always use CoinGecko API directly (reliable & free)
- * 2. Stock prices: Try canister first, fall back to CoinGecko/generated data if out of cycles
+ * 1. Primary: Use ICP canister      
+      // For symbols not found in market summary, try individual fetches
+      const notFoundSymbols = symbols.filter(symbol => 
+        !results.some(r => r.symbol.toUpperCase() === symbol.toUpperCase())
+      );
+
+      if (notFoundSymbols.length > 0) {
+        console.log(`🔍 Fetching ${notFoundSymbols.length} remaining stocks individually`);
+      
+        // Check if we've recently tried individual calls and failed
+        const batchKey = notFoundSymbols.join(',');
+        if (this.canisterSpamPrevention.has(batchKey)) {
+          console.log('🚫 Preventing canister spam - using fallback data instead');
+          return results;
+        }
+
+        // Mark this batch to prevent future spam
+        this.canisterSpamPrevention.add(batchKey);
+        
+        // Try limited individual calls (max 5 symbols)
+        console.log('🔄 Testing canister with limited individual calls');
+        const limitedSymbols = notFoundSymbols.slice(0, 5); // Only test with first 5 symbolso and stock prices (HTTP outcalls)
+ * 2. Fallback: CoinGecko API directly for crypto if canister unavailable  
  * 3. Smart caching with timer-based updates to minimize API calls
  * 4. Graceful fallback to generated data if all APIs fail
  */
@@ -111,15 +132,31 @@ class RealStockService {
   }
 
   /**
-   * Fetch stock prices from canister in batch
+   * Fetch stock prices from canister using the new methods
    */
   private async fetchStockPricesFromCanister(actor: any, symbols: string[]): Promise<any[]> {
     try {
-      // Try to use batch method first if available
-      if (actor.fetch_multiple_stock_prices) {
-        console.log('🚀 Using canister batch method for stocks');
-        const result = await actor.fetch_multiple_stock_prices(symbols);
-        return Array.isArray(result) ? result : [];
+      console.log('🚀 Using updated canister methods for stock prices');
+      const results = [];
+
+      // First, try to get market summary which might contain our stocks
+      const marketSummary = await canisterService.getMarketSummary();
+      if (marketSummary) {
+        console.log('� Got market summary from canister with', marketSummary.size, 'stocks');
+        
+        for (const symbol of symbols) {
+          const stockData = marketSummary.get(symbol.toUpperCase());
+          if (stockData) {
+            results.push({
+              symbol: stockData.symbol,
+              price: stockData.current_price,
+              companyName: stockData.name,
+              marketCap: stockData.metrics.market_cap,
+              peRatio: stockData.metrics.pe_ratio,
+              sector: stockData.sector || 'Unknown'
+            });
+          }
+        }
       }
       
       // Check if we've recently tried individual calls and failed
@@ -134,7 +171,6 @@ class RealStockService {
       
       // Try limited individual calls (max 3 symbols to test canister availability)
       console.log('🔄 Testing canister with limited individual calls');
-      const results = [];
       const testSymbols = symbols.slice(0, 3); // Only test with first 3 symbols
       
       for (const symbol of testSymbols) {
@@ -213,10 +249,43 @@ class RealStockService {
   }
 
   /**
-   * Fetch crypto prices directly from CoinGecko API
+   * Fetch crypto prices using canister first, fallback to CoinGecko API
    */
   private async fetchCryptoPricesBatch(coinGeckoIds: string[]): Promise<any[]> {
     try {
+      // First try to use canister for crypto prices
+      try {
+        const idsStr = coinGeckoIds.join(',');
+        console.log('🚀 Trying canister for crypto prices:', idsStr);
+        
+        const canisterResult = await canisterService.fetchMultipleCryptoPrices(idsStr);
+        if (canisterResult && canisterResult.length > 0) {
+          console.log(`✅ Got ${canisterResult.length} crypto prices from canister`);
+          
+          // Convert canister result to expected format
+          const results = [];
+          for (const [coinId, price] of canisterResult) {
+            const symbol = this.getSymbolFromCoinGeckoId(coinId);
+            results.push({
+              symbol: symbol,
+              price: price,
+              companyName: `${symbol} Token`,
+              marketCap: 0,
+              peRatio: 0,
+              sector: 'Cryptocurrency',
+              isRealTime: true
+            });
+          }
+          
+          if (results.length > 0) {
+            return results;
+          }
+        }
+      } catch (canisterError) {
+        console.warn('Canister crypto fetch failed, falling back to direct API:', canisterError);
+      }
+      
+      // Fallback to direct CoinGecko API
       const idsStr = coinGeckoIds.join(',');
       const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsStr}&vs_currencies=usd`;
       

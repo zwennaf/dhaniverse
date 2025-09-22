@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { animate } from 'motion';
 import { canisterService } from '../../../services/CanisterService';
 import { balanceManager } from '../../../services/BalanceManager';
+// Import the canister Achievement type
+import type { Achievement } from '../../../declarations/dhaniverse_backend/dhaniverse_backend.did.d.ts';
 
 interface VaultPosition {
   id: string;
@@ -13,18 +15,22 @@ interface VaultPosition {
   status: 'active' | 'pending' | 'completed';
 }
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  unlocked: boolean;
-  category: string;
-  rarity: string;
-  reward?: {
-    reward_type: string;
-    amount: number;
-  };
-}
+// Helper functions to extract string values from canister enums
+const getCategoryString = (category: any): string => {
+  if (typeof category === 'object' && category !== null) {
+    const keys = Object.keys(category);
+    return keys.length > 0 ? keys[0] : 'Unknown';
+  }
+  return category || 'Unknown';
+};
+
+const getRarityString = (rarity: any): string => {
+  if (typeof rarity === 'object' && rarity !== null) {
+    const keys = Object.keys(rarity);
+    return keys.length > 0 ? keys[0] : 'Common';
+  }
+  return rarity || 'Common';
+};
 
 interface DeFiBankingVaultProps {
   isOpen: boolean;
@@ -150,12 +156,13 @@ const DeFiBankingVault: React.FC<DeFiBankingVaultProps> = ({
       // Create transaction record
       const txResult = await canisterService.createTransaction(
         walletAddress,
-        'Deposit',
+        { 'Deposit': null }, // Use proper TransactionType variant
         amount,
         `DeFi Banking Vault - ${selectedPool}`
       );
 
-      if (txResult.success) {
+      // The createTransaction method now returns Web3Transaction, not a success object
+      if (txResult && txResult.id) {
         // Simulate the selected pool
         const poolResult = selectedPool === 'liquidity' 
           ? await canisterService.simulateLiquidityPool("DHANI", amount)
@@ -213,7 +220,7 @@ const DeFiBankingVault: React.FC<DeFiBankingVaultProps> = ({
       // Create withdrawal transaction
       const txResult = await canisterService.createTransaction(
         walletAddress,
-        'Withdraw',
+        { 'Withdraw': null }, // Use proper TransactionType variant
         position.amount + position.estimatedYield,
         `DeFi Vault withdrawal - ${position.poolType}`
       );
@@ -367,15 +374,15 @@ const DeFiBankingVault: React.FC<DeFiBankingVaultProps> = ({
                       <h4 className="font-medium text-yellow-500">{achievement.title}</h4>
                       <p className="text-sm text-gray-400 mt-1">{achievement.description}</p>
                       <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">
-                        {achievement.category} • {achievement.rarity}
+                        {getCategoryString(achievement.category)} • {getRarityString(achievement.rarity)}
                       </p>
                     </div>
-                    {achievement.unlocked && achievement.reward && (
+                    {achievement.unlocked && achievement.reward && achievement.reward.length > 0 && (
                       <button
                         onClick={() => claimAchievementReward(achievement.id)}
                         className="bg-yellow-600 text-black text-xs px-4 py-2 rounded font-medium hover:bg-yellow-500 transition-colors duration-200"
                       >
-                        Claim ₹{achievement.reward.amount}
+                        Claim ₹{achievement.reward?.[0]?.amount || 0}
                       </button>
                     )}
                   </div>

@@ -11,12 +11,10 @@ const AchievementsPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const load = async () => {
       setLoading(true);
       try {
-        const { stockCanisterClient } = await import('../../../services/stockCanister');
-        // Try to use canister service via a safe wrapper or fallback to API
-        await stockCanisterClient.ensureInitialized();
-        // There's no dedicated get_achievements on the wrapper; try direct canisterService as fallback
+        // Use the integrated canister service directly
+        const { canisterService } = await import('../../../services/CanisterService');
+        await canisterService.initialize();
         try {
-          const { canisterService } = await import('../../../services/CanisterService');
           const res = await (canisterService as any).get_achievements?.(window.location?.hostname || '');
           if (res) setAchievements(res);
         } catch (e) {

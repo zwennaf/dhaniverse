@@ -187,10 +187,11 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
 
                 // Dynamically import the stockMarketService to avoid side-effects
                 const { stockMarketService } = await import("../../../services/StockMarketService");
-                const { stockCanisterClient } = await import("../../../services/stockCanister");
+                // Use the integrated canister service directly
+                const { canisterService } = await import("../../../services/CanisterService");
 
                 // Ensure canister is initialized (safe, idempotent)
-                await stockCanisterClient.ensureInitialized();
+                await canisterService.initialize();
 
                 // Initialize stock market service (fetches batched data once)
                 if (!stockMarketService.isServiceInitialized()) {
