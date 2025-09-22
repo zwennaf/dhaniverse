@@ -65,9 +65,8 @@ const Profile: React.FC = () => {
 
         // Extract bank balance from bank account response safely
         const bankBalance =
-          bankAccountRes?.data?.balance ??
-          bankAccountRes?.data?.account?.balance ??
-          bankAccountRes?.balance ??
+          (bankAccountRes?.success && bankAccountRes.data?.balance) ??
+          (bankAccountRes?.success && bankAccountRes.data?.account?.balance) ??
           null;
 
         setCashBalance(typeof rupees === 'number' ? rupees : null);
