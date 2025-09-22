@@ -2,28 +2,7 @@
  * RealStockService - Hybrid API integration for real-time stock and crypto prices
  * 
  * Strategy:
- * 1. Primary: Use ICP canister      
-      // For symbols not found in market summary, try individual fetches
-      const notFoundSymbols = symbols.filter(symbol => 
-        !results.some(r => r.symbol.toUpperCase() === symbol.toUpperCase())
-      );
-
-      if (notFoundSymbols.length > 0) {
-        console.log(`🔍 Fetching ${notFoundSymbols.length} remaining stocks individually`);
-      
-        // Check if we've recently tried individual calls and failed
-        const batchKey = notFoundSymbols.join(',');
-        if (this.canisterSpamPrevention.has(batchKey)) {
-          console.log('🚫 Preventing canister spam - using fallback data instead');
-          return results;
-        }
-
-        // Mark this batch to prevent future spam
-        this.canisterSpamPrevention.add(batchKey);
-        
-        // Try limited individual calls (max 5 symbols)
-        console.log('🔄 Testing canister with limited individual calls');
-        const limitedSymbols = notFoundSymbols.slice(0, 5); // Only test with first 5 symbolso and stock prices (HTTP outcalls)
+ * 1. Primary: Use ICP canister for crypto and stock prices (HTTP outcalls)
  * 2. Fallback: CoinGecko API directly for crypto if canister unavailable  
  * 3. Smart caching with timer-based updates to minimize API calls
  * 4. Graceful fallback to generated data if all APIs fail
@@ -259,12 +238,34 @@ class RealStockService {
         console.log('🚀 Trying canister for crypto prices:', idsStr);
         
         const canisterResult = await canisterService.fetchMultipleCryptoPrices(idsStr);
-        if (canisterResult && canisterResult.length > 0) {
+        console.log('🔍 Canister result type:', typeof canisterResult, canisterResult);
+        
+        if (canisterResult && Array.isArray(canisterResult) && canisterResult.length > 0) {
           console.log(`✅ Got ${canisterResult.length} crypto prices from canister`);
           
           // Convert canister result to expected format
           const results = [];
-          for (const [coinId, price] of canisterResult) {
+          for (const priceData of canisterResult) {
+            // Handle both tuple format [coinId, price] and object format
+            let coinId: string, price: number;
+            
+            if (Array.isArray(priceData) && priceData.length >= 2) {
+              [coinId, price] = priceData;
+            } else if (typeof priceData === 'object' && priceData !== null) {
+              // Handle object format if canister returns objects
+              const priceObj = priceData as any;
+              coinId = priceObj[0] || priceObj.coinId;
+              price = priceObj[1] || priceObj.price;
+            } else {
+              console.warn('Unexpected price data format:', priceData);
+              continue;
+            }
+            
+            if (!coinId || typeof price !== 'number') {
+              console.warn('Invalid price data:', { coinId, price });
+              continue;
+            }
+            
             const symbol = this.getSymbolFromCoinGeckoId(coinId);
             results.push({
               symbol: symbol,
