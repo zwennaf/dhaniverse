@@ -34,10 +34,12 @@ interface RealStockData {
 // RealStockService uses the centralized stock mappings from config
 class RealStockService {
   private cache: Map<string, { data: RealStockData; timestamp: number }> = new Map();
-  private cacheTimeout = 60000; // 1 minute cache for API calls
+  private cacheTimeout = 60000; // 1 minute cache for regular API calls
+  private canisterCacheTimeout = 600000; // 10 minutes cache for canister calls (prevent spam)
+  private lastCanisterCall = 0;
   private updateTimer: NodeJS.Timeout | null = null;
   private lastBatchUpdate = 0;
-  private BATCH_UPDATE_INTERVAL = 60000; // 1 minute between batch updates
+  private BATCH_UPDATE_INTERVAL = 600000; // 10 minutes between batch updates to prevent canister spam
   private realStocks: StockMapping[] = realStocks;
   private initializationPromise: Promise<RealStockData[]> | null = null;
   private isInitializing = false;
@@ -229,64 +231,65 @@ class RealStockService {
 
   /**
    * Fetch crypto prices using canister first, fallback to CoinGecko API
+   * Returns array of tuples: [coinId, price]
    */
-  private async fetchCryptoPricesBatch(coinGeckoIds: string[]): Promise<any[]> {
+  private async fetchCryptoPricesBatch(coinGeckoIds: string[]): Promise<[string, number][]> {
     try {
-      // First try to use canister for crypto prices
-      try {
-        const idsStr = coinGeckoIds.join(',');
-        console.log('🚀 Trying canister for crypto prices:', idsStr);
-        
-        const canisterResult = await canisterService.fetchMultipleCryptoPrices(idsStr);
-        console.log('🔍 Canister result type:', typeof canisterResult, canisterResult);
-        
-        if (canisterResult && Array.isArray(canisterResult) && canisterResult.length > 0) {
-          console.log(`✅ Got ${canisterResult.length} crypto prices from canister`);
-          
-          // Convert canister result to expected format
-          const results = [];
-          for (const priceData of canisterResult) {
-            // Handle both tuple format [coinId, price] and object format
-            let coinId: string, price: number;
-            
-            if (Array.isArray(priceData) && priceData.length >= 2) {
-              [coinId, price] = priceData;
-            } else if (typeof priceData === 'object' && priceData !== null) {
-              // Handle object format if canister returns objects
-              const priceObj = priceData as any;
-              coinId = priceObj[0] || priceObj.coinId;
-              price = priceObj[1] || priceObj.price;
-            } else {
-              console.warn('Unexpected price data format:', priceData);
-              continue;
-            }
-            
-            if (!coinId || typeof price !== 'number') {
-              console.warn('Invalid price data:', { coinId, price });
-              continue;
-            }
-            
-            const symbol = this.getSymbolFromCoinGeckoId(coinId);
-            results.push({
-              symbol: symbol,
-              price: price,
-              companyName: `${symbol} Token`,
-              marketCap: 0,
-              peRatio: 0,
-              sector: 'Cryptocurrency',
-              isRealTime: true
-            });
-          }
-          
-          if (results.length > 0) {
-            return results;
-          }
-        }
-      } catch (canisterError) {
-        console.warn('Canister crypto fetch failed, falling back to direct API:', canisterError);
-      }
+      // Check if we should use canister (10-minute cooling period)
+      const now = Date.now();
+      const canisterCooledDown = (now - this.lastCanisterCall) >= this.canisterCacheTimeout;
       
-      // Fallback to direct CoinGecko API
+      if (canisterCooledDown) {
+        // First try to use canister for crypto prices
+        try {
+          const idsStr = coinGeckoIds.join(',');
+          console.log('🚀 Trying canister for crypto prices (last call was', Math.round((now - this.lastCanisterCall) / 60000), 'minutes ago):', idsStr);
+          
+          this.lastCanisterCall = now; // Update last call timestamp
+          const canisterResult = await canisterService.fetchMultipleCryptoPrices(idsStr);
+          console.log('🔍 Canister result type:', typeof canisterResult, canisterResult);
+          
+          if (canisterResult && Array.isArray(canisterResult) && canisterResult.length > 0) {
+            console.log(`✅ Got ${canisterResult.length} crypto prices from canister`);
+            
+            // Convert canister result to tuple format [coinId, price]
+            const results: [string, number][] = [];
+            for (const priceData of canisterResult) {
+              // Handle both tuple format [coinId, price] and object format
+              let coinId: string, price: number;
+              
+              if (Array.isArray(priceData) && priceData.length >= 2) {
+                [coinId, price] = priceData;
+              } else if (typeof priceData === 'object' && priceData !== null) {
+                // Handle object format if canister returns objects
+                const priceObj = priceData as any;
+                coinId = priceObj[0] || priceObj.coinId;
+                price = priceObj[1] || priceObj.price;
+              } else {
+                console.warn('Unexpected price data format:', priceData);
+                continue;
+              }
+              
+              if (!coinId || typeof price !== 'number') {
+                console.warn('Invalid price data:', { coinId, price });
+                continue;
+              }
+
+              // Return tuple format for consistency
+              results.push([coinId, price]);
+            }
+            
+            if (results.length > 0) {
+              return results;
+            }
+          }
+        } catch (canisterError) {
+          console.warn('Canister crypto fetch failed, falling back to direct API:', canisterError);
+        }
+      } else {
+        const minutesLeft = Math.ceil((this.canisterCacheTimeout - (now - this.lastCanisterCall)) / 60000);
+        console.log(`⏰ Canister cooling down - ${minutesLeft} minutes left before next call`);
+      }      // Fallback to direct CoinGecko API
       const idsStr = coinGeckoIds.join(',');
       const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsStr}&vs_currencies=usd`;
       
@@ -299,11 +302,14 @@ class RealStockService {
       
       const data = await response.json();
       
-      // Convert to array format expected by the caller
-      const results = [];
+      // Convert to tuple array format [coinId, price]
+      const results: [string, number][] = [];
       for (const [coinId, priceData] of Object.entries(data)) {
         if (priceData && typeof priceData === 'object' && 'usd' in priceData) {
-          results.push([coinId, (priceData as any).usd]);
+          const price = (priceData as any).usd;
+          if (typeof price === 'number') {
+            results.push([coinId, price]);
+          }
         }
       }
       
@@ -367,8 +373,32 @@ class RealStockService {
           
           const cryptoResult = await this.fetchCryptoPricesBatch(coinGeckoIds);
           
-          if (cryptoResult && Array.isArray(cryptoResult)) {
-            cryptoResult.forEach(([coinId, priceUsd]: [string, number]) => {
+          console.log('🔍 DEBUG cryptoResult:', cryptoResult, 'isArray:', Array.isArray(cryptoResult));
+          
+          if (cryptoResult && Array.isArray(cryptoResult) && cryptoResult.length > 0) {
+            cryptoResult.forEach((item) => {
+              console.log('🔍 Processing crypto item:', item, 'type:', typeof item);
+              
+              // Safe destructuring with fallback
+              let coinId: string, priceUsd: number;
+              
+              if (Array.isArray(item) && item.length >= 2) {
+                [coinId, priceUsd] = item;
+              } else if (typeof item === 'object' && item !== null) {
+                // Handle object format if needed
+                const itemObj = item as any;
+                coinId = itemObj.coinId || itemObj[0] || '';
+                priceUsd = itemObj.price || itemObj[1] || 0;
+              } else {
+                console.warn('⚠️ Unexpected crypto item format:', item);
+                return; // Skip this item
+              }
+              
+              if (!coinId || typeof priceUsd !== 'number' || priceUsd <= 0) {
+                console.warn('⚠️ Invalid crypto data:', { coinId, priceUsd });
+                return; // Skip this item
+              }
+              
               const symbol = this.getSymbolFromCoinGeckoId(coinId);
               const mapping = cryptoMappings.find(m => m.symbol === symbol);
               

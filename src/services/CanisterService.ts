@@ -756,14 +756,10 @@ class CanisterService {
     // SSE Stream Endpoints
     async getCanisterMetrics(): Promise<any> {
         try {
-            if (this.actor && this.actor.get_system_health) {
-                console.log('getCanisterMetrics: calling get_system_health');
-                const health = await this.actor.get_system_health();
-                console.log('getCanisterMetrics: health result:', health);
-                return health;
-            } else if (this.actor && this.actor.health_check) {
-                console.log('getCanisterMetrics: calling health_check as fallback');
+            if (this.actor && this.actor.health_check) {
+                console.log('getCanisterMetrics: calling health_check');
                 const health = await this.actor.health_check();
+                console.log('getCanisterMetrics: health result:', health);
                 return {
                     status: health,
                     cycles_balance: 37826189712, // Your actual cycles
@@ -787,9 +783,7 @@ class CanisterService {
 
     async getSystemHealth(): Promise<any> {
         try {
-            if (this.actor && this.actor.get_system_health) {
-                return await this.actor.get_system_health();
-            } else if (this.actor && this.actor.health_check) {
+            if (this.actor && this.actor.health_check) {
                 const health = await this.actor.health_check();
                 return {
                     status: health,

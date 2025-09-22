@@ -8,6 +8,7 @@ import authRouter from "./src/routes/authRouter.ts";
 import apiRouter from "./src/routes/apiRouter.ts";
 import gameRouter from "./src/routes/gameRouter.ts";
 import adminRouter from "./src/routes/adminRouter.ts";
+import docsRouter from "./src/routes/docsRouter.ts";
 
 // Initialize database connection
 async function initializeDatabase() {
@@ -131,6 +132,19 @@ app.use(async (ctx, next) => {
     }
     await next();
 });
+
+// Root route redirect to documentation
+app.use(async (ctx, next) => {
+    if (ctx.request.url.pathname === "/") {
+        ctx.response.redirect("/docs");
+        return;
+    }
+    await next();
+});
+
+// Documentation routes - mount first to catch /docs requests
+app.use(docsRouter.routes());
+app.use(docsRouter.allowedMethods());
 
 // Use API router for all /api routes
 app.use(apiRouter.routes());
