@@ -100,38 +100,52 @@ function initializeBankingUI() {
   }
 }
 
-// Function to initialize stock market UI
+// Function to initialize stock market UI (singleton pattern)
+let stockMarketUIRoot: any = null;
+let stockMarketUIInitialized = false;
+
 function initializeStockMarketUI() {
   const stockMarketUIContainer = document.getElementById('stock-market-ui-container');
   
-  if (stockMarketUIContainer) {
-    // Avoid mounting the stock market UI on pages that don't need it (e.g., /signin, /profile)
-    const path = window.location.pathname || '/';
-    const shouldMount = path.endsWith('/game');
-
-    if (!shouldMount) {
-      console.log(`Skipping Stock Market UI mount on path=${path}`);
-      return;
-    }
-
-    // Dynamically import and mount `StockMarketUI` only when needed
-    const stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
-    import('./ui/components/stockmarket/StockMarketUI.tsx').then(({ default: StockMarketUI }) => {
-      stockMarketUIRoot.render(
-        React.createElement(AuthProvider, null,
-          React.createElement(StockMarketUI)
-        )
-      );
-      // Make sure the stock market container is visible after mount
-      stockMarketUIContainer.style.display = 'block';
-      console.log('StockMarketUI dynamically imported and mounted');
-    }).catch(err => {
-      console.error('Failed to dynamically load StockMarketUI:', err);
-    });
-    console.log("Stock Market UI mount initiated (dynamic import)");
-  } else {
-    console.error("Could not find stock-market-ui-container element");
+  if (!stockMarketUIContainer) {
+    console.warn('Stock Market UI container not found');
+    return;
   }
+
+  // Avoid mounting the stock market UI on pages that don't need it (e.g., /signin, /profile)
+  const path = window.location.pathname || '/';
+  const shouldMount = path.endsWith('/game');
+
+  if (!shouldMount) {
+    console.log(`Skipping Stock Market UI mount on path=${path}`);
+    return;
+  }
+
+  // Only create root once
+  if (stockMarketUIInitialized) {
+    console.log('Stock Market UI already initialized, skipping...');
+    return;
+  }
+
+  stockMarketUIInitialized = true;
+  
+  // Dynamically import and mount `StockMarketUI` only when needed
+  stockMarketUIRoot = ReactDOM.createRoot(stockMarketUIContainer);
+  import('./ui/components/stockmarket/StockMarketUI.tsx').then(({ default: StockMarketUI }) => {
+    stockMarketUIRoot.render(
+      React.createElement(AuthProvider, null,
+        React.createElement(StockMarketUI)
+      )
+    );
+    // Make sure the stock market container is visible after mount
+    stockMarketUIContainer.style.display = 'block';
+    console.log('StockMarketUI dynamically imported and mounted');
+  }).catch(err => {
+    console.error('Failed to dynamically load StockMarketUI:', err);
+    stockMarketUIInitialized = false; // Reset on error
+  });
+  
+  console.log("Stock Market UI mount initiated (dynamic import)");
 }
 
 // Function to initialize post office UI

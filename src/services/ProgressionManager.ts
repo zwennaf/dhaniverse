@@ -34,11 +34,25 @@ class ProgressionManager {
   async initializeFromPlayerState(playerState?: any, forceRefresh = false) {
     if (this.initialized && !forceRefresh) return;
     
+    console.log('🔄 ProgressionManager: Initializing from player state...');
+    
     // Always try to load from database first
     try {
       const response = await playerStateApi.get();
       if (response.success && response.data?.onboarding) {
         const dbState = response.data.onboarding;
+        
+        // CRITICAL FIX: Don't overwrite local state with older database state
+        // If we have a more recent local update (like bankOnboardingComplete), preserve it
+        const shouldPreserveLocal = this.initialized && this.state.bankOnboardingComplete && !dbState.bankOnboardingComplete;
+        
+        if (shouldPreserveLocal) {
+          console.log('⚠️ ProgressionManager: Local state is newer than database, preserving local state');
+          console.log('🔄 ProgressionManager: Saving newer local state to database');
+          await this.persist(); // Save our newer local state to database
+          return;
+        }
+        
         this.state = { 
           ...DEFAULT_STATE, 
           ...dbState, 
@@ -74,7 +88,28 @@ class ProgressionManager {
 
   getState(): OnboardingState { 
     if (!this.initialized) {
-      console.warn('ProgressionManager not initialized, using default state');
+      console.warn('⚠️ ProgressionManager not initialized yet, initializing now...');
+      // Try to initialize synchronously from localStorage as fallback
+      const localData = localStorage.getItem('dhaniverse_player_state');
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          if (parsed?.onboarding) {
+            this.state = { 
+              ...DEFAULT_STATE, 
+              ...parsed.onboarding, 
+              unlockedBuildings: { 
+                ...DEFAULT_STATE.unlockedBuildings, 
+                ...(parsed.onboarding.unlockedBuildings || {}) 
+              } 
+            };
+            this.initialized = true;
+            console.log('✅ ProgressionManager initialized from localStorage fallback');
+          }
+        } catch (e) {
+          console.warn('Failed to parse localStorage fallback:', e);
+        }
+      }
     }
     return this.state; 
   }
@@ -82,7 +117,15 @@ class ProgressionManager {
   private async persist() {
     if (this.syncing) return; // simple throttle
     this.syncing = true;
-    try { await playerStateApi.update({ onboarding: this.state }); } catch(e){ console.warn('Failed to persist onboarding', e);} finally { this.syncing = false; }
+    try { 
+      console.log('🔄 ProgressionManager: Persisting state to database:', this.state);
+      await playerStateApi.update({ onboarding: this.state }); 
+      console.log('✅ ProgressionManager: State persisted successfully');
+    } catch(e){ 
+      console.warn('❌ ProgressionManager: Failed to persist onboarding', e);
+    } finally { 
+      this.syncing = false; 
+    }
   }
 
   markMetMaya() {
@@ -141,8 +184,12 @@ class ProgressionManager {
       this.state.unlockedBuildings.stockmarket = true;
       console.log('🏦 ProgressionManager: Bank onboarding marked as completed. New state:', this.state);
       
-      // Immediately persist the change
-      this.persist();
+      // Immediately persist the change and wait for it
+      this.persistAndWait().then(() => {
+        console.log('✅ ProgressionManager: Bank onboarding state persisted successfully');
+      }).catch(e => {
+        console.warn('❌ ProgressionManager: Failed to persist bank onboarding state:', e);
+      });
       
       // Also try to update localStorage as backup
       try {
@@ -160,6 +207,18 @@ class ProgressionManager {
       }
     } else {
       console.log('🏦 ProgressionManager: Bank onboarding was already completed, not marking again');
+    }
+  }
+
+  // Helper method to persist and wait (without throttling for critical updates)
+  private async persistAndWait() {
+    try { 
+      console.log('🔄 ProgressionManager: Force persisting critical state to database:', this.state);
+      await playerStateApi.update({ onboarding: this.state }); 
+      console.log('✅ ProgressionManager: Critical state persisted successfully');
+    } catch(e){ 
+      console.warn('❌ ProgressionManager: Failed to persist critical state', e);
+      throw e;
     }
   }
 
@@ -227,21 +286,23 @@ class ProgressionManager {
       return { allowed: true };
     }
     
-    // For new or mid-onboarding players, check progression flags in order:
-    
-    // Before meeting Maya (hasMetMaya = false)
-    if (!s.hasMetMaya) {
-      return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
-    }
-    
-    // Special case: If user has claimed money, they should have access to unlocked buildings
-    // regardless of hasFollowedMaya state (fixes inconsistent state bug)
+    // CRITICAL FIX: Check for claimed money FIRST - if user has claimed money, they should have access
+    // to unlocked buildings regardless of other progression flags (fixes inconsistent state bug)
     if (s.hasClaimedMoney) {
+      console.log('💰 User has claimed money, checking building unlock status for:', buildingId);
       // After claiming money - check specific building access
       if (!s.unlockedBuildings[buildingId]) {
         return { allowed: false, message: 'Access Denied — This building unlocks later. Continue your journey.' };
       }
+      console.log('✅ Building is unlocked for user who has claimed money');
       return { allowed: true };
+    }
+    
+    // For new or mid-onboarding players who HAVEN'T claimed money yet, check progression flags in order:
+    
+    // Before meeting Maya (hasMetMaya = false)
+    if (!s.hasMetMaya) {
+      return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
     }
     
     // After meeting Maya but not followed to bank (hasMetMaya = true && hasFollowedMaya = false)
@@ -254,7 +315,7 @@ class ProgressionManager {
       return { allowed: false, message: 'Access Denied — Talk to Maya outside the bank to claim your ₹1000 and begin.' };
     }
     
-    // After claiming money - check specific building access
+    // After claiming money - check specific building access (shouldn't reach here due to early return above)
     if (!s.unlockedBuildings[buildingId]) {
       return { allowed: false, message: 'Access Denied — This building unlocks later. Continue your journey.' };
     }

@@ -328,15 +328,26 @@ export class BuildingManager {
     const mapManager = this.scene.mapManager;
     if (!player || !mapManager || this.transitionInProgress) return;
 
-    // Centralized progression gating
+    // Centralized progression gating with detailed debugging
     try {
+      const progressionState = progressionManager.getState();
+      console.log('🏢 BuildingManager: Checking building access for', buildingType);
+      console.log('🏢 Current progression state:', progressionState);
+      
       const check = progressionManager.canEnterBuilding(buildingType === 'bank' ? 'bank' : 'stockmarket');
+      console.log('🏢 Building access check result:', check);
+      
       if (!check.allowed) {
         this.lastInteractionTime = Date.now(); // Update interaction time to prevent spam
+        console.log('🚫 Access denied to', buildingType, '- showing message:', check.message);
         progressionManager.showAccessDenied(check.message!);
         return;
       }
-    } catch (e) { console.warn('Progression gating unavailable', e); }
+      
+      console.log('✅ Access granted to', buildingType);
+    } catch (e) { 
+      console.warn('Progression gating unavailable', e); 
+    }
     
     // Set transition in progress to prevent multiple transitions
     this.transitionInProgress = true;
