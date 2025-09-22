@@ -21,7 +21,7 @@ This codebase is proprietary. All rights reserved. See the LICENSE file for full
 - Game Design & Strategy: [Onboarding & Retention](https://github.com/dhaniverse/dhaniverse-docs/blob/main/game-design/onboarding-retention-strategy.md)
 - Technical Architecture: [System Design](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/architecture.md)
 
-
+<img width="3437" height="1929" alt="image" src="https://github.com/user-attachments/assets/eaedda6f-16b7-4f2e-a438-8e07c813b2b1" />
 
 ## Tech Snapshot
 
