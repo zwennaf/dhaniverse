@@ -224,17 +224,32 @@ export const bankingApi = {
             const response = await apiFetch('/game/bank-account');
             
             if (response.status === 404) {
-                console.log('🏦 Banking API: No bank account found (404)');
+                console.log('🏦 Banking API: No bank account found (404) - this is expected for new users');
                 return {
                     success: false,
                     error: "No bank account found",
                     data: null
                 };
             }
+            
+            if (!response.ok) {
+                console.warn("🏦 Banking API: Account request failed with status:", response.status);
+                const errorData = await response.json().catch(() => ({ error: "Network error" }));
+                return {
+                    success: false,
+                    error: errorData.error || `HTTP ${response.status}`,
+                    data: null
+                };
+            }
+            
             console.log('🏦 Banking API: Account request successful');
-            return handleApiResponse(response);
+            const data = await response.json();
+            return {
+                success: true,
+                data: data.data || data
+            };
         } catch (error) {
-            console.error("🏦 Banking API: Error getting bank account:", error);
+            console.error("🏦 Banking API: Network error getting bank account:", error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),

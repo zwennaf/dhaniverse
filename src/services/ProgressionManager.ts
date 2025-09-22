@@ -48,7 +48,8 @@ class ProgressionManager {
           } 
         };
         this.initialized = true;
-        console.log('✅ ProgressionManager loaded from database');
+        console.log('✅ ProgressionManager loaded from database. bankOnboardingComplete:', this.state.bankOnboardingComplete);
+        console.log('✅ Full state loaded:', this.state);
         return;
       }
     } catch (error) {
@@ -106,6 +107,11 @@ class ProgressionManager {
     if (!this.state.hasClaimedMoney) {
       this.state.hasClaimedMoney = true;
       this.state.onboardingStep = 'claimed_money';
+      // Ensure consistency: if money is claimed, Maya must have been followed
+      if (!this.state.hasFollowedMaya) {
+        this.state.hasFollowedMaya = true;
+        console.log('🔧 Auto-correcting hasFollowedMaya to true for consistency');
+      }
       // Unlock ONLY bank building at this stage (stock market stays locked until bank onboarding complete)
       this.state.unlockedBuildings.bank = true;
       this.persist();
@@ -134,7 +140,17 @@ class ProgressionManager {
       // Unlock stock market building when bank onboarding is completed
       this.state.unlockedBuildings.stockmarket = true;
       console.log('🏦 ProgressionManager: Bank onboarding marked as completed. New state:', this.state);
+      
+      // Immediately persist the change
       this.persist();
+      
+      // Also try to update localStorage as backup
+      try {
+        localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+        console.log('✅ Also set localStorage backup flag: dhaniverse_bank_onboarding_completed = true');
+      } catch (e) {
+        console.warn('Failed to set localStorage backup flag:', e);
+      }
       
       // Notify UI that stock market unlocked
       try {
@@ -216,6 +232,16 @@ class ProgressionManager {
     // Before meeting Maya (hasMetMaya = false)
     if (!s.hasMetMaya) {
       return { allowed: false, message: 'Access Denied — Go meet Maya first to begin your journey.' };
+    }
+    
+    // Special case: If user has claimed money, they should have access to unlocked buildings
+    // regardless of hasFollowedMaya state (fixes inconsistent state bug)
+    if (s.hasClaimedMoney) {
+      // After claiming money - check specific building access
+      if (!s.unlockedBuildings[buildingId]) {
+        return { allowed: false, message: 'Access Denied — This building unlocks later. Continue your journey.' };
+      }
+      return { allowed: true };
     }
     
     // After meeting Maya but not followed to bank (hasMetMaya = true && hasFollowedMaya = false)

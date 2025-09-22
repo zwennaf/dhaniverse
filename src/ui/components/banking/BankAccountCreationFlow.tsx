@@ -394,6 +394,17 @@ const BankAccountCreationFlow: React.FC = () => {
         }));
         localStorage.setItem('dhaniverse_bank_account_holder_name', trimmedName);
         
+        // ✅ CRITICAL FIX: Mark onboarding as completed immediately after successful account creation
+        try {
+          const { progressionManager } = await import('../../../services/ProgressionManager');
+          progressionManager.markBankOnboardingCompleted();
+          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+          console.log('✅ Bank onboarding marked as completed after successful account creation');
+        } catch (error) {
+          console.warn('Could not update progression manager after account creation:', error);
+          localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
+        }
+        
         // Fast transition to details after brief processing
         setTimeout(() => {
           if (containerRef.current) {
