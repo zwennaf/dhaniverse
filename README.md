@@ -105,7 +105,25 @@ dhaniverse/
 ├── README.md
 └── package.json
 ```
+# Dhaniverse ICP Canister - Smart Contract Implementation
 
+> **Rust-based Internet Computer canister** providing blockchain backend for Dhaniverse's financial education game.
+
+## 📚 Documentation Links
+
+- **Main Repository**: [Dhaniverse GitHub](https://github.com/dhaniverse/dhaniverse)
+- **Smart Contract Architecture**: [Blockchain Integration Guide](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/components/blockchain-integration.md)
+- **Contract Development Roadmap**: [Future Development Plans](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/development/future-roadmap.md#4-objective-evaluator-contract)
+- **API Documentation**: [Full API Reference](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/api-documentation.md)
+- **Web3 Integration**: [Frontend Web3 Services](../../../src/services/web3/)
+
+## 🎯 Smart Contract Features
+
+- **User State Management**: Persistent game progress and financial data
+- **Transaction Processing**: Secure in-game financial operations  
+- **Quest System**: Automated objective validation and rewards
+- **Achievement Tracking**: Blockchain-verified accomplishments
+- **Dual Storage Pattern**: Seamless fallback to traditional backend
 ### Key Systems (Summary)
 
 #### Map Optimization Package
