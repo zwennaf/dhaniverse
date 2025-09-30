@@ -3,8 +3,8 @@ import { MainScene } from '../scenes/MainScene';
 import { Constants } from '../utils/Constants';
 import { canisterService } from '../../services/CanisterService';
 import { balanceManager } from '../../services/BalanceManager';
-import { getRealStockService, type StockMapping } from '../../services/RealStockService';
-import { realStocks as stockConfig } from '../../config/RealStocks';
+import { stockPriceService } from '../../services/StockPriceService';
+import { realStocks, type StockMapping } from '../../config/RealStocks';
 
 interface NPCSprite extends GameObjects.Sprite {
   nameText?: GameObjects.Text;
@@ -564,46 +564,49 @@ export class StockMarketManager {
    * Initialize real stock data from external API via ICP canister
    */
   private async initializeRealStockData(): Promise<void> {
-    console.log('Loading real stock market data from ICP canister...');
+    console.log('Loading real stock market data from ICP canister via StockPriceService...');
     
-    // ONLY use RealStockService - NO FALLBACK to mock data
-  const realStocks = await getRealStockService().initializeRealStocks();
+    // Get all stock symbols from config (realStocks is a Record, get values)
+    const symbols = Object.keys(realStocks);
     
-    if (!realStocks || realStocks.length === 0) {
+    // Fetch prices using new StockPriceService
+    const priceResponse = await stockPriceService.getStockPrices({ symbols });
+    
+    if (!priceResponse.success || priceResponse.data.length === 0) {
       throw new Error('Failed to load real stock data from ICP canister. Cannot proceed without real stock prices.');
     }
 
-    // Convert RealStockData to our Stock interface format
-    this.stockData = realStocks.map((stockData: any, index: number) => {
-      console.log(`🔍 Mapping stock ${index} from RealStocks.ts config:`, {
-        symbol: stockData.symbol,
-        companyName: stockData.companyName,
-        sector: stockData.sector,
-        expectedName: stockConfig.find(s => s.symbol === stockData.symbol)?.name || 'NOT_FOUND'
+    // Convert StockPrice to our Stock interface format
+    this.stockData = priceResponse.data.map((stockPrice, index) => {
+      console.log(`🔍 Mapping stock ${index} from StockPriceService:`, {
+        symbol: stockPrice.symbol,
+        price: stockPrice.price,
+        source: stockPrice.source
       });
       
       // Get the mapping from the config to ensure we have the correct company name
-      const stockMapping = stockConfig.find(s => s.symbol === stockData.symbol);
-      const displayName = stockData.companyName || stockMapping?.name || stockData.symbol;
+      const stockMapping = realStocks[stockPrice.symbol];
+      const displayName = stockMapping?.name || stockPrice.symbol;
+      const sector = stockMapping?.sector || 'Unknown';
       
-      console.log(`📋 Final display name for ${stockData.symbol}: "${displayName}"`);
+      console.log(`📋 Final display name for ${stockPrice.symbol}: "${displayName}"`);
       
       return {
-        id: stockData.symbol.toLowerCase(),
-        symbol: stockData.symbol, // Keep original uppercase symbol for API calls
+        id: stockPrice.symbol.toLowerCase(),
+        symbol: stockPrice.symbol, // Keep original uppercase symbol for API calls
         name: displayName,
-        sector: stockData.sector,
-        currentPrice: stockData.price, // Real price in INR from canister
-        priceHistory: this.generateRealisticPriceHistory(stockData.price, stockData.changePercent),
+        sector: sector,
+        currentPrice: stockPrice.price, // Real price in INR from canister
+        priceHistory: this.generateRealisticPriceHistory(stockPrice.price, stockPrice.change || 0),
         debtEquityRatio: 0.5 + Math.random() * 1.5, // Realistic range
-        businessGrowth: stockData.changePercent * 2, // Based on recent performance
+        businessGrowth: (stockPrice.change || 0) * 2, // Based on recent performance
         news: [],
-        volatility: Math.abs(stockData.changePercent) / 10 + 1,
+        volatility: Math.abs(stockPrice.change || 0) / 10 + 1,
         lastUpdate: Date.now(),
-        marketCap: stockData.marketCap,
-        peRatio: stockData.peRatio,
-        eps: stockData.price / stockData.peRatio,
-        outstandingShares: Math.floor(stockData.marketCap / stockData.price),
+        marketCap: 0, // Will be populated if available
+        peRatio: 0, // Will be populated if available
+        eps: 0, // Will be calculated if P/E available
+        outstandingShares: 0, // Will be calculated if market cap available
         industryAvgPE: 15 + Math.random() * 10
       };
     });
