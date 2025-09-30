@@ -14,7 +14,21 @@ import ProcessingLoader from "../common/ProcessingLoader.tsx";
 import { stockApi } from "../../../utils/api.ts";
 import { balanceManager } from "../../../services/BalanceManager";
 import { portfolioAnalytics } from '../../../services/PortfolioAnalyticsService';
-import type { Stock } from "../../../services/StockMarketService";
+import { stockTransactionService } from '../../../services/StockTransactionService';
+
+// Use Stock from stock.types and extend it with legacy properties for backward compatibility
+import type { Stock as BaseStock } from "../../../types/stock.types";
+
+type Stock = BaseStock & {
+    // Legacy properties used by child components
+    id?: string;
+    debtEquityRatio?: number;
+    businessGrowth?: number;
+    industryAvgPE?: number;
+    outstandingShares?: number;
+    volatility?: number;
+    lastUpdate?: number;
+};
 
 interface StockHolding {
     stockId: string;
@@ -105,6 +119,34 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             console.warn('⚠️ Failed to fetch server stock transactions for hydration:', err);
         }
         return false;
+    };
+
+    // Load portfolio data from stockTransactionService
+    const loadPortfolioData = async () => {
+        try {
+            const servicePortfolio = stockTransactionService.getPortfolio();
+            const transformedPortfolio: PlayerPortfolio = {
+                holdings: servicePortfolio.holdings.map(h => ({
+                    stockId: h.symbol.toLowerCase(),
+                    quantity: h.quantity,
+                    averagePurchasePrice: h.averagePrice,
+                    totalInvestment: h.totalCost,
+                })),
+                transactionHistory: stockTransactionService.getTransactions(50).map(t => ({
+                    stockId: t.symbol.toLowerCase(),
+                    stockName: t.symbol,
+                    type: t.type,
+                    price: t.price,
+                    quantity: t.quantity,
+                    timestamp: t.timestamp,
+                    total: t.totalAmount,
+                })),
+            };
+            setPortfolio(transformedPortfolio);
+            console.log('📊 Portfolio loaded from stockTransactionService:', transformedPortfolio);
+        } catch (error) {
+            console.error('Failed to load portfolio from stockTransactionService:', error);
+        }
     };
 
     // Log authentication status for debugging
@@ -1183,19 +1225,22 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             {/* Trade Popup */}
             {showTrade && selectedStock && (
                 <TradeStockPopup
-                    stock={selectedStock}
+                    stock={selectedStock as any}
                     onClose={closeTrade}
-                    onBuy={handleBuyStock}
-                    onSell={handleSellStock}
-                    playerRupees={currentRupees}
-                    holdings={portfolio.holdings}
+                    onTransactionComplete={async () => {
+                        // Reload portfolio after transaction
+                        await loadPortfolioData();
+                        // Update balance display
+                        const balance = balanceManager.getBalance();
+                        setCurrentRupees(balance.cash);
+                    }}
                 />
             )}
 
             {/* Stock Detail Popup */}
             {showDetail && selectedStock && (
                 <StockDetail 
-                    stock={selectedStock}
+                    stock={selectedStock as any}
                     onShowGraph={() => {
                         closeDetail();
                         openGraph();
@@ -1215,7 +1260,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             {/* Stock Graph Popup */}
             {showGraph && selectedStock && (
                 <StockGraph 
-                    stock={selectedStock}
+                    stock={selectedStock as any}
                     onClose={closeGraph}
                 />
             )}
@@ -1259,7 +1304,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             {/* News Popup */}
             {showNews && selectedStock && (
                 <NewsPopup 
-                    stock={selectedStock}
+                    stock={selectedStock as any}
                     onClose={closeNews}
                 />
             )}
