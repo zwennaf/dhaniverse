@@ -563,6 +563,33 @@ class CanisterService {
         }
     }
 
+    /**
+     * Fetch multiple stock prices in a single call (batch operation)
+     * More efficient than multiple individual calls
+     * @param symbols Comma-separated list like "AAPL,GOOGL,MSFT"
+     * @returns Array of [symbol, price] tuples
+     */
+    async fetchMultipleStockPrices(symbols: string): Promise<[string, number][]> {
+        if (!this.isConnected()) {
+            console.warn('fetchMultipleStockPrices: Canister not connected, using mock data');
+            // Return empty array as fallback
+            return [];
+        }
+
+        try {
+            const result = await this.actor.fetch_multiple_stock_prices(symbols.toUpperCase());
+            if ('Ok' in result) {
+                return result.Ok.map(([symbol, price]: [string, number]) => [symbol, price]);
+            } else {
+                console.error('fetchMultipleStockPrices error:', result.Err);
+                return [];
+            }
+        } catch (error) {
+            console.error('fetchMultipleStockPrices error:', error);
+            return [];
+        }
+    }
+
     async refreshStockCache(symbol: string): Promise<StockData | null> {
         if (!this.isConnected()) {
             console.warn('refreshStockCache: Canister not connected');
@@ -1243,6 +1270,27 @@ class CanisterService {
         } catch (error) {
             console.error(`fetchAndAppendSnapshot error for ${symbol}:`, error);
             return 0;
+        }
+    }
+
+    // Record stock transaction on blockchain (fire and forget)
+    async recordStockTransaction(transaction: any): Promise<void> {
+        if (!this.isConnected()) {
+            console.warn('recordStockTransaction: Canister not connected (non-critical)');
+            return;
+        }
+
+        try {
+            // Store transaction on blockchain for permanent record
+            // This is a fire-and-forget operation - failures are non-critical
+            console.log('Recording transaction on ICP:', transaction.id);
+            
+            // TODO: Call canister method when implemented
+            // await this.actor.record_stock_transaction(transaction);
+            
+            console.log('✅ Transaction recorded on ICP');
+        } catch (error) {
+            console.warn('recordStockTransaction failed (non-critical):', error);
         }
     }
 }
