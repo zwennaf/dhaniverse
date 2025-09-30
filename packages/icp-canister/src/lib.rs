@@ -373,6 +373,14 @@ async fn fetch_stock_price(symbol: String) -> Result<Option<f64>, String> {
     Ok(prices.into_iter().find(|(s, _)| s == &symbol).map(|(_, p)| p))
 }
 
+/// Fetch multiple stock prices at once (batch operation)
+/// Takes comma-separated symbols like "AAPL,GOOGL,MSFT"
+/// Returns Vec<(symbol, price)>
+#[ic_cdk::update]
+async fn fetch_multiple_stock_prices(symbols: String) -> Result<Vec<(String, f64)>, String> {
+    http_client::fetch_stock_prices(&symbols).await
+}
+
 // CoinGecko API endpoints for historical data
 #[ic_cdk::update]
 async fn fetch_coin_market_chart_range(coin_id: String, vs_currency: String, from: u64, to: u64) -> Result<Vec<(String, Vec<(u64, f64)>)>, String> {
