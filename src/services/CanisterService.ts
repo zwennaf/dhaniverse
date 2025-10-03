@@ -93,8 +93,16 @@ class CanisterService {
             });
             console.log('HTTP agent created successfully');
 
-            // Never fetch root key since we're always on IC mainnet now
-            // (NetworkConfig.isLocal() always returns false)
+            // Fetch root key when running locally (required for local dfx replica)
+            if (NetworkConfig.isLocal()) {
+                console.log('Local network detected, fetching root key...');
+                try {
+                    await this.agent.fetchRootKey();
+                    console.log('Root key fetched successfully');
+                } catch (fetchError) {
+                    console.warn('Failed to fetch root key (expected on mainnet):', fetchError);
+                }
+            }
 
             // Verify idlFactory is available
             if (!idlFactory) {
@@ -519,22 +527,34 @@ class CanisterService {
         }
     }
 
-    async getMarketSummary(): Promise<Map<string, StockData> | null> {
+    /**
+     * Get complete market data for ALL stocks in ONE call
+     * Returns Record/Object with all stock data - NO SPAMMING
+     * This is the ONLY call needed to populate entire stock market UI
+     * 
+     * NEW: Uses get_market_summary_real() which fetches REAL DATA from Polygon.io:
+     * - 7-day historical OHLC price data
+     * - Real market cap, shares outstanding
+     * - Calculated P/E, EPS, volatility from real data
+     * - Intelligent 30-minute canister caching
+     */
+    async getMarketSummary(): Promise<Record<string, StockData> | null> {
         if (!this.isConnected()) {
             console.warn('getMarketSummary: Canister not connected');
             return null;
         }
 
         try {
-            const result = await this.actor.get_market_summary();
+            console.log('🚀 Calling get_market_summary_real() for REAL DATA from Polygon.io...');
+            
+            // Call the NEW async endpoint that fetches REAL data
+            const result = await this.actor.get_market_summary_real();
+            
             if ('Ok' in result) {
-                // Convert the result to a Map
-                const summaryMap = new Map<string, StockData>();
-                const entries = result.Ok as Array<[string, StockData]>;
-                entries.forEach(([key, value]) => {
-                    summaryMap.set(key, value);
-                });
-                return summaryMap;
+                const stockCount = Object.keys(result.Ok).length;
+                console.log(`✅ REAL market data fetched in ONE call: ${stockCount} stocks with 7-day history`);
+                console.log('📊 Data includes: current price, 7-day OHLC, market cap, P/E, EPS, volatility');
+                return result.Ok as Record<string, StockData>;
             } else {
                 console.warn('getMarketSummary error:', result.Err);
                 return null;

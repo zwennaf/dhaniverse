@@ -1,23 +1,39 @@
+// Helper to detect if running locally
+const isLocalEnvironment = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+};
+
 // ICP Canister Configuration
 export const ICP_CONFIG = {
   // Mainnet Canister Configuration
   CANISTER_ID: '2v55c-vaaaa-aaaas-qbrpq-cai',
+  LOCAL_CANISTER_ID: 'bd3sg-teaaa-aaaaa-qaaba-cai', // Default local canister ID
   
   // Network URLs
-  IC_HOST: process.env.NODE_ENV === 'production' ? 'https://ic0.app' : 'https://ic0.app',
+  IC_HOST: 'https://ic0.app',
   LOCAL_HOST: 'http://127.0.0.1:4943',
   
   // Internet Identity Configuration
-  // Use Internet Identity v2 authorize URL
-  INTERNET_IDENTITY_URL: 'https://identity.internetcomputer.org/#authorize',
-  INTERNET_IDENTITY_CANISTER_ID: 'rdmx6-jaaaa-aaaah-qcaiq-cai',
+  // Use Internet Identity v2 authorize URL for mainnet
+  INTERNET_IDENTITY_URL: isLocalEnvironment() 
+    ? 'http://127.0.0.1:4943/?canisterId=rdmx6-jaaaa-aaaaa-aaaaa-cai'
+    : 'https://identity.internetcomputer.org/#authorize',
+  INTERNET_IDENTITY_CANISTER_ID: isLocalEnvironment()
+    ? 'rdmx6-jaaaa-aaaaa-aaaaa-cai' // Local II canister ID
+    : 'rdmx6-jaaaa-aaaah-qcaiq-cai', // Mainnet II canister ID
   
   // Canister URLs
-  CANISTER_URL: 'https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/',
-  CANDID_UI_URL: 'https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai',
+  CANISTER_URL: isLocalEnvironment()
+    ? 'http://127.0.0.1:4943/'
+    : 'https://2v55c-vaaaa-aaaas-qbrpq-cai.icp0.io/',
+  CANDID_UI_URL: isLocalEnvironment()
+    ? 'http://127.0.0.1:4943/?canisterId=aaaaa-aa'
+    : 'https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai',
   
-  // Network Detection
-  NETWORK: process.env.NODE_ENV === 'production' ? 'ic' : 'ic', // Always use mainnet for now
+  // Network Detection - auto-detect based on hostname
+  NETWORK: isLocalEnvironment() ? 'local' : 'ic',
   
   // Feature Flags
   FEATURES: {
