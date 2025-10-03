@@ -1,0 +1,8 @@
+{
+  "local": {
+    "type": "ephemeral",
+    "replica": {
+      "subnet_type": "application"
+    }
+  }
+}
