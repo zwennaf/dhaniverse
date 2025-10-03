@@ -1,8 +1,38 @@
-# Dhaniverse — Gamified Financial Management Platform
+![Dhaniverse Header.png](https://cdn.dorahacks.io/static/files/198e7f4ba1a9b7d8d11a0e64fc6ab990.png)
 
-![dhaniverse readme](https://github.com/user-attachments/assets/a734781e-3fb3-4339-a5de-d21b3143685f)
+# Dhaniverse: Gamified Financial Literacy Platform
 
-An immersive 2D RPG that teaches real-world money skills through play.
+---
+
+<div align="center">
+
+<a href="https://www.youtube.com/watch?v=gIDD5Um57pE" target="_blank" style="text-decoration:none">
+  <img src="https://img.shields.io/badge/Watch-Pitch-FFD700?style=for-the-badge&logo=youtube&logoColor=black" alt="Watch Pitch on YouTube"/>
+</a>
+&nbsp;&nbsp;
+<a href="https://www.youtube.com/watch?v=6wBJPf9ul8E" target="_blank" style="text-decoration:none">
+  <img src="https://img.shields.io/badge/Watch-Demo-FFD700?style=for-the-badge&logo=youtube&logoColor=black" alt="Watch Demo on YouTube"/>
+</a>
+
+</div>
+
+
+## Gamified Learning. Verifiable Achievements. Financial Empowerment.
+
+Dhaniverse transforms financial education into an engaging 2D RPG experience, making money management skills accessible and rewarding for the next generation through blockchain-verified progress tracking and intelligent personalized learning via [ContRAG](https://github.com/dhaniverse/contrag).
+
+**Learn. Verify. Empower. Personalize.**
+
+## Try It Now
+
+**Live Platforms:**
+
+- **Play Game**: [dhaniverse.in](https://www.dhaniverse.in)
+- **Landing Page (ICP Native)**: [nogct-7aaaa-aaaas-qbzba-cai.icp0.io](https://nogct-7aaaa-aaaas-qbzba-cai.icp0.io)
+- **Backend Canister (ICP)**: [2v55c-vaaaa-aaaas-qbrpq-cai](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=2v55c-vaaaa-aaaas-qbrpq-cai)
+- **API Health**: [api.dhaniverse.in/health](https://api.dhaniverse.in/health)
+- **API Documentation (JSON)**: [api.dhaniverse.in/api/docs/json](https://api.dhaniverse.in/api/docs/json)
+- **WebSocket Server**: [dhaniverse-ws.azurewebsites.net](wss://dhaniverse-ws.azurewebsites.net)
 
 > "We're not just making financial education fun — we're making it relevant to young India's unique challenges."
 
@@ -21,7 +51,7 @@ This codebase is proprietary. All rights reserved. See the LICENSE file for full
 - Game Design & Strategy: [Onboarding & Retention](https://github.com/dhaniverse/dhaniverse-docs/blob/main/game-design/onboarding-retention-strategy.md)
 - Technical Architecture: [System Design](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/architecture.md)
 
-
+<img width="3437" height="1929" alt="image" src="https://github.com/user-attachments/assets/eaedda6f-16b7-4f2e-a438-8e07c813b2b1" />
 
 ## Tech Snapshot
 
@@ -105,7 +135,25 @@ dhaniverse/
 ├── README.md
 └── package.json
 ```
+# Dhaniverse ICP Canister - Smart Contract Implementation
 
+> **Rust-based Internet Computer canister** providing blockchain backend for Dhaniverse's financial education game.
+
+## 📚 Documentation Links
+
+- **Main Repository**: [Dhaniverse GitHub](https://github.com/dhaniverse/dhaniverse)
+- **Smart Contract Architecture**: [Blockchain Integration Guide](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/components/blockchain-integration.md)
+- **Contract Development Roadmap**: [Future Development Plans](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/development/future-roadmap.md#4-objective-evaluator-contract)
+- **API Documentation**: [Full API Reference](https://github.com/dhaniverse/dhaniverse-docs/blob/main/technical/api-documentation.md)
+- **Web3 Integration**: [Frontend Web3 Services](../../../src/services/web3/)
+
+## 🎯 Smart Contract Features
+
+- **User State Management**: Persistent game progress and financial data
+- **Transaction Processing**: Secure in-game financial operations  
+- **Quest System**: Automated objective validation and rewards
+- **Achievement Tracking**: Blockchain-verified accomplishments
+- **Dual Storage Pattern**: Seamless fallback to traditional backend
 ### Key Systems (Summary)
 
 #### Map Optimization Package
