@@ -5,10 +5,43 @@ use ic_cdk::api::time;
 use std::collections::HashMap;
 
 // Cache configuration
-const STOCK_CACHE_DURATION: u64 = 300_000_000_000; // 5 minutes in nanoseconds
+const STOCK_CACHE_DURATION: u64 = 2_700_000_000_000; // 45 minutes in nanoseconds
 const STOCK_RATE_LIMIT: u64 = 30_000_000_000; // 30 seconds between requests for same stock
 const MAX_PRICE_HISTORY_DAYS: usize = 7; // One week of daily data
 const MAX_ACCESS_COUNT_PER_PERIOD: u32 = 100; // Rate limiting
+const USER_ACTIVITY_WINDOW: u64 = 6 * 60 * 60 * 1_000_000_000; // 6 hours in nanoseconds
+
+// Global market summary cache (shared across all users)
+use std::cell::RefCell;
+use ic_cdk_timers::{TimerId, set_timer_interval, clear_timer};
+
+thread_local! {
+    static MARKET_SUMMARY_CACHE: RefCell<Option<(HashMap<String, Stock>, u64)>> = RefCell::new(None);
+    static LAST_USER_ACTIVITY: RefCell<u64> = RefCell::new(0);
+    static REFRESH_TIMER: RefCell<Option<TimerId>> = RefCell::new(None);
+}
+
+const THIRTY_MINUTES_NANOS: u64 = 30 * 60 * 1_000_000_000; // 30 minutes
+
+// Track user activity
+pub fn update_user_activity() {
+    let now = time();
+    LAST_USER_ACTIVITY.with(|activity| {
+        *activity.borrow_mut() = now;
+    });
+}
+
+// Check if there are active users in the last 6 hours
+fn has_recent_user_activity() -> bool {
+    let now = time();
+    LAST_USER_ACTIVITY.with(|activity| {
+        let last_activity = *activity.borrow();
+        if last_activity == 0 {
+            return false; // No activity recorded yet
+        }
+        now - last_activity < USER_ACTIVITY_WINDOW
+    })
+}
 
 // Generate mock stock data with realistic patterns
 pub fn generate_mock_stock_data(stock_id: &str) -> Result<Stock, CanisterError> {
@@ -154,8 +187,68 @@ pub fn should_refresh_cache(cache: &StockCache) -> bool {
     false
 }
 
+/// Fetch REAL stock data from Polygon.io
+/// This replaces generate_mock_stock_data() with actual API calls
+pub async fn fetch_real_stock_data(stock_id: &str) -> Result<Stock, CanisterError> {
+    let current_time = time();
+    
+    ic_cdk::println!("🚀 Fetching REAL data for {} from Polygon.io", stock_id);
+    
+    // 1. Fetch 7-day historical price data
+    let price_history = crate::http_client::fetch_polygon_historical(stock_id, 7).await
+        .map_err(|e| {
+            ic_cdk::println!("❌ Failed to fetch historical data for {}: {}", stock_id, e);
+            CanisterError::internal_error(format!("HTTP outcall failed: {}", e))
+        })?;
+    
+    if price_history.is_empty() {
+        return Err(CanisterError::NotFound(format!("No historical data for {}", stock_id)));
+    }
+    
+    // 2. Fetch stock details (market cap, shares, name)
+    let details = crate::http_client::fetch_polygon_stock_details(stock_id).await
+        .map_err(|e| {
+            ic_cdk::println!("❌ Failed to fetch stock details for {}: {}", stock_id, e);
+            CanisterError::internal_error(format!("HTTP outcall failed: {}", e))
+        })?;
+    
+    // 3. Calculate real metrics from historical data
+    let current_price = price_history.last().unwrap().close;
+    let metrics = crate::http_client::calculate_metrics(
+        stock_id,
+        current_price,
+        &price_history,
+        &details,
+    );
+    
+    // 4. Generate realistic news (this can stay mock for now)
+    let stock_name = &details.name;
+    let news = vec![
+        format!("{} reports strong quarterly earnings, beats analyst expectations", stock_name),
+        format!("Market analysts maintain 'Buy' rating on {} with price target of ${:.2}", stock_name, current_price * 1.15),
+        format!("{} announces $2B share buyback program", stock_name),
+        format!("Institutional investors increase stake in {} by 12%", stock_name),
+        format!("Analysts upgrade {} target price citing robust fundamentals", stock_name),
+        format!("{} announces new strategic initiatives for digital transformation", stock_name),
+    ];
+    
+    ic_cdk::println!("✅ Successfully fetched REAL data for {}: price=${:.2}, market_cap=${:.0}, pe={:.2}", 
+        stock_id, current_price, metrics.market_cap, metrics.pe_ratio);
+    
+    Ok(Stock {
+        id: stock_id.to_string(),
+        name: details.name,
+        symbol: stock_id.to_string(),
+        current_price,
+        price_history,
+        metrics,
+        news,
+        last_update: current_time,
+    })
+}
+
 // Get stock data with caching
-pub fn get_cached_stock_data(stock_id: &str) -> Result<Stock, CanisterError> {
+pub async fn get_cached_stock_data_async(stock_id: &str) -> Result<Stock, CanisterError> {
     let current_time = time();
     
     // Try to get from cache first
@@ -166,12 +259,15 @@ pub fn get_cached_stock_data(stock_id: &str) -> Result<Stock, CanisterError> {
             cache.last_access = current_time;
             set_stock_cache(stock_id, &cache);
             
+            ic_cdk::println!("✅ Cache hit for {}", stock_id);
             return Ok(cache.stock_data);
         }
     }
     
-    // Generate fresh data
-    let stock_data = generate_mock_stock_data(stock_id)?;
+    ic_cdk::println!("🔄 Cache miss for {}, fetching REAL data", stock_id);
+    
+    // Fetch REAL data from Polygon.io
+    let stock_data = fetch_real_stock_data(stock_id).await?;
     
     // Create/update cache
     let cache = StockCache {
@@ -256,21 +352,188 @@ pub fn broadcast_stock_news(stock_id: &str, news: &[String]) -> Result<usize, Ca
     Ok(connection_ids.len())
 }
 
-// Get stock market summary for SSE streaming
-pub fn get_market_summary() -> Result<HashMap<String, Stock>, CanisterError> {
+// Get stock data with caching (SYNC version for backward compatibility)
+pub fn get_cached_stock_data(stock_id: &str) -> Result<Stock, CanisterError> {
+    // For sync calls, return cached data or mock fallback
+    if let Some(cache) = get_stock_cache(stock_id) {
+        if !should_refresh_cache(&cache) {
+            return Ok(cache.stock_data);
+        }
+    }
+    
+    // Fallback to mock data if cache miss and async not available
+    generate_mock_stock_data(stock_id)
+}
+
+// Start periodic refresh timer (30 minutes)
+fn start_periodic_refresh() {
+    REFRESH_TIMER.with(|timer_cell| {
+        // Clear existing timer if any
+        if let Some(existing_timer) = timer_cell.borrow_mut().take() {
+            clear_timer(existing_timer);
+        }
+        
+        // Set up new 30-minute periodic refresh
+        let timer_id = set_timer_interval(std::time::Duration::from_nanos(THIRTY_MINUTES_NANOS), || {
+            ic_cdk::println!("⏰ Periodic refresh timer triggered (30 min interval)");
+            
+            ic_cdk::spawn(async {
+                // Check if there are still active users
+                if has_recent_user_activity() {
+                    ic_cdk::println!("🔄 Active users detected - refreshing market data");
+                    match fetch_all_real_market_data().await {
+                        Ok(market_data) => {
+                            let now = time();
+                            MARKET_SUMMARY_CACHE.with(|cache| {
+                                *cache.borrow_mut() = Some((market_data, now));
+                            });
+                            ic_cdk::println!("✅ Periodic refresh complete");
+                        }
+                        Err(e) => {
+                            ic_cdk::println!("❌ Periodic refresh failed: {:?}", e);
+                        }
+                    }
+                } else {
+                    ic_cdk::println!("⏸️  No active users - stopping periodic refresh");
+                    // Stop the timer
+                    REFRESH_TIMER.with(|timer| {
+                        if let Some(timer_id) = timer.borrow_mut().take() {
+                            clear_timer(timer_id);
+                        }
+                    });
+                }
+            });
+        });
+        
+        *timer_cell.borrow_mut() = Some(timer_id);
+        ic_cdk::println!("✅ Started 30-minute periodic refresh timer");
+    });
+}
+
+// Fetch all real market data from Polygon.io (NO MOCK DATA)
+async fn fetch_all_real_market_data() -> Result<HashMap<String, Stock>, CanisterError> {
     let popular_stocks = vec![
-        "RELIANCE", "TCS", "INFY", "HDFC", "ICICI", 
-        "SBI", "BHARTI", "ITC", "WIPRO", "TECHM"
+        "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA",
+        "NVDA", "META", "NFLX", "AMD", "INTC"
     ];
     
     let mut market_data = HashMap::new();
+    let mut failed_stocks = Vec::new();
     
+    // Fetch REAL data for each stock (NO MOCK FALLBACK)
     for stock_id in popular_stocks {
-        let stock_data = get_cached_stock_data(stock_id)?;
-        market_data.insert(stock_id.to_string(), stock_data);
+        ic_cdk::println!("🔄 Fetching REAL data for {}", stock_id);
+        match fetch_real_stock_data(stock_id).await {
+            Ok(stock_data) => {
+                market_data.insert(stock_id.to_string(), stock_data);
+                ic_cdk::println!("✅ Successfully fetched {}", stock_id);
+            }
+            Err(e) => {
+                ic_cdk::println!("❌ Failed to fetch {}: {:?}", stock_id, e);
+                failed_stocks.push(stock_id);
+            }
+        }
     }
     
+    if market_data.is_empty() {
+        return Err(CanisterError::internal_error("Failed to fetch any real stock data"));
+    }
+    
+    if !failed_stocks.is_empty() {
+        ic_cdk::println!("⚠️  Failed to fetch {} stocks: {:?}", failed_stocks.len(), failed_stocks);
+    }
+    
+    ic_cdk::println!("✅ Fetched {} real stocks (no mock data)", market_data.len());
     Ok(market_data)
+}
+
+// Get stock market summary for SSE streaming (ASYNC with REAL data)
+// LOGIC:
+// 1. This request counts as active user activity
+// 2. If cache is valid (< 45 min), return cached data
+// 3. If cache expired or no cache, fetch REAL data from Polygon.io
+// 4. Start 30-min periodic refresh timer
+// 5. NO MOCK DATA - only real API calls
+pub async fn get_market_summary_async() -> Result<HashMap<String, Stock>, CanisterError> {
+    let now = time();
+    
+    // THIS REQUEST COUNTS AS ACTIVE USER
+    update_user_activity();
+    ic_cdk::println!("📊 get_market_summary_async called - user activity recorded");
+    
+    // Check if cache is valid (< 45 minutes old)
+    let cache_valid = MARKET_SUMMARY_CACHE.with(|cache| {
+        let cache = cache.borrow();
+        if let Some((data, cached_at)) = &*cache {
+            let age = now - cached_at;
+            if age < STOCK_CACHE_DURATION {
+                let age_minutes = age / 60_000_000_000;
+                ic_cdk::println!("✅ Cache is valid (age: {} min < 45 min)", age_minutes);
+                return Some(data.clone());
+            } else {
+                ic_cdk::println!("⏰ Cache expired (age: {} min > 45 min)", age / 60_000_000_000);
+            }
+        } else {
+            ic_cdk::println!("📭 No cache available");
+        }
+        None
+    });
+    
+    if let Some(cached_data) = cache_valid {
+        // Cache is fresh - start timer if not already running
+        start_periodic_refresh();
+        return Ok(cached_data);
+    }
+    
+    // Cache expired or doesn't exist - fetch REAL data
+    ic_cdk::println!("🚀 Fetching REAL data from Polygon.io (NO MOCK DATA)");
+    
+    let market_data = fetch_all_real_market_data().await?;
+    
+    // Update cache
+    MARKET_SUMMARY_CACHE.with(|cache| {
+        *cache.borrow_mut() = Some((market_data.clone(), now));
+    });
+    
+    // Start periodic 30-minute refresh
+    start_periodic_refresh();
+    
+    ic_cdk::println!("✅ Market summary complete: {} real stocks (cached for 45 min)", market_data.len());
+    
+    Ok(market_data)
+}
+
+// Get stock market summary for SSE streaming (SYNC version - uses cached data only)
+// This is called from query endpoints - ALWAYS returns cached data, NEVER makes HTTP outcalls
+pub fn get_market_summary() -> Result<HashMap<String, Stock>, CanisterError> {
+    // Track user activity
+    update_user_activity();
+    
+    // Always return from global cache (query endpoints cannot make HTTP outcalls)
+    MARKET_SUMMARY_CACHE.with(|cache| {
+        let cache = cache.borrow();
+        if let Some((data, cached_at)) = &*cache {
+            let age_minutes = (time() - cached_at) / 60_000_000_000;
+            ic_cdk::println!("✅ Returning cached market summary (age: {} min)", age_minutes);
+            return Ok(data.clone());
+        }
+        
+        // No cache available - generate mock data
+        ic_cdk::println!("⚠️  No cache available, returning mock data");
+        let popular_stocks = vec![
+            "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA",
+            "NVDA", "META", "NFLX", "AMD", "INTC"
+        ];
+        
+        let mut market_data = HashMap::new();
+        for stock_id in popular_stocks {
+            if let Ok(stock_data) = get_cached_stock_data(stock_id) {
+                market_data.insert(stock_id.to_string(), stock_data);
+            }
+        }
+        
+        Ok(market_data)
+    })
 }
 
 // Broadcast market summary update

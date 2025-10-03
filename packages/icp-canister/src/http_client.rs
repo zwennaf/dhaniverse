@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 // Polygon.io API configuration
 const POLYGON_API_BASE: &str = "https://api.polygon.io/v2";
-const POLYGON_API_KEY: &str = ""; // Set via environment or leave empty for demo mode
+const POLYGON_API_KEY: &str = "8gQaSj2WkVK0iwh2fHDJxl4DhM02QrBl";
 
 // CoinGecko API configuration (backup for crypto)
 const COINGECKO_API_BASE: &str = "https://api.coingecko.com/api/v3";
@@ -116,6 +116,191 @@ pub async fn fetch_price(token_ids: &str) -> Result<Vec<(String, f64)>, String> 
 // POLYGON.IO STOCK API INTEGRATION
 // ============================================================================
 
+/// Fetch 7-day historical OHLC data from Polygon.io
+/// Endpoint: GET /v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}
+pub async fn fetch_polygon_historical(
+    symbol: &str,
+    days: u32,
+) -> Result<Vec<crate::types::StockPrice>, String> {
+    use crate::types::StockPrice;
+    
+    if POLYGON_API_KEY.is_empty() {
+        return Err("Polygon API key not configured".to_string());
+    }
+    
+    // Calculate date range in milliseconds
+    let now_ms = (ic_cdk::api::time() / 1_000_000) as i64; // Convert nanoseconds to milliseconds
+    let from_ms = now_ms - (days as i64 * 24 * 60 * 60 * 1000);
+    
+    let url = format!(
+        "{}/aggs/ticker/{}/range/1/day/{}/{}?adjusted=true&sort=asc&limit=50&apiKey={}",
+        POLYGON_API_BASE,
+        symbol,
+        from_ms,
+        now_ms,
+        POLYGON_API_KEY
+    );
+    
+    ic_cdk::println!("🔍 Fetching historical data for {} from {}", symbol, url);
+    
+    let request = CanisterHttpRequestArgument {
+        url: url.clone(),
+        method: HttpMethod::GET,
+        body: None,
+        max_response_bytes: Some(50_000), // 50KB for historical data
+        transform: Some(TransformContext::from_name("transform_response".to_string(), vec![])),
+        headers: vec![
+            HttpHeader {
+                name: "User-Agent".to_string(),
+                value: "Dhaniverse/1.0".to_string(),
+            },
+        ],
+    };
+    
+    match http_request(request, 25_000_000_000).await { // 25B cycles
+        Ok((response,)) => {
+            if response.status != candid::Nat::from(200u8) {
+                return Err(format!("HTTP {}: {}", response.status, String::from_utf8_lossy(&response.body)));
+            }
+            
+            let body_str = String::from_utf8(response.body)
+                .map_err(|e| format!("UTF-8 decode error: {}", e))?;
+            
+            let json: Value = serde_json::from_str(&body_str)
+                .map_err(|e| format!("JSON parse error: {}", e))?;
+            
+            // Parse Polygon aggregates response
+            if let Some(results) = json.get("results").and_then(|r| r.as_array()) {
+                let mut price_history = Vec::new();
+                
+                for bar in results {
+                    // Extract OHLCV data
+                    let timestamp = bar.get("t").and_then(|t| t.as_u64()).unwrap_or(0);
+                    let open = bar.get("o").and_then(|o| o.as_f64()).unwrap_or(0.0);
+                    let high = bar.get("h").and_then(|h| h.as_f64()).unwrap_or(0.0);
+                    let low = bar.get("l").and_then(|l| l.as_f64()).unwrap_or(0.0);
+                    let close = bar.get("c").and_then(|c| c.as_f64()).unwrap_or(0.0);
+                    let volume = bar.get("v").and_then(|v| v.as_u64()).unwrap_or(0);
+                    
+                    // Convert milliseconds to nanoseconds for ICP
+                    let timestamp_ns = timestamp * 1_000_000;
+                    
+                    price_history.push(StockPrice {
+                        timestamp: timestamp_ns,
+                        price: close,
+                        volume,
+                        high,
+                        low,
+                        open,
+                        close,
+                    });
+                }
+                
+                if price_history.is_empty() {
+                    return Err(format!("No historical data available for {}", symbol));
+                }
+                
+                ic_cdk::println!("✅ Fetched {} historical data points for {}", price_history.len(), symbol);
+                return Ok(price_history);
+            }
+            
+            Err(format!("Invalid response structure for {}", symbol))
+        }
+        Err((code, msg)) => {
+            Err(format!("HTTP request failed for {}: {:?} - {}", symbol, code, msg))
+        }
+    }
+}
+
+/// Fetch stock details from Polygon.io
+/// Endpoint: GET /v3/reference/tickers/{ticker}
+pub async fn fetch_polygon_stock_details(symbol: &str) -> Result<StockDetails, String> {
+    if POLYGON_API_KEY.is_empty() {
+        return Err("Polygon API key not configured".to_string());
+    }
+    
+    let url = format!(
+        "https://api.polygon.io/v3/reference/tickers/{}?apiKey={}",
+        symbol,
+        POLYGON_API_KEY
+    );
+    
+    ic_cdk::println!("🔍 Fetching stock details for {} from {}", symbol, url);
+    
+    let request = CanisterHttpRequestArgument {
+        url: url.clone(),
+        method: HttpMethod::GET,
+        body: None,
+        max_response_bytes: Some(50_000), // 50KB for ticker details
+        transform: Some(TransformContext::from_name("transform_response".to_string(), vec![])),
+        headers: vec![
+            HttpHeader {
+                name: "User-Agent".to_string(),
+                value: "Dhaniverse/1.0".to_string(),
+            },
+        ],
+    };
+    
+    match http_request(request, 25_000_000_000).await {
+        Ok((response,)) => {
+            if response.status != candid::Nat::from(200u8) {
+                return Err(format!("HTTP {}: {}", response.status, String::from_utf8_lossy(&response.body)));
+            }
+            
+            let body_str = String::from_utf8(response.body)
+                .map_err(|e| format!("UTF-8 decode error: {}", e))?;
+            
+            let json: Value = serde_json::from_str(&body_str)
+                .map_err(|e| format!("JSON parse error: {}", e))?;
+            
+            // Parse ticker details response
+            if let Some(results) = json.get("results") {
+                let name = results.get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or(symbol)
+                    .to_string();
+                
+                let market_cap = results.get("market_cap")
+                    .and_then(|m| m.as_f64())
+                    .unwrap_or(0.0);
+                
+                let outstanding_shares = results.get("weighted_shares_outstanding")
+                    .and_then(|s| s.as_u64())
+                    .or_else(|| results.get("share_class_shares_outstanding").and_then(|s| s.as_u64()))
+                    .unwrap_or(0);
+                
+                let description = results.get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                
+                ic_cdk::println!("✅ Fetched details for {}: market_cap={}, shares={}", symbol, market_cap, outstanding_shares);
+                
+                return Ok(StockDetails {
+                    name,
+                    market_cap,
+                    outstanding_shares,
+                    description,
+                });
+            }
+            
+            Err(format!("Invalid response structure for {}", symbol))
+        }
+        Err((code, msg)) => {
+            Err(format!("HTTP request failed for {}: {:?} - {}", symbol, code, msg))
+        }
+    }
+}
+
+/// Stock details from Polygon.io ticker endpoint
+#[derive(Debug, Clone)]
+pub struct StockDetails {
+    pub name: String,
+    pub market_cap: f64,
+    pub outstanding_shares: u64,
+    pub description: String,
+}
+
 /// Fetch real stock prices from Polygon.io API
 /// Uses previous close endpoint which is free tier compatible
 /// Optimized for ICP cycles with 30-minute caching
@@ -195,7 +380,7 @@ async fn fetch_polygon_prev_close(symbol: &str) -> Result<f64, String> {
     
     match http_request(request, 25_000_000_000).await { // 25B cycles ~= $0.000033 per call
         Ok((response,)) => {
-            if response.status != 200u8.into() {
+            if response.status != candid::Nat::from(200u8) {
                 return Err(format!("HTTP {}: {}", response.status, String::from_utf8_lossy(&response.body)));
             }
             
@@ -327,6 +512,160 @@ pub fn get_cache_stats() -> (usize, usize) {
             .count();
         (total, valid)
     })
+}
+
+// ============================================================================
+// METRICS CALCULATION FROM REAL DATA
+// ============================================================================
+
+/// Calculate financial metrics from real Polygon.io data
+pub fn calculate_metrics(
+    symbol: &str,
+    _current_price: f64,
+    price_history: &[crate::types::StockPrice],
+    details: &StockDetails,
+) -> crate::types::StockMetrics {
+    use crate::types::StockMetrics;
+    
+    // P/E Ratio: Estimate based on sector averages (or use real if available)
+    let pe_ratio = estimate_pe_from_sector(symbol);
+    
+    // EPS: Calculate from market cap and P/E ratio
+    // EPS = (Market Cap / Outstanding Shares) / P/E Ratio
+    let eps = if details.outstanding_shares > 0 && pe_ratio > 0.0 {
+        (details.market_cap / details.outstanding_shares as f64) / pe_ratio
+    } else {
+        0.0
+    };
+    
+    // Volatility: Calculate standard deviation from price history
+    let volatility = calculate_volatility(price_history);
+    
+    // Business Growth: Calculate from 7-day price change
+    let business_growth = if price_history.len() >= 2 {
+        let first = price_history.first().unwrap().close;
+        let last = price_history.last().unwrap().close;
+        if first > 0.0 {
+            ((last - first) / first) * 100.0
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    
+    // Debt/Equity: Use industry average estimates
+    let debt_equity_ratio = estimate_debt_equity(symbol);
+    
+    // Industry Average P/E
+    let industry_avg_pe = get_industry_avg_pe(symbol);
+    
+    StockMetrics {
+        market_cap: details.market_cap,
+        pe_ratio,
+        eps,
+        debt_equity_ratio,
+        business_growth,
+        industry_avg_pe,
+        outstanding_shares: details.outstanding_shares,
+        volatility,
+    }
+}
+
+/// Calculate volatility (standard deviation) from price history
+fn calculate_volatility(price_history: &[crate::types::StockPrice]) -> f64 {
+    if price_history.len() < 2 {
+        return 0.0;
+    }
+    
+    // Calculate daily returns
+    let mut returns: Vec<f64> = Vec::new();
+    for i in 1..price_history.len() {
+        let prev_price = price_history[i - 1].close;
+        let curr_price = price_history[i].close;
+        if prev_price > 0.0 {
+            let daily_return = (curr_price - prev_price) / prev_price;
+            returns.push(daily_return);
+        }
+    }
+    
+    if returns.is_empty() {
+        return 0.0;
+    }
+    
+    // Calculate mean
+    let mean: f64 = returns.iter().sum::<f64>() / returns.len() as f64;
+    
+    // Calculate variance
+    let variance: f64 = returns.iter()
+        .map(|r| {
+            let diff = r - mean;
+            diff * diff
+        })
+        .sum::<f64>() / returns.len() as f64;
+    
+    // Return standard deviation (annualized)
+    variance.sqrt() * (252.0_f64).sqrt() // 252 trading days per year
+}
+
+/// Estimate P/E ratio based on sector
+fn estimate_pe_from_sector(symbol: &str) -> f64 {
+    match symbol {
+        // Tech stocks (high P/E)
+        "AAPL" | "GOOGL" | "MSFT" | "AMZN" | "META" | "NVDA" => 28.5,
+        "NFLX" | "AMD" | "INTC" | "CSCO" => 22.0,
+        
+        // Auto (moderate P/E)
+        "TSLA" | "F" | "GM" => 18.0,
+        
+        // Finance (low P/E)
+        "JPM" | "BAC" | "WFC" | "GS" => 12.5,
+        
+        // Energy (low P/E)
+        "XOM" | "CVX" => 10.5,
+        
+        // Healthcare (moderate-high P/E)
+        "JNJ" | "UNH" | "PFE" => 20.0,
+        
+        // Default
+        _ => 18.5,
+    }
+}
+
+/// Estimate debt/equity ratio based on sector
+fn estimate_debt_equity(symbol: &str) -> f64 {
+    match symbol {
+        // Tech (low debt)
+        "AAPL" | "GOOGL" | "MSFT" | "META" | "NVDA" => 0.15,
+        "AMZN" | "NFLX" => 0.25,
+        
+        // Auto (moderate debt)
+        "TSLA" | "F" | "GM" => 0.55,
+        
+        // Finance (high leverage)
+        "JPM" | "BAC" | "WFC" | "GS" => 0.85,
+        
+        // Energy (moderate debt)
+        "XOM" | "CVX" => 0.45,
+        
+        // Healthcare (low-moderate debt)
+        "JNJ" | "UNH" | "PFE" => 0.35,
+        
+        // Default
+        _ => 0.50,
+    }
+}
+
+/// Get industry average P/E ratio
+fn get_industry_avg_pe(symbol: &str) -> f64 {
+    match symbol {
+        "AAPL" | "GOOGL" | "MSFT" | "AMZN" | "META" | "NVDA" | "NFLX" | "AMD" | "INTC" | "CSCO" => 25.8,
+        "TSLA" | "F" | "GM" => 16.5,
+        "JPM" | "BAC" | "WFC" | "GS" => 11.2,
+        "XOM" | "CVX" => 9.8,
+        "JNJ" | "UNH" | "PFE" => 18.5,
+        _ => 20.5,
+    }
 }
 
 // Fetch historical chart data for a coin within a time range

@@ -1029,6 +1029,16 @@ fn get_market_summary() -> Result<std::collections::HashMap<String, types::Stock
         .map_err(|e| format!("Failed to get market summary: {:?}", e))
 }
 
+/// Get market summary with REAL data from Polygon.io (async)
+/// This fetches fresh data with historical prices, market cap, metrics
+#[ic_cdk::update]
+async fn get_market_summary_real() -> Result<std::collections::HashMap<String, types::Stock>, String> {
+    ic_cdk::println!("🚀 API Call: get_market_summary_real() - Fetching REAL data");
+    
+    stock_sse::get_market_summary_async().await
+        .map_err(|e| format!("Failed to get real market summary: {:?}", e))
+}
+
 #[ic_cdk::update]
 async fn refresh_stock_cache(stock_id: String) -> Result<types::Stock, String> {
     // Force refresh by removing existing cache
