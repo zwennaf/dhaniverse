@@ -17,18 +17,10 @@ import { portfolioAnalytics } from '../../../services/PortfolioAnalyticsService'
 import { stockTransactionService } from '../../../services/StockTransactionService';
 
 // Use Stock from stock.types and extend it with legacy properties for backward compatibility
-import type { Stock as BaseStock } from "../../../types/stock.types";
+import type { UIStock } from "../../../services/StockMarketDataService";
 
-type Stock = BaseStock & {
-    // Legacy properties used by child components
-    id?: string;
-    debtEquityRatio?: number;
-    businessGrowth?: number;
-    industryAvgPE?: number;
-    outstandingShares?: number;
-    volatility?: number;
-    lastUpdate?: number;
-};
+// Use UIStock directly - it has everything we need
+type Stock = UIStock;
 
 interface StockHolding {
     stockId: string;
@@ -56,6 +48,7 @@ interface StockMarketDashboardProps {
     onClose: () => void;
     playerRupees: number;
     stocks: Stock[];
+    isLoadingStocks?: boolean;
 }
 
 type SortField = "name" | "currentPrice" | "sector" | "marketCap" | "peRatio";
@@ -64,7 +57,7 @@ type FilterOption = "all" | "technology" | "finance" | "healthcare" | "consumer"
 type TabOption = "market" | "portfolio";
 type ViewMode = "cards" | "table";
 
-const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees }) => {
+const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees, stocks: propsStocks, isLoadingStocks: propsIsLoadingStocks }) => {
     // Auth context for Internet Identity persistence
     const { user, isSignedIn, refreshAuth } = useAuth();
 
@@ -219,48 +212,17 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Load real stocks data only when the dashboard mounts (explicit) and
-    // avoid initializing canister services until the UI requests them.
+    // Use stocks from props (loaded via ONE CALL in StockMarketUI)
     useEffect(() => {
-        let mounted = true;
-        const load = async () => {
-            try {
-                setLoadingStage("Loading Real Stock Market Data (on-demand)");
-
-                // Dynamically import the stockMarketService to avoid side-effects
-                const { stockMarketService } = await import("../../../services/StockMarketService");
-                // Use the integrated canister service directly
-                const { canisterService } = await import("../../../services/CanisterService");
-
-                // Ensure canister is initialized (safe, idempotent)
-                await canisterService.initialize();
-
-                // Initialize stock market service (fetches batched data once)
-                if (!stockMarketService.isServiceInitialized()) {
-                    await stockMarketService.initialize();
-                }
-
-                // Start periodic updates now that UI is active
-                stockMarketService.startPeriodicUpdatesIfNeeded();
-
-                const allStocks = stockMarketService.getStockMarketData();
-                if (!mounted) return;
-
-                if (allStocks && allStocks.length > 0) {
-                    setFilteredStocks(allStocks);
-                    console.log(`✅ Loaded ${allStocks.length} stocks on-demand`);
-                } else {
-                    console.warn("No stocks available after on-demand load");
-                }
-            } catch (e) {
-                console.error("Failed to load stocks on-demand:", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        load();
-        return () => { mounted = false; };
-    }, []);
+        if (propsStocks && propsStocks.length > 0) {
+            setFilteredStocks(propsStocks);
+            console.log(`✅ Using ${propsStocks.length} stocks from ONE CALL`);
+            setIsLoading(false);
+        } else if (!propsIsLoadingStocks) {
+            // If not loading and no stocks, show empty state
+            setIsLoading(false);
+        }
+    }, [propsStocks, propsIsLoadingStocks]);
 
     // Listen for rupee updates
     useEffect(() => {
@@ -643,10 +605,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     <div className="text-right">
                                         <p className="text-xs text-gray-400 uppercase tracking-wide">Available Balance</p>
                                         <p className="text-xl font-light text-yellow-500">₹{currentRupees.toLocaleString()}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">All prices in INR</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-gray-400 uppercase tracking-wide">Portfolio Value</p>
                                         <p className="text-xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">1 USD = ₹88</p>
                                     </div>
                                     <button 
                                         onClick={openLeaderboard}

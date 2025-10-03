@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import StockMarketDashboard from "./StockMarketDashboard.tsx";
 import { balanceManager } from "../../../services/BalanceManager";
-import { type Stock } from "../../../services/StockMarketService";
+import { stockMarketDataService } from "../../../services/StockMarketDataService";
+import type { UIStock } from "../../../services/StockMarketDataService";
 import { getTaskManager } from "../../../game/tasks/TaskManager";
 
 const StockMarketUI: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [playerRupees, setPlayerRupees] = useState(0);
-    const [stocks, setStocks] = useState<Stock[]>([]);
+    const [stocks, setStocks] = useState<UIStock[]>([]);
     const [mayaOnboardingCompleted, setMayaOnboardingCompleted] = useState(false);
+    const [isLoadingStocks, setIsLoadingStocks] = useState(false);
 
     // Subscribe to balance manager updates
     useEffect(() => {
@@ -26,6 +28,33 @@ const StockMarketUI: React.FC = () => {
         };
     }, []);
 
+    // Load ALL stock market data in ONE CALL when UI opens
+    useEffect(() => {
+        if (!isOpen || isLoadingStocks) return;
+
+        const loadCompleteMarketData = async () => {
+            setIsLoadingStocks(true);
+            console.log("📊 Loading complete market data in ONE CALL...");
+
+            try {
+                const marketData = await stockMarketDataService.getCompleteMarketData();
+                
+                if (marketData.success && marketData.stocks.length > 0) {
+                    setStocks(marketData.stocks);
+                    console.log(`✅ Loaded ${marketData.stocks.length} stocks in ONE CALL (source: ${marketData.source})`);
+                } else {
+                    console.error("❌ Failed to load market data");
+                }
+            } catch (error) {
+                console.error("❌ Error loading market data:", error);
+            } finally {
+                setIsLoadingStocks(false);
+            }
+        };
+
+        loadCompleteMarketData();
+    }, [isOpen, isLoadingStocks]);
+
     useEffect(() => {
         // Listen for the custom event from the game to open the stock market UI
         const handleOpenStockMarketUI = (event: CustomEvent) => {
@@ -34,11 +63,6 @@ const StockMarketUI: React.FC = () => {
             // Get player rupees from the event
             if (event.detail.playerRupees !== undefined) {
                 setPlayerRupees(event.detail.playerRupees);
-            }
-
-            // Store stocks data if provided
-            if (event.detail.stocks) {
-                setStocks(event.detail.stocks);
             }
 
             // Show the stock market UI
@@ -161,6 +185,7 @@ const StockMarketUI: React.FC = () => {
             onClose={handleClose}
             playerRupees={playerRupees}
             stocks={stocks}
+            isLoadingStocks={isLoadingStocks}
         />
     );
 };

@@ -573,7 +573,15 @@ export class StockMarketManager {
     const priceResponse = await stockPriceService.getStockPrices({ symbols });
     
     if (!priceResponse.success || priceResponse.data.length === 0) {
-      throw new Error('Failed to load real stock data from ICP canister. Cannot proceed without real stock prices.');
+      console.warn('⚠️ Failed to load from canister, using fallback data');
+      // Don't throw error - let fallback data be used
+      if (priceResponse.data.length === 0) {
+        throw new Error('No stock data available (canister and fallback failed)');
+      }
+    }
+    
+    if (priceResponse.metadata.source === 'fallback') {
+      console.log('📊 Using fallback stock prices for local development');
     }
 
     // Convert StockPrice to our Stock interface format

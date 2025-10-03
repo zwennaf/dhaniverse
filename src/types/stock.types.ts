@@ -305,7 +305,7 @@ export interface StockPriceResponse {
     errors?: string[]; // Symbols that failed
     rateLimit?: RateLimitInfo;
     metadata: {
-        source: 'polygon' | 'canister' | 'cache';
+        source: 'polygon' | 'canister' | 'cache' | 'fallback';
         timestamp: number;
         cacheHit: boolean;
         apiCallsMade: number;

@@ -60,7 +60,9 @@ const TradeStockPopup: React.FC<TradeStockPopupProps> = ({
       setPlayerRupees(newBalance.cash);
     });
     
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+    };
   }, [stock.symbol]);
   
   const sharesOwned = holding?.quantity || 0;
