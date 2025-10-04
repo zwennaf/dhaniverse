@@ -12,6 +12,7 @@ import MagicLinkVerification from './components/auth/MagicLinkVerification';
 import Profile from './components/auth/Profile';
 import AdminPage from './admin/AdminPage';
 import BannedPageWrapper from './components/BannedPageWrapper';
+import TestBankDashboard from './components/banking/TestBankDashboard';
 
 // Redirect component for cross-domain navigation
 const CrossDomainRedirect: React.FC<{ to: string, navigateFn: () => void }> = ({ navigateFn }) => {
@@ -111,6 +112,12 @@ const AppRoutes = () => {
             <AdminPage />
           </ProtectedRoute>
         }
+      />
+      
+      {/* Test Bank Dashboard - For UI development */}
+      <Route
+        path="/test-bank"
+        element={<TestBankDashboard />}
       />
       
       {/* Fallback: unknown routes redirect to landing page */}
