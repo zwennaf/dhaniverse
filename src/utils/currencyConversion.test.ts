@@ -18,9 +18,9 @@ import {
 
 describe('Currency Conversion', () => {
     describe('convertUsdToInr', () => {
-        it('should convert USD to INR at rate of 88', () => {
-            expect(convertUsdToInr(1)).toBe(88);
-            expect(convertUsdToInr(100)).toBe(8800);
+        it('should convert USD to INR at rate of 88.76', () => {
+            expect(convertUsdToInr(1)).toBe(88.76);
+            expect(convertUsdToInr(100)).toBe(8876);
             expect(convertUsdToInr(175.50)).toBe(15444);
         });
 

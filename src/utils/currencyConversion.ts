@@ -8,8 +8,8 @@
  * @date 2025-10-03
  */
 
-// Fixed exchange rate: 1 USD = 88 INR (approximate)
-const USD_TO_INR_RATE = 88;
+// Fixed exchange rate: 1 USD = 88.76 INR (updated October 5, 2025)
+const USD_TO_INR_RATE = 88.76;
 
 /**
  * Convert USD price to INR

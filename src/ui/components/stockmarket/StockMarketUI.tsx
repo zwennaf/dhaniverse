@@ -30,32 +30,49 @@ const StockMarketUI: React.FC = () => {
         };
     }, []);
 
-    // Load ALL stock market data in ONE CALL when UI opens
+    // Load ALL market data (crypto + stocks) IMMEDIATELY when UI opens
+    // This runs BEFORE rendering the dashboard, during the loading screen
     useEffect(() => {
-        if (!isOpen || isLoadingStocks) return;
+        if (!isOpen) return;
+        
+        // Only fetch once when opening
+        if (stocks.length > 0 && !isLoadingStocks) {
+            console.log("✅ Using cached market data:", stocks.length, "items");
+            return;
+        }
 
         const loadCompleteMarketData = async () => {
             setIsLoadingStocks(true);
-            console.log("📊 Loading complete market data in ONE CALL...");
+            console.log("📊 [PRE-LOAD] Fetching market data from CoinGecko + Polygon...");
 
             try {
-                const marketData = await stockMarketDataService.getCompleteMarketData();
+                // Fetch both crypto and stocks in parallel DURING loading screen
+                const [cryptoData, stockData] = await Promise.all([
+                    stockMarketDataService.getCryptocurrencies(),
+                    stockMarketDataService.getStocks()
+                ]);
                 
-                if (marketData.success && marketData.stocks.length > 0) {
-                    setStocks(marketData.stocks);
-                    console.log(`✅ Loaded ${marketData.stocks.length} stocks in ONE CALL (source: ${marketData.source})`);
+                // Combine both datasets
+                const allStocks = [...cryptoData.stocks, ...stockData.stocks];
+                
+                if (allStocks.length > 0) {
+                    setStocks(allStocks);
+                    console.log(`✅ [PRE-LOAD] Loaded ${cryptoData.stocks.length} cryptocurrencies + ${stockData.stocks.length} stocks BEFORE dashboard render`);
                 } else {
                     console.error("❌ Failed to load market data");
                 }
             } catch (error) {
                 console.error("❌ Error loading market data:", error);
             } finally {
+                // Immediately ready - no artificial delay
                 setIsLoadingStocks(false);
+                console.log("✅ [PRE-LOAD] Market data ready, dashboard will render INSTANTLY");
             }
         };
 
         loadCompleteMarketData();
-    }, [isOpen, isLoadingStocks]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     useEffect(() => {
         // Listen for the custom event from the game to open the stock market UI

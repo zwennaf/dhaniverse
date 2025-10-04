@@ -540,7 +540,7 @@ export function formatPercent(value: number, decimals: number = 2): string {
 /**
  * Convert USD to INR (approximate rate)
  */
-export const USD_TO_INR_RATE = 83.0; // Update this periodically
+export const USD_TO_INR_RATE = 88.76; // Updated October 5, 2025
 
 export function usdToInr(usd: number): number {
     return usd * USD_TO_INR_RATE;

@@ -54,7 +54,7 @@ interface StockMarketDashboardProps {
 type SortField = "name" | "currentPrice" | "sector" | "marketCap" | "peRatio";
 type SortDirection = "asc" | "desc";
 type FilterOption = "all" | "technology" | "finance" | "healthcare" | "consumer" | "energy" | "cryptocurrency";
-type TabOption = "market" | "portfolio";
+type TabOption = "cryptocurrency" | "stocks" | "portfolio";
 type ViewMode = "cards" | "table";
 
 const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, playerRupees, stocks: propsStocks, isLoadingStocks: propsIsLoadingStocks }) => {
@@ -68,7 +68,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const getWalletManager = () => null;
     
     // Core UI state
-    const [activeTab, setActiveTab] = useState<TabOption>("market");
+    const [activeTab, setActiveTab] = useState<TabOption>("cryptocurrency");
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [showTrade, setShowTrade] = useState(false);
     const [showDetail, setShowDetail] = useState(false);
@@ -83,9 +83,12 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
     const [filterOption, setFilterOption] = useState<FilterOption>("all");
     const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
+    const [cryptocurrencies, setCryptocurrencies] = useState<Stock[]>([]);
+    const [traditionalStocks, setTraditionalStocks] = useState<Stock[]>([]);
     const [currentRupees, setCurrentRupees] = useState(playerRupees);
     const [portfolio, setPortfolio] = useState<PlayerPortfolio>({ holdings: [], transactionHistory: [] });
-    const [isLoading, setIsLoading] = useState(true);
+    // Use parent's loading state - stocks are pre-loaded before dashboard renders
+    const [isLoading, setIsLoading] = useState(propsIsLoadingStocks ?? true);
     const [loadingStage, setLoadingStage] = useState("Loading Stock Market Data");
     const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
@@ -212,17 +215,51 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Use stocks from props (loaded via ONE CALL in StockMarketUI)
+    // Separate crypto and traditional stocks when propsStocks changes
+    // This now runs INSTANTLY since stocks are pre-loaded by parent
     useEffect(() => {
+        console.log("🔄 [DASHBOARD] Props changed:", {
+            propsStocksLength: propsStocks?.length,
+            isLoadingStocks: propsIsLoadingStocks,
+            activeTab
+        });
+        
         if (propsStocks && propsStocks.length > 0) {
-            setFilteredStocks(propsStocks);
-            console.log(`✅ Using ${propsStocks.length} stocks from ONE CALL`);
+            console.log("✅ [DASHBOARD] Processing pre-loaded stocks instantly");
+            
+            const crypto = propsStocks.filter(s => s.sector === 'Cryptocurrency');
+            const stocks = propsStocks.filter(s => s.sector !== 'Cryptocurrency');
+            
+            console.log(`📊 [DASHBOARD] Split: ${crypto.length} crypto, ${stocks.length} stocks`);
+            
+            setCryptocurrencies(crypto);
+            setTraditionalStocks(stocks);
+            
+            // Set filtered stocks based on active tab
+            let filtered: Stock[] = [];
+            if (activeTab === 'cryptocurrency') {
+                filtered = crypto;
+            } else if (activeTab === 'stocks') {
+                filtered = stocks;
+            } else {
+                filtered = propsStocks;
+            }
+            
+            setFilteredStocks(filtered);
+            
+            // Immediately hide loader since data is ready
             setIsLoading(false);
-        } else if (!propsIsLoadingStocks) {
-            // If not loading and no stocks, show empty state
+            console.log(`✅ [DASHBOARD] INSTANT RENDER - ${filtered.length} items ready for "${activeTab}" tab`);
+        } else if (propsIsLoadingStocks) {
+            // Still loading from parent
+            setIsLoading(true);
+            console.log("⏳ [DASHBOARD] Waiting for parent to load stocks...");
+        } else {
+            // Not loading but no stocks
             setIsLoading(false);
+            console.log("⚠️ [DASHBOARD] No stocks available");
         }
-    }, [propsStocks, propsIsLoadingStocks]);
+    }, [propsStocks, propsIsLoadingStocks, activeTab]);
 
     // Listen for rupee updates
     useEffect(() => {
@@ -660,15 +697,26 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                             {/* Tab Navigation */}
                             <div className="flex space-x-4 mt-6">
                                 <button
-                                    onClick={() => setActiveTab("market")}
+                                    onClick={() => setActiveTab("cryptocurrency")}
                                     className={`px-6 py-3 font-medium tracking-wide transition-colors duration-200 border-b-2 ${
-                                        activeTab === "market" 
+                                        activeTab === "cryptocurrency" 
                                             ? "text-yellow-500 border-yellow-500" 
                                             : "text-gray-400 border-transparent hover:text-yellow-500"
                                     }`}
                                     style={{ fontFamily:'VCR OSD Mono, monospace' }}
                                 >
-                                    MARKET
+                                    💰 CRYPTOCURRENCY
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("stocks")}
+                                    className={`px-6 py-3 font-medium tracking-wide transition-colors duration-200 border-b-2 ${
+                                        activeTab === "stocks" 
+                                            ? "text-yellow-500 border-yellow-500" 
+                                            : "text-gray-400 border-transparent hover:text-yellow-500"
+                                    }`}
+                                    style={{ fontFamily:'VCR OSD Mono, monospace' }}
+                                >
+                                    📈 STOCKS
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("portfolio")}
@@ -679,14 +727,14 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     }`}
                                     style={{ fontFamily:'VCR OSD Mono, monospace' }}
                                 >
-                                    PORTFOLIO
+                                    📊 PORTFOLIO
                                 </button>
                             </div>
                         </div>
 
                         {/* Main Content */}
                         <div className="flex-1 overflow-y-auto flex flex-col">
-                            {activeTab === "market" && (
+                            {(activeTab === "cryptocurrency" || activeTab === "stocks") && (
                                 <>
                                     {/* Filters */}
                                     <div className="bg-gray-900/50 border-b border-gray-700/50 p-4">
@@ -754,7 +802,24 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
 
                                     {/* Stock List */}
                                     <div className="flex-1 overflow-y-auto">
-                                        {viewMode === "cards" ? (
+                                        {displayStocks.length === 0 && (
+                                            <div className="flex items-center justify-center h-64">
+                                                <div className="text-center">
+                                                    <p className="text-gray-400 text-lg mb-2">No stocks available</p>
+                                                    <p className="text-gray-500 text-sm">
+                                                        {activeTab === 'cryptocurrency' ? 'No cryptocurrencies loaded' : 
+                                                         activeTab === 'stocks' ? 'No stocks loaded' : 
+                                                         'No portfolio items'}
+                                                    </p>
+                                                    <p className="text-gray-600 text-xs mt-2">
+                                                        filteredStocks: {filteredStocks.length} | 
+                                                        propsStocks: {propsStocks?.length || 0} | 
+                                                        isLoading: {isLoading ? 'true' : 'false'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {viewMode === "cards" && displayStocks.length > 0 ? (
                                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 p-6">
                                                 {displayStocks.map((stock) => {
                                                     const holding = portfolio.holdings.find(h => h.stockId === stock.id);
@@ -825,7 +890,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                                     );
                                                 })}
                                             </div>
-                                        ) : (
+                                        ) : displayStocks.length > 0 ? (
                                             <div className="p-6">
                                                 <div className="bg-gray-900/50 rounded-lg overflow-hidden">
                                                     <table className="w-full">
@@ -904,7 +969,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                                     </table>
                                                 </div>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </>
                             )}
