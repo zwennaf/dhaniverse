@@ -160,7 +160,14 @@ class StockPriceService {
             }
             
             // Fetch missing symbols from canister
-            const freshPrices = await this.fetchFromCanister(symbolsToFetch);
+            let freshPrices = await this.fetchFromCanister(symbolsToFetch);
+            
+            // If canister returned nothing, use fallback for missing symbols
+            if (freshPrices.length === 0 && symbolsToFetch.length > 0) {
+                console.warn('⚠️ Canister returned no data, using fallback prices');
+                const fallbackResponse = await this.getFallbackPrices(symbolsToFetch);
+                freshPrices = fallbackResponse.data;
+            }
             
             // Cache the fresh results
             this.cacheResults(freshPrices);
@@ -171,9 +178,15 @@ class StockPriceService {
             const responseTime = Date.now() - startTime;
             console.log(`📊 Fetched ${freshPrices.length} prices in ${responseTime}ms`);
             
+            // If still no data, use fallback for ALL symbols
+            if (allPrices.length === 0) {
+                console.warn('⚠️ No data from any source, using complete fallback');
+                return this.getFallbackPrices(normalizedSymbols);
+            }
+            
             return this.createSuccessResponse(
                 allPrices,
-                cachedPrices.length > 0 ? 'cache' : 'canister',
+                cachedPrices.length > 0 ? 'cache' : (freshPrices.length > 0 ? 'canister' : 'fallback'),
                 cachedPrices.length > 0,
                 responseTime
             );
@@ -304,19 +317,46 @@ class StockPriceService {
         this.recordCanisterCall();
         
         try {
-            // Fetch from canister (which has its own 30-min cache)
+            // Ensure canister is initialized
+            if (!canisterService.isConnected()) {
+                console.log('🔌 Initializing canister connection...');
+                const initialized = await canisterService.initialize();
+                if (!initialized) {
+                    throw new Error('Failed to initialize canister');
+                }
+            }
+            
+            // Fetch from canister (which has its own cache)
             const symbolsString = symbols.join(',');
+            console.log(`📡 Requesting stock prices for: ${symbolsString}`);
             const rawPrices = await canisterService.fetchMultipleStockPrices(symbolsString);
             
+            if (!rawPrices || rawPrices.length === 0) {
+                console.warn('⚠️ No data returned from canister, trying localStorage');
+                const localPrices = this.getFromLocalStorage(symbols);
+                if (localPrices.length > 0) {
+                    return localPrices;
+                }
+                // If localStorage also empty, return empty (will trigger fallback)
+                throw new Error('No data from canister or localStorage');
+            }
+            
             this.stats.canisterCalls++;
+            console.log(`✅ Received ${rawPrices.length} prices from canister`);
             
             // Convert to StockPrice format
             return rawPrices.map(([symbol, price]: [string, number]) => this.createStockPrice(symbol, price));
             
         } catch (error) {
-            console.error('Canister fetch failed:', error);
+            console.error('❌ Canister fetch failed:', error);
             // Fall back to localStorage
-            return this.getFromLocalStorage(symbols);
+            const localPrices = this.getFromLocalStorage(symbols);
+            if (localPrices.length > 0) {
+                console.log(`📂 Using ${localPrices.length} prices from localStorage`);
+                return localPrices;
+            }
+            // Return empty array - caller will handle fallback
+            return [];
         }
     }
     
@@ -404,31 +444,66 @@ class StockPriceService {
     // ========================================================================
     
     private async getFallbackPrices(symbols: string[]): Promise<StockPriceResponse> {
-        console.warn('⚠️ Using fallback prices');
+        console.warn(`⚠️ Using fallback prices for ${symbols.length} symbols:`, symbols);
         this.stats.fallbacks++;
         
         const fallbackPrices: Record<string, number> = {
-            // Indian stocks
-            'RELIANCE': 2500,
-            'TCS': 3500,
-            'HDFCBANK': 1650,
-            'INFY': 1450,
-            'ICICIBANK': 950,
+            // Tech Giants
+            'AAPL': 175.50,
+            'MSFT': 378.25,
+            'GOOGL': 140.80,
+            'AMZN': 145.30,
+            'TSLA': 248.50,
+            'META': 325.75,
+            'NVDA': 485.20,
+            'NFLX': 420.50,
             
-            // US stocks
-            'AAPL': 175,
-            'GOOGL': 140,
-            'MSFT': 370,
-            'TSLA': 250,
-            'NVDA': 480,
+            // Financial Services
+            'JPM': 155.75,
+            'BAC': 32.45,
+            'V': 245.60,
+            'MA': 385.90,
+            
+            // Healthcare
+            'JNJ': 162.35,
+            'PFE': 28.70,
+            'UNH': 485.60,
+            
+            // Energy
+            'XOM': 112.40,
+            'CVX': 158.75,
+            
+            // Retail
+            'WMT': 165.80,
+            'HD': 342.90,
+            
+            // Cryptocurrencies (in USD equivalent)
+            'BTC': 62500.00,
+            'ETH': 2850.00,
+            'ADA': 0.58,
+            'DOT': 7.25,
+            'SOL': 145.80,
+            'AVAX': 32.50,
+            'MATIC': 0.88,
+            'LINK': 14.75,
+            'UNI': 8.65,
+            'LTC': 72.40,
+            'ICP': 12.35,
         };
         
         const prices = symbols.map(symbol => {
             const upperSymbol = symbol.toUpperCase();
             const price = fallbackPrices[upperSymbol] || 100;
+            const hasFallback = fallbackPrices[upperSymbol] !== undefined;
+            
+            if (!hasFallback) {
+                console.warn(`⚠️ No fallback price for ${upperSymbol}, using default: $100`);
+            }
+            
             return this.createStockPrice(upperSymbol, price, true);
         });
         
+        console.log(`✅ Generated ${prices.length} fallback prices`);
         return this.createSuccessResponse(prices, 'fallback', false);
     }
     

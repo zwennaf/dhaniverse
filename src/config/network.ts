@@ -2,45 +2,41 @@
 export const NetworkConfig = {
   // Detect environment based on hostname or env variable
   getNetwork(): 'local' | 'ic' {
-    // Check if explicitly set via environment variable
+    // Check environment variable to determine network
     const envNetwork = import.meta.env.VITE_DFX_NETWORK;
     if (envNetwork === 'local') {
       return 'local';
     }
+    if (envNetwork === 'ic') {
+      return 'ic';
+    }
     
-    // Auto-detect based on hostname
+    // Fallback: auto-detect based on hostname
     const hostname = window.location.hostname;
     const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
-    
     return isLocalHost ? 'local' : 'ic';
   },
 
   // Get host URL based on environment
   getHost(): string {
-    const network = this.getNetwork();
-    
-    if (network === 'local') {
-      // Use local dfx replica
-      return import.meta.env.VITE_IC_HOST || 'http://127.0.0.1:4943';
+    const envHost = import.meta.env.VITE_IC_HOST;
+    if (envHost) {
+      return envHost;
     }
     
-    // Use IC mainnet
-    return 'https://ic0.app';
+    // Fallback based on network
+    return this.getNetwork() === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app';
   },
 
   // Get the canister ID based on environment
   getCanisterId(): string {
-    const network = this.getNetwork();
-    
-    // For local development, try to get from environment or use default
-    if (network === 'local') {
-      return import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND_LOCAL || 
-             import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND || 
-             'bd3sg-teaaa-aaaaa-qaaba-cai'; // Default local canister ID
+    const envCanisterId = import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND;
+    if (envCanisterId) {
+      return envCanisterId;
     }
     
-    // For IC mainnet
-    return import.meta.env.VITE_CANISTER_ID_DHANIVERSE_BACKEND || '2v55c-vaaaa-aaaas-qbrpq-cai';
+    // Fallback to production canister
+    return '2v55c-vaaaa-aaaas-qbrpq-cai';
   },
 
   // Check if we're running locally

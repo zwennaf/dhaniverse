@@ -93,15 +93,17 @@ class CanisterService {
             });
             console.log('HTTP agent created successfully');
 
-            // Fetch root key when running locally (required for local dfx replica)
+            // Fetch root key for local development (REQUIRED for local dfx)
             if (NetworkConfig.isLocal()) {
-                console.log('Local network detected, fetching root key...');
+                console.log('🔧 Local development detected - fetching root key for local replica');
                 try {
                     await this.agent.fetchRootKey();
-                    console.log('Root key fetched successfully');
-                } catch (fetchError) {
-                    console.warn('Failed to fetch root key (expected on mainnet):', fetchError);
+                    console.log('✅ Root key fetched successfully for local replica');
+                } catch (rootKeyError) {
+                    console.warn('⚠️ Failed to fetch root key (this is expected on mainnet):', rootKeyError);
                 }
+            } else {
+                console.log('🌐 Using IC mainnet - skipping root key fetch');
             }
 
             // Verify idlFactory is available
@@ -205,13 +207,7 @@ class CanisterService {
                         host: NetworkConfig.getHost()
                     });
 
-                    if (NetworkConfig.isLocal()) {
-                        try {
-                            await this.agent.fetchRootKey();
-                        } catch (error) {
-                            console.warn('Failed to fetch root key during authentication:', error);
-                        }
-                    }
+                    // No root key needed - always using IC mainnet
 
                     // Recreate actor with authenticated agent
                     this.actor = Actor.createActor(idlFactory, {
@@ -243,13 +239,7 @@ class CanisterService {
                 host: NetworkConfig.getHost()
             });
 
-            if (NetworkConfig.isLocal()) {
-                try {
-                    await this.agent.fetchRootKey();
-                } catch (error) {
-                    console.warn('Failed to fetch root key during logout:', error);
-                }
-            }
+            // No root key needed - always using IC mainnet
 
             this.actor = Actor.createActor(idlFactory, {
                 agent: this.agent,
@@ -532,11 +522,8 @@ class CanisterService {
      * Returns Record/Object with all stock data - NO SPAMMING
      * This is the ONLY call needed to populate entire stock market UI
      * 
-     * NEW: Uses get_market_summary_real() which fetches REAL DATA from Polygon.io:
-     * - 7-day historical OHLC price data
-     * - Real market cap, shares outstanding
-     * - Calculated P/E, EPS, volatility from real data
-     * - Intelligent 30-minute canister caching
+     * Tries get_market_summary_real() first (REAL Polygon.io data),
+     * falls back to get_market_summary() if not available
      */
     async getMarketSummary(): Promise<Record<string, StockData> | null> {
         if (!this.isConnected()) {
@@ -544,23 +531,55 @@ class CanisterService {
             return null;
         }
 
+        // Try get_market_summary_real() first (if deployed)
         try {
-            console.log('🚀 Calling get_market_summary_real() for REAL DATA from Polygon.io...');
+            console.log('🚀 Attempting get_market_summary_real() for REAL Polygon.io data...');
             
-            // Call the NEW async endpoint that fetches REAL data
-            const result = await this.actor.get_market_summary_real();
+            if (typeof this.actor.get_market_summary_real === 'function') {
+                const result = await this.actor.get_market_summary_real();
+                
+                if ('Ok' in result) {
+                    const stockCount = Object.keys(result.Ok).length;
+                    console.log(`✅ get_market_summary_real SUCCESS: ${stockCount} stocks with 7-day history`);
+                    console.log('📊 Data includes: current price, 7-day OHLC, real market cap, P/E, EPS');
+                    return result.Ok as Record<string, StockData>;
+                } else {
+                    console.warn('get_market_summary_real returned error:', result.Err);
+                }
+            } else {
+                console.warn('⚠️ get_market_summary_real not available on this canister');
+            }
+        } catch (error) {
+            console.warn('⚠️ get_market_summary_real failed, falling back to get_market_summary:', error);
+        }
+
+        // Fallback to get_market_summary() (available on all canisters)
+        try {
+            console.log('📊 Using fallback: get_market_summary() (may return cached/empty data)');
+            const result = await this.actor.get_market_summary();
             
             if ('Ok' in result) {
-                const stockCount = Object.keys(result.Ok).length;
-                console.log(`✅ REAL market data fetched in ONE call: ${stockCount} stocks with 7-day history`);
-                console.log('📊 Data includes: current price, 7-day OHLC, market cap, P/E, EPS, volatility');
-                return result.Ok as Record<string, StockData>;
+                const marketArray = result.Ok;
+                const stockCount = marketArray.length;
+                console.log(`✅ get_market_summary returned ${stockCount} stocks`);
+                
+                // Convert array format to Record format
+                const marketRecord: Record<string, StockData> = {};
+                for (const [symbol, data] of marketArray) {
+                    marketRecord[symbol] = data as StockData;
+                }
+                
+                if (stockCount === 0) {
+                    console.warn('⚠️ Canister returned 0 stocks - will use fallback prices');
+                }
+                
+                return marketRecord;
             } else {
-                console.warn('getMarketSummary error:', result.Err);
+                console.error('get_market_summary error:', result.Err);
                 return null;
             }
         } catch (error) {
-            console.error('getMarketSummary error:', error);
+            console.error('❌ Both methods failed:', error);
             return null;
         }
     }
@@ -585,27 +604,87 @@ class CanisterService {
 
     /**
      * Fetch multiple stock prices in a single call (batch operation)
-     * More efficient than multiple individual calls
-     * @param symbols Comma-separated list like "AAPL,GOOGL,MSFT"
+     * Tries get_market_summary_real() first, falls back to get_market_summary()
+     * @param symbols Comma-separated list like "AAPL,GOOGL,MSFT" (will be split)
      * @returns Array of [symbol, price] tuples
      */
     async fetchMultipleStockPrices(symbols: string): Promise<[string, number][]> {
         if (!this.isConnected()) {
-            console.warn('fetchMultipleStockPrices: Canister not connected, using mock data');
-            // Return empty array as fallback
-            return [];
+            console.warn('fetchMultipleStockPrices: Canister not connected, attempting to initialize...');
+            const initialized = await this.initialize();
+            if (!initialized) {
+                console.error('Failed to initialize canister connection');
+                return [];
+            }
         }
 
+        // Try get_market_summary_real() first (if available)
+        if (typeof this.actor.get_market_summary_real === 'function') {
+            try {
+                console.log('📊 Attempting get_market_summary_real() for REAL Polygon.io data...');
+                const result = await this.actor.get_market_summary_real();
+                
+                if ('Ok' in result) {
+                    const marketData = result.Ok as Record<string, StockData>;
+                    const stockCount = Object.keys(marketData).length;
+                    console.log(`✅ get_market_summary_real: ${stockCount} stocks with 7-day history`);
+                    
+                    if (stockCount > 0) {
+                        const prices: [string, number][] = Object.entries(marketData).map(([symbol, data]) => {
+                            console.log(`  📈 ${symbol}: $${data.current_price}`);
+                            return [symbol, data.current_price];
+                        });
+                        
+                        const requestedSymbols = symbols ? symbols.toUpperCase().split(',').map(s => s.trim()) : [];
+                        if (requestedSymbols.length > 0) {
+                            const filtered = prices.filter(([symbol]) => requestedSymbols.includes(symbol));
+                            console.log(`🔍 Filtered ${filtered.length} stocks`);
+                            return filtered;
+                        }
+                        return prices;
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ get_market_summary_real failed, trying fallback:', error);
+            }
+        }
+
+        // Fallback to get_market_summary()
         try {
-            const result = await this.actor.fetch_multiple_stock_prices(symbols.toUpperCase());
+            console.log('📊 Using fallback: get_market_summary()...');
+            const result = await this.actor.get_market_summary();
+            
             if ('Ok' in result) {
-                return result.Ok.map(([symbol, price]: [string, number]) => [symbol, price]);
+                const marketData = result.Ok;
+                const stockCount = marketData.length;
+                console.log(`✅ get_market_summary: ${stockCount} stocks`);
+                
+                if (stockCount === 0) {
+                    console.warn('⚠️ Canister returned 0 stocks - will use fallback prices');
+                    return [];
+                }
+                
+                const prices: [string, number][] = marketData.map(([symbol, data]: [string, any]) => {
+                    console.log(`  📈 ${symbol}: $${data.current_price}`);
+                    return [symbol, data.current_price];
+                });
+                
+                const requestedSymbols = symbols ? symbols.toUpperCase().split(',').map(s => s.trim()) : [];
+                if (requestedSymbols.length > 0) {
+                    const filtered = prices.filter(([symbol]) => requestedSymbols.includes(symbol));
+                    console.log(`🔍 Filtered ${filtered.length} stocks`);
+                    return filtered;
+                }
+                return prices;
             } else {
-                console.error('fetchMultipleStockPrices error:', result.Err);
+                console.error('❌ get_market_summary error:', result.Err);
                 return [];
             }
         } catch (error) {
-            console.error('fetchMultipleStockPrices error:', error);
+            console.error('❌ fetchMultipleStockPrices error:', error);
+            if (error instanceof Error) {
+                console.error('Error details:', error.message, error.stack);
+            }
             return [];
         }
     }
@@ -1318,3 +1397,15 @@ class CanisterService {
 // Create and export singleton instance
 export const canisterService = new CanisterService();
 export default canisterService;
+
+// Auto-initialize on import (async, non-blocking)
+// This ensures the canister is ready when services need it
+canisterService.initialize().then(success => {
+    if (success) {
+        console.log('✅ Canister service auto-initialized successfully');
+    } else {
+        console.warn('⚠️ Canister service auto-initialization failed - will retry on first use');
+    }
+}).catch(error => {
+    console.warn('⚠️ Canister auto-initialization error:', error);
+});

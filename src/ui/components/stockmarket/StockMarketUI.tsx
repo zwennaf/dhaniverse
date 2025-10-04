@@ -6,6 +6,8 @@ import type { UIStock } from "../../../services/StockMarketDataService";
 import { getTaskManager } from "../../../game/tasks/TaskManager";
 
 const StockMarketUI: React.FC = () => {
+    console.log("🎮 StockMarketUI component mounted/re-rendered");
+    
     const [isOpen, setIsOpen] = useState(false);
     const [playerRupees, setPlayerRupees] = useState(0);
     const [stocks, setStocks] = useState<UIStock[]>([]);
@@ -58,14 +60,18 @@ const StockMarketUI: React.FC = () => {
     useEffect(() => {
         // Listen for the custom event from the game to open the stock market UI
         const handleOpenStockMarketUI = (event: CustomEvent) => {
-            console.log("Stock Market UI received open event");
+            console.log("📢 Stock Market UI received open event");
+            console.log("   - Event detail:", event.detail);
+            console.log("   - Current isOpen state:", isOpen);
 
             // Get player rupees from the event
             if (event.detail.playerRupees !== undefined) {
+                console.log("   - Setting player rupees:", event.detail.playerRupees);
                 setPlayerRupees(event.detail.playerRupees);
             }
 
             // Show the stock market UI
+            console.log("   - Setting isOpen to TRUE");
             setIsOpen(true);
 
             // Complete Maya onboarding when stock market UI opens (only once)
@@ -77,9 +83,11 @@ const StockMarketUI: React.FC = () => {
             const container = document.getElementById(
                 "stock-market-ui-container"
             );
+            console.log("   - Container element:", container ? "FOUND" : "NOT FOUND");
             if (container) {
                 container.classList.add("active");
-                console.log("Stock Market UI activated");
+                console.log("   - ✅ Stock Market UI container activated with 'active' class");
+                console.log("   - Container classes:", container.className);
             }
         };
 
@@ -128,6 +136,7 @@ const StockMarketUI: React.FC = () => {
         };
 
         // Add event listeners
+        console.log("📡 Registering openStockMarketUI event listener");
         window.addEventListener(
             "openStockMarketUI",
             handleOpenStockMarketUI as EventListener
@@ -137,8 +146,11 @@ const StockMarketUI: React.FC = () => {
             handleRupeeUpdate as EventListener
         );
 
+        console.log("✅ Event listeners registered successfully");
+
         // Clean up event listeners when the component unmounts
         return () => {
+            console.log("🧹 Cleaning up StockMarketUI event listeners");
             window.removeEventListener(
                 "openStockMarketUI",
                 handleOpenStockMarketUI as EventListener
@@ -177,7 +189,15 @@ const StockMarketUI: React.FC = () => {
     }, [isOpen, handleClose]);
 
     // Render nothing if the stock market UI is closed
-    if (!isOpen) return null;
+    if (!isOpen) {
+        console.log("🚫 StockMarketUI: Not rendering (isOpen is false)");
+        return null;
+    }
+
+    console.log("✅ StockMarketUI: Rendering StockMarketDashboard");
+    console.log("   - playerRupees:", playerRupees);
+    console.log("   - stocks count:", stocks.length);
+    console.log("   - isLoadingStocks:", isLoadingStocks);
 
     // Otherwise, render the StockMarketDashboard
     return (

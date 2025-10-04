@@ -536,6 +536,9 @@ export class MainScene extends Scene implements MainGameScene {
         }
     } // Method to open the stock market UI
     openStockMarketUI(stocks: any[]): void {
+        console.log("📢 MainScene.openStockMarketUI called with", stocks.length, "stocks");
+        console.log("   - Player rupees:", this.playerRupees);
+        
         // Dispatch custom event for the React component to catch
         const stockMarketEvent = new CustomEvent("openStockMarketUI", {
             detail: {
@@ -543,7 +546,9 @@ export class MainScene extends Scene implements MainGameScene {
                 stocks: stocks,
             },
         });
+        console.log("   - Dispatching openStockMarketUI event...");
         window.dispatchEvent(stockMarketEvent);
+        console.log("   - Event dispatched successfully");
 
         // Add event listener for stock market UI closed event if not already added
         if (!this._stockMarketClosedListenerAdded) {

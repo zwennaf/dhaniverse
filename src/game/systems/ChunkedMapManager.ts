@@ -989,6 +989,26 @@ export class ChunkedMapManager {
                     
                     console.log(`Positioned bank manager at (${bankManagerX}, ${bankManagerY})`);
                 }
+            } else if (buildingType === "stockmarket") {
+                // Position stock broker relative to the interior center
+                const brokerX = centerX; // Center horizontally
+                const brokerY = centerY - 100; // Slightly above center
+                
+                // Access the stock market manager from the scene
+                const mainScene = this.scene as any;
+                if (mainScene.stockMarketManager && mainScene.stockMarketManager.broker) {
+                    const broker = mainScene.stockMarketManager.broker;
+                    broker.setPosition(brokerX, brokerY);
+                    broker.setVisible(true);
+                    broker.setDepth(10); // Ensure broker appears above the map
+                    
+                    // Also update the broker's name text position if it exists
+                    if (broker.nameText) {
+                        broker.nameText.setPosition(brokerX, brokerY - 50);
+                    }
+                    
+                    console.log(`Positioned stock broker at (${brokerX}, ${brokerY})`);
+                }
             }
 
             // Set camera and physics bounds to match the scaled interior size and position
@@ -1032,7 +1052,7 @@ export class ChunkedMapManager {
             // Store reference to interior map for cleanup
             (this as any).currentInteriorMap = interiorMap;
 
-            // Calculate player spawn position for bank
+            // Calculate player spawn position for bank or stock market
             let playerSpawnX = centerX;
             let playerSpawnY = centerY;
             
@@ -1043,6 +1063,11 @@ export class ChunkedMapManager {
                 playerSpawnX = 586; // Horizontally centered minus 200px as requested
                 playerSpawnY = 2918; // Near the bottom (gate), with some padding
                 console.log(`Bank spawn position: (${playerSpawnX}, ${playerSpawnY})`);
+            } else if (buildingType === "stockmarket") {
+                // Spawn player at the center, near the broker
+                playerSpawnX = centerX;
+                playerSpawnY = centerY + 80; // Slightly below center, facing the broker
+                console.log(`Stock market spawn position: (${playerSpawnX}, ${playerSpawnY})`);
             }
 
             return { x: playerSpawnX, y: playerSpawnY };
@@ -1073,9 +1098,10 @@ export class ChunkedMapManager {
         // Show the chunked map container again
         this.mapContainer.setVisible(true);
 
-        // Restore bank manager to outdoor position if exiting bank
+        // Restore NPCs to outdoor positions when exiting buildings
+        const mainScene = this.scene as any;
+        
         if (this.currentBuildingType === "bank") {
-            const mainScene = this.scene as any;
             if (mainScene.bankNPCManager && mainScene.bankNPCManager.banker) {
                 const banker = mainScene.bankNPCManager.banker;
                 // Restore to original outdoor position
@@ -1089,6 +1115,19 @@ export class ChunkedMapManager {
                 }
                 
                 console.log(`Restored bank manager to outdoor position (${originalX}, ${originalY})`);
+            }
+        } else if (this.currentBuildingType === "stockmarket") {
+            if (mainScene.stockMarketManager && mainScene.stockMarketManager.broker) {
+                const broker = mainScene.stockMarketManager.broker;
+                // Hide broker when exiting (it shouldn't be visible outside)
+                broker.setVisible(false);
+                
+                // Also hide the broker's name text if it exists
+                if (broker.nameText) {
+                    broker.nameText.setVisible(false);
+                }
+                
+                console.log(`Hidden stock broker when exiting stock market`);
             }
         }
 
