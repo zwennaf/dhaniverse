@@ -1,20 +1,46 @@
 /**
  * StockMarketDataService - Single Batch Call for Complete Market Data
  * 
- * This service fetches ALL stock market data in ONE canister call.
- * No spamming, no multiple requests - just one call to get everything.
+ * This service fetches ALL stock market data using REAL prices from CoinGecko.
+ * NO FALLBACK PRICES - Always uses l        } catch (error) {
+            console.error('❌ Failed to fetch market data from canister:', error);
+            
+            // Try CoinGecko as fallback
+            try {
+                const fallbackResponse = await this.getFallbackData();
+                this.notifyPendingCallbacks(fallbackResponse);
+                return fallbackResponse;
+            } catch (fallbackError) {
+                console.error('❌ Fallback also failed:', fallbackError);
+                const emptyResponse: MarketDataResponse = {
+                    success: false,
+                    stocks: [],
+                    timestamp: Date.now(),
+                    source: 'fallback',
+                    error: 'All data sources failed'
+                };
+                this.notifyPendingCallbacks(emptyResponse);
+                return emptyResponse;
+            }
+
+        } finally {
+            this.isFetching = false;
+        }
+    }ata.
  * 
  * Architecture:
- * - One call: `getCompleteMarketData()`
- * - Returns: All stocks with prices, history, metrics, news
+ * - Primary: CoinGecko API for real cryptocurrency prices
+ * - Secondary: ICP Canister for traditional stocks (if needed)
+ * - Mock data: News, graphs, and metrics (until real sources available)
  * - Cached: 5 minutes for optimal performance
  * - Format: Ready for StockDetail.tsx and StockGraph.tsx
  * 
  * @author Dhaniverse Team
- * @date 2025-10-03
+ * @date 2025-10-05
  */
 
 import { canisterService } from './CanisterService';
+import { coinGeckoService } from './CoinGeckoService';
 import { convertUsdToInr } from '../utils/currencyConversion';
 
 // ============================================================================
@@ -88,9 +114,11 @@ export interface MarketDataResponse {
 const CONFIG = {
     CACHE_TTL: 5 * 60 * 1000, // 5 minutes
     STORAGE_KEY: 'dhaniverse_market_data',
-    FALLBACK_STOCKS: [
-        'AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA',
-        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK'
+    // Default crypto stocks to show (all from CoinGecko)
+    DEFAULT_STOCKS: [
+        'BTC', 'ETH', 'SOL', 'BNB', 'ADA',
+        'AVAX', 'DOT', 'MATIC', 'LINK', 'UNI',
+        'LTC', 'ICP', 'XRP', 'ATOM', 'ALGO'
     ]
 } as const;
 
@@ -197,10 +225,23 @@ class StockMarketDataService {
         } catch (error) {
             console.error('❌ Failed to fetch market data from canister:', error);
             
-            // Try fallback
-            const fallbackResponse = this.getFallbackData();
-            this.notifyPendingCallbacks(fallbackResponse);
-            return fallbackResponse;
+            // Try CoinGecko as fallback
+            try {
+                const fallbackResponse = await this.getFallbackData();
+                this.notifyPendingCallbacks(fallbackResponse);
+                return fallbackResponse;
+            } catch (fallbackError) {
+                console.error('❌ Fallback also failed:', fallbackError);
+                const emptyResponse: MarketDataResponse = {
+                    success: false,
+                    stocks: [],
+                    timestamp: Date.now(),
+                    source: 'fallback',
+                    error: 'All data sources failed'
+                };
+                this.notifyPendingCallbacks(emptyResponse);
+                return emptyResponse;
+            }
 
         } finally {
             this.isFetching = false;
@@ -316,45 +357,98 @@ class StockMarketDataService {
         }
     }
 
-    private getFallbackData(): MarketDataResponse {
-        console.warn('⚠️ Using fallback stock data');
+    private async getFallbackData(): Promise<MarketDataResponse> {
+        console.log('💰 Fetching real cryptocurrency prices from CoinGecko...');
 
-        // Fallback prices in USD (will be converted to INR)
-        const fallbackPricesUsd: Record<string, number> = {
-            'AAPL': 175, 'GOOGL': 140, 'MSFT': 370, 'TSLA': 250, 'NVDA': 480,
-            'RELIANCE': 30, 'TCS': 42, 'HDFCBANK': 20, 'INFY': 17.5, 'ICICIBANK': 11.5
-        };
-
-        const stocks: UIStock[] = CONFIG.FALLBACK_STOCKS.map(symbol => {
-            const usdPrice = fallbackPricesUsd[symbol] || 100;
-            const inrPrice = convertUsdToInr(usdPrice);
+        try {
+            // Fetch real prices from CoinGecko
+            const realPrices = await coinGeckoService.getPrices([...CONFIG.DEFAULT_STOCKS]);
             
-            return {
-                id: symbol,
-                symbol: symbol,
-                name: symbol,
-                currentPrice: inrPrice,
-                priceHistory: this.generateMockHistory(inrPrice),
-                debtEquityRatio: 0.8,
-                businessGrowth: 5.0,
-                news: ['Market update: Trading at stable levels'],
-                marketCap: convertUsdToInr(1000000000),
-                peRatio: 20.0,
-                eps: convertUsdToInr(35.0),
-                industryAvgPE: 22.0,
-                outstandingShares: 1000000,
-                volatility: 0.15,
-                lastUpdate: Date.now(),
-                sector: this.determineSector(symbol)
-            };
-        });
+            if (realPrices.length === 0) {
+                console.error('❌ CoinGecko returned no data');
+                return {
+                    success: false,
+                    stocks: [],
+                    timestamp: Date.now(),
+                    source: 'fallback',
+                    error: 'Failed to fetch cryptocurrency prices'
+                };
+            }
 
-        return {
-            success: true,
-            stocks,
-            timestamp: Date.now(),
-            source: 'fallback'
+            // Convert to UIStock format with mock data for news/metrics
+            const stocks: UIStock[] = realPrices.map(priceData => {
+                const inrPrice = convertUsdToInr(priceData.price);
+                
+                return {
+                    id: priceData.symbol,
+                    symbol: priceData.symbol,
+                    name: this.getCoinName(priceData.symbol),
+                    currentPrice: inrPrice,
+                    priceHistory: this.generateMockHistory(inrPrice),
+                    debtEquityRatio: 0, // N/A for crypto
+                    businessGrowth: priceData.changePercent,
+                    news: this.generateMockNews(priceData.symbol, priceData.changePercent),
+                    marketCap: convertUsdToInr(priceData.price * 1000000000), // Estimate
+                    peRatio: 0, // N/A for crypto
+                    eps: 0, // N/A for crypto
+                    industryAvgPE: 0, // N/A for crypto
+                    outstandingShares: 1000000000, // Estimate
+                    volatility: Math.abs(priceData.changePercent) / 100,
+                    lastUpdate: priceData.timestamp,
+                    sector: 'Cryptocurrency'
+                };
+            });
+
+            console.log(`✅ Loaded ${stocks.length} real cryptocurrency prices from CoinGecko`);
+
+            return {
+                success: true,
+                stocks,
+                timestamp: Date.now(),
+                source: 'coingecko' as any
+            };
+        } catch (error) {
+            console.error('❌ Failed to fetch from CoinGecko:', error);
+            return {
+                success: false,
+                stocks: [],
+                timestamp: Date.now(),
+                source: 'fallback',
+                error: 'CoinGecko API error'
+            };
+        }
+    }
+
+    private getCoinName(symbol: string): string {
+        const names: Record<string, string> = {
+            'BTC': 'Bitcoin',
+            'ETH': 'Ethereum',
+            'SOL': 'Solana',
+            'BNB': 'Binance Coin',
+            'ADA': 'Cardano',
+            'AVAX': 'Avalanche',
+            'DOT': 'Polkadot',
+            'MATIC': 'Polygon',
+            'LINK': 'Chainlink',
+            'UNI': 'Uniswap',
+            'LTC': 'Litecoin',
+            'ICP': 'Internet Computer',
+            'XRP': 'Ripple',
+            'ATOM': 'Cosmos',
+            'ALGO': 'Algorand',
         };
+        return names[symbol.toUpperCase()] || symbol;
+    }
+
+    private generateMockNews(symbol: string, changePercent: number): string[] {
+        const direction = changePercent > 0 ? 'up' : 'down';
+        const change = Math.abs(changePercent).toFixed(2);
+        
+        return [
+            `${this.getCoinName(symbol)} is ${direction} ${change}% in the last 24 hours`,
+            `Market analysis: ${symbol} showing ${changePercent > 0 ? 'bullish' : 'bearish'} trends`,
+            `Trading volume increases for ${symbol}`,
+        ];
     }
 
     private generateMockHistory(currentPrice: number): number[] {

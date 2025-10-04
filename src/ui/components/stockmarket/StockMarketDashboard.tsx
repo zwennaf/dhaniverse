@@ -610,7 +610,10 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     <div className="text-right">
                                         <p className="text-xs text-gray-400 uppercase tracking-wide">Portfolio Value</p>
                                         <p className="text-xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
-                                        <p className="text-xs text-gray-500 mt-0.5">1 USD = ₹88</p>
+                                        <div className="flex items-center gap-1 justify-end mt-0.5">
+                                            <span className="text-xs text-green-400 font-medium">●</span>
+                                            <p className="text-xs text-gray-500">Live Prices via CoinGecko</p>
+                                        </div>
                                     </div>
                                     <button 
                                         onClick={openLeaderboard}
@@ -765,7 +768,14 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                                         >
                                                             <div className="flex justify-between items-start mb-4">
                                                                 <div>
-                                                                    <h3 className="text-lg font-medium text-white mb-1">{stock.name}</h3>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <h3 className="text-lg font-medium text-white">{stock.name}</h3>
+                                                                        {stock.sector === 'Cryptocurrency' && (
+                                                                            <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30 animate-pulse">
+                                                                                LIVE
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                     <p className="text-xs text-gray-400 uppercase tracking-wide">{stock.sector}</p>
                                                                 </div>
                                                                 <div className="text-right">

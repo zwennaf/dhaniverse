@@ -2,25 +2,26 @@
  * StockPriceService - Clean Multi-Layer Price Fetching Architecture
  * 
  * This service provides a SINGLE, CLEAN interface for fetching stock prices
- * with intelligent multi-layer caching and automatic fallbacks.
+ * with intelligent multi-layer caching and REAL price data.
  * 
  * Architecture:
  * 1. Memory Cache (5min TTL) - Fastest, in-memory
- * 2. ICP Canister (30min cache) - Primary source with HTTP outcalls to Polygon.io
- * 3. localStorage (1 hour TTL) - Offline fallback
- * 4. Fallback prices - Last resort for known stocks
+ * 2. CoinGecko API - REAL cryptocurrency prices (NO FALLBACKS!)
+ * 3. ICP Canister (30min cache) - Secondary source for traditional stocks
+ * 4. localStorage (1 hour TTL) - Offline cache only
  * 
  * Optimizations:
- * - Batch requests to minimize ICP cycles
+ * - Batch requests to minimize API calls
  * - Aggressive caching with smart TTL
- * - Rate limit aware (max 5 calls/minute to canister)
+ * - Rate limit aware
  * - Automatic retry with exponential backoff
  * 
  * @author Dhaniverse Team
- * @date 2025-10-01
+ * @date 2025-10-05
  */
 
 import { canisterService } from './CanisterService';
+import { coinGeckoService } from './CoinGeckoService';
 import type {
     StockPrice,
     StockPriceRequest,
@@ -159,14 +160,33 @@ class StockPriceService {
                 }
             }
             
-            // Fetch missing symbols from canister
-            let freshPrices = await this.fetchFromCanister(symbolsToFetch);
+            // Try to fetch from CoinGecko first (for crypto symbols)
+            const cryptoSymbols = symbolsToFetch.filter(s => coinGeckoService.isSupported(s));
+            const otherSymbols = symbolsToFetch.filter(s => !coinGeckoService.isSupported(s));
             
-            // If canister returned nothing, use fallback for missing symbols
-            if (freshPrices.length === 0 && symbolsToFetch.length > 0) {
-                console.warn('⚠️ Canister returned no data, using fallback prices');
-                const fallbackResponse = await this.getFallbackPrices(symbolsToFetch);
-                freshPrices = fallbackResponse.data;
+            let freshPrices: StockPrice[] = [];
+            
+            // Fetch crypto prices from CoinGecko
+            if (cryptoSymbols.length > 0) {
+                try {
+                    console.log(`💰 Fetching ${cryptoSymbols.length} crypto prices from CoinGecko...`);
+                    const cryptoPrices = await coinGeckoService.getPrices(cryptoSymbols);
+                    freshPrices.push(...cryptoPrices);
+                    console.log(`✅ Got ${cryptoPrices.length} real prices from CoinGecko`);
+                } catch (error) {
+                    console.error('❌ CoinGecko fetch failed:', error);
+                }
+            }
+            
+            // Fetch traditional stock prices from canister (if any)
+            if (otherSymbols.length > 0) {
+                try {
+                    console.log(`📊 Fetching ${otherSymbols.length} stock prices from canister...`);
+                    const stockPrices = await this.fetchFromCanister(otherSymbols);
+                    freshPrices.push(...stockPrices);
+                } catch (error) {
+                    console.error('❌ Canister fetch failed:', error);
+                }
             }
             
             // Cache the fresh results
@@ -178,15 +198,24 @@ class StockPriceService {
             const responseTime = Date.now() - startTime;
             console.log(`📊 Fetched ${freshPrices.length} prices in ${responseTime}ms`);
             
-            // If still no data, use fallback for ALL symbols
+            // If still no data, return empty response
             if (allPrices.length === 0) {
-                console.warn('⚠️ No data from any source, using complete fallback');
-                return this.getFallbackPrices(normalizedSymbols);
+                console.error('❌ No data from any source - check CoinGecko API and canister');
+                return {
+                    success: false,
+                    data: [],
+                    metadata: {
+                        source: 'none',
+                        timestamp: Date.now(),
+                        cacheHit: false,
+                        apiCallsMade: 0,
+                    },
+                };
             }
             
             return this.createSuccessResponse(
                 allPrices,
-                cachedPrices.length > 0 ? 'cache' : (freshPrices.length > 0 ? 'canister' : 'fallback'),
+                cachedPrices.length > 0 ? 'cache' : 'coingecko',
                 cachedPrices.length > 0,
                 responseTime
             );
@@ -195,8 +224,17 @@ class StockPriceService {
             this.stats.errors++;
             console.error('❌ Error fetching stock prices:', error);
             
-            // Try fallback
-            return this.getFallbackPrices(request.symbols);
+            // Return empty response - NO FALLBACKS
+            return {
+                success: false,
+                data: [],
+                metadata: {
+                    source: 'none',
+                    timestamp: Date.now(),
+                    cacheHit: false,
+                    apiCallsMade: 0,
+                },
+            };
         }
     }
     
@@ -440,72 +478,8 @@ class StockPriceService {
     }
     
     // ========================================================================
-    // FALLBACK LAYER
+    // NO FALLBACK LAYER - Real prices only from CoinGecko API!
     // ========================================================================
-    
-    private async getFallbackPrices(symbols: string[]): Promise<StockPriceResponse> {
-        console.warn(`⚠️ Using fallback prices for ${symbols.length} symbols:`, symbols);
-        this.stats.fallbacks++;
-        
-        const fallbackPrices: Record<string, number> = {
-            // Tech Giants
-            'AAPL': 175.50,
-            'MSFT': 378.25,
-            'GOOGL': 140.80,
-            'AMZN': 145.30,
-            'TSLA': 248.50,
-            'META': 325.75,
-            'NVDA': 485.20,
-            'NFLX': 420.50,
-            
-            // Financial Services
-            'JPM': 155.75,
-            'BAC': 32.45,
-            'V': 245.60,
-            'MA': 385.90,
-            
-            // Healthcare
-            'JNJ': 162.35,
-            'PFE': 28.70,
-            'UNH': 485.60,
-            
-            // Energy
-            'XOM': 112.40,
-            'CVX': 158.75,
-            
-            // Retail
-            'WMT': 165.80,
-            'HD': 342.90,
-            
-            // Cryptocurrencies (in USD equivalent)
-            'BTC': 62500.00,
-            'ETH': 2850.00,
-            'ADA': 0.58,
-            'DOT': 7.25,
-            'SOL': 145.80,
-            'AVAX': 32.50,
-            'MATIC': 0.88,
-            'LINK': 14.75,
-            'UNI': 8.65,
-            'LTC': 72.40,
-            'ICP': 12.35,
-        };
-        
-        const prices = symbols.map(symbol => {
-            const upperSymbol = symbol.toUpperCase();
-            const price = fallbackPrices[upperSymbol] || 100;
-            const hasFallback = fallbackPrices[upperSymbol] !== undefined;
-            
-            if (!hasFallback) {
-                console.warn(`⚠️ No fallback price for ${upperSymbol}, using default: $100`);
-            }
-            
-            return this.createStockPrice(upperSymbol, price, true);
-        });
-        
-        console.log(`✅ Generated ${prices.length} fallback prices`);
-        return this.createSuccessResponse(prices, 'fallback', false);
-    }
     
     // ========================================================================
     // UTILITIES
@@ -536,7 +510,7 @@ class StockPriceService {
     
     private createSuccessResponse(
         prices: StockPrice[],
-        source: 'cache' | 'canister' | 'fallback',
+        source: 'cache' | 'canister' | 'coingecko' | 'none',
         cacheHit: boolean,
         responseTime?: number
     ): StockPriceResponse {
@@ -547,7 +521,7 @@ class StockPriceService {
                 source: source as any,
                 timestamp: Date.now(),
                 cacheHit,
-                apiCallsMade: source === 'canister' ? 1 : 0,
+                apiCallsMade: source === 'coingecko' || source === 'canister' ? 1 : 0,
             },
         };
     }

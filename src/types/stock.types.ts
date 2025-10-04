@@ -18,7 +18,7 @@
 
 /**
  * Real-time stock price information
- * Source: Polygon.io API or ICP canister cache
+ * Source: CoinGecko API, Polygon.io API or ICP canister cache
  */
 export interface StockPrice {
     symbol: string;
@@ -32,7 +32,7 @@ export interface StockPrice {
     changePercent: number; // Price change percentage
     timestamp: number; // Unix timestamp (ms)
     isRealTime: boolean; // True if from API, false if cached/fallback
-    source: 'polygon' | 'canister' | 'cache' | 'fallback';
+    source: 'coingecko' | 'polygon' | 'canister' | 'cache' | 'fallback' | 'none';
 }
 
 /**
@@ -305,7 +305,7 @@ export interface StockPriceResponse {
     errors?: string[]; // Symbols that failed
     rateLimit?: RateLimitInfo;
     metadata: {
-        source: 'polygon' | 'canister' | 'cache' | 'fallback';
+        source: 'coingecko' | 'polygon' | 'canister' | 'cache' | 'fallback' | 'none';
         timestamp: number;
         cacheHit: boolean;
         apiCallsMade: number;
