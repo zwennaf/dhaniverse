@@ -451,7 +451,7 @@ export class BankOnboardingManager {
         if (hasCompletedOnboarding) {
           try {
             const { progressionManager } = await import('../../../services/ProgressionManager');
-            progressionManager.markBankOnboardingCompleted();
+            await progressionManager.markBankOnboardingCompleted();
             console.log('✅ ProgressionManager synchronized with database');
           } catch (e) {
             console.warn('Failed to sync progression manager with database:', e);
@@ -552,7 +552,7 @@ export class BankOnboardingManager {
     (async () => {
       try { 
         const { progressionManager } = await import('../../../services/ProgressionManager'); 
-        progressionManager.markBankOnboardingCompleted(); 
+        await progressionManager.markBankOnboardingCompleted(); 
         console.log('[Progression] Bank onboarding completion persisted immediately:', progressionManager.getState());
       } catch(e) { 
         console.warn('Could not mark bank onboarding completion', e);

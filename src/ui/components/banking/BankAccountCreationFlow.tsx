@@ -76,31 +76,28 @@ const BankAccountCreationFlow: React.FC = () => {
         
         // Step 2: Check if bank onboarding is already completed in progression
         if (progressionState.bankOnboardingComplete) {
-          console.log('🏦 Bank onboarding already completed in progression, showing welcome back dialogue');
+          console.log('🏦 Bank onboarding already completed in progression');
+          console.log('🏦 User already has bank account, closing flow and opening banking UI directly');
           
           // Mark localStorage flag as well for consistency
           localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
           
-          // Show welcome back dialogue for existing users
-          dialogueManager.showDialogue({
-            text: 'Welcome back to Dhaniverse Bank! Your account is ready for use.',
-            characterName: 'Bank Manager',
-            allowSpaceAdvance: true,
-            showBackdrop: false
-          }, { 
-            onAdvance: () => {
-              dialogueManager.closeDialogue();
-              
-              // After dialogue, trigger completion and open banking UI
-              window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
-                detail: { 
-                  name: 'Existing User', 
-                  account: null,
-                  openBankingUI: true // Signal to open banking UI
-                } 
-              }));
-            }
-          });
+          // CRITICAL FIX: Don't show "Welcome back" dialogue - this causes confusion
+          // when player interacts with Maya after completing bank onboarding.
+          // Instead, directly close the flow and open banking UI.
+          
+          // Immediately close the flow
+          setStep('HIDDEN');
+          
+          // Dispatch event to open banking UI directly
+          window.dispatchEvent(new CustomEvent('bank-account-creation-finished', { 
+            detail: { 
+              name: 'Existing User', 
+              account: null,
+              openBankingUI: true // Signal to open banking UI
+            } 
+          }));
+          
           return;
         }
         
@@ -137,7 +134,7 @@ const BankAccountCreationFlow: React.FC = () => {
                 console.log('🏦 User has valid bank account but onboarding not marked complete. Completing onboarding...');
                 
                 // Mark onboarding as completed since they have a valid account
-                progressionManager.markBankOnboardingCompleted();
+                await progressionManager.markBankOnboardingCompleted();
                 localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
                 
                 // Store account details for consistency
@@ -397,7 +394,7 @@ const BankAccountCreationFlow: React.FC = () => {
         // ✅ CRITICAL FIX: Mark onboarding as completed immediately after successful account creation
         try {
           const { progressionManager } = await import('../../../services/ProgressionManager');
-          progressionManager.markBankOnboardingCompleted();
+          await progressionManager.markBankOnboardingCompleted();
           localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
           console.log('✅ Bank onboarding marked as completed after successful account creation');
         } catch (error) {
@@ -461,7 +458,7 @@ const BankAccountCreationFlow: React.FC = () => {
             // Mark onboarding as completed
             try {
               const { progressionManager } = await import('../../../services/ProgressionManager');
-              progressionManager.markBankOnboardingCompleted();
+              await progressionManager.markBankOnboardingCompleted();
               localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
             } catch (error) {
               console.warn('Could not update progression manager:', error);
@@ -572,7 +569,7 @@ const BankAccountCreationFlow: React.FC = () => {
     try {
       // Mark bank onboarding as completed in progression manager for all cases
       const { progressionManager } = await import('../../../services/ProgressionManager');
-      progressionManager.markBankOnboardingCompleted();
+      await progressionManager.markBankOnboardingCompleted();
       localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
       console.log('🏦 Bank onboarding marked as completed in both progression manager and localStorage');
     } catch (error) {

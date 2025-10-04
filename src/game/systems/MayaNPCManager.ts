@@ -677,7 +677,7 @@ export class MayaNPCManager {
                                     }, { onAdvance: () => dialogueManager.closeDialogue() });
                                     return;
                                 }
-                                // Stock market guidance branch
+                                // Stock market guidance branch - CRITICAL PATH for completed bank onboarding
                                 if (ps.bankOnboardingComplete && !ps.stockMarketOnboardingComplete) {
                                     console.log('🚀 Maya: Bank onboarding completed, checking stock market guidance...');
                                     console.log('🚀 Maya: stockMarketGuideCompleted:', this.stockMarketGuideCompleted, 'stockMarketGuideActive:', this.stockMarketGuideActive);
@@ -688,7 +688,16 @@ export class MayaNPCManager {
                                         this.startStockMarketGuidance();
                                     } else {
                                         console.log('🚀 Maya: Stock market guidance already completed or active');
+                                        // Show a reminder message to the player
+                                        dialogueManager.showDialogue({
+                                            text: 'I\'m ready when you are! Let\'s head to the stock market together.',
+                                            characterName: 'M.A.Y.A',
+                                            allowSpaceAdvance: true,
+                                            showBackdrop: false,
+                                            keyboardInputEnabled: true
+                                        }, { onAdvance: () => dialogueManager.closeDialogue() });
                                     }
+                                    // CRITICAL: Return here to prevent any bank-related dialogues from showing
                                     return;
                                 }
                                 // After everything is complete - provide a friendly message
@@ -814,7 +823,7 @@ export class MayaNPCManager {
         this.guidedSequenceActive = true;
 
         // Progression: mark hasMetMaya
-    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markMetMaya(); } catch(e) { console.warn('Could not mark hasMetMaya', e); } })();
+    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); await progressionManager.markMetMaya(); } catch(e) { console.warn('Could not mark hasMetMaya', e); } })();
 
         // Hide interaction text
         this.interactionText.setAlpha(0);
@@ -965,7 +974,7 @@ export class MayaNPCManager {
         (async () => {
             try {
                 const { progressionManager } = await import('../../services/ProgressionManager');
-                progressionManager.updateMayaPosition(this.maya.x, this.maya.y);
+                await progressionManager.updateMayaPosition(this.maya.x, this.maya.y);
                 console.log('🚀 Maya: Updated position in state:', { x: this.maya.x, y: this.maya.y });
             } catch (e) {
                 console.warn('Could not update Maya position in state', e);
@@ -1043,7 +1052,7 @@ export class MayaNPCManager {
         this.showTemporaryDialog("We have arrived at the Bank. Let's go inside.", 3000);
 
         // Progression: player has followed Maya to bank (will still need interaction to claim)
-    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markFollowedMaya(); } catch(e) { console.warn('Could not mark hasFollowedMaya', e); } })();
+    (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); await progressionManager.markFollowedMaya(); } catch(e) { console.warn('Could not mark hasFollowedMaya', e); } })();
 
         // Update objective to claim joining bonus now that destination is reached
         this.updateObjectiveClaimBonus();
@@ -1169,7 +1178,7 @@ export class MayaNPCManager {
             (async () => { 
                 try { 
                     const { progressionManager } = await import('../../services/ProgressionManager'); 
-                    progressionManager.markStockMarketOnboardingCompleted();
+                    await progressionManager.markStockMarketOnboardingCompleted();
                     console.log('🚀 Maya: Marked stock market onboarding completed in progression');
                 } catch(e) { 
                     console.warn('Could not mark stock market onboarding completed', e);
@@ -1402,7 +1411,7 @@ export class MayaNPCManager {
                     const creditedAmount = data.amount ?? (newlyClaimed ? 1000 : 0);
                     if (newlyClaimed) {
                         // Progression: mark claimed money, unlock bank
-                        (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); progressionManager.markClaimedMoney(); } catch(e) { console.warn('Could not mark claimed money', e); } })();
+                        (async () => { try { const { progressionManager } = await import('../../services/ProgressionManager'); await progressionManager.markClaimedMoney(); } catch(e) { console.warn('Could not mark claimed money', e); } })();
                         
                         // Update objective to enter bank after claiming money
                         this.updateObjectiveEnterBank();
