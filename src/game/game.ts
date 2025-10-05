@@ -255,6 +255,15 @@ function startAssetLoading(username: string, selectedCharacter: string, roomCode
     // Notify the custom loader to start
     window.dispatchEvent(new CustomEvent('gameAssetLoadingStart'));
 
+    // 🚀 START STOCK MARKET DATA PRELOAD IN PARALLEL
+    // This runs alongside asset loading so stock data is ready when game starts
+    import('../services/StockMarketPreloader').then(({ stockMarketPreloader }) => {
+        console.log('📊 Starting stock market data preload during asset loading...');
+        stockMarketPreloader.preloadMarketData().catch(err => {
+            console.error('❌ Stock market preload failed:', err);
+        });
+    });
+
     // Create asset loader with progress callbacks
     assetLoader = new AssetLoader(
         (progress: number) => {

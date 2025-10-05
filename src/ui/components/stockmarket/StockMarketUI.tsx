@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import StockMarketDashboard from "./StockMarketDashboard.tsx";
 import { balanceManager } from "../../../services/BalanceManager";
 import { stockMarketDataService } from "../../../services/StockMarketDataService";
+import { stockMarketPreloader } from "../../../services/StockMarketPreloader";
 import type { UIStock } from "../../../services/StockMarketDataService";
 import { getTaskManager } from "../../../game/tasks/TaskManager";
 
@@ -13,6 +14,19 @@ const StockMarketUI: React.FC = () => {
     const [stocks, setStocks] = useState<UIStock[]>([]);
     const [mayaOnboardingCompleted, setMayaOnboardingCompleted] = useState(false);
     const [isLoadingStocks, setIsLoadingStocks] = useState(false);
+
+    // Load preloaded data immediately on mount
+    useEffect(() => {
+        console.log("🚀 [MOUNT] StockMarketUI mounted, checking for preloaded data...");
+        const preloadedData = stockMarketPreloader.getPreloadedData();
+        if (preloadedData?.allStocks && preloadedData.allStocks.length > 0) {
+            console.log(`✅ [MOUNT] Found preloaded data: ${preloadedData.allStocks.length} stocks`);
+            setStocks(preloadedData.allStocks);
+            setIsLoadingStocks(false);
+        } else {
+            console.log("⏳ [MOUNT] No preloaded data yet, will load when opened");
+        }
+    }, []); // Only run once on mount
 
     // Subscribe to balance manager updates
     useEffect(() => {
@@ -30,43 +44,56 @@ const StockMarketUI: React.FC = () => {
         };
     }, []);
 
-    // Load ALL market data (crypto + stocks) IMMEDIATELY when UI opens
-    // This runs BEFORE rendering the dashboard, during the loading screen
+    // Load market data - CHECK PRELOADED DATA FIRST for instant display
+    // Data was preloaded during game initialization, so this should be instant
     useEffect(() => {
         if (!isOpen) return;
         
-        // Only fetch once when opening
+        // Skip if already loaded
         if (stocks.length > 0 && !isLoadingStocks) {
             console.log("✅ Using cached market data:", stocks.length, "items");
             return;
         }
 
         const loadCompleteMarketData = async () => {
+            // 🚀 INSTANT CHECK: Don't set loading=true if data is already preloaded
+            const preloadedData = stockMarketPreloader.getPreloadedData();
+            
+            if (preloadedData && preloadedData.allStocks.length > 0) {
+                // DATA IS ALREADY LOADED! Display instantly WITHOUT loading state
+                console.log(`⚡ [INSTANT] Using preloaded stock market data!`);
+                console.log(`   - ${preloadedData.cryptocurrencies.length} cryptocurrencies`);
+                console.log(`   - ${preloadedData.stocks.length} stocks`);
+                console.log(`   - Total: ${preloadedData.allStocks.length} assets ready INSTANTLY`);
+                
+                setStocks(preloadedData.allStocks);
+                setIsLoadingStocks(false); // Ensure loading is false
+                return; // Done! No need to fetch
+            }
+            
+            // Only set loading=true if we need to fetch
             setIsLoadingStocks(true);
-            console.log("📊 [PRE-LOAD] Fetching market data from CoinGecko + Polygon...");
 
+            // Fallback: If preload failed or wasn't ready, fetch now
+            console.log("⚠️ [FALLBACK] Preloaded data not available, fetching now...");
             try {
-                // Fetch both crypto and stocks in parallel DURING loading screen
                 const [cryptoData, stockData] = await Promise.all([
                     stockMarketDataService.getCryptocurrencies(),
                     stockMarketDataService.getStocks()
                 ]);
                 
-                // Combine both datasets
                 const allStocks = [...cryptoData.stocks, ...stockData.stocks];
                 
                 if (allStocks.length > 0) {
                     setStocks(allStocks);
-                    console.log(`✅ [PRE-LOAD] Loaded ${cryptoData.stocks.length} cryptocurrencies + ${stockData.stocks.length} stocks BEFORE dashboard render`);
+                    console.log(`✅ [FALLBACK] Loaded ${cryptoData.stocks.length} crypto + ${stockData.stocks.length} stocks`);
                 } else {
                     console.error("❌ Failed to load market data");
                 }
             } catch (error) {
                 console.error("❌ Error loading market data:", error);
             } finally {
-                // Immediately ready - no artificial delay
                 setIsLoadingStocks(false);
-                console.log("✅ [PRE-LOAD] Market data ready, dashboard will render INSTANTLY");
             }
         };
 
