@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const OverviewIcon = () => {
+const OverviewIcon: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
+    const gradientId = `paint0_linear_470_109${isActive ? '_active' : ''}`;
     return (
         <svg
             width="58"
@@ -11,26 +12,36 @@ const OverviewIcon = () => {
         >
             <path
                 d="M12.0833 7.25V45.9167H50.75V50.75H7.25V7.25H12.0833ZM49.0412 15.2078L52.4588 18.6255L38.6667 32.4177L31.4167 25.1696L21.0422 35.5422L17.6245 32.1245L31.4167 18.3323L38.6667 25.5804L49.0412 15.2078Z"
-                fill="url(#paint0_linear_470_109)"
+                fill={`url(#${gradientId})`}
             />
             <defs>
                 <linearGradient
-                    id="paint0_linear_470_109"
+                    id={gradientId}
                     x1="29.8544"
                     y1="7.25"
                     x2="29.8544"
                     y2="50.75"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop stop-color="white" />
-                    <stop offset="1" stop-color="#999999" />
+                    {isActive ? (
+                        <>
+                            <stop stopColor="#F0C33A" />
+                            <stop offset="1" stopColor="#D4A028" />
+                        </>
+                    ) : (
+                        <>
+                            <stop stopColor="white" />
+                            <stop offset="1" stopColor="#999999" />
+                        </>
+                    )}
                 </linearGradient>
             </defs>
         </svg>
     );
 };
 
-const BankIcon = () => {
+const BankIcon: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
+    const gradientId = `paint0_linear_470_112${isActive ? '_active' : ''}`;
     return (
         <svg
             width="58"
@@ -41,26 +52,36 @@ const BankIcon = () => {
         >
             <path
                 d="M5 48.499H53.3333V53.3324H5V48.499ZM9.83333 29.1657H14.6667V46.0824H9.83333V29.1657ZM21.9167 29.1657H26.75V46.0824H21.9167V29.1657ZM31.5833 29.1657H36.4167V46.0824H31.5833V29.1657ZM43.6667 29.1657H48.5V46.0824H43.6667V29.1657ZM5 17.0824L29.1667 4.99902L53.3333 17.0824V26.749H5V17.0824ZM29.1667 19.499C30.5014 19.499 31.5833 18.417 31.5833 17.0824C31.5833 15.7477 30.5014 14.6657 29.1667 14.6657C27.8319 14.6657 26.75 15.7477 26.75 17.0824C26.75 18.417 27.8319 19.499 29.1667 19.499Z"
-                fill="url(#paint0_linear_470_112)"
+                fill={`url(#${gradientId})`}
             />
             <defs>
                 <linearGradient
-                    id="paint0_linear_470_112"
+                    id={gradientId}
                     x1="29.1667"
                     y1="4.99902"
                     x2="29.1667"
                     y2="53.3324"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop stop-color="white" />
-                    <stop offset="1" stop-color="#999999" />
+                    {isActive ? (
+                        <>
+                            <stop stopColor="#F0C33A" />
+                            <stop offset="1" stopColor="#D4A028" />
+                        </>
+                    ) : (
+                        <>
+                            <stop stopColor="white" />
+                            <stop offset="1" stopColor="#999999" />
+                        </>
+                    )}
                 </linearGradient>
             </defs>
         </svg>
     );
 };
 
-const FixedDepositIcon = () => {
+const FixedDepositIcon: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
+    const gradientId = `paint0_linear_470_115${isActive ? '_active' : ''}`;
     return (
         <svg
             width="58"
@@ -71,26 +92,36 @@ const FixedDepositIcon = () => {
         >
             <path
                 d="M4.8335 28.9997H9.66683V50.7497H4.8335V28.9997ZM12.0835 33.833H16.9168V50.7497H12.0835V33.833ZM38.6668 19.333H43.5002V50.7497H38.6668V19.333ZM45.9168 24.1663H50.7502V50.7497H45.9168V24.1663ZM21.7502 4.83301H26.5835V50.7497H21.7502V4.83301ZM29.0002 9.66634H33.8335V50.7497H29.0002V9.66634Z"
-                fill="url(#paint0_linear_470_115)"
+                fill={`url(#${gradientId})`}
             />
             <defs>
                 <linearGradient
-                    id="paint0_linear_470_115"
+                    id={gradientId}
                     x1="27.7918"
                     y1="4.83301"
                     x2="27.7918"
                     y2="50.7497"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop stop-color="white" />
-                    <stop offset="1" stop-color="#999999" />
+                    {isActive ? (
+                        <>
+                            <stop stopColor="#F0C33A" />
+                            <stop offset="1" stopColor="#D4A028" />
+                        </>
+                    ) : (
+                        <>
+                            <stop stopColor="white" />
+                            <stop offset="1" stopColor="#999999" />
+                        </>
+                    )}
                 </linearGradient>
             </defs>
         </svg>
     );
 };
 
-const NFTIcon = () => {
+const NFTIcon: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
+    const gradientId = `paint0_linear_470_91${isActive ? '_active' : ''}`;
     return (
         <svg
             width="58"
@@ -101,19 +132,28 @@ const NFTIcon = () => {
         >
             <path
                 d="M21.7498 29.0003C24.4193 29.0003 26.5832 26.8364 26.5832 24.167C26.5832 21.4976 24.4193 19.3337 21.7498 19.3337C19.0805 19.3337 16.9165 21.4976 16.9165 24.167C16.9165 26.8364 19.0805 29.0003 21.7498 29.0003ZM51.9582 15.7087L28.9998 2.41699L6.0415 15.7087V42.292L28.9998 55.5837L51.9582 42.292V15.7087ZM28.9998 8.00191L47.1248 18.4953V35.1237L36.0998 28.5088L16.836 42.9566L10.8748 39.5053V18.4953L28.9998 8.00191ZM28.9998 49.9987L21.3822 45.5886L36.3999 34.3252L46.0603 40.1216L28.9998 49.9987Z"
-                fill="url(#paint0_linear_470_91)"
+                fill={`url(#${gradientId})`}
             />
             <defs>
                 <linearGradient
-                    id="paint0_linear_470_91"
+                    id={gradientId}
                     x1="28.9998"
                     y1="2.41699"
                     x2="28.9998"
                     y2="55.5837"
                     gradientUnits="userSpaceOnUse"
                 >
-                    <stop stop-color="white" />
-                    <stop offset="1" stop-color="#999999" />
+                    {isActive ? (
+                        <>
+                            <stop stopColor="#F0C33A" />
+                            <stop offset="1" stopColor="#D4A028" />
+                        </>
+                    ) : (
+                        <>
+                            <stop stopColor="white" />
+                            <stop offset="1" stopColor="#999999" />
+                        </>
+                    )}
                 </linearGradient>
             </defs>
         </svg>
@@ -156,29 +196,33 @@ const ButtonBackgroundSVG: React.FC<{ id: string }> = ({ id }) => (
 
 // Reusable Tab Button Component
 interface TabButtonProps {
-    icon: string | React.ReactNode;
+    icon: React.ReactElement<{ isActive?: boolean }>;
     label: string;
     onClick: () => void;
+    isCompact?: boolean;
+    isActive?: boolean;
 }
 
-const   TabButton: React.FC<TabButtonProps> = ({ icon, label, onClick }) => (
+const TabButton: React.FC<TabButtonProps> = ({ icon, label, onClick, isCompact = false, isActive = false }) => (
     <div className="flex flex-col items-center cursor-pointer select-none">
         <button
             onClick={onClick}
             className="relative flex flex-col items-center gap-1 transition-all hover:scale-[1.02] focus:outline-0 outline-0 hover:border-none border-none overflow-hidden"
             style={{ background: "transparent" }}
         >
-            <TabBackgroundSVG />
-            <div className="relative z-10 p-8">{icon}</div>
+            <TabBackgroundSVG isActive={isActive} />
+            <div className={`relative z-10 ${isCompact ? 'p-2' : 'p-8'}`}>
+                {React.cloneElement(icon, { isActive } as { isActive: boolean })}
+            </div>
         </button>
-        <span className="text-white font-pixeloid text-xl relative z-10">
+        <span className={`text-white font-pixeloid relative z-10 ${isCompact ? 'text-sm' : 'text-xl'}`}>
             {label}
         </span>
     </div>
 );
 
 // Reusable Tab Navigation Background SVG Component
-const TabBackgroundSVG: React.FC = () => (
+const TabBackgroundSVG: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => (
     <svg
         className="absolute inset-0 w-full h-full"
         width="172"
@@ -197,7 +241,7 @@ const TabBackgroundSVG: React.FC = () => (
         />
         <path
             d="M163.18 4.81836L158.618 4.81836V9.38003L163.18 9.38003V4.81836ZM166.616 4.81836L171.178 4.81836V0.256693L166.616 0.256693V4.81836ZM166.616 9.30078H162.055V13.8624H166.616V9.30078ZM171.781 9.30078H176.343V4.73912L171.781 4.73912V9.30078ZM171.781 105.616V110.178H176.343V105.616H171.781ZM166.633 105.616V101.055L162.071 101.055V105.616L166.633 105.616ZM166.633 108.972V113.533H171.194V108.972H166.633ZM163.195 108.972V104.41H158.634V108.972H163.195ZM163.195 112.323V116.885L167.757 116.885V112.323L163.195 112.323ZM8.58984 112.323H4.02818L4.02818 116.885H8.58984V112.323ZM8.58984 108.972H13.1515V104.41H8.58984V108.972ZM5.17188 108.972H0.610209L0.610209 113.533H5.17188L5.17188 108.972ZM5.17188 105.605H9.73354L9.73354 101.044H5.17188L5.17188 105.605ZM0 105.605H-4.56167L-4.56167 110.167H0L0 105.605ZM0 9.30078L0 4.73912L-4.56167 4.73912L-4.56167 9.30078L0 9.30078ZM5.14844 9.30078L5.14844 13.8624H9.7101L9.7101 9.30078H5.14844ZM5.14844 4.8252L5.14844 0.263529L0.586771 0.263529L0.586771 4.8252L5.14844 4.8252ZM8.58887 4.8252V9.38686L13.1505 9.38686V4.8252L8.58887 4.8252ZM8.58887 0.339844L8.58887 -4.22182L4.0272 -4.22182L4.0272 0.339844L8.58887 0.339844ZM163.18 0.339844L167.741 0.339844V-4.22182L163.18 -4.22182V0.339844ZM171.781 1.46094V6.0226L176.343 6.0226V1.46094L171.781 1.46094ZM171.769 1.46094L167.207 1.46094V6.0226L171.769 6.0226V1.46094ZM171.769 0.339844V-4.22182L167.207 -4.22182V0.339844L171.769 0.339844ZM171.781 0.339844L176.343 0.339844V-4.22182L171.781 -4.22182V0.339844ZM163.18 4.81836V9.38003H166.616V4.81836V0.256693L163.18 0.256693V4.81836ZM166.616 4.81836L162.055 4.81836V9.30078H166.616L171.178 9.30078V4.81836L166.616 4.81836ZM166.616 9.30078V13.8624L171.781 13.8624V9.30078V4.73912L166.616 4.73912V9.30078ZM171.781 9.30078L167.22 9.30078L167.22 105.616H171.781H176.343L176.343 9.30078H171.781ZM171.781 105.616V101.055H166.633V105.616V110.178H171.781V105.616ZM166.633 105.616L162.071 105.616V108.972L166.633 108.972H171.194V105.616H166.633ZM166.633 108.972V104.41L163.195 104.41V108.972V113.533L166.633 113.533V108.972ZM163.195 108.972H158.634V112.323H163.195L167.757 112.323V108.972L163.195 108.972ZM163.195 112.323V107.762L8.58984 107.762L8.58984 112.323V116.885L163.195 116.885V112.323ZM8.58984 112.323H13.1515L13.1515 108.972H8.58984H4.02818L4.02818 112.323H8.58984ZM8.58984 108.972V104.41H5.17188L5.17188 108.972L5.17188 113.533H8.58984L8.58984 108.972ZM5.17188 108.972H9.73354V105.605H5.17188H0.610209L0.610209 108.972H5.17188ZM5.17188 105.605L5.17188 101.044H0L0 105.605L0 110.167H5.17188L5.17188 105.605ZM0 105.605H4.56167L4.56167 9.30078L0 9.30078L-4.56167 9.30078L-4.56167 105.605H0ZM0 9.30078L0 13.8624L5.14844 13.8624L5.14844 9.30078L5.14844 4.73912L0 4.73912L0 9.30078ZM5.14844 9.30078H9.7101V4.8252L5.14844 4.8252L0.586771 4.8252L0.586771 9.30078L5.14844 9.30078ZM5.14844 4.8252L5.14844 9.38686H8.58887V4.8252L8.58887 0.263529L5.14844 0.263529L5.14844 4.8252ZM8.58887 4.8252L13.1505 4.8252L13.1505 0.339844L8.58887 0.339844L4.0272 0.339844L4.0272 4.8252L8.58887 4.8252ZM8.58887 0.339844L8.58887 4.90151L163.18 4.90151V0.339844V-4.22182L8.58887 -4.22182L8.58887 0.339844ZM163.18 0.339844L158.618 0.339844V4.81836L163.18 4.81836L167.741 4.81836V0.339844L163.18 0.339844ZM171.781 1.46094V-3.10073H171.769V1.46094V6.0226H171.781V1.46094ZM171.769 1.46094L176.33 1.46094V0.339844L171.769 0.339844L167.207 0.339844V1.46094L171.769 1.46094ZM171.769 0.339844V4.90151H171.781V0.339844V-4.22182H171.769V0.339844ZM171.781 0.339844L167.22 0.339844V1.46094L171.781 1.46094L176.343 1.46094V0.339844L171.781 0.339844Z"
-            fill="url(#paint1_linear_367_191)"
+            fill={isActive ? "url(#paint1_linear_active)" : "url(#paint1_linear_367_191)"}
             mask="url(#path-1-inside-1_367_191)"
         />
         <defs>
@@ -223,6 +267,17 @@ const TabBackgroundSVG: React.FC = () => (
                 <stop stop-color="white" />
                 <stop offset="1" stop-color="#9E9E9E" />
             </linearGradient>
+            <linearGradient
+                id="paint1_linear_active"
+                x1="85.8906"
+                y1="0.339844"
+                x2="85.8906"
+                y2="112.323"
+                gradientUnits="userSpaceOnUse"
+            >
+                <stop stop-color="#F0C33A" />
+                <stop offset="1" stop-color="#D4A028" />
+            </linearGradient>
         </defs>
     </svg>
 );
@@ -232,6 +287,9 @@ interface TestBankDashboardProps {
 }
 
 const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
+    const [activeTab, setActiveTab] = useState("overview");
+    const [amount, setAmount] = useState("");
+    const [transactionType, setTransactionType] = useState<"deposit" | "withdraw">("deposit");
     const [scrollY, setScrollY] = useState(0);
     const [transactionScrollY, setTransactionScrollY] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -269,6 +327,30 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
             onClose();
         } else {
             window.history.back();
+        }
+    };
+
+    const handleNumberClick = (num: string) => {
+        setAmount(prev => prev + num);
+    };
+
+    const handleDelete = () => {
+        setAmount(prev => prev.slice(0, -1));
+    };
+
+    const handleDeposit = () => {
+        if (amount) {
+            console.log("Deposit amount:", amount);
+            // Add deposit logic here
+            setAmount("");
+        }
+    };
+
+    const handleWithdraw = () => {
+        if (amount) {
+            console.log("Withdraw amount:", amount);
+            // Add withdraw logic here
+            setAmount("");
         }
     };
 
@@ -384,7 +466,7 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
                     </div>
                 </div>
 
-                {/* Welcome Title - Fixed, doesn't move */}
+                {/* Title - Changes based on active tab */}
                 <div
                     className="sticky top-[96px] text-center py-8 z-40 overflow-hidden"
                     style={{
@@ -395,58 +477,208 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
                     }}
                 >
                     <h1 className="text-white font-pixeloid text-5xl tracking-wide">
-                        Welcome To Dhaniverse Bank
+                        {activeTab === "overview" ? "Welcome To Dhaniverse Bank" : "Dhaniverse Bank"}
                     </h1>
                 </div>
 
-                {/* Main Action Buttons - Fixed, no transform */}
-                <div className="sticky top-[216px] z-35 overflow-hidden">
-                    <div className="flex items-center justify-center gap-6 max-w-2xl mx-auto">
-                        <button
-                            onClick={() => console.log("Deposit clicked")}
-                            className="relative flex-1 py-6 text-black font-pixeloid hover:border-none select-none focus:outline-0 text-lg transition-all transform hover:scale-[1.02] overflow-hidden"
-                            style={{
-                                background: "transparent",
-                            }}
-                        >
-                            <ButtonBackgroundSVG id="deposit" />
-                            <span className="relative z-10 text-3xl text-[#743A1C]">
-                                DEPOSIT
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => console.log("Withdraw clicked")}
-                            className="relative flex-1  py-6 text-black font-pixeloid hover:border-none select-none focus:outline-0 text-lg transition-all transform hover:scale-[1.02] overflow-hidden"
-                            style={{
-                                background: "transparent",
-                            }}
-                        >
-                            <ButtonBackgroundSVG id="withdraw" />
-                            <span className="relative z-10 text-3xl text-[#743A1C]">
-                                WITHDRAW
-                            </span>
-                        </button>
-                    </div>
-                </div>
+                {/* Conditional Layout based on active tab */}
+                {activeTab === "overview" && (
+                    <>
+                        {/* Main Action Buttons - Fixed, no transform */}
+                        <div className="sticky top-[216px] z-35 overflow-hidden">
+                            <div className="flex items-center justify-center gap-6 max-w-2xl mx-auto">
+                                <button
+                                    onClick={handleDeposit}
+                                    className="relative flex-1 py-6 text-black font-pixeloid hover:border-none select-none focus:outline-0 text-lg transition-all transform hover:scale-[1.02] overflow-hidden"
+                                    style={{
+                                        background: "transparent",
+                                    }}
+                                >
+                                    <ButtonBackgroundSVG id="deposit" />
+                                    <span className="relative z-10 text-3xl text-[#743A1C]">
+                                        DEPOSIT
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={handleWithdraw}
+                                    className="relative flex-1  py-6 text-black font-pixeloid hover:border-none select-none focus:outline-0 text-lg transition-all transform hover:scale-[1.02] overflow-hidden"
+                                    style={{
+                                        background: "transparent",
+                                    }}
+                                >
+                                    <ButtonBackgroundSVG id="withdraw" />
+                                    <span className="relative z-10 text-3xl text-[#743A1C]">
+                                        WITHDRAW
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
 
-                {/* Tab Navigation - Fixed, no transform */}
-                <div className="sticky top-[296px] mb-6 z-35 overflow-hidden">
-                    <div className="flex items-center justify-center gap-2 max-w-4xl mx-auto">
-                        {tabButtons.map((tab) => (
-                            <TabButton
-                                key={tab.id}
-                                icon={tab.icon}
-                                label={tab.label}
-                                onClick={() =>
-                                    console.log(`${tab.label} clicked`)
-                                }
-                            />
-                        ))}
-                    </div>
-                </div>
+                        {/* Tab Navigation - Fixed, no transform */}
+                        <div className="sticky top-[296px] mb-6 z-35 overflow-hidden">
+                            <div className="flex items-center justify-center gap-2 max-w-4xl mx-auto">
+                                {tabButtons.map((tab) => (
+                                    <TabButton
+                                        key={tab.id}
+                                        icon={tab.icon}
+                                        label={tab.label}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        isActive={activeTab === tab.id}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
 
-                {/* Transaction Container - Scrolls over buttons */}
+                {activeTab === "bank" && (
+                    <>
+                        {/* Number Pad and Balance Cards - Max Width Container */}
+                        <div className="sticky top-[216px] z-35 px-8 pb-6">
+                            <div className="max-w-6xl mx-auto bg-black rounded-xl">
+                                {/* Single Black Container with Buttons, Number Pad and Balance Cards */}
+                                <div className="p-6 max-w-4xl mx-auto">
+                                    {/* Deposit and Withdraw Buttons - Toggleable */}
+                                    <div className="flex items-center justify-center gap-2 max-w-sm mx-auto mb-6 bg-yellow-600/50 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setTransactionType("deposit")}
+                                            className={`flex-1 font-pixeloid text-2xl py-1 px-3 rounded-lg transition-all outline-none focus:outline-none hover:border-none border-none hover:scale-[1.02] ${
+                                                transactionType === "deposit"
+                                                    ? "bg-[#F0C33A] text-white"
+                                                    : "bg-transparent text-gray-400 hover:bg-text-gray-200"
+                                            }`}
+                                        >
+                                            Deposit
+                                        </button>
+                                        <button
+                                            onClick={() => setTransactionType("withdraw")}
+                                            className={`flex-1 font-pixeloid text-2xl py-1 px-3 rounded-lg transition-all outline-none focus:outline-none hover:border-none border-none hover:scale-[1.02] ${
+                                                transactionType === "withdraw"
+                                                    ? "bg-white text-black"
+                                                    : "bg-transparent text-gray-400 hover:text-gray-200"
+                                            }`}
+                                        >
+                                            Withdraw
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        {/* Left Side - Number Pad */}
+                                        <div className="flex-1">
+                                            <input
+                                                type="text"
+                                                value={amount}
+                                                readOnly
+                                                placeholder="Enter Amount"
+                                                className="w-full bg-neutral-900 text-white font-pixeloid text-lg px-2 py-3 rounded-md mb-2 text-center placeholder-gray-500"
+                                            />
+                                            
+                                            {/* Number Grid */}
+                                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                                {[9, 8, 7, 6, 5, 4, 3, 2, 1].map((num) => (
+                                                    <button
+                                                        key={num}
+                                                        onClick={() => handleNumberClick(num.toString())}
+                                                        className="bg-neutral-900 hover:bg-neutral-800 outline-none focus:outline-none hover:border-none border-none text-white font-pixeloid text-xl py-3 rounded-md transition-all hover:scale-[1.02]"
+                                                    >
+                                                        {num}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Bottom Row: Empty space, 0 centered, and Delete */}
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div></div>
+                                                <button
+                                                    onClick={() => handleNumberClick("0")}
+                                                    className="bg-neutral-900 hover:bg-neutral-800 outline-none focus:outline-none hover:border-none border-none text-white font-pixeloid text-xl py-2 rounded-md transition-all hover:scale-[1.02]"
+                                                >
+                                                    0
+                                                </button>
+                                                <button
+                                                    onClick={handleDelete}
+                                                    className="bg-red-700 hover:bg-red-600 text-white font-pixeloid outline-none focus:outline-none hover:border-none border-none text-sm py-2 rounded-md transition-all hover:scale-[1.02] flex items-center justify-center gap-1"
+                                                >
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M19 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H19V11Z" fill="currentColor"/>
+                                                    </svg>
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Side - Balance Cards */}
+                                        <div className="flex flex-col justify-center w-72">
+                                            {/* Bank Balance Card */}
+                                            <div className="bg-neutral-900 rounded-xl p-4 flex-1 flex flex-col justify-center">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-gray-400 font-pixeloid text-xs text-center">Bank Balance</span>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2"/>
+                                                        <path d="M12 8V12L14 14" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                                                    </svg>
+                                                </div>
+                                                <h2 className="text-white font-pixeloid text-3xl mb-1">$10,000</h2>
+                                                <p className="text-gray-500 font-pixeloid text-[10px]">Last Deposited $200 on 16/2/25</p>
+                                            </div>
+
+                                            {/* Cash Balance Card */}
+                                            <div className="bg-neutral-900 rounded-xl p-4 flex-1 flex flex-col justify-center mt-2">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-gray-400 font-pixeloid text-xs">Cash Balance</span>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2"/>
+                                                        <path d="M12 8V12L14 14" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                                                    </svg>
+                                                </div>
+                                                <h2 className="text-white font-pixeloid text-3xl mb-1">$10,00,000</h2>
+                                                <p className="text-gray-500 font-pixeloid text-[10px]">Last Deposited $200 on 16/2/25</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tab Navigation - Absolute position at bottom */}
+                        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+                            <div className="flex items-center justify-center gap-2">
+                                {tabButtons.map((tab) => (
+                                    <TabButton
+                                        key={tab.id}
+                                        icon={tab.icon}
+                                        label={tab.label}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        isCompact={true}
+                                        isActive={activeTab === tab.id}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* For Fixed Deposit and NFT tabs - show tabs at bottom position */}
+                {(activeTab === "fixed-deposit" || activeTab === "nft") && (
+                    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+                        <div className="flex items-center justify-center gap-2">
+                            {tabButtons.map((tab) => (
+                                <TabButton
+                                    key={tab.id}
+                                    icon={tab.icon}
+                                    label={tab.label}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    isCompact={true}
+                                    isActive={activeTab === tab.id}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Content Area - Changes based on active tab */}
                 <div className="px-8 pb-8 max-w-7xl mx-auto">
+                    {activeTab === "overview" && (
                     <div
                         ref={transactionBoxRef}
                         className="backdrop-blur-sm rounded-t-2xl border-t-2 border-x-2 border-white/10 relative z-30 transition-colors duration-300"
@@ -544,6 +776,23 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
                             </button>
                         </div>
                     </div>
+                    )}
+
+                    {/* Fixed Deposit Tab Content */}
+                    {activeTab === "fixed-deposit" && (
+                        <div className="backdrop-blur-sm bg-black/60 rounded-2xl p-12 border-2 border-white/10 text-center">
+                            <h2 className="text-white font-pixeloid text-3xl mb-4">Fixed Deposit</h2>
+                            <p className="text-gray-400 font-pixeloid text-lg">Coming Soon!</p>
+                        </div>
+                    )}
+
+                    {/* NFT Tab Content */}
+                    {activeTab === "nft" && (
+                        <div className="backdrop-blur-sm bg-black/60 rounded-2xl p-12 border-2 border-white/10 text-center">
+                            <h2 className="text-white font-pixeloid text-3xl mb-4">NFT Gallery</h2>
+                            <p className="text-gray-400 font-pixeloid text-lg">Coming Soon!</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
