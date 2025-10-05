@@ -330,21 +330,27 @@ export class BuildingManager {
 
     // Centralized progression gating with detailed debugging
     try {
-      const progressionState = progressionManager.getState();
-      console.log('🏢 BuildingManager: Checking building access for', buildingType);
-      console.log('🏢 Current progression state:', progressionState);
-      
-      const check = progressionManager.canEnterBuilding(buildingType === 'bank' ? 'bank' : 'stockmarket');
-      console.log('🏢 Building access check result:', check);
-      
-      if (!check.allowed) {
-        this.lastInteractionTime = Date.now(); // Update interaction time to prevent spam
-        console.log('🚫 Access denied to', buildingType, '- showing message:', check.message);
-        progressionManager.showAccessDenied(check.message!);
-        return;
+      // Check if progression manager is ready before accessing state
+      if (!progressionManager.isReady()) {
+        console.warn('🏢 BuildingManager: ProgressionManager not ready yet, allowing entry (will check on actual entry)');
+        // Allow entry - progression will be checked again inside the building
+      } else {
+        const progressionState = progressionManager.getState();
+        console.log('🏢 BuildingManager: Checking building access for', buildingType);
+        console.log('🏢 Current progression state:', progressionState);
+        
+        const check = progressionManager.canEnterBuilding(buildingType === 'bank' ? 'bank' : 'stockmarket');
+        console.log('🏢 Building access check result:', check);
+        
+        if (!check.allowed) {
+          this.lastInteractionTime = Date.now(); // Update interaction time to prevent spam
+          console.log('🚫 Access denied to', buildingType, '- showing message:', check.message);
+          progressionManager.showAccessDenied(check.message!);
+          return;
+        }
+        
+        console.log('✅ Access granted to', buildingType);
       }
-      
-      console.log('✅ Access granted to', buildingType);
     } catch (e) { 
       console.warn('Progression gating unavailable', e); 
     }

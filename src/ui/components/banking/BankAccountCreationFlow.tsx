@@ -65,7 +65,9 @@ const BankAccountCreationFlow: React.FC = () => {
       try {
         // Step 1: Check progression manager state to understand if user is new/existing
         const { progressionManager } = await import('../../../services/ProgressionManager');
-        const progressionState = progressionManager.getState();
+        
+        // Wait for initialization to complete before checking state
+        const progressionState = await progressionManager.getStateAsync();
         
         console.log('🏦 Bank Account Creation: Checking user state', {
           bankOnboardingComplete: progressionState.bankOnboardingComplete,

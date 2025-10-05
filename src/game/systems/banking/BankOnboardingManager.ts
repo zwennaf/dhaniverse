@@ -411,7 +411,9 @@ export class BankOnboardingManager {
     // For new players who haven't met Maya yet, always show onboarding when they enter bank
     try {
       const { progressionManager } = await import('../../../services/ProgressionManager');
-      const progressState = progressionManager.getState();
+      
+      // Wait for initialization if needed (use async version)
+      const progressState = await progressionManager.getStateAsync();
       
       // If player is completely new (hasn't met Maya), show onboarding
       if (progressState.onboardingStep === 'not_started' && !progressState.hasMetMaya) {

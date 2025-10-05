@@ -637,7 +637,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
         const handleProgressionUpdate = async () => {
             try {
                 const { progressionManager } = await import('../../../services/ProgressionManager');
-                const state = progressionManager.getState();
+                const state = await progressionManager.getStateAsync();
                 updateObjectivesBasedOnProgression(state);
             } catch (e) {
                 console.warn('Failed to get progression state for objective update:', e);

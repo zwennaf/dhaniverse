@@ -78,8 +78,8 @@ export class MayaNPCManager {
             // Import and get position from progression manager
             const { progressionManager } = await import('../../services/ProgressionManager');
             
-            // Check if progression manager has been initialized with player state
-            const state = progressionManager.getState();
+            // Wait for progression manager to be fully initialized
+            const state = await progressionManager.getStateAsync();
             
             // For completely new players (all values false), Maya should be at default position
             const isCompletelyNew = state.onboardingStep === 'not_started' && 
@@ -651,7 +651,7 @@ export class MayaNPCManager {
                                     console.warn('Failed to refresh progression state:', e);
                                 }
                                 
-                                const ps = progressionManager.getState();
+                                const ps = await progressionManager.getStateAsync();
                                 console.log('🚀 Maya: Current progression state:', ps);
                                 
                                 // ORIGINAL CHAIN (unchanged behavior): until claimed money
@@ -988,7 +988,7 @@ export class MayaNPCManager {
             try {
                 const { progressionManager } = await import('../../services/ProgressionManager');
                 await progressionManager.initializeFromPlayerState(undefined, true); // Force refresh
-                const state = progressionManager.getState();
+                const state = await progressionManager.getStateAsync();
                 console.log('🚀 Maya: State refreshed after progression change:', state);
             } catch (e) {
                 console.warn('Could not refresh Maya state', e);
@@ -999,7 +999,7 @@ export class MayaNPCManager {
     private async updateLocationTrackerForProgress(): Promise<void> {
         try {
             const { progressionManager } = await import('../../services/ProgressionManager');
-            const state = progressionManager.getState();
+            const state = await progressionManager.getStateAsync();
             
             // For existing players who have already met Maya, point directly to her
             if (state.hasMetMaya) {

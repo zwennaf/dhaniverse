@@ -102,6 +102,7 @@ gameRouter.get("/game/player-state", async (ctx) => {
         );
 
         let playerState = await playerStates.findOne({ userId });
+        
         // Create initial player state if doesn't exist
         if (!playerState) {
             const newPlayerState: PlayerStateDocument = {
@@ -130,53 +131,62 @@ gameRouter.get("/game/player-state", async (ctx) => {
                     hasCompletedBankOnboarding: false,
                     hasReachedStockMarket: false,
                     onboardingStep: 'not_started',
-                    unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+                    unlockedBuildings: { bank: false, atm: false, stockmarket: false },
+                    bankOnboardingComplete: false,
+                    stockMarketOnboardingComplete: false,
+                    mayaPosition: { x: 7779, y: 3581 }
                 },
                 settings: {
                     soundEnabled: true,
                     musicEnabled: true,
                     autoSave: true,
                 },
+                schemaVersion: 2,
                 hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date(),
             };
 
             const result = await playerStates.insertOne(newPlayerState);
             playerState = { ...newPlayerState, _id: result.insertedId };
-        }
-
-        // Backfill onboarding defaults if missing (for legacy players)
-        let needsUpdate = false;
-    const claimedLegacy = (playerState as (PlayerStateDocument & { starterClaimed?: boolean })).starterClaimed === true || playerState.progress?.completedTutorials?.includes('starter-claimed');
-        
-        // Backfill hasCompletedTutorial for existing players
-        if (typeof playerState.hasCompletedTutorial === 'undefined') {
-            playerState.hasCompletedTutorial = claimedLegacy; // Legacy players who claimed starter are considered to have completed tutorial
-            needsUpdate = true;
-        }
-        
-        if (!playerState.onboarding) {
-            playerState.onboarding = {
-                hasMetMaya: claimedLegacy, // if legacy claimed, treat as completed
-                hasFollowedMaya: claimedLegacy,
-                hasClaimedMoney: claimedLegacy,
-                hasCompletedBankOnboarding: false,
-                hasReachedStockMarket: false,
-                onboardingStep: claimedLegacy ? 'claimed_money' : 'not_started',
-                unlockedBuildings: { bank: claimedLegacy, atm: false, stockmarket: false }
-            };
-            needsUpdate = true;
-        } else if (claimedLegacy && !playerState.onboarding.hasClaimedMoney) {
-            // Upgrade partially existing onboarding state to claimed completion
-            playerState.onboarding.hasMetMaya = true;
-            playerState.onboarding.hasFollowedMaya = true;
-            playerState.onboarding.hasClaimedMoney = true;
-            playerState.onboarding.onboardingStep = 'claimed_money';
-            playerState.onboarding.unlockedBuildings = { ...playerState.onboarding.unlockedBuildings, bank: true };
-            needsUpdate = true;
-        }
-        if (needsUpdate) {
-            await playerStates.updateOne({ userId }, { $set: { onboarding: playerState.onboarding, lastUpdated: new Date() } });
+            
+            console.log(`✅ Created new player state for user ${userId} with schema version 2`);
+        } else {
+            // MIGRATION: Apply schema migration for existing users
+            const { migratePlayerState, isSchemaOutdated, logMigrationChanges, validateMigratedState } = await import("../services/schemaMigration.ts");
+            
+            if (isSchemaOutdated(playerState)) {
+                console.log(`🔄 Migrating player state for user ${userId}...`);
+                
+                const { migrated, changes, needsUpdate } = migratePlayerState(playerState);
+                
+                if (needsUpdate) {
+                    // Validate before persisting
+                    if (validateMigratedState(migrated)) {
+                        // Log changes for debugging
+                        logMigrationChanges(userId, changes);
+                        
+                        // Persist migrated state to database
+                        await playerStates.updateOne(
+                            { userId }, 
+                            { $set: { 
+                                ...migrated,
+                                lastUpdated: new Date() 
+                            } }
+                        );
+                        
+                        // Re-fetch to get the updated state with _id
+                        const updated = await playerStates.findOne({ userId });
+                        if (updated) {
+                            playerState = updated;
+                        }
+                        console.log(`✅ Successfully migrated and persisted player state for user ${userId}`);
+                    } else {
+                        console.error(`❌ Migration validation failed for user ${userId}, using original state`);
+                    }
+                } else {
+                    console.log(`✅ Player state for user ${userId} is already up to date`);
+                }
+            }
         }
 
         ctx.response.body = {

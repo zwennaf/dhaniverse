@@ -168,7 +168,7 @@ export class BankNPCManager {
       let accountOrBalanceExists = false;
       try {
         const { progressionManager } = await import('../../services/ProgressionManager');
-        const progressState = progressionManager.getState();
+        const progressState = await progressionManager.getStateAsync();
         
         // For completely new players, don't check account - always show onboarding
         if (progressState.onboardingStep !== 'not_started' || progressState.hasMetMaya) {

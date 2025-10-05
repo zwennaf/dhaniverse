@@ -31,10 +31,12 @@ class ProgressionManager {
   private syncing = false;
   private initialized = false;
   private initPromise: Promise<void> | null = null;
+  private isInitializing = false;
 
   async initializeFromPlayerState(playerState?: any, forceRefresh = false) {
     // If already initializing, wait for that to complete
-    if (this.initPromise && !forceRefresh) {
+    if (this.isInitializing && this.initPromise && !forceRefresh) {
+      console.log('⏳ ProgressionManager: Already initializing, waiting...');
       await this.initPromise;
       return;
     }
@@ -45,10 +47,18 @@ class ProgressionManager {
       return;
     }
     
+    // Set initializing flag
+    this.isInitializing = true;
+    
     // Create initialization promise
     this.initPromise = this._performInitialization(playerState, forceRefresh);
-    await this.initPromise;
-    this.initPromise = null;
+    
+    try {
+      await this.initPromise;
+    } finally {
+      this.isInitializing = false;
+      this.initPromise = null;
+    }
   }
 
   private async _performInitialization(playerState?: any, forceRefresh = false) {
@@ -60,26 +70,35 @@ class ProgressionManager {
       if (response.success && response.data?.onboarding) {
         const dbState = response.data.onboarding;
         
-        console.log('📥 ProgressionManager: Loaded state from database:', dbState);
-        
-        // Merge database state with defaults to ensure all fields exist
-        this.state = { 
-          ...DEFAULT_STATE, 
-          ...dbState, 
-          unlockedBuildings: { 
-            ...DEFAULT_STATE.unlockedBuildings, 
-            ...(dbState.unlockedBuildings || {}) 
-          } 
+        // Sync server-side and client-side field naming
+        // Server uses: hasCompletedBankOnboarding, hasReachedStockMarket
+        // Client uses: bankOnboardingComplete, stockMarketOnboardingComplete
+        // IMPORTANT: Use OR (||) to get the TRUE value if either field is true
+        const syncedState = {
+          ...DEFAULT_STATE,
+          ...dbState,
+          // Prefer TRUE values - if either client or server field is true, use true
+          bankOnboardingComplete: dbState.hasCompletedBankOnboarding || dbState.bankOnboardingComplete || false,
+          stockMarketOnboardingComplete: dbState.hasReachedStockMarket || dbState.stockMarketOnboardingComplete || false,
+          unlockedBuildings: {
+            ...DEFAULT_STATE.unlockedBuildings,
+            ...(dbState.unlockedBuildings || {})
+          },
+          mayaPosition: dbState.mayaPosition || DEFAULT_STATE.mayaPosition
         };
         
+        this.state = syncedState;
         this.initialized = true;
-        console.log('✅ ProgressionManager initialized from database. Current state:', {
+        
+        // Log only the final, synced state - consolidated into ONE object
+        console.log('✅ ProgressionManager initialized from database. State is now ready:', {
           step: this.state.onboardingStep,
           bankComplete: this.state.bankOnboardingComplete,
           stockComplete: this.state.stockMarketOnboardingComplete,
           hasMetMaya: this.state.hasMetMaya,
           hasClaimedMoney: this.state.hasClaimedMoney,
-          unlockedBuildings: this.state.unlockedBuildings
+          unlockedBuildings: this.state.unlockedBuildings,
+          mayaPosition: this.state.mayaPosition
         });
         return;
       } else {
@@ -112,17 +131,39 @@ class ProgressionManager {
 
   getState(): OnboardingState { 
     if (!this.initialized) {
-      console.warn('⚠️ ProgressionManager not initialized yet. Attempting emergency initialization...');
+      // If currently initializing, warn but return current state
+      if (this.isInitializing) {
+        console.warn('⚠️ ProgressionManager: Initialization in progress, returning current state...');
+        return this.state;
+      }
       
-      // Emergency: Trigger async initialization and return best-effort state
-      this.initializeFromPlayerState().catch(e => {
-        console.error('❌ Emergency initialization failed:', e);
-      });
-      
-      // Return current state (will be defaults if never initialized)
-      console.log('⚠️ Returning current state (may be incomplete):', this.state);
+      // If not initialized and not initializing, this is an error condition
+      console.error('❌ ProgressionManager: getState() called before initialization! Call initializeFromPlayerState() first.');
+      console.warn('⚠️ Returning default state. Components should await initializeFromPlayerState() before calling getState().');
     }
     return this.state; 
+  }
+  
+  /**
+   * Async version of getState that waits for initialization to complete
+   * Use this in async contexts to ensure you get the correct state
+   */
+  async getStateAsync(): Promise<OnboardingState> {
+    if (!this.initialized && this.isInitializing && this.initPromise) {
+      console.log('⏳ ProgressionManager: Waiting for initialization to complete...');
+      await this.initPromise;
+    } else if (!this.initialized) {
+      console.warn('⚠️ ProgressionManager: Not initialized, initializing now...');
+      await this.initializeFromPlayerState();
+    }
+    return this.state;
+  }
+  
+  /**
+   * Check if manager is ready to use
+   */
+  isReady(): boolean {
+    return this.initialized && !this.isInitializing;
   }
 
   private async persist(immediate = false) {
@@ -138,10 +179,22 @@ class ProgressionManager {
         step: this.state.onboardingStep,
         bankComplete: this.state.bankOnboardingComplete,
         stockComplete: this.state.stockMarketOnboardingComplete,
-        unlockedBuildings: this.state.unlockedBuildings
+        unlockedBuildings: this.state.unlockedBuildings,
+        mayaPosition: this.state.mayaPosition
       });
       
-      const response = await playerStateApi.update({ onboarding: this.state }); 
+      // Send both client and server field names for full compatibility
+      const persistPayload = {
+        ...this.state,
+        // Server-side fields (source of truth in database)
+        hasCompletedBankOnboarding: this.state.bankOnboardingComplete,
+        hasReachedStockMarket: this.state.stockMarketOnboardingComplete,
+        // Client-side fields (for UI/game logic)
+        bankOnboardingComplete: this.state.bankOnboardingComplete,
+        stockMarketOnboardingComplete: this.state.stockMarketOnboardingComplete
+      };
+      
+      const response = await playerStateApi.update({ onboarding: persistPayload }); 
       
       if (response.success) {
         console.log('✅ ProgressionManager: State persisted successfully');
@@ -396,7 +449,16 @@ export const progressionManager = new ProgressionManager();
 if (typeof window !== 'undefined') {
   (window as any).progressionManager = progressionManager;
   (window as any).debugProgression = () => {
-    console.log('🔍 Progression Debug State:', progressionManager.getState());
+    console.log('🔍 Progression Debug Info:', {
+      initialized: progressionManager.isReady(),
+      isInitializing: (progressionManager as any).isInitializing,
+      state: progressionManager.getState()
+    });
     return progressionManager.getState();
+  };
+  (window as any).debugProgressionAsync = async () => {
+    const state = await progressionManager.getStateAsync();
+    console.log('🔍 Progression Async State (guaranteed initialized):', state);
+    return state;
   };
 }

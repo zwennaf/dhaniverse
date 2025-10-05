@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import TradeStockPopup from "./TradeStockPopup.tsx";
 import StockDetail from "./StockDetail.tsx";
@@ -87,10 +87,53 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
     const [traditionalStocks, setTraditionalStocks] = useState<Stock[]>([]);
     const [currentRupees, setCurrentRupees] = useState(playerRupees);
     const [portfolio, setPortfolio] = useState<PlayerPortfolio>({ holdings: [], transactionHistory: [] });
-    // Use parent's loading state - stocks are pre-loaded before dashboard renders
-    const [isLoading, setIsLoading] = useState(propsIsLoadingStocks ?? true);
+    
+    // DEBUG: Log initial props
+    console.log('🔍 [DASHBOARD MOUNT] Initial props:', {
+        hasStocks: propsStocks?.length || 0,
+        isLoadingFromParent: propsIsLoadingStocks
+    });
+    
+    // INSTANT LOADING: If stocks already provided, skip loading screen entirely
+    const [isLoading, setIsLoading] = useState(() => {
+        const shouldLoad = !(propsStocks && propsStocks.length > 0);
+        console.log('🎬 [INIT] Setting initial isLoading:', shouldLoad);
+        return shouldLoad;
+    });
     const [loadingStage, setLoadingStage] = useState("Loading Stock Market Data");
     const [viewMode, setViewMode] = useState<ViewMode>("cards");
+
+    // AGGRESSIVE: Force loading off if stocks are present
+    useEffect(() => {
+        console.log('🔄 [EFFECT] Props check:', {
+            hasStocks: propsStocks?.length || 0,
+            isCurrentlyLoading: isLoading,
+            parentLoading: propsIsLoadingStocks
+        });
+        
+        if (propsStocks && propsStocks.length > 0) {
+            if (isLoading) {
+                console.log('⚡ [FORCE] Stocks present, FORCING loading OFF');
+                setIsLoading(false);
+            }
+        } else if (!propsIsLoadingStocks && isLoading) {
+            // Parent says not loading but we still are - force off
+            console.log('⚠️ [FORCE] Parent not loading, FORCING loading OFF');
+            setIsLoading(false);
+        }
+    }, [propsStocks, propsIsLoadingStocks, isLoading]);
+    
+    // SAFETY TIMEOUT: Force loading off after 2 seconds maximum
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (isLoading) {
+                console.error('⏰ [TIMEOUT] Loading took too long, FORCING OFF after 2s');
+                setIsLoading(false);
+            }
+        }, 2000);
+        
+        return () => clearTimeout(timeout);
+    }, [isLoading]);
 
     // Fetch server transactions (authoritative) and hydrate analytics. Returns true if real history applied.
     const fetchAndHydrateTransactions = async (stockNames?: { [id: string]: string }) => {
@@ -270,13 +313,14 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         return () => window.removeEventListener("rupeesUpdated", handler);
     }, []);
 
-    // Filter and sort stocks
-    const getDisplayStocks = () => {
+    // Filter and sort stocks - OPTIMIZED with useMemo to prevent recalculation on every render
+    const displayStocks = useMemo(() => {
+        console.log('🔄 [MEMO] Recalculating displayStocks');
         let result = [...filteredStocks];
         
         // Apply sector filter
         if (filterOption !== "all") {
-            result = filteredStocks.filter(s => {
+            result = result.filter(s => {
                 const sector = s.sector?.toLowerCase() || "";
                 switch (filterOption) {
                     case "technology": return sector.includes("tech");
@@ -326,18 +370,20 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
             }
         });
         
+        console.log(`✅ [MEMO] displayStocks calculated: ${result.length} items`);
         return result;
-    };
+    }, [filteredStocks, filterOption, sortField, sortDirection]);
 
-    const displayStocks = getDisplayStocks();
+    // Create stock price map for portfolio analytics - OPTIMIZED with useMemo
+    const stockPriceMap = useMemo(() => {
+        return filteredStocks.reduce((map, stock) => {
+            map[stock.symbol.toLowerCase()] = stock.currentPrice; // Use lowercase for consistency
+            return map;
+        }, {} as { [stockId: string]: number });
+    }, [filteredStocks]);
 
-    // Create stock price map for portfolio analytics
-    const stockPriceMap = filteredStocks.reduce((map, stock) => {
-        map[stock.symbol.toLowerCase()] = stock.currentPrice; // Use lowercase for consistency
-        return map;
-    }, {} as { [stockId: string]: number });
-
-    const calculatePortfolioValue = () => {
+    // OPTIMIZED: Use useMemo to prevent recalculation on every render
+    const portfolioValue = useMemo(() => {
         let totalValue = 0;
         let totalInvestment = 0;
         
@@ -354,7 +400,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
         const profitLossPercent = totalInvestment > 0 ? (profitLoss / totalInvestment) * 100 : 0;
         
         return { totalValue, totalInvestment, profitLoss, profitLossPercent };
-    };
+    }, [portfolio.holdings, filteredStocks]);
 
     const openTrade = (stock: Stock) => {
         setSelectedStock(stock);
@@ -646,7 +692,7 @@ const StockMarketDashboard: React.FC<StockMarketDashboardProps> = ({ onClose, pl
                                     </div>
                                     <div className="text-right">
                                         <p className="text-xs text-gray-400 uppercase tracking-wide">Portfolio Value</p>
-                                        <p className="text-xl font-light text-yellow-500">₹{calculatePortfolioValue().totalValue.toLocaleString()}</p>
+                                        <p className="text-xl font-light text-yellow-500">₹{portfolioValue.totalValue.toLocaleString()}</p>
                                         <div className="flex items-center gap-1 justify-end mt-0.5">
                                             <span className="text-xs text-green-400 font-medium">●</span>
                                             <p className="text-xs text-gray-500">Live Prices via CoinGecko</p>
