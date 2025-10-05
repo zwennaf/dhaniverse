@@ -150,10 +150,10 @@ class ProgressionManager {
    */
   async getStateAsync(): Promise<OnboardingState> {
     if (!this.initialized && this.isInitializing && this.initPromise) {
-      console.log('⏳ ProgressionManager: Waiting for initialization to complete...');
+      // Silently wait for ongoing initialization
       await this.initPromise;
     } else if (!this.initialized) {
-      console.warn('⚠️ ProgressionManager: Not initialized, initializing now...');
+      // Trigger initialization if not started yet
       await this.initializeFromPlayerState();
     }
     return this.state;
