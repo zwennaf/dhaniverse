@@ -288,44 +288,6 @@ const BankingUI: React.FC = () => {
             {/* Enhanced backdrop with gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-black/95 via-gray-900/90 to-black/95" />
 
-            {/* Connection status overlay */}
-            <div className="absolute top-4 right-4 z-50">
-                <div
-                    className="bg-black/80 border-2 border-dhani-gold p-3 animate-slide-in-right"
-                    style={{ imageRendering: "pixelated" }}
-                >
-                    <div className="flex items-center space-x-3">
-                        <StatusIndicator type="success" size="sm" />
-                        <div className="font-vcr text-xs">
-                            <div className="text-dhani-gold font-bold tracking-wider">
-                                BANKING SYSTEM
-                            </div>
-                            <div className="text-white">ONLINE & SECURE</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Balance indicator */}
-            <div className="absolute top-4 left-4 z-50">
-                <div
-                    className="bg-dhani-gold/20 border-2 border-dhani-gold p-3 animate-slide-in-left"
-                    style={{ imageRendering: "pixelated" }}
-                >
-                    <div className="flex items-center space-x-3">
-                        <span className="text-2xl">💰</span>
-                        <div className="font-vcr">
-                            <div className="text-dhani-gold text-xs font-bold tracking-wider">
-                                WALLET BALANCE
-                            </div>
-                            <div className="text-white font-bold text-lg">
-                                ₹{playerRupees.toLocaleString()}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* Message notification */}
             {message && (
                 <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 animate-bounce-in">
@@ -365,7 +327,6 @@ const BankingUI: React.FC = () => {
             <div className="relative z-30 h-full animate-scale-in">
                 <BankingDashboard
                     onClose={handleClose}
-                    playerRupees={playerRupees}
                 />
             </div>
 
