@@ -97,11 +97,26 @@ gameRouter.use(authenticateUser);
 gameRouter.get("/game/player-state", async (ctx) => {
     try {
         const userId = ctx.state.userId;
+        
+        if (!userId) {
+            console.error("❌ No userId in context state - authentication may have failed");
+            ctx.response.status = 401;
+            ctx.response.body = { 
+                success: false,
+                error: "Unauthorized - No user ID found" 
+            };
+            return;
+        }
+
+        console.log(`📥 Loading player state for user: ${userId}`);
+        
         const playerStates = mongodb.getCollection<PlayerStateDocument>(
             COLLECTIONS.PLAYER_STATES
         );
 
         let playerState = await playerStates.findOne({ userId });
+        console.log(`🔍 Database lookup result: ${playerState ? 'Found existing user' : 'New user - no state found'}`);
+        
         // Create initial player state if doesn't exist
         if (!playerState) {
             const newPlayerState: PlayerStateDocument = {
@@ -130,63 +145,122 @@ gameRouter.get("/game/player-state", async (ctx) => {
                     hasCompletedBankOnboarding: false,
                     hasReachedStockMarket: false,
                     onboardingStep: 'not_started',
-                    unlockedBuildings: { bank: false, atm: false, stockmarket: false }
+                    unlockedBuildings: { bank: false, atm: false, stockmarket: false },
+                    bankOnboardingComplete: false,
+                    stockMarketOnboardingComplete: false,
+                    mayaPosition: { x: 7779, y: 3581 }
                 },
                 settings: {
                     soundEnabled: true,
                     musicEnabled: true,
                     autoSave: true,
                 },
+                schemaVersion: 2,
                 hasCompletedTutorial: false, // New players haven't completed tutorial yet
                 lastUpdated: new Date(),
             };
 
             const result = await playerStates.insertOne(newPlayerState);
             playerState = { ...newPlayerState, _id: result.insertedId };
+            
+            console.log(`✅ Created new player state for user ${userId} with schema version 2`);
+        } else {
+            // Ensure all required fields exist (auto-migration for old users)
+            let needsUpdate = false;
+            const updates: Partial<PlayerStateDocument> = {};
+
+            // Ensure schemaVersion exists
+            if (!playerState.schemaVersion) {
+                updates.schemaVersion = 2;
+                needsUpdate = true;
+            }
+
+            // Ensure hasCompletedTutorial exists
+            if (playerState.hasCompletedTutorial === undefined) {
+                updates.hasCompletedTutorial = playerState.onboarding?.hasClaimedMoney || false;
+                needsUpdate = true;
+            }
+
+            // Ensure onboarding object exists with all required fields
+            if (!playerState.onboarding) {
+                updates.onboarding = {
+                    hasMetMaya: false,
+                    hasFollowedMaya: false,
+                    hasClaimedMoney: false,
+                    hasCompletedBankOnboarding: false,
+                    hasReachedStockMarket: false,
+                    onboardingStep: 'not_started',
+                    unlockedBuildings: { bank: false, atm: false, stockmarket: false },
+                    bankOnboardingComplete: false,
+                    stockMarketOnboardingComplete: false,
+                    mayaPosition: { x: 7779, y: 3581 }
+                };
+                needsUpdate = true;
+            } else {
+                // Backfill missing onboarding fields - check and add all at once
+                const onb = playerState.onboarding;
+                const needsOnboardingUpdate = 
+                    !onb.mayaPosition ||
+                    onb.hasCompletedBankOnboarding === undefined ||
+                    onb.hasReachedStockMarket === undefined ||
+                    onb.bankOnboardingComplete === undefined ||
+                    onb.stockMarketOnboardingComplete === undefined ||
+                    !onb.unlockedBuildings;
+
+                if (needsOnboardingUpdate) {
+                    updates.onboarding = {
+                        ...onb,
+                        mayaPosition: onb.mayaPosition || { x: 7779, y: 3581 },
+                        hasCompletedBankOnboarding: onb.hasCompletedBankOnboarding ?? false,
+                        hasReachedStockMarket: onb.hasReachedStockMarket ?? false,
+                        bankOnboardingComplete: onb.bankOnboardingComplete ?? onb.hasCompletedBankOnboarding ?? false,
+                        stockMarketOnboardingComplete: onb.stockMarketOnboardingComplete ?? onb.hasReachedStockMarket ?? false,
+                        unlockedBuildings: onb.unlockedBuildings || { bank: false, atm: false, stockmarket: false }
+                    };
+                    needsUpdate = true;
+                }
+            }
+
+            // Apply updates if needed
+            if (needsUpdate) {
+                updates.lastUpdated = new Date();
+                await playerStates.updateOne({ userId }, { $set: updates });
+                
+                // Re-fetch updated state
+                const updated = await playerStates.findOne({ userId });
+                if (updated) {
+                    playerState = updated;
+                }
+                console.log(`✅ Auto-migrated player state for user ${userId}`);
+            }
         }
 
-        // Backfill onboarding defaults if missing (for legacy players)
-        let needsUpdate = false;
-    const claimedLegacy = (playerState as (PlayerStateDocument & { starterClaimed?: boolean })).starterClaimed === true || playerState.progress?.completedTutorials?.includes('starter-claimed');
-        
-        // Backfill hasCompletedTutorial for existing players
-        if (typeof playerState.hasCompletedTutorial === 'undefined') {
-            playerState.hasCompletedTutorial = claimedLegacy; // Legacy players who claimed starter are considered to have completed tutorial
-            needsUpdate = true;
-        }
-        
-        if (!playerState.onboarding) {
-            playerState.onboarding = {
-                hasMetMaya: claimedLegacy, // if legacy claimed, treat as completed
-                hasFollowedMaya: claimedLegacy,
-                hasClaimedMoney: claimedLegacy,
-                hasCompletedBankOnboarding: false,
-                hasReachedStockMarket: false,
-                onboardingStep: claimedLegacy ? 'claimed_money' : 'not_started',
-                unlockedBuildings: { bank: claimedLegacy, atm: false, stockmarket: false }
-            };
-            needsUpdate = true;
-        } else if (claimedLegacy && !playerState.onboarding.hasClaimedMoney) {
-            // Upgrade partially existing onboarding state to claimed completion
-            playerState.onboarding.hasMetMaya = true;
-            playerState.onboarding.hasFollowedMaya = true;
-            playerState.onboarding.hasClaimedMoney = true;
-            playerState.onboarding.onboardingStep = 'claimed_money';
-            playerState.onboarding.unlockedBuildings = { ...playerState.onboarding.unlockedBuildings, bank: true };
-            needsUpdate = true;
-        }
-        if (needsUpdate) {
-            await playerStates.updateOne({ userId }, { $set: { onboarding: playerState.onboarding, lastUpdated: new Date() } });
-        }
+        console.log(`✅ Returning player state for user ${userId}:`, {
+            hasCompletedTutorial: playerState.hasCompletedTutorial,
+            onboardingStep: playerState.onboarding?.onboardingStep,
+            schemaVersion: playerState.schemaVersion
+        });
 
         ctx.response.body = {
             success: true,
             data: playerState,
         };
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        console.error("❌ Get player state error:", {
+            userId: ctx.state.userId,
+            error: errorMessage,
+            stack: errorStack
+        });
+        
         ctx.response.status = 500;
-        ctx.response.body = { error: "Failed to get player state" };
-        console.error("Get player state error:", error);
+        ctx.response.body = { 
+            success: false,
+            error: "Failed to get player state",
+            details: errorMessage 
+        };
     }
 });
 

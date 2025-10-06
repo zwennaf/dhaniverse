@@ -30,11 +30,39 @@ class ProgressionManager {
   private state: OnboardingState = { ...DEFAULT_STATE };
   private syncing = false;
   private initialized = false;
+  private initPromise: Promise<void> | null = null;
+  private isInitializing = false;
 
   async initializeFromPlayerState(playerState?: any, forceRefresh = false) {
-    if (this.initialized && !forceRefresh) return;
+    // If already initializing, wait for that to complete
+    if (this.isInitializing && this.initPromise && !forceRefresh) {
+      console.log('⏳ ProgressionManager: Already initializing, waiting...');
+      await this.initPromise;
+      return;
+    }
     
-    console.log('🔄 ProgressionManager: Initializing from player state...');
+    // If already initialized and not forcing refresh, skip
+    if (this.initialized && !forceRefresh) {
+      console.log('✅ ProgressionManager already initialized, skipping');
+      return;
+    }
+    
+    // Set initializing flag
+    this.isInitializing = true;
+    
+    // Create initialization promise
+    this.initPromise = this._performInitialization(playerState, forceRefresh);
+    
+    try {
+      await this.initPromise;
+    } finally {
+      this.isInitializing = false;
+      this.initPromise = null;
+    }
+  }
+
+  private async _performInitialization(playerState?: any, forceRefresh = false) {
+    console.log('🔄 ProgressionManager: Initializing from player state...', { forceRefresh });
     
     // Always try to load from database first
     try {
@@ -42,37 +70,48 @@ class ProgressionManager {
       if (response.success && response.data?.onboarding) {
         const dbState = response.data.onboarding;
         
-        // CRITICAL FIX: Don't overwrite local state with older database state
-        // If we have a more recent local update (like bankOnboardingComplete), preserve it
-        const shouldPreserveLocal = this.initialized && this.state.bankOnboardingComplete && !dbState.bankOnboardingComplete;
-        
-        if (shouldPreserveLocal) {
-          console.log('⚠️ ProgressionManager: Local state is newer than database, preserving local state');
-          console.log('🔄 ProgressionManager: Saving newer local state to database');
-          await this.persist(); // Save our newer local state to database
-          return;
-        }
-        
-        this.state = { 
-          ...DEFAULT_STATE, 
-          ...dbState, 
-          unlockedBuildings: { 
-            ...DEFAULT_STATE.unlockedBuildings, 
-            ...(dbState.unlockedBuildings || {}) 
-          } 
+        // Sync server-side and client-side field naming
+        // Server uses: hasCompletedBankOnboarding, hasReachedStockMarket
+        // Client uses: bankOnboardingComplete, stockMarketOnboardingComplete
+        // IMPORTANT: Use OR (||) to get the TRUE value if either field is true
+        const syncedState = {
+          ...DEFAULT_STATE,
+          ...dbState,
+          // Prefer TRUE values - if either client or server field is true, use true
+          bankOnboardingComplete: dbState.hasCompletedBankOnboarding || dbState.bankOnboardingComplete || false,
+          stockMarketOnboardingComplete: dbState.hasReachedStockMarket || dbState.stockMarketOnboardingComplete || false,
+          unlockedBuildings: {
+            ...DEFAULT_STATE.unlockedBuildings,
+            ...(dbState.unlockedBuildings || {})
+          },
+          mayaPosition: dbState.mayaPosition || DEFAULT_STATE.mayaPosition
         };
+        
+        this.state = syncedState;
         this.initialized = true;
-        console.log('✅ ProgressionManager loaded from database. bankOnboardingComplete:', this.state.bankOnboardingComplete);
-        console.log('✅ Full state loaded:', this.state);
+        
+        // Log only the final, synced state - consolidated into ONE object
+        console.log('✅ ProgressionManager initialized from database. State is now ready:', {
+          step: this.state.onboardingStep,
+          bankComplete: this.state.bankOnboardingComplete,
+          stockComplete: this.state.stockMarketOnboardingComplete,
+          hasMetMaya: this.state.hasMetMaya,
+          hasClaimedMoney: this.state.hasClaimedMoney,
+          unlockedBuildings: this.state.unlockedBuildings,
+          mayaPosition: this.state.mayaPosition
+        });
         return;
+      } else {
+        console.log('📥 ProgressionManager: No onboarding data in database, using defaults');
       }
     } catch (error) {
-      console.warn('Failed to load progression from database, using fallback:', error);
+      console.warn('❌ ProgressionManager: Failed to load from database:', error);
     }
     
     // Fallback to provided player state (from localStorage or initial load)
     if (playerState?.onboarding) {
       const incoming = playerState.onboarding;
+      console.log('📥 ProgressionManager: Loading from provided player state:', incoming);
       this.state = { 
         ...DEFAULT_STATE, 
         ...incoming, 
@@ -81,168 +120,236 @@ class ProgressionManager {
           ...(incoming.unlockedBuildings || {}) 
         } 
       };
+    } else {
+      console.log('📥 ProgressionManager: Using DEFAULT_STATE');
+      this.state = { ...DEFAULT_STATE };
     }
     
     this.initialized = true;
+    console.log('✅ ProgressionManager initialized with fallback state:', this.state);
   }
 
   getState(): OnboardingState { 
     if (!this.initialized) {
-      console.warn('⚠️ ProgressionManager not initialized yet, initializing now...');
-      // Try to initialize synchronously from localStorage as fallback
-      const localData = localStorage.getItem('dhaniverse_player_state');
-      if (localData) {
-        try {
-          const parsed = JSON.parse(localData);
-          if (parsed?.onboarding) {
-            this.state = { 
-              ...DEFAULT_STATE, 
-              ...parsed.onboarding, 
-              unlockedBuildings: { 
-                ...DEFAULT_STATE.unlockedBuildings, 
-                ...(parsed.onboarding.unlockedBuildings || {}) 
-              } 
-            };
-            this.initialized = true;
-            console.log('✅ ProgressionManager initialized from localStorage fallback');
-          }
-        } catch (e) {
-          console.warn('Failed to parse localStorage fallback:', e);
-        }
+      // If currently initializing, warn but return current state
+      if (this.isInitializing) {
+        console.warn('⚠️ ProgressionManager: Initialization in progress, returning current state...');
+        return this.state;
       }
+      
+      // If not initialized and not initializing, this is an error condition
+      console.error('❌ ProgressionManager: getState() called before initialization! Call initializeFromPlayerState() first.');
+      console.warn('⚠️ Returning default state. Components should await initializeFromPlayerState() before calling getState().');
     }
     return this.state; 
   }
+  
+  /**
+   * Async version of getState that waits for initialization to complete
+   * Use this in async contexts to ensure you get the correct state
+   */
+  async getStateAsync(): Promise<OnboardingState> {
+    if (!this.initialized && this.isInitializing && this.initPromise) {
+      // Silently wait for ongoing initialization
+      await this.initPromise;
+    } else if (!this.initialized) {
+      // Trigger initialization if not started yet
+      await this.initializeFromPlayerState();
+    }
+    return this.state;
+  }
+  
+  /**
+   * Check if manager is ready to use
+   */
+  isReady(): boolean {
+    return this.initialized && !this.isInitializing;
+  }
 
-  private async persist() {
-    if (this.syncing) return; // simple throttle
+  private async persist(immediate = false) {
+    // Allow immediate persistence to bypass throttle for critical updates
+    if (this.syncing && !immediate) {
+      console.log('⏳ ProgressionManager: Sync already in progress, skipping');
+      return;
+    }
+    
     this.syncing = true;
     try { 
-      console.log('🔄 ProgressionManager: Persisting state to database:', this.state);
-      await playerStateApi.update({ onboarding: this.state }); 
-      console.log('✅ ProgressionManager: State persisted successfully');
+      console.log('💾 ProgressionManager: Persisting state to database:', {
+        step: this.state.onboardingStep,
+        bankComplete: this.state.bankOnboardingComplete,
+        stockComplete: this.state.stockMarketOnboardingComplete,
+        unlockedBuildings: this.state.unlockedBuildings,
+        mayaPosition: this.state.mayaPosition
+      });
+      
+      // Send both client and server field names for full compatibility
+      const persistPayload = {
+        ...this.state,
+        // Server-side fields (source of truth in database)
+        hasCompletedBankOnboarding: this.state.bankOnboardingComplete,
+        hasReachedStockMarket: this.state.stockMarketOnboardingComplete,
+        // Client-side fields (for UI/game logic)
+        bankOnboardingComplete: this.state.bankOnboardingComplete,
+        stockMarketOnboardingComplete: this.state.stockMarketOnboardingComplete
+      };
+      
+      const response = await playerStateApi.update({ onboarding: persistPayload }); 
+      
+      if (response.success) {
+        console.log('✅ ProgressionManager: State persisted successfully');
+      } else {
+        console.warn('⚠️ ProgressionManager: Persist returned non-success:', response);
+      }
     } catch(e){ 
-      console.warn('❌ ProgressionManager: Failed to persist onboarding', e);
+      console.error('❌ ProgressionManager: Failed to persist onboarding:', e);
+      // Don't throw - log and continue
     } finally { 
       this.syncing = false; 
     }
   }
 
-  markMetMaya() {
-    if (!this.state.hasMetMaya) {
-      this.state.hasMetMaya = true;
-      this.state.onboardingStep = 'met_maya';
-      this.persist();
+  async markMetMaya() {
+    if (this.state.hasMetMaya) {
+      console.log('👋 ProgressionManager: Already met Maya, skipping');
+      return;
     }
+    
+    this.state.hasMetMaya = true;
+    this.state.onboardingStep = 'met_maya';
+    console.log('👋 ProgressionManager: Marked met Maya');
+    
+    await this.persist(true);
   }
 
-  markFollowedMaya() {
+  async markFollowedMaya() {
+    if (this.state.hasFollowedMaya) {
+      console.log('🚶 ProgressionManager: Already followed Maya, skipping');
+      return;
+    }
+    
+    this.state.hasFollowedMaya = true;
+    if (!this.state.hasClaimedMoney) {
+      this.state.onboardingStep = 'at_bank_with_maya';
+    }
+    
+    // Update Maya position to bank area where she arrives after guiding
+    this.state.mayaPosition = { x: 9415, y: 6297 };
+    console.log('🚶 ProgressionManager: Marked followed Maya');
+    
+    await this.persist(true);
+  }
+
+  async markClaimedMoney() {
+    if (this.state.hasClaimedMoney) {
+      console.log('💰 ProgressionManager: Already claimed money, skipping');
+      return;
+    }
+    
+    this.state.hasClaimedMoney = true;
+    this.state.onboardingStep = 'claimed_money';
+    
+    // Ensure consistency: if money is claimed, Maya must have been followed
     if (!this.state.hasFollowedMaya) {
       this.state.hasFollowedMaya = true;
-      if (!this.state.hasClaimedMoney) this.state.onboardingStep = 'at_bank_with_maya';
-      // Update Maya position to bank area where she arrives after guiding
-      this.state.mayaPosition = { x: 9415, y: 6297 };
-      this.persist();
+      console.log('🔧 Auto-correcting hasFollowedMaya to true for consistency');
+    }
+    
+    // Unlock ONLY bank building at this stage (stock market stays locked until bank onboarding complete)
+    this.state.unlockedBuildings.bank = true;
+    console.log('💰 ProgressionManager: Marked claimed money, unlocked bank');
+    
+    await this.persist(true);
+    
+    // Also mark the main tutorial as completed when user claims starter money
+    try {
+      await playerStateApi.update({ hasCompletedTutorial: true });
+      console.log('✅ Main tutorial marked as completed after claiming starter money');
+    } catch (error) {
+      console.warn('Failed to mark main tutorial as completed:', error);
     }
   }
 
-  markClaimedMoney() {
-    if (!this.state.hasClaimedMoney) {
-      this.state.hasClaimedMoney = true;
-      this.state.onboardingStep = 'claimed_money';
-      // Ensure consistency: if money is claimed, Maya must have been followed
-      if (!this.state.hasFollowedMaya) {
-        this.state.hasFollowedMaya = true;
-        console.log('🔧 Auto-correcting hasFollowedMaya to true for consistency');
-      }
-      // Unlock ONLY bank building at this stage (stock market stays locked until bank onboarding complete)
-      this.state.unlockedBuildings.bank = true;
-      this.persist();
-      
-      // Also mark the main tutorial as completed when user claims starter money
-      // This is the point where the basic Maya tutorial is considered complete
-      (async () => {
-        try {
-          const { playerStateApi } = await import('../utils/api');
-          await playerStateApi.update({ hasCompletedTutorial: true });
-          console.log('✅ Main tutorial marked as completed after claiming starter money');
-        } catch (error) {
-          console.warn('Failed to mark main tutorial as completed:', error);
-        }
-      })();
-    }
-  }
-
-  markBankOnboardingCompleted() {
+  async markBankOnboardingCompleted() {
     console.log('🏦 ProgressionManager: markBankOnboardingCompleted called. Current state:', this.state.bankOnboardingComplete);
-    if (!this.state.bankOnboardingComplete) {
-      this.state.bankOnboardingComplete = true;
-      if (this.state.onboardingStep === 'claimed_money') this.state.onboardingStep = 'bank_onboarding_complete';
-      // Maya remains at bank entrance ready for stock market guidance
-      this.state.mayaPosition = { x: 9415, y: 6297 };
-      // Unlock stock market building when bank onboarding is completed
-      this.state.unlockedBuildings.stockmarket = true;
-      console.log('🏦 ProgressionManager: Bank onboarding marked as completed. New state:', this.state);
-      
-      // Immediately persist the change and wait for it
-      this.persistAndWait().then(() => {
-        console.log('✅ ProgressionManager: Bank onboarding state persisted successfully');
-      }).catch(e => {
-        console.warn('❌ ProgressionManager: Failed to persist bank onboarding state:', e);
-      });
-      
-      // Also try to update localStorage as backup
-      try {
-        localStorage.setItem('dhaniverse_bank_onboarding_completed', 'true');
-        console.log('✅ Also set localStorage backup flag: dhaniverse_bank_onboarding_completed = true');
-      } catch (e) {
-        console.warn('Failed to set localStorage backup flag:', e);
-      }
-      
-      // Notify UI that stock market unlocked
-      try {
-        window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
-      } catch (e) {
-        console.warn('Failed to dispatch stockMarketUnlocked event', e);
-      }
-    } else {
-      console.log('🏦 ProgressionManager: Bank onboarding was already completed, not marking again');
+    
+    if (this.state.bankOnboardingComplete) {
+      console.log('🏦 ProgressionManager: Bank onboarding was already completed, skipping');
+      return;
+    }
+    
+    // Update state
+    this.state.bankOnboardingComplete = true;
+    if (this.state.onboardingStep === 'claimed_money') {
+      this.state.onboardingStep = 'bank_onboarding_complete';
+    }
+    
+    // Maya remains at bank entrance ready for stock market guidance
+    this.state.mayaPosition = { x: 9415, y: 6297 };
+    
+    // Unlock stock market building when bank onboarding is completed
+    this.state.unlockedBuildings.stockmarket = true;
+    
+    console.log('🏦 ProgressionManager: Bank onboarding marked as completed. New state:', {
+      step: this.state.onboardingStep,
+      bankComplete: this.state.bankOnboardingComplete,
+      unlockedBuildings: this.state.unlockedBuildings
+    });
+    
+    // CRITICAL: Immediately persist with immediate flag to bypass throttle
+    try {
+      await this.persist(true);
+      console.log('✅ ProgressionManager: Bank onboarding state persisted successfully');
+    } catch (e) {
+      console.error('❌ ProgressionManager: Failed to persist bank onboarding state:', e);
+    }
+    
+    // Notify UI that stock market unlocked
+    try {
+      window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
+      console.log('📢 Dispatched stockMarketUnlocked event');
+    } catch (e) {
+      console.warn('Failed to dispatch stockMarketUnlocked event:', e);
     }
   }
 
-  // Helper method to persist and wait (without throttling for critical updates)
-  private async persistAndWait() {
-    try { 
-      console.log('🔄 ProgressionManager: Force persisting critical state to database:', this.state);
-      await playerStateApi.update({ onboarding: this.state }); 
-      console.log('✅ ProgressionManager: Critical state persisted successfully');
-    } catch(e){ 
-      console.warn('❌ ProgressionManager: Failed to persist critical state', e);
-      throw e;
+  async markStockMarketOnboardingCompleted() {
+    if (this.state.stockMarketOnboardingComplete) {
+      console.log('📈 ProgressionManager: Stock market onboarding already completed, skipping');
+      return;
+    }
+    
+    this.state.stockMarketOnboardingComplete = true;
+    this.state.onboardingStep = 'stock_market_onboarding_complete';
+    
+    // Ensure stockmarket building is unlocked
+    this.state.unlockedBuildings.stockmarket = true;
+    
+    // Update Maya position to stock market entrance
+    this.state.mayaPosition = { x: 2598, y: 3736 };
+    
+    console.log('📈 ProgressionManager: Stock market onboarding marked as completed');
+    
+    // Immediately persist
+    try {
+      await this.persist(true);
+      console.log('✅ ProgressionManager: Stock market onboarding state persisted successfully');
+    } catch (e) {
+      console.error('❌ ProgressionManager: Failed to persist stock market onboarding state:', e);
+    }
+    
+    // Notify UI that stock market unlocked
+    try {
+      window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
+    } catch (e) {
+      console.warn('Failed to dispatch stockMarketUnlocked event:', e);
     }
   }
 
-  markStockMarketOnboardingCompleted() {
-    if (!this.state.stockMarketOnboardingComplete) {
-      this.state.stockMarketOnboardingComplete = true;
-      this.state.onboardingStep = 'stock_market_onboarding_complete';
-      // Ensure stockmarket building is unlocked (should already be unlocked from bank completion)
-      this.state.unlockedBuildings.stockmarket = true;
-      // Update Maya position to stock market entrance
-      this.state.mayaPosition = { x: 2598, y: 3736 };
-      this.persist();
-      // Notify UI that stock market unlocked so it can lazily mount
-      try {
-        window.dispatchEvent(new CustomEvent('stockMarketUnlocked'));
-      } catch (e) {
-        console.warn('Failed to dispatch stockMarketUnlocked event', e);
-      }
-    }
-  }
-
-  updateMayaPosition(x: number, y: number) {
+  async updateMayaPosition(x: number, y: number) {
     this.state.mayaPosition = { x, y };
-    this.persist();
+    console.log('📍 ProgressionManager: Updated Maya position to:', { x, y });
+    await this.persist();
   }
 
   getMayaPosition(): { x: number; y: number } {
@@ -342,7 +449,16 @@ export const progressionManager = new ProgressionManager();
 if (typeof window !== 'undefined') {
   (window as any).progressionManager = progressionManager;
   (window as any).debugProgression = () => {
-    console.log('🔍 Progression Debug State:', progressionManager.getState());
+    console.log('🔍 Progression Debug Info:', {
+      initialized: progressionManager.isReady(),
+      isInitializing: (progressionManager as any).isInitializing,
+      state: progressionManager.getState()
+    });
     return progressionManager.getState();
+  };
+  (window as any).debugProgressionAsync = async () => {
+    const state = await progressionManager.getStateAsync();
+    console.log('🔍 Progression Async State (guaranteed initialized):', state);
+    return state;
   };
 }

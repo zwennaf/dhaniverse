@@ -1,65 +1,31 @@
 /**
- * StockMarketDataService - Single Batch Call for Complete Market Data
+ * StockMarketDataService - Dual-Source Market Data Integration
  * 
- * This service fetches ALL stock market data in ONE canister call.
- * No spamming, no multiple requests - just one call to get everything.
+ * This service fetches market data from TWO sources:
+ * 1. CoinGecko API - Real cryptocurrency prices
+ * 2. Polygon.io API - Real stock prices
  * 
- * Architecture:
- * - One call: `getCompleteMarketData()`
- * - Returns: All stocks with prices, history, metrics, news
- * - Cached: 5 minutes for optimal performance
- * - Format: Ready for StockDetail.tsx and StockGraph.tsx
+ * NO FALLBACK PRICES - Always uses live market data.
  * 
  * @author Dhaniverse Team
- * @date 2025-10-03
+ * @date 2025-10-05
  */
 
-import { canisterService } from './CanisterService';
+import { coinGeckoService } from './CoinGeckoService';
+import { polygonService } from './PolygonService';
 import { convertUsdToInr } from '../utils/currencyConversion';
+import type { StockPrice } from '../types/stock.types';
 
 // ============================================================================
-// TYPES - Matches Rust canister types exactly
+// TYPES
 // ============================================================================
 
-export interface StockPrice {
-    timestamp: bigint;
-    price: number;
-    volume: bigint;
-    high: number;
-    low: number;
-    open: number;
-    close: number;
-}
-
-export interface StockMetrics {
-    market_cap: number;
-    pe_ratio: number;
-    eps: number;
-    debt_equity_ratio: number;
-    business_growth: number;
-    industry_avg_pe: number;
-    outstanding_shares: bigint;
-    volatility: number;
-}
-
-export interface CanisterStock {
-    id: string;
-    name: string;
-    symbol: string;
-    current_price: number;
-    price_history: StockPrice[];
-    metrics: StockMetrics;
-    news: string[];
-    last_update: bigint;
-}
-
-// UI-friendly format for components
 export interface UIStock {
     id: string;
-    symbol: string; // Stock symbol (same as id)
+    symbol: string;
     name: string;
     currentPrice: number;
-    priceHistory: number[]; // Simplified for graph
+    priceHistory: number[];
     debtEquityRatio: number;
     businessGrowth: number;
     news: string[];
@@ -70,14 +36,14 @@ export interface UIStock {
     outstandingShares: number;
     volatility: number;
     lastUpdate: number;
-    sector?: string; // Stock sector (technology, finance, etc.)
+    sector?: string;
 }
 
 export interface MarketDataResponse {
     success: boolean;
     stocks: UIStock[];
     timestamp: number;
-    source: 'canister' | 'cache' | 'fallback';
+    source: 'coingecko' | 'polygon' | 'mixed' | 'cache';
     error?: string;
 }
 
@@ -87,63 +53,186 @@ export interface MarketDataResponse {
 
 const CONFIG = {
     CACHE_TTL: 5 * 60 * 1000, // 5 minutes
-    STORAGE_KEY: 'dhaniverse_market_data',
-    FALLBACK_STOCKS: [
-        'AAPL', 'GOOGL', 'MSFT', 'TSLA', 'NVDA',
-        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK'
-    ]
 } as const;
+
+// ============================================================================
+// STOCK METADATA
+// ============================================================================
+
+const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
+    // US Tech Stocks
+    'AAPL': { name: 'Apple Inc.', sector: 'Technology' },
+    'MSFT': { name: 'Microsoft Corporation', sector: 'Technology' },
+    'GOOGL': { name: 'Alphabet Inc.', sector: 'Technology' },
+    'AMZN': { name: 'Amazon.com Inc.', sector: 'Technology' },
+    'TSLA': { name: 'Tesla Inc.', sector: 'Automotive' },
+    'META': { name: 'Meta Platforms Inc.', sector: 'Technology' },
+    'NVDA': { name: 'NVIDIA Corporation', sector: 'Technology' },
+    'NFLX': { name: 'Netflix Inc.', sector: 'Entertainment' },
+    // Financial
+    'JPM': { name: 'JPMorgan Chase & Co.', sector: 'Finance' },
+    'BAC': { name: 'Bank of America Corp.', sector: 'Finance' },
+    'V': { name: 'Visa Inc.', sector: 'Finance' },
+    'MA': { name: 'Mastercard Inc.', sector: 'Finance' },
+    // Healthcare
+    'JNJ': { name: 'Johnson & Johnson', sector: 'Healthcare' },
+    'PFE': { name: 'Pfizer Inc.', sector: 'Healthcare' },
+    'UNH': { name: 'UnitedHealth Group', sector: 'Healthcare' },
+    // Energy
+    'XOM': { name: 'Exxon Mobil Corporation', sector: 'Energy' },
+    'CVX': { name: 'Chevron Corporation', sector: 'Energy' },
+    // Retail
+    'WMT': { name: 'Walmart Inc.', sector: 'Retail' },
+    'HD': { name: 'The Home Depot Inc.', sector: 'Retail' },
+};
+
+const CRYPTO_NAMES: Record<string, string> = {
+    'BTC': 'Bitcoin',
+    'ETH': 'Ethereum',
+    'SOL': 'Solana',
+    'BNB': 'Binance Coin',
+    'ADA': 'Cardano',
+    'AVAX': 'Avalanche',
+    'DOT': 'Polkadot',
+    'MATIC': 'Polygon',
+    'LINK': 'Chainlink',
+    'UNI': 'Uniswap',
+    'LTC': 'Litecoin',
+    'ICP': 'Internet Computer',
+    'XRP': 'Ripple',
+    'ATOM': 'Cosmos',
+    'ALGO': 'Algorand',
+};
 
 // ============================================================================
 // STOCK MARKET DATA SERVICE
 // ============================================================================
 
 class StockMarketDataService {
-    private cache: MarketDataResponse | null = null;
-    private cacheTimestamp: number = 0;
-    private isFetching: boolean = false;
-    private pendingCallbacks: Array<(data: MarketDataResponse) => void> = [];
+    private cryptoCache: MarketDataResponse | null = null;
+    private cryptoCacheTimestamp: number = 0;
+    private stockCache: MarketDataResponse | null = null;
+    private stockCacheTimestamp: number = 0;
 
     constructor() {
-        this.loadFromStorage();
-        console.log('📊 StockMarketDataService initialized - ONE CALL architecture');
+        console.log('📊 StockMarketDataService initialized - Dual source (CoinGecko + Polygon)');
     }
 
     // ========================================================================
-    // PUBLIC API - THE ONLY METHOD YOU NEED
+    // PUBLIC API
     // ========================================================================
 
     /**
-     * Get complete market data for ALL stocks in ONE call
-     * Returns cached data if fresh (< 5 min old), otherwise fetches from canister
+     * Get cryptocurrency data from CoinGecko
+     */
+    async getCryptocurrencies(forceRefresh = false): Promise<MarketDataResponse> {
+        if (!forceRefresh && this.isCryptoCacheValid()) {
+            console.log('✅ Cryptocurrency data from cache');
+            return this.cryptoCache!;
+        }
+
+        try {
+            console.log('💰 Fetching cryptocurrencies from CoinGecko...');
+            
+            const cryptoSymbols = coinGeckoService.getSupportedSymbols().slice(0, 15); // First 15
+            const prices = await coinGeckoService.getPrices(cryptoSymbols);
+            
+            const stocks = prices.map(price => this.convertPriceToUIStock(price, 'crypto'));
+            
+            const response: MarketDataResponse = {
+                success: true,
+                stocks,
+                timestamp: Date.now(),
+                source: 'coingecko'
+            };
+            
+            this.cryptoCache = response;
+            this.cryptoCacheTimestamp = Date.now();
+            
+            console.log(`✅ Loaded ${stocks.length} cryptocurrencies from CoinGecko`);
+            return response;
+            
+        } catch (error) {
+            console.error('❌ Failed to fetch cryptocurrencies:', error);
+            return {
+                success: false,
+                stocks: [],
+                timestamp: Date.now(),
+                source: 'coingecko',
+                error: 'Failed to fetch cryptocurrency data'
+            };
+        }
+    }
+
+    /**
+     * Get stock data from Polygon.io
+     */
+    async getStocks(forceRefresh = false): Promise<MarketDataResponse> {
+        if (!forceRefresh && this.isStockCacheValid()) {
+            console.log('✅ Stock data from cache');
+            return this.stockCache!;
+        }
+
+        try {
+            console.log('📈 Fetching stocks from Polygon.io...');
+            
+            const stockSymbols = polygonService.getSupportedSymbols().slice(0, 10); // First 10
+            const prices = await polygonService.getPrices(stockSymbols);
+            
+            const stocks = prices.map(price => this.convertPriceToUIStock(price, 'stock'));
+            
+            const response: MarketDataResponse = {
+                success: true,
+                stocks,
+                timestamp: Date.now(),
+                source: 'polygon'
+            };
+            
+            this.stockCache = response;
+            this.stockCacheTimestamp = Date.now();
+            
+            console.log(`✅ Loaded ${stocks.length} stocks from Polygon.io`);
+            return response;
+            
+        } catch (error) {
+            console.error('❌ Failed to fetch stocks:', error);
+            return {
+                success: false,
+                stocks: [],
+                timestamp: Date.now(),
+                source: 'polygon',
+                error: 'Failed to fetch stock data'
+            };
+        }
+    }
+
+    /**
+     * Get ALL market data (crypto + stocks combined)
      */
     async getCompleteMarketData(forceRefresh = false): Promise<MarketDataResponse> {
-        // Check cache first
-        if (!forceRefresh && this.isCacheValid()) {
-            console.log('✅ Market data from cache');
-            return this.cache!;
-        }
+        const [cryptoData, stockData] = await Promise.all([
+            this.getCryptocurrencies(forceRefresh),
+            this.getStocks(forceRefresh)
+        ]);
 
-        // If already fetching, wait for that call to complete
-        if (this.isFetching) {
-            console.log('⏳ Market data fetch in progress, waiting...');
-            return new Promise((resolve) => {
-                this.pendingCallbacks.push(resolve);
-            });
-        }
-
-        // Fetch fresh data
-        return this.fetchMarketData();
+        return {
+            success: cryptoData.success && stockData.success,
+            stocks: [...cryptoData.stocks, ...stockData.stocks],
+            timestamp: Date.now(),
+            source: 'mixed',
+            error: cryptoData.error || stockData.error
+        };
     }
 
     /**
-     * Clear cache and force refresh on next call
+     * Clear all caches
      */
     clearCache(): void {
-        this.cache = null;
-        this.cacheTimestamp = 0;
-        localStorage.removeItem(CONFIG.STORAGE_KEY);
-        console.log('🗑️ Market data cache cleared');
+        this.cryptoCache = null;
+        this.cryptoCacheTimestamp = 0;
+        this.stockCache = null;
+        this.stockCacheTimestamp = 0;
+        console.log('🗑️ All market data caches cleared');
     }
 
     /**
@@ -151,11 +240,18 @@ class StockMarketDataService {
      */
     getCacheStatus() {
         return {
-            isCached: this.cache !== null,
-            cacheAge: this.cache ? Date.now() - this.cacheTimestamp : 0,
-            isValid: this.isCacheValid(),
-            stockCount: this.cache?.stocks.length || 0,
-            source: this.cache?.source || 'none'
+            crypto: {
+                isCached: this.cryptoCache !== null,
+                cacheAge: this.cryptoCache ? Date.now() - this.cryptoCacheTimestamp : 0,
+                isValid: this.isCryptoCacheValid(),
+                count: this.cryptoCache?.stocks.length || 0
+            },
+            stocks: {
+                isCached: this.stockCache !== null,
+                cacheAge: this.stockCache ? Date.now() - this.stockCacheTimestamp : 0,
+                isValid: this.isStockCacheValid(),
+                count: this.stockCache?.stocks.length || 0
+            }
         };
     }
 
@@ -163,211 +259,73 @@ class StockMarketDataService {
     // PRIVATE METHODS
     // ========================================================================
 
-    private async fetchMarketData(): Promise<MarketDataResponse> {
-        this.isFetching = true;
-
-        try {
-            console.log('🔄 Fetching complete market data from canister...');
-            
-            // ONE CALL to get all stocks
-            const result = await canisterService.getMarketSummary();
-            
-            if (result && typeof result === 'object') {
-                // Convert HashMap<String, Stock> to array
-                const stocks = Object.entries(result).map(([symbol, stock]) => 
-                    this.convertToUIFormat(stock as any)
-                );
-
-                const response: MarketDataResponse = {
-                    success: true,
-                    stocks,
-                    timestamp: Date.now(),
-                    source: 'canister'
-                };
-
-                this.updateCache(response);
-                this.notifyPendingCallbacks(response);
-
-                console.log(`✅ Fetched ${stocks.length} stocks from canister in ONE call`);
-                return response;
-            }
-
-            throw new Error('Invalid response from canister');
-
-        } catch (error) {
-            console.error('❌ Failed to fetch market data from canister:', error);
-            
-            // Try fallback
-            const fallbackResponse = this.getFallbackData();
-            this.notifyPendingCallbacks(fallbackResponse);
-            return fallbackResponse;
-
-        } finally {
-            this.isFetching = false;
-        }
-    }
-
-    private convertToUIFormat(canisterStock: CanisterStock): UIStock {
-        const symbol = canisterStock.symbol || canisterStock.id;
-        
-        // Convert all USD prices to INR (1 USD = 83 INR)
-        const currentPriceInr = convertUsdToInr(canisterStock.current_price);
-        const priceHistoryInr = canisterStock.price_history.map(p => convertUsdToInr(p.close));
-        const marketCapInr = convertUsdToInr(canisterStock.metrics.market_cap);
-        const epsInr = convertUsdToInr(canisterStock.metrics.eps);
-        
-        return {
-            id: symbol,
-            symbol: symbol,
-            name: canisterStock.name,
-            currentPrice: currentPriceInr,
-            priceHistory: priceHistoryInr,
-            debtEquityRatio: canisterStock.metrics.debt_equity_ratio,
-            businessGrowth: canisterStock.metrics.business_growth,
-            news: canisterStock.news,
-            marketCap: marketCapInr,
-            peRatio: canisterStock.metrics.pe_ratio, // Ratio stays same
-            eps: epsInr,
-            industryAvgPE: canisterStock.metrics.industry_avg_pe, // Ratio stays same
-            outstandingShares: Number(canisterStock.metrics.outstanding_shares),
-            volatility: canisterStock.metrics.volatility, // Percentage stays same
-            lastUpdate: Number(canisterStock.last_update),
-            sector: this.determineSector(symbol)
-        };
-    }
-    
-    private determineSector(symbol: string): string {
-        const upperSymbol = symbol.toUpperCase();
-        
-        // Technology stocks
-        if (['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'META', 'AMZN', 'TSLA'].includes(upperSymbol)) {
-            return 'Technology';
-        }
-        
-        // Finance stocks
-        if (['HDFCBANK', 'ICICIBANK', 'SBIN', 'AXISBANK', 'KOTAKBANK'].includes(upperSymbol)) {
-            return 'Finance';
-        }
-        
-        // IT Services
-        if (['TCS', 'INFY', 'WIPRO', 'HCLTECH', 'TECHM'].includes(upperSymbol)) {
-            return 'Technology';
-        }
-        
-        // Consumer/Retail
-        if (['RELIANCE', 'HINDUNILVR', 'ITC', 'ASIANPAINT', 'NESTLEIND'].includes(upperSymbol)) {
-            return 'Consumer';
-        }
-        
-        // Cryptocurrency
-        if (['BTC', 'ETH', 'USDT', 'BNB', 'SOL'].includes(upperSymbol)) {
-            return 'Cryptocurrency';
-        }
-        
-        // Default to Technology
-        return 'Technology';
-    }
-
-    private isCacheValid(): boolean {
-        if (!this.cache || this.cacheTimestamp === 0) return false;
-        const age = Date.now() - this.cacheTimestamp;
+    private isCryptoCacheValid(): boolean {
+        if (!this.cryptoCache || this.cryptoCacheTimestamp === 0) return false;
+        const age = Date.now() - this.cryptoCacheTimestamp;
         return age < CONFIG.CACHE_TTL;
     }
 
-    private updateCache(data: MarketDataResponse): void {
-        this.cache = data;
-        this.cacheTimestamp = Date.now();
-        this.saveToStorage(data);
+    private isStockCacheValid(): boolean {
+        if (!this.stockCache || this.stockCacheTimestamp === 0) return false;
+        const age = Date.now() - this.stockCacheTimestamp;
+        return age < CONFIG.CACHE_TTL;
     }
 
-    private notifyPendingCallbacks(data: MarketDataResponse): void {
-        this.pendingCallbacks.forEach(callback => callback(data));
-        this.pendingCallbacks = [];
-    }
-
-    private saveToStorage(data: MarketDataResponse): void {
-        try {
-            localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify({
-                data,
-                timestamp: this.cacheTimestamp
-            }));
-        } catch (error) {
-            console.warn('Failed to save market data to storage:', error);
-        }
-    }
-
-    private loadFromStorage(): void {
-        try {
-            const stored = localStorage.getItem(CONFIG.STORAGE_KEY);
-            if (!stored) return;
-
-            const { data, timestamp } = JSON.parse(stored);
-            const age = Date.now() - timestamp;
-
-            if (age < CONFIG.CACHE_TTL) {
-                this.cache = data;
-                this.cacheTimestamp = timestamp;
-                console.log(`✅ Loaded ${data.stocks.length} stocks from storage (${Math.round(age / 1000)}s old)`);
-            } else {
-                localStorage.removeItem(CONFIG.STORAGE_KEY);
-            }
-        } catch (error) {
-            console.warn('Failed to load market data from storage:', error);
-        }
-    }
-
-    private getFallbackData(): MarketDataResponse {
-        console.warn('⚠️ Using fallback stock data');
-
-        // Fallback prices in USD (will be converted to INR)
-        const fallbackPricesUsd: Record<string, number> = {
-            'AAPL': 175, 'GOOGL': 140, 'MSFT': 370, 'TSLA': 250, 'NVDA': 480,
-            'RELIANCE': 30, 'TCS': 42, 'HDFCBANK': 20, 'INFY': 17.5, 'ICICIBANK': 11.5
-        };
-
-        const stocks: UIStock[] = CONFIG.FALLBACK_STOCKS.map(symbol => {
-            const usdPrice = fallbackPricesUsd[symbol] || 100;
-            const inrPrice = convertUsdToInr(usdPrice);
+    private convertPriceToUIStock(price: StockPrice, type: 'crypto' | 'stock'): UIStock {
+        const inrPrice = convertUsdToInr(price.price);
+        const symbol = price.symbol.toUpperCase();
+        
+        // Get name and sector
+        const name = type === 'crypto' 
+            ? (CRYPTO_NAMES[symbol] || symbol)
+            : (STOCK_METADATA[symbol]?.name || symbol);
             
-            return {
-                id: symbol,
-                symbol: symbol,
-                name: symbol,
-                currentPrice: inrPrice,
-                priceHistory: this.generateMockHistory(inrPrice),
-                debtEquityRatio: 0.8,
-                businessGrowth: 5.0,
-                news: ['Market update: Trading at stable levels'],
-                marketCap: convertUsdToInr(1000000000),
-                peRatio: 20.0,
-                eps: convertUsdToInr(35.0),
-                industryAvgPE: 22.0,
-                outstandingShares: 1000000,
-                volatility: 0.15,
-                lastUpdate: Date.now(),
-                sector: this.determineSector(symbol)
-            };
-        });
+        const sector = type === 'crypto'
+            ? 'Cryptocurrency'
+            : (STOCK_METADATA[symbol]?.sector || 'Unknown');
 
         return {
-            success: true,
-            stocks,
-            timestamp: Date.now(),
-            source: 'fallback'
+            id: symbol.toLowerCase(),
+            symbol: symbol,
+            name: name,
+            currentPrice: inrPrice,
+            priceHistory: this.generateMockHistory(inrPrice),
+            debtEquityRatio: type === 'stock' ? 0.8 : 0,
+            businessGrowth: price.changePercent,
+            news: this.generateMockNews(name, price.changePercent),
+            marketCap: convertUsdToInr(price.volume * price.price * 1000), // Estimate
+            peRatio: type === 'stock' ? 20.0 : 0,
+            eps: type === 'stock' ? convertUsdToInr(35.0) : 0,
+            industryAvgPE: type === 'stock' ? 22.0 : 0,
+            outstandingShares: 1000000000,
+            volatility: Math.abs(price.changePercent) / 100,
+            lastUpdate: price.timestamp,
+            sector: sector
         };
     }
 
     private generateMockHistory(currentPrice: number): number[] {
         const history: number[] = [];
-        let price = currentPrice * 0.9; // Start 10% lower
+        let price = currentPrice * 0.9;
         
         for (let i = 0; i < 30; i++) {
             history.push(price);
-            price += (Math.random() - 0.48) * currentPrice * 0.02; // Random walk
+            price += (Math.random() - 0.48) * currentPrice * 0.02;
         }
         
-        history.push(currentPrice); // End at current price
+        history.push(currentPrice);
         return history;
+    }
+
+    private generateMockNews(name: string, changePercent: number): string[] {
+        const direction = changePercent > 0 ? 'up' : 'down';
+        const change = Math.abs(changePercent).toFixed(2);
+        
+        return [
+            `${name} is ${direction} ${change}% today`,
+            `Market analysis: ${name} showing ${changePercent > 0 ? 'bullish' : 'bearish'} trends`,
+            `Trading volume increases for ${name}`,
+        ];
     }
 }
 

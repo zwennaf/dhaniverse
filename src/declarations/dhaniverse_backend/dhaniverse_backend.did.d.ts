@@ -217,6 +217,42 @@ export interface _SERVICE {
       } |
       { 'Err' : string }
   >,
+  'get_market_summary_real' : ActorMethod<
+    [],
+    {
+        'Ok' : { [key: string]: {
+              'id' : string,
+              'metrics' : {
+                'eps' : number,
+                'market_cap' : number,
+                'volatility' : number,
+                'pe_ratio' : number,
+                'outstanding_shares' : bigint,
+                'industry_avg_pe' : number,
+                'business_growth' : number,
+                'debt_equity_ratio' : number,
+              },
+              'name' : string,
+              'news' : Array<string>,
+              'current_price' : number,
+              'price_history' : Array<
+                {
+                  'low' : number,
+                  'high' : number,
+                  'close' : number,
+                  'open' : number,
+                  'volume' : bigint,
+                  'timestamp' : bigint,
+                  'price' : number,
+                }
+              >,
+              'last_update' : bigint,
+              'symbol' : string,
+            }
+        }
+      } |
+      { 'Err' : string }
+  >,
   'get_price_history' : ActorMethod<[], Array<PriceSnapshot>>,
   'get_session' : ActorMethod<[string], [] | [Web3Session]>,
   'get_stock_data' : ActorMethod<

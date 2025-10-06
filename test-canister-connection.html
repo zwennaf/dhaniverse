@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canister Connection Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .test-section {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        .test-section.error {
+            border-left-color: #f44336;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #4CAF50;
+        }
+        .status.error {
+            background: #f44336;
+        }
+        .status.pending {
+            background: #FF9800;
+        }
+        .button-group {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .logs {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .log-entry.info { border-left: 3px solid #2196F3; }
+        .log-entry.success { border-left: 3px solid #4CAF50; }
+        .log-entry.warning { border-left: 3px solid #FF9800; }
+        .log-entry.error { border-left: 3px solid #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 ICP Canister Connection Test</h1>
+        
+        <div class="test-section">
+            <h3>Configuration</h3>
+            <div id="config"></div>
+        </div>
+
+        <div class="button-group">
+            <button onclick="testConnection()">🔍 Test Connection</button>
+            <button onclick="testStockData()">📊 Test Stock Data</button>
+            <button onclick="testMarketSummary()">📈 Test Market Summary</button>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Connection Status</h3>
+            <div id="status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results</h3>
+            <div id="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Console Logs</h3>
+            <div id="logs" class="logs"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import services
+        import { canisterService } from './src/services/CanisterService.js';
+        import { stockPriceService } from './src/services/StockPriceService.js';
+        import NetworkConfig from './src/config/network.js';
+
+        // Make available globally for button onclick
+        window.canisterService = canisterService;
+        window.stockPriceService = stockPriceService;
+        window.NetworkConfig = NetworkConfig;
+
+        // Capture console logs
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        console.log = (...args) => {
+            originalLog(...args);
+            addLog(args.join(' '), 'info');
+        };
+
+        console.warn = (...args) => {
+            originalWarn(...args);
+            addLog(args.join(' '), 'warning');
+        };
+
+        console.error = (...args) => {
+            originalError(...args);
+            addLog(args.join(' '), 'error');
+        };
+
+        // Display configuration
+        function displayConfig() {
+            const configDiv = document.getElementById('config');
+            const config = {
+                network: NetworkConfig.getNetwork(),
+                host: NetworkConfig.getHost(),
+                canisterId: NetworkConfig.getCanisterId(),
+                isLocal: NetworkConfig.isLocal(),
+            };
+            configDiv.innerHTML = `<pre>${JSON.stringify(config, null, 2)}</pre>`;
+        }
+
+        // Test connection
+        window.testConnection = async function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<span class="status pending">Testing...</span>';
+            
+            try {
+                console.log('🔍 Testing canister connection...');
+                const connected = await canisterService.testConnection();
+                
+                if (connected) {
+                    statusDiv.innerHTML = '<span class="status success">✅ Connected</span>';
+                    console.log('✅ Canister connection successful');
+                    
+                    const connStatus = canisterService.getConnectionStatus();
+                    document.getElementById('results').innerHTML = `<pre>${JSON.stringify(connStatus, null, 2)}</pre>`;
+                } else {
+                    statusDiv.innerHTML = '<span class="status error">❌ Failed</span>';
+                    console.error('❌ Canister connection failed');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<span class="status error">❌ Error</span>';
+                console.error('Error testing connection:', error);
+                document.getElementById('results').innerHTML = `<pre style="color: #f44336;">${error.message}\n${error.stack}</pre>`;
+            }
+        };
+
+        // Test stock data
+        window.testStockData = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<span class="status pending">Fetching stock data...</span>';
+            
+            try {
+                console.log('📊 Fetching stock data...');
+                const symbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA'];
+                const response = await stockPriceService.getStockPrices({ symbols });
+                
+                resultsDiv.innerHTML = `
+                    <h4>Stock Data Response</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+                
+                if (response.success) {
+                    console.log(`✅ Fetched ${response.data.length} stock prices`);
+                } else {
+                    console.warn('⚠️ Stock data fetch had issues');
+                }
+            } catch (error) {
+                console.error('Error fetching stock data:', error);
+                resultsDiv.innerHTML = `<pre style="color: #f44336;">${error.message}\n${error.stack}</pre>`;
+            }
+        };
+
+        // Test market summary
+        window.testMarketSummary = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<span class="status pending">Fetching market summary...</span>';
+            
+            try {
+                console.log('📈 Fetching market summary...');
+                const prices = await canisterService.fetchMultipleStockPrices('AAPL,GOOGL,MSFT,TSLA,NVDA');
+                
+                resultsDiv.innerHTML = `
+                    <h4>Market Summary</h4>
+                    <pre>${JSON.stringify(prices, null, 2)}</pre>
+                `;
+                
+                if (prices && prices.length > 0) {
+                    console.log(`✅ Fetched ${prices.length} stock prices from market summary`);
+                } else {
+                    console.warn('⚠️ No prices returned from market summary');
+                }
+            } catch (error) {
+                console.error('Error fetching market summary:', error);
+                resultsDiv.innerHTML = `<pre style="color: #f44336;">${error.message}\n${error.stack}</pre>`;
+            }
+        };
+
+        // Clear logs
+        window.clearLogs = function() {
+            document.getElementById('logs').innerHTML = '';
+            console.log('🗑️ Logs cleared');
+        };
+
+        // Initialize on load
+        displayConfig();
+        console.log('🚀 Test page loaded - click buttons to test functionality');
+    </script>
+</body>
+</html>

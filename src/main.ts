@@ -61,17 +61,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Mount the bank account creation flow root (hidden until event)
   initializeBankAccountCreationFlow();
   
-    // Stock market UI must NOT be initialized eagerly. It will be mounted
-    // when the player reaches/unlocks the Stock Market (see ProgressionManager).
-  
-
+  // Initialize Stock Market UI immediately (it will be hidden until opened)
+  console.log('🎮 Initializing Stock Market UI on page load...');
+  try { 
+    initializeStockMarketUI(); 
+    console.log('✅ Stock Market UI initialized successfully');
+  } catch (e) { 
+    console.error('❌ Failed to initialize stock market UI:', e); 
+  }
   
   // Initialize the ATM interface
   initializeATMInterface();
 
-  // Listen for progression unlock that should mount stock market UI lazily
+  // Listen for progression unlock that should mount stock market UI lazily (backup)
   window.addEventListener('stockMarketUnlocked', () => {
-    console.log('stockMarketUnlocked event received — mounting Stock Market UI');
+    console.log('stockMarketUnlocked event received — ensuring Stock Market UI is mounted');
     try { initializeStockMarketUI(); } catch (e) { console.error('Failed to initialize stock market UI:', e); }
   });
   // Listen for game initialization errors (e.g., WebGL unsupported) and show overlay

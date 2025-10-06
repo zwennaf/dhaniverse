@@ -255,6 +255,15 @@ function startAssetLoading(username: string, selectedCharacter: string, roomCode
     // Notify the custom loader to start
     window.dispatchEvent(new CustomEvent('gameAssetLoadingStart'));
 
+    // 🚀 START STOCK MARKET DATA PRELOAD IN PARALLEL
+    // This runs alongside asset loading so stock data is ready when game starts
+    import('../services/StockMarketPreloader').then(({ stockMarketPreloader }) => {
+        console.log('📊 Starting stock market data preload during asset loading...');
+        stockMarketPreloader.preloadMarketData().catch(err => {
+            console.error('❌ Stock market preload failed:', err);
+        });
+    });
+
     // Create asset loader with progress callbacks
     assetLoader = new AssetLoader(
         (progress: number) => {
@@ -294,7 +303,7 @@ export function preloadGameAssets(username: string = 'preload', selectedCharacte
 /**
  * Initialize Phaser game after assets are preloaded
  */
-function initializePhaserGame(username: string, selectedCharacter: string, roomCode: string): void {
+async function initializePhaserGame(username: string, selectedCharacter: string, roomCode: string): Promise<void> {
     if (!gameContainer) {
         console.error("Game container not found");
         return;
@@ -355,6 +364,10 @@ function initializePhaserGame(username: string, selectedCharacter: string, roomC
     }
 
     try {
+        // CRITICAL: Initialize ProgressionManager BEFORE creating the game
+        // This prevents "not initialized" warnings from scene systems
+        loadPlayerStateAndInitializeHUD().catch(e => console.warn('Failed to pre-load player state:', e));
+
         game = new Phaser.Game(config);
 
         // Register the username, room code, and selected character for the game
@@ -364,9 +377,6 @@ function initializePhaserGame(username: string, selectedCharacter: string, roomC
 
         // Initialize the React HUD when game is ready
         game.events.once("ready", () => {
-            // Load player state from backend and initialize HUD
-            loadPlayerStateAndInitializeHUD();
-
             // Notify custom loader that game is ready
             window.dispatchEvent(new CustomEvent('gameAssetLoadingComplete'));
 

@@ -167,7 +167,10 @@ export const playerStateApi = {
     // Update full player state
     update: async (stateData: any) => {
         try {
-            const response = await apiFetch('/game/player-state');
+            const response = await apiFetch('/game/player-state', { 
+                method: 'PUT', 
+                body: JSON.stringify(stateData) 
+            });
             return handleApiResponse(response);
         } catch (error) {
             console.error("Error updating player state:", error);

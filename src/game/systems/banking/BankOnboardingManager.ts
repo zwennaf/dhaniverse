@@ -411,7 +411,9 @@ export class BankOnboardingManager {
     // For new players who haven't met Maya yet, always show onboarding when they enter bank
     try {
       const { progressionManager } = await import('../../../services/ProgressionManager');
-      const progressState = progressionManager.getState();
+      
+      // Wait for initialization if needed (use async version)
+      const progressState = await progressionManager.getStateAsync();
       
       // If player is completely new (hasn't met Maya), show onboarding
       if (progressState.onboardingStep === 'not_started' && !progressState.hasMetMaya) {
@@ -451,7 +453,7 @@ export class BankOnboardingManager {
         if (hasCompletedOnboarding) {
           try {
             const { progressionManager } = await import('../../../services/ProgressionManager');
-            progressionManager.markBankOnboardingCompleted();
+            await progressionManager.markBankOnboardingCompleted();
             console.log('✅ ProgressionManager synchronized with database');
           } catch (e) {
             console.warn('Failed to sync progression manager with database:', e);
@@ -552,7 +554,7 @@ export class BankOnboardingManager {
     (async () => {
       try { 
         const { progressionManager } = await import('../../../services/ProgressionManager'); 
-        progressionManager.markBankOnboardingCompleted(); 
+        await progressionManager.markBankOnboardingCompleted(); 
         console.log('[Progression] Bank onboarding completion persisted immediately:', progressionManager.getState());
       } catch(e) { 
         console.warn('Could not mark bank onboarding completion', e);

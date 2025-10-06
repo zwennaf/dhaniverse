@@ -66,7 +66,7 @@ interface StockTransaction {
 
 export class StockMarketManager {
   private scene: MainScene;
-  private broker: NPCSprite;
+  public broker: NPCSprite;
   private interactionKey: Input.Keyboard.Key | null = null;
   private readonly interactionDistance: number = 150;
   private interactionText: GameObjects.Text;
@@ -122,11 +122,16 @@ export class StockMarketManager {
     // Initialize market events
     this.marketEvents = this.setupMarketEvents();
     
-    // Initialize real stock data instead of mock data
-    this.initializeRealStockData();
-    
     // Initialize news database
     this.newsItems = this.setupNewsDatabase();
+    
+    // Initialize real stock data asynchronously (don't block constructor)
+    // This will load in the background
+    this.initializeRealStockData().catch(error => {
+      console.error('Failed to load stock data, but manager will continue:', error);
+      // Set empty stock data so the manager still works
+      this.stockData = [];
+    });
     
     // Create broker NPC at predefined position (will be moved by game system)
     const brokerX = 800;
@@ -145,6 +150,7 @@ export class StockMarketManager {
     }).setOrigin(0.5);
     
     // Add interaction text (initially hidden)
+    // NOTE: setScrollFactor(1) so it moves with the broker, not fixed to screen
     this.interactionText = scene.add.text(this.broker.x, this.broker.y - 80, "Press E to interact", {
       fontFamily: Constants.UI_TEXT_FONT,
       fontSize: Constants.UI_TEXT_SIZE,
@@ -152,7 +158,7 @@ export class StockMarketManager {
       align: 'center',
       backgroundColor: Constants.UI_TEXT_BACKGROUND,
       padding: Constants.UI_TEXT_PADDING
-    }).setOrigin(0.5).setAlpha(0).setScrollFactor(0).setDepth(100);
+    }).setOrigin(0.5).setAlpha(0).setScrollFactor(1).setDepth(100);
     
     // Add market timer text
     
@@ -572,16 +578,23 @@ export class StockMarketManager {
     // Fetch prices using new StockPriceService
     const priceResponse = await stockPriceService.getStockPrices({ symbols });
     
-    if (!priceResponse.success || priceResponse.data.length === 0) {
-      console.warn('⚠️ Failed to load from canister, using fallback data');
-      // Don't throw error - let fallback data be used
-      if (priceResponse.data.length === 0) {
-        throw new Error('No stock data available (canister and fallback failed)');
-      }
+    if (!priceResponse.success) {
+      console.error('❌ StockPriceService request failed completely');
+      throw new Error('Failed to initialize stock prices');
     }
     
+    if (priceResponse.data.length === 0) {
+      console.error('❌ No stock data available from any source (canister, localStorage, or fallback)');
+      throw new Error('No stock data available from any source');
+    }
+    
+    // Log the data source
     if (priceResponse.metadata.source === 'fallback') {
-      console.log('📊 Using fallback stock prices for local development');
+      console.log('📊 Using fallback stock prices (canister unavailable)');
+    } else if (priceResponse.metadata.source === 'cache') {
+      console.log('💾 Using cached stock prices');
+    } else {
+      console.log('✅ Using real-time stock prices from canister');
     }
 
     // Convert StockPrice to our Stock interface format
@@ -874,6 +887,11 @@ export class StockMarketManager {
     const wasNearBroker = this.isPlayerNearBroker;
     this.isPlayerNearBroker = distance < this.interactionDistance;
     
+    // Debug log when player enters/exits interaction range (optional, can be removed)
+    if (this.isPlayerNearBroker && !wasNearBroker) {
+      console.log(`🎯 Player near stock broker - Press E to interact`);
+    }
+    
     // Show interaction prompt if player is in range and no dialog is active
     if (this.isPlayerNearBroker && !this.activeDialog) {
       this.interactionText.setAlpha(1);
@@ -884,6 +902,7 @@ export class StockMarketManager {
       
       // Check for interaction key press
       if (this.interactionKey && Phaser.Input.Keyboard.JustDown(this.interactionKey)) {
+        console.log("🔑 E key pressed! Calling startStockMarketInteraction()");
         this.startStockMarketInteraction();
       }
     } else if (!this.isPlayerNearBroker && wasNearBroker) {
@@ -921,21 +940,54 @@ export class StockMarketManager {
   /**
    * Start the stock market interaction UI
    */
-  private startStockMarketInteraction(): void {
-    if (this.activeDialog) return;
+  private async startStockMarketInteraction(): Promise<void> {
+    console.log("🔑 startStockMarketInteraction called");
+    console.log("   - activeDialog:", this.activeDialog);
     
-    console.log("Starting stock market interaction");
+    if (this.activeDialog) {
+      console.log("   - ❌ Already active, returning");
+      return;
+    }
+    
+    console.log("   - ✅ Starting stock market interaction");
     this.activeDialog = true;
     this.interactionText.setAlpha(0);
+    
+    // Wait for stock data to load if not loaded yet
+    if (this.stockData.length === 0) {
+      console.log('📊 Stock data not loaded yet, waiting...');
+      try {
+        await this.initializeRealStockData();
+        console.log('✅ Stock data loaded successfully:', this.stockData.length, 'stocks');
+      } catch (error) {
+        console.error('❌ Failed to load stock data:', error);
+        // Show error message to user
+        this.interactionText.setText('Stock market unavailable');
+        this.interactionText.setAlpha(1);
+        this.activeDialog = false;
+        return;
+      }
+    } else {
+      console.log('📊 Stock data already loaded:', this.stockData.length, 'stocks');
+    }
     
     // Ensure stocks have news before opening the UI
     this.ensureStocksHaveNews();
     
     // Force the stock market UI container to be active
-    document.getElementById('stock-market-ui-container')?.classList.add('active');
+    const container = document.getElementById('stock-market-ui-container');
+    console.log('📦 Stock market container element:', container ? 'FOUND' : 'NOT FOUND');
+    container?.classList.add('active');
+    
+    console.log('📈 Calling scene.openStockMarketUI with', this.stockData.length, 'stocks');
     
     // Signal to MainScene to open stock market UI
     this.scene.openStockMarketUI(this.stockData);
+    
+    console.log('✅ Stock market UI opened successfully');
+    
+    // NOTE: activeDialog stays true while UI is open - it will be reset by endStockMarketInteraction when UI closes
+    // or by onEnterBuilding when re-entering the building
   }
   
   /**
@@ -973,6 +1025,8 @@ export class StockMarketManager {
     // Show the broker only if the player is in the stock market building
     if (buildingType === 'stockmarket') {
       this.toggleVisibility(true);
+      // Reset activeDialog state when entering the building
+      this.activeDialog = false;
       console.log("Player entered stock market building, showing broker");
     }
   }

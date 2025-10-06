@@ -63,17 +63,24 @@ export interface PlayerStateDocument extends Document {
     hasMetMaya: boolean;
     hasFollowedMaya: boolean;
     hasClaimedMoney: boolean;
-  // New extended progression flags (Aug 2025)
-  hasCompletedBankOnboarding?: boolean; // set true only after full bank manager flow & account confirmation
-  hasReachedStockMarket?: boolean; // set true after Maya guides player to stock market
-  onboardingStep: 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_completed' | 'reached_stock_market';
+    // New extended progression flags (Aug 2025)
+    hasCompletedBankOnboarding?: boolean; // set true only after full bank manager flow & account confirmation
+    hasReachedStockMarket?: boolean; // set true after Maya guides player to stock market
+    onboardingStep: 'not_started' | 'met_maya' | 'at_bank_with_maya' | 'claimed_money' | 'bank_onboarding_completed' | 'reached_stock_market';
     unlockedBuildings: Record<string, boolean>; // granular per-building unlocks
+    // Client-side compatibility fields
+    bankOnboardingComplete?: boolean; // Synced with hasCompletedBankOnboarding
+    stockMarketOnboardingComplete?: boolean; // Synced with hasReachedStockMarket
+    mayaPosition?: { x: number; y: number }; // Maya NPC position tracking
   };
   settings: {
     soundEnabled: boolean;
     musicEnabled: boolean;
     autoSave: boolean;
   };
+  // Schema versioning for migration tracking
+  schemaVersion?: number;
+  hasCompletedTutorial?: boolean; // Tutorial completion flag
   lastUpdated: Date;
 }
 
