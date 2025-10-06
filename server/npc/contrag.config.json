@@ -20,7 +20,7 @@
   "embedder": {
     "plugin": "gemini",
     "config": {
-      "apiKey": "AIzaSyA7H_6tVhqA1pPzrN82kwjO_xo5R7vOiwU",
+      "apiKey": "",
       "model": "embedding-001",
       "dimensions": 768
     }
