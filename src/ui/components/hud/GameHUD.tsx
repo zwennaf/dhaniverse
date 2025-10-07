@@ -1255,7 +1255,7 @@ const GameHUD: React.FC<GameHUDProps> = ({
             </div>
 
             {/* Player connection display (moved to bottom-right, uses SVG background) */}
-            <div className="absolute bottom-5 right-9 z-[1100]">
+            <div className="absolute bottom-6 right-9 z-[1100]">
                 {/* Fixed notification stack (reliable visibility above UI) */}
                 <div className="fixed right-8 bottom-20 z-[2000] pointer-events-none">
                     {/* Accessibility: announce join/leave notifications to screen readers */}
@@ -1280,79 +1280,83 @@ const GameHUD: React.FC<GameHUDProps> = ({
                     </div>
                 </div>
 
-                <div className="relative w-[120px] h-auto">
-                    <img src="/UI/game/onlinecount.svg" alt="Online count" className="block w-full h-full" style={{ display: 'block' }} />
-
-                    <div className="absolute inset-0 flex items-center justify-center z-[200]">
-                        <div
-                            className="absolute inset-0 z-[4000] pointer-events-auto"
-                            onMouseEnter={() => setShowOnlineTooltip(true)}
-                            onMouseLeave={() => setShowOnlineTooltip(false)}
-                            onClick={() => setShowOnlineTooltip((s) => !s)}
-                            onContextMenu={(e) => { e.preventDefault(); setShowOnlineTooltip(true); }}
-                            onFocus={() => {
-                                setShowOnlineTooltip(true);
-                                if (connectedPlayers.length === 0 && typeof onlineCount === 'number' && onlineCount >= 1) {
-                                    window.dispatchEvent(new CustomEvent('requestExistingPlayers'));
-                                }
-                            }}
-                            onBlur={() => setShowOnlineTooltip(false)}
-                            role="button"
-                            aria-haspopup="listbox"
-                            aria-expanded={showOnlineTooltip}
-                            aria-label="Show online players"
-                            tabIndex={0}
-                        />
-
-                        <div className="relative">
-                            <div
-                                className="inline-flex items-center gap-3 px-3 rounded-2xl cursor-default min-w-0"
-                                onMouseEnter={() => setShowOnlineTooltip(true)}
-                                onMouseLeave={() => setShowOnlineTooltip(false)}
-                            >
-                                <span className="w-2 h-2 rounded-full bg-green-400" aria-hidden />
-                                <div className="inline-flex items-center gap-2 max-w-[240px] overflow-hidden min-w-0">
-                                    {connectedPlayers && connectedPlayers.length > 0 ? (
-                                        <div className="inline-flex items-center gap-2 truncate min-w-0">
-                                            {connectedPlayers.slice(-6).map((p) => {
-                                                const skinId = (p as any).skin || (p as any).selectedCharacter || null;
-                                                const color = getCharacterColor(skinId, p.username);
-                                                const isLocal = user && (user.gameUsername as string) === p.username;
-                                                return <span key={p.id} className="text-sm font-['Tickerbit',Arial,sans-serif] truncate" style={{ color }} aria-hidden>{p.username}{isLocal ? ' (you)' : ''}</span>;
-                                            })}
-                                            {connectedPlayers.length > 6 && <span className="text-xs text-white/70">+{connectedPlayers.length - 6}</span>}
-                                        </div>
-                                    ) : (
-                                        (typeof onlineCount === 'number' && onlineCount >= 1) ? (
-                                            <span className="text-sm font-['Tickerbit',Arial,sans-serif] truncate text-white">{onlineCount} online</span>
-                                        ) : null
-                                    )}
+                <div className="relative">
+                    <div
+                        className="inline-flex items-center gap-3 px-4 py-2.5 cursor-pointer focus:outline-0 outline-0 border-none focus:border-none min-w-0 bg-black rounded-full pointer-events-auto"
+                        onMouseEnter={() => setShowOnlineTooltip(true)}
+                        onMouseLeave={() => setShowOnlineTooltip(false)}
+                        onClick={() => setShowOnlineTooltip((s) => !s)}
+                        onContextMenu={(e) => { e.preventDefault(); setShowOnlineTooltip(true); }}
+                        onFocus={() => {
+                            setShowOnlineTooltip(true);
+                            if (connectedPlayers.length === 0 && typeof onlineCount === 'number' && onlineCount >= 1) {
+                                window.dispatchEvent(new CustomEvent('requestExistingPlayers'));
+                            }
+                        }}
+                        onBlur={() => setShowOnlineTooltip(false)}
+                        role="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={showOnlineTooltip}
+                        aria-label="Show online players"
+                        tabIndex={0}
+                    >
+                        <span className="w-2 h-2 rounded-full bg-green-400" aria-hidden />
+                        <div className="inline-flex items-center gap-2 max-w-[240px] overflow-hidden min-w-0">
+                            {connectedPlayers && connectedPlayers.length > 1 ? (
+                                <span className="text-sm font-['Tickerbit',Arial,sans-serif] truncate text-white">{connectedPlayers.length} players</span>
+                            ) : connectedPlayers && connectedPlayers.length === 1 ? (
+                                <div className="inline-flex items-center gap-2 truncate min-w-0">
+                                    {(() => {
+                                        const player = connectedPlayers[0];
+                                        const skinId = (player as any).skin || (player as any).selectedCharacter || null;
+                                        const color = getCharacterColor(skinId, player.username);
+                                        const isLocal = user && (user.gameUsername as string) === player.username;
+                                        return <span className="text-sm font-['Tickerbit',Arial,sans-serif] truncate" style={{ color }} aria-hidden>{player.username}{isLocal ? ' (you)' : ''}</span>;
+                                    })()}
                                 </div>
-                            </div>
-
-                            <div className={`absolute right-0 bottom-full mb-4 w-56 text-center max-h-40 overflow-auto bg-black/85 text-sm rounded-xl p-2 shadow-lg transition-opacity duration-150 ${showOnlineTooltip ? 'opacity-100 pointer-events-auto z-[3000]' : 'opacity-0 pointer-events-none z-[200]' }`}>
-                                {connectedPlayers && connectedPlayers.length > 0 ? (
-                                    <ul className="space-y-1">
-                                        {connectedPlayers.slice().reverse().map((p) => {
-                                            const skinId = (p as any).skin || (p as any).selectedCharacter || null;
-                                            const color = getCharacterColor(skinId, p.username);
-                                            const isLocal = user && (user.gameUsername as string) === p.username;
-                                            return <li key={p.id} className="truncate" style={{ color }} aria-hidden>{p.username}{isLocal ? ' (you)' : ''}</li>;
-                                        })}
-                                    </ul>
-                                ) : (
-                                    (typeof onlineCount === 'number' && onlineCount >= 1) ? (
-                                        <div className="text-sm" aria-hidden>
-                                            {(() => {
-                                                const displayName = (user && (user.gameUsername as string)) || username || 'You';
-                                                const color = getCharacterColor(user?.selectedCharacter, displayName);
-                                                return <span style={{ color }}>{displayName} (you)</span>;
-                                            })()}
-                                        </div>
-                                    ) : null
-                                )}
-                            </div>
+                            ) : (
+                                (typeof onlineCount === 'number' && onlineCount === 1) ? (
+                                    (() => {
+                                        const displayName = (user && (user.gameUsername as string)) || username || 'You';
+                                        const color = getCharacterColor(user?.selectedCharacter, displayName);
+                                        return <span className="text-sm font-['Tickerbit',Arial,sans-serif] truncate" style={{ color }}>{displayName} (you)</span>;
+                                    })()
+                                ) : null
+                            )}
                         </div>
+                    </div>
+
+                    <div className={`absolute right-0 bottom-full mb-4 w-56 text-center max-h-40 overflow-auto bg-black/85 text-sm rounded-xl p-2 shadow-lg transition-opacity duration-150 ${showOnlineTooltip ? 'opacity-100 pointer-events-auto z-[3000]' : 'opacity-0 pointer-events-none z-[200]' }`}>
+                        {connectedPlayers && connectedPlayers.length > 1 ? (
+                            <ul className="space-y-1">
+                                {connectedPlayers.slice().reverse().map((p) => {
+                                    const skinId = (p as any).skin || (p as any).selectedCharacter || null;
+                                    const color = getCharacterColor(skinId, p.username);
+                                    const isLocal = user && (user.gameUsername as string) === p.username;
+                                    return <li key={p.id} className="truncate" style={{ color }} aria-hidden>{p.username}{isLocal ? ' (you)' : ''}</li>;
+                                })}
+                            </ul>
+                        ) : connectedPlayers && connectedPlayers.length === 1 ? (
+                            <div className="text-sm" aria-hidden>
+                                {(() => {
+                                    const player = connectedPlayers[0];
+                                    const skinId = (player as any).skin || (player as any).selectedCharacter || null;
+                                    const color = getCharacterColor(skinId, player.username);
+                                    const isLocal = user && (user.gameUsername as string) === player.username;
+                                    return <span style={{ color }}>{player.username}{isLocal ? ' (you)' : ''}</span>;
+                                })()}
+                            </div>
+                        ) : (
+                            (typeof onlineCount === 'number' && onlineCount === 1) ? (
+                                <div className="text-sm" aria-hidden>
+                                    {(() => {
+                                        const displayName = (user && (user.gameUsername as string)) || username || 'You';
+                                        const color = getCharacterColor(user?.selectedCharacter, displayName);
+                                        return <span style={{ color }}>{displayName} (you)</span>;
+                                    })()}
+                                </div>
+                            ) : null
+                        )}
                     </div>
                 </div>
             </div>
