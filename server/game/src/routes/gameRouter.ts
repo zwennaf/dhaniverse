@@ -811,16 +811,23 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
             return;
         }
 
-        // Calculate interest rate based on duration
-        let interestRate = 5.0; // Base rate
-        if (duration >= 730) interestRate = 9.5;
-        else if (duration >= 365) interestRate = 8.5;
-        else if (duration >= 180) interestRate = 7.5;
-        else if (duration >= 90) interestRate = 6.5;
+        // Calculate interest rate based on duration (in game days)
+        // Using the same rates as frontend: 6M=3.5%, 1Y=4.5%, 3Y=5.5%, 5Y=6.5%
+        let interestRate = 3.5; // Base rate (6 months)
+        if (duration >= 1825) interestRate = 6.5; // 5 years
+        else if (duration >= 1095) interestRate = 5.5; // 3 years
+        else if (duration >= 365) interestRate = 4.5; // 1 year
+        else if (duration >= 180) interestRate = 3.5; // 6 months
 
         const startDate = new Date();
+        
+        // Game time conversion: 1 in-game day = 20 real-world minutes
+        // So duration (in game days) * 20 minutes = real-world time until maturity
+        const realWorldMinutes = duration * 20;
+        const realWorldMilliseconds = realWorldMinutes * 60 * 1000;
+        
         const maturityDate = new Date(
-            startDate.getTime() + duration * 24 * 60 * 60 * 1000
+            startDate.getTime() + realWorldMilliseconds
         );
 
         // Create fixed deposit
@@ -843,6 +850,17 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
         );
         const insertedId = await fixedDeposits.insertOne(fixedDeposit);
 
+        // Calculate maturity time for display
+        const realWorldMinutesForDisplay = duration * 20;
+        const daysIRL = Math.floor(realWorldMinutesForDisplay / (24 * 60));
+        const hoursIRL = Math.floor((realWorldMinutesForDisplay % (24 * 60)) / 60);
+        const minsIRL = realWorldMinutesForDisplay % 60;
+        
+        let maturityTimeStr = "";
+        if (daysIRL > 0) maturityTimeStr += `${daysIRL} day${daysIRL > 1 ? 's' : ''}`;
+        if (hoursIRL > 0) maturityTimeStr += `${maturityTimeStr ? ', ' : ''}${hoursIRL} hour${hoursIRL > 1 ? 's' : ''}`;
+        if (minsIRL > 0) maturityTimeStr += `${maturityTimeStr ? ', ' : ''}${minsIRL} min${minsIRL > 1 ? 's' : ''}`;
+
         // Deduct from bank balance
         await bankAccounts.updateOne(
             { userId },
@@ -854,7 +872,7 @@ gameRouter.post("/game/fixed-deposits", async (ctx) => {
                         type: "withdrawal" as const,
                         amount,
                         timestamp: new Date(),
-                        description: `Fixed Deposit creation - ₹${amount} for ${duration} days`,
+                        description: `Fixed Deposit - ₹${amount} @ ${interestRate}% for ${duration} days (Matures in ${maturityTimeStr} IRL)`,
                     },
                 },
                 $set: { lastUpdated: new Date() },

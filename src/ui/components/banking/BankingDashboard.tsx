@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { balanceManager } from "../../../services/BalanceManager";
-import { bankingApi, playerStateApi } from "../../../utils/api";
+import { bankingApi, playerStateApi, fixedDepositApi } from "../../../utils/api";
 
 const OverviewIcon: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
     const gradientId = `paint0_linear_470_109${isActive ? '_active' : ''}`;
@@ -360,12 +360,102 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
     const [transactionType, setTransactionType] = useState<"deposit" | "withdraw">("deposit");
     const [scrollY, setScrollY] = useState(0);
     const [transactionScrollY, setTransactionScrollY] = useState(0);
+    const [backgroundsVisible, setBackgroundsVisible] = useState(false); // Track background visibility
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const transactionBoxRef = useRef<HTMLDivElement>(null);
+    const dashboardRef = useRef<HTMLDivElement>(null);
     
     // Fixed Deposit state
     const [fdAmount, setFdAmount] = useState("");
     const [selectedTerm, setSelectedTerm] = useState("6M");
+
+    // FD interest rates (annual percentage)
+    const fdInterestRates: Record<string, number> = {
+        "6M": 3.5,  // 3.5% for 6 months
+        "1Y": 4.5,  // 4.5% for 1 year
+        "3Y": 5.5,  // 5.5% for 3 years
+        "5Y": 6.5   // 6.5% for 5 years
+    };
+
+    // Term durations in years
+    const termDurations: Record<string, number> = {
+        "6M": 0.5,
+        "1Y": 1,
+        "3Y": 3,
+        "5Y": 5
+    };
+
+    // Calculate real-world maturity time
+    // In-game: 1 day = 20 minutes
+    // So, 1 in-game month (30 days) = 30 × 20 = 600 minutes = 10 hours
+    const calculateMaturityTime = (term: string): { days: number; hours: number; minutes: number; totalMinutes: number } => {
+        const inGameDays: Record<string, number> = {
+            "6M": 180,   // 6 months = 180 days
+            "1Y": 365,   // 1 year = 365 days
+            "3Y": 1095,  // 3 years = 1095 days
+            "5Y": 1825   // 5 years = 1825 days
+        };
+        
+        const days = inGameDays[term];
+        const totalMinutes = days * 20; // Each in-game day = 20 real minutes
+        const realDays = Math.floor(totalMinutes / (24 * 60));
+        const remainingMinutes = totalMinutes % (24 * 60);
+        const realHours = Math.floor(remainingMinutes / 60);
+        const realMinutes = remainingMinutes % 60;
+        
+        return {
+            days: realDays,
+            hours: realHours,
+            minutes: realMinutes,
+            totalMinutes
+        };
+    };
+
+    // Calculate projected return
+    const calculateFdReturn = (): { 
+        return: number; 
+        formula: string; 
+        termLabel: string;
+        maturityTime: string;
+        hasAmount: boolean;
+    } => {
+        const principal = parseFloat(fdAmount) || 0;
+        const hasAmount = fdAmount.trim() !== "" && principal > 0;
+        const rate = fdInterestRates[selectedTerm];
+        const duration = termDurations[selectedTerm];
+        
+        // Simple Interest: P * R * T / 100
+        const returnAmount = (principal * rate * duration) / 100;
+        
+        const termLabel = selectedTerm === "6M" ? "6 months" :
+                         selectedTerm === "1Y" ? "1 year" :
+                         selectedTerm === "3Y" ? "3 years" : "5 years";
+        
+        const formula = `${principal.toLocaleString()}*${duration}*${rate}%`;
+        
+        // Calculate real-world maturity time
+        const maturity = calculateMaturityTime(selectedTerm);
+        let maturityTime = "";
+        if (maturity.days > 0) {
+            maturityTime += `${maturity.days} day${maturity.days > 1 ? 's' : ''}`;
+        }
+        if (maturity.hours > 0) {
+            maturityTime += maturity.days > 0 ? `, ${maturity.hours} hour${maturity.hours > 1 ? 's' : ''}` : `${maturity.hours} hour${maturity.hours > 1 ? 's' : ''}`;
+        }
+        if (maturity.minutes > 0) {
+            maturityTime += (maturity.days > 0 || maturity.hours > 0) ? `, ${maturity.minutes} min${maturity.minutes > 1 ? 's' : ''}` : `${maturity.minutes} min${maturity.minutes > 1 ? 's' : ''}`;
+        }
+        
+        return { 
+            return: Math.round(returnAmount), 
+            formula,
+            termLabel,
+            maturityTime: maturityTime || "0 mins",
+            hasAmount
+        };
+    };
+
+    const fdReturn = calculateFdReturn();
 
     // Real data state
     const [userName, setUserName] = useState("Player");
@@ -449,6 +539,26 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
         };
     }, []);
 
+    // Listen for scroll events and make backgrounds visible when scroll happens
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (container) {
+            const handleScroll = () => {
+                if (!backgroundsVisible) {
+                    setBackgroundsVisible(true);
+                    console.log('✅ Scroll detected - backgrounds now visible');
+                }
+            };
+
+            // Add scroll listener - only listen for real user scroll events
+            container.addEventListener('scroll', handleScroll);
+
+            return () => {
+                container.removeEventListener('scroll', handleScroll);
+            };
+        }
+    }, [backgroundsVisible]);
+
     const handleClose = () => {
         if (onClose) {
             onClose();
@@ -517,12 +627,57 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
         }
     };
 
-    const handleFdDeposit = () => {
-        if (fdAmount) {
-            console.log("FD Deposit amount:", fdAmount, "term:", selectedTerm);
-            // TODO: Add FD deposit logic here
-            alert("Fixed Deposit feature coming soon!");
-            setFdAmount("");
+    const handleFdDeposit = async () => {
+        if (!fdAmount || parseFloat(fdAmount) <= 0) {
+            console.warn("Invalid FD amount");
+            return;
+        }
+
+        const depositAmount = parseFloat(fdAmount);
+        
+        // Check if bank has enough balance
+        if (depositAmount > bankBalance) {
+            console.error("Insufficient bank balance for FD");
+            alert("Insufficient bank balance!");
+            return;
+        }
+
+        // Get duration in game days based on selected term
+        const termDurations: Record<string, number> = {
+            "6M": 180,  // 6 months = 180 days
+            "1Y": 365,  // 1 year = 365 days
+            "3Y": 1095, // 3 years = 1095 days
+            "5Y": 1825  // 5 years = 1825 days
+        };
+
+        const gameDurationInDays = termDurations[selectedTerm];
+
+        try {
+            // Call fixed deposit API with game duration
+            const response = await fixedDepositApi.create(depositAmount, gameDurationInDays);
+            
+            if (response.success) {
+                // Update local balance (deduct from bank)
+                balanceManager.updateBankBalance(bankBalance - depositAmount);
+                
+                // Add transaction record
+                balanceManager.addTransaction({
+                    type: "withdrawal",
+                    amount: depositAmount,
+                    description: `Fixed Deposit created - ${selectedTerm} term`,
+                    location: "Dhaniverse Bank - Fixed Deposit"
+                });
+
+                console.log("Fixed Deposit created successfully:", response.data);
+                alert(`Fixed Deposit created successfully! Amount: ₹${depositAmount.toLocaleString()}, Term: ${selectedTerm}`);
+                setFdAmount("");
+            } else {
+                console.error("FD creation failed:", response.error);
+                alert(`FD creation failed: ${response.error}`);
+            }
+        } catch (error) {
+            console.error("FD creation error:", error);
+            alert("Failed to create Fixed Deposit. Please try again.");
         }
     };
 
@@ -619,19 +774,31 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
     );
 
     return (
-        <div className="fixed inset-0 overflow-hidden">
+        <div 
+            className="fixed inset-0 overflow-hidden" 
+            style={{ 
+                pointerEvents: 'auto',
+                zIndex: 50 
+            }}
+        >
             {/* Background Image */}
             <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
                     backgroundImage: "url('/UI/game/bankbg.png')",
                     backgroundSize: "cover",
-                    backgroundPosition: "center",
+                    backgroundPosition: "center center",
+                    backgroundAttachment: "fixed",
+                    backgroundRepeat: "no-repeat",
+                    pointerEvents: 'none'
                 }}
             />
 
             {/* Gradient Overlay */}
-            <div className="absolute inset-0 top-60 w-full bg-gradient-to-b from-transparent via-black/80 to-black" />
+            <div 
+                className="absolute inset-0 top-60 w-full bg-gradient-to-b from-transparent via-black/80 to-black" 
+                style={{ pointerEvents: 'none' }}
+            />
 
             {/* Main Content - Scrollable */}
             <div
@@ -640,61 +807,77 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
                 style={{
                     scrollbarWidth: "none",
                     msOverflowStyle: "none",
+                    pointerEvents: 'auto',
+                    zIndex: 10
                 }}
             >
                 {/* Fixed Header - Always visible */}
-                <div
-                    className="sticky top-0 px-8 pt-6 pb-4 z-50 backdrop-blur-sm"
-                    style={{
-                        backgroundImage: "url('/UI/game/bankbg.png')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundAttachment: "fixed",
-                    }}
-                >
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h2 className="text-white font-robert font-bold text-xl">
-                                {userName}
-                            </h2>
-                            <p className="text-white/80 font-robert text-lg">
-                                A/c no: {accountNumber}
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleClose}
-                            className="px-4 py-2 bg-black/80 hover:bg-black hover:border-none border-none text-white font-pixeloid text-sm rounded-xl border transition-colors flex items-center gap-2"
-                        >
-                            <svg
-                                width="15"
-                                height="16"
-                                viewBox="0 0 15 16"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
+                <div className="sticky top-0 px-8 pt-6 pb-4 z-50 backdrop-blur-sm">
+                    {/* Background layer - controlled opacity */}
+                    <div 
+                        className={`absolute inset-0 transition-opacity duration-300 ${backgroundsVisible ? 'opacity-100' : 'opacity-0'}`}
+                        style={{
+                            backgroundImage: backgroundsVisible ? "url('/UI/game/bankbg.png')" : "none",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center center",
+                            backgroundAttachment: "fixed",
+                            backgroundRepeat: "no-repeat"
+                        }}
+                    />
+                    
+                    {/* Content layer - always visible */}
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h2 className="text-white font-robert font-bold text-xl">
+                                    {userName}
+                                </h2>
+                                <p className="text-white/80 font-robert text-lg">
+                                    A/c no: {accountNumber}
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleClose}
+                                className="px-4 py-2 bg-black/80 hover:bg-black hover:border-none border-none text-white font-pixeloid text-sm rounded-xl border transition-colors flex items-center gap-2"
                             >
-                                <path
-                                    d="M0.789474 16C0.353463 16 0 15.6418 0 15.2V0.8C0 0.358176 0.353463 0 0.789474 0H11.8421C12.2781 0 12.6316 0.358176 12.6316 0.8V3.2H11.0526V1.6H1.57895V14.4H11.0526V12.8H12.6316V15.2C12.6316 15.6418 12.2781 16 11.8421 16H0.789474ZM11.0526 11.2V8.8H5.52632V7.2H11.0526V4.8L15 8L11.0526 11.2Z"
-                                    fill="white"
-                                />
-                            </svg>
-                            Exit
-                        </button>
+                                <svg
+                                    width="15"
+                                    height="16"
+                                    viewBox="0 0 15 16"
+                                    fill="none"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path
+                                        d="M0.789474 16C0.353463 16 0 15.6418 0 15.2V0.8C0 0.358176 0.353463 0 0.789474 0H11.8421C12.2781 0 12.6316 0.358176 12.6316 0.8V3.2H11.0526V1.6H1.57895V14.4H11.0526V12.8H12.6316V15.2C12.6316 15.6418 12.2781 16 11.8421 16H0.789474ZM11.0526 11.2V8.8H5.52632V7.2H11.0526V4.8L15 8L11.0526 11.2Z"
+                                        fill="white"
+                                    />
+                                </svg>
+                                Exit
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Title - Changes based on active tab */}
-                <div
-                    className="sticky top-[96px] text-center py-8 z-40 overflow-hidden"
-                    style={{
-                        backgroundImage: "url('/UI/game/bankbg.png')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundAttachment: "fixed",
-                    }}
-                >
-                    <h1 className="text-white font-pixeloid text-5xl tracking-wide">
-                        {activeTab === "overview" ? "Welcome To Dhaniverse Bank" : "Dhaniverse Bank"}
-                    </h1>
+                <div className="sticky top-[96px] text-center py-8 z-40 overflow-hidden">
+                    {/* Background layer - controlled opacity */}
+                    <div 
+                        className={`absolute inset-0  ${backgroundsVisible ? 'opacity-100' : 'opacity-0'}`}
+                        style={{
+                            backgroundImage: backgroundsVisible ? "url('/UI/game/bankbg.png')" : "none",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center center",
+                            backgroundAttachment: "fixed",
+                            backgroundRepeat: "no-repeat"
+                        }}
+                    />
+                    
+                    {/* Content layer - always visible */}
+                    <div className="relative z-10">
+                        <h1 className="text-white font-pixeloid text-5xl tracking-wide">
+                            {activeTab === "overview" ? "Welcome To Dhaniverse Bank" : "Dhaniverse Bank"}
+                        </h1>
+                    </div>
                 </div>
 
                 {/* Conditional Layout based on active tab */}
@@ -1035,46 +1218,68 @@ const TestBankDashboard: React.FC<TestBankDashboardProps> = ({ onClose }) => {
                                     
                                     {/* Projected Return Container - Graph Left, Calculated Returns Right */}
                                     <div className="flex gap-2 flex-1">
-                                        {/* Graph on Left */}
-                                        <div className="flex-1 bg-neutral-900 rounded-xl p-4 flex flex-col">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-white font-pixeloid text-sm">Projected Return</span>
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2"/>
-                                                    <path d="M12 8V12M12 16H12.01" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                                        {fdReturn.hasAmount ? (
+                                            <>
+                                                {/* Graph on Left */}
+                                                <div className="flex-1 bg-neutral-900 rounded-xl p-4 flex flex-col">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-white font-pixeloid text-sm">Projected Return</span>
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2"/>
+                                                            <path d="M12 8V12M12 16H12.01" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                                                        </svg>
+                                                    </div>
+                                                    {/* Graph SVG */}
+                                                    <div className="flex-1 flex items-center justify-left">
+                                                        <svg width="178" height="169" viewBox="0 0 178 169" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M27 0L24.1132 5H29.8868L27 0ZM27 148H26.5V148.5H27V148ZM178 148L173 145.113V150.887L178 148ZM27 4.5H26.5V148H27H27.5V4.5H27ZM27 148V148.5H173.5V148V147.5H27V148Z" fill="white"/>
+                                                            <path d="M45.3945 167.023V167.512H42.4648V167.023H41.9766V166.535H41.4883V161.652H41.9766V161.164H42.4648V160.676H45.3945V161.164H45.8828V161.652H46.3711V162.629H45.3945V162.141H44.9062V161.652H42.9531V162.141H42.4648V163.605H45.3945V164.094H45.8828V164.582H46.3711V166.535H45.8828V167.023H45.3945ZM42.9531 166.535H44.9062V166.047H45.3945V165.07H44.9062V164.582H42.4648V166.047H42.9531V166.535ZM48.3242 163.605V167.512H47.3477V162.141H48.3242V162.629H48.8125V162.141H51.2539V162.629H51.7422V163.117H52.2305V167.512H51.2539V163.605H50.7656V163.117H50.2773V167.512H49.3008V163.117H48.8125V163.605H48.3242Z" fill="white"/>
+                                                            <path d="M80.418 166.535H81.3945V167.512H78.4648V166.535H79.4414V162.629H78.4648V161.652H78.9531V161.164H79.4414V160.676H80.418V166.535ZM84.3242 167.512V166.535H86.7656V166.047H87.2539V164.582H86.7656V165.07H86.2773V165.559H84.3242V165.07H83.8359V164.582H83.3477V161.652H84.3242V164.094H84.8125V164.582H85.7891V164.094H86.2773V163.605H86.7656V162.629H87.2539V161.652H88.2305V166.535H87.7422V167.023H87.2539V167.512H84.3242Z" fill="white"/>
+                                                            <path d="M113.977 166.535H113.488V165.559H114.465V166.047H114.953V166.535H116.906V166.047H117.395V165.07H116.906V164.582H115.441V163.605H116.906V163.117H117.395V162.141H116.906V161.652H114.953V162.141H114.465V162.629H113.488V161.652H113.977V161.164H114.465V160.676H117.395V161.164H117.883V161.652H118.371V163.605H117.883V164.582H118.371V166.535H117.883V167.023H117.395V167.512H114.465V167.023H113.977V166.535ZM120.324 167.512V166.535H122.766V166.047H123.254V164.582H122.766V165.07H122.277V165.559H120.324V165.07H119.836V164.582H119.348V161.652H120.324V164.094H120.812V164.582H121.789V164.094H122.277V163.605H122.766V162.629H123.254V161.652H124.23V166.535H123.742V167.023H123.254V167.512H120.324Z" fill="white"/>
+                                                            <path d="M149.488 160.676H154.371V161.652H150.465V162.629H153.395V163.117H153.883V163.605H154.371V166.535H153.883V167.023H153.395V167.512H150.465V167.023H149.977V166.535H149.488V165.559H150.465V166.047H150.953V166.535H152.906V166.047H153.395V164.094H152.906V163.605H149.488V160.676ZM156.324 167.512V166.535H158.766V166.047H159.254V164.582H158.766V165.07H158.277V165.559H156.324V165.07H155.836V164.582H155.348V161.652H156.324V164.094H156.812V164.582H157.789V164.094H158.277V163.605H158.766V162.629H159.254V161.652H160.23V166.535H159.742V167.023H159.254V167.512H156.324Z" fill="white"/>
+                                                            <path d="M0.976562 19.5352H0.488281V18.5586H1.46484V19.0469H1.95312V19.5352H3.90625V19.0469H4.39453V18.0703H3.90625V17.582H2.44141V16.6055H3.90625V16.1172H4.39453V15.1406H3.90625V14.6523H1.95312V15.1406H1.46484V15.6289H0.488281V14.6523H0.976562V14.1641H1.46484V13.6758H4.39453V14.1641H4.88281V14.6523H5.37109V16.6055H4.88281V17.582H5.37109V19.5352H4.88281V20.0234H4.39453V20.5117H1.46484V20.0234H0.976562V19.5352ZM6.34766 13.6758H11.2305V14.6523H7.32422V15.6289H10.2539V16.1172H10.7422V16.6055H11.2305V19.5352H10.7422V20.0234H10.2539V20.5117H7.32422V20.0234H6.83594V19.5352H6.34766V18.5586H7.32422V19.0469H7.8125V19.5352H9.76562V19.0469H10.2539V17.0938H9.76562V16.6055H6.34766V13.6758ZM13.1836 15.6289H13.6719V14.6523H13.1836V15.6289ZM16.6016 20.0234V20.5117H15.1367V20.0234H14.6484V18.0703H15.1367V17.582H16.6016V18.0703H17.0898V20.0234H16.6016ZM15.625 19.5352H16.1133V18.5586H15.625V19.5352ZM14.6484 16.1172H15.1367V15.6289H15.625V15.1406H16.1133V13.6758H17.0898V15.6289H16.6016V16.1172H16.1133V16.6055H15.625V17.0938H15.1367V17.582H14.6484V18.0703H14.1602V18.5586H13.6719V19.0469H13.1836V20.5117H12.207V18.5586H12.6953V18.0703H13.1836V17.582H13.6719V17.0938H14.1602V16.6055H12.6953V16.1172H12.207V14.1641H12.6953V13.6758H14.1602V14.1641H14.6484V16.1172ZM14.1602 16.6055H14.6484V16.1172H14.1602V16.6055Z" fill="white"/>
+                                                            <path d="M0.976562 38.5352H0.488281V37.5586H1.46484V38.0469H1.95312V38.5352H3.90625V38.0469H4.39453V37.0703H3.90625V36.582H2.44141V35.6055H3.90625V35.1172H4.39453V34.1406H3.90625V33.6523H1.95312V34.1406H1.46484V34.6289H0.488281V33.6523H0.976562V33.1641H1.46484V32.6758H4.39453V33.1641H4.88281V33.6523H5.37109V35.6055H4.88281V36.582H5.37109V38.5352H4.88281V39.0234H4.39453V39.5117H1.46484V39.0234H0.976562V38.5352ZM7.8125 36.582V36.0938H8.30078V35.6055H8.78906V35.1172H9.27734V34.6289H10.2539V34.1406H9.76562V33.6523H7.8125V34.1406H7.32422V36.582H7.8125ZM7.32422 37.5586V38.0469H7.8125V38.5352H9.76562V38.0469H10.2539V35.6055H9.76562V36.0938H9.27734V36.582H8.78906V37.0703H8.30078V37.5586H7.32422ZM7.32422 33.1641V32.6758H10.2539V33.1641H10.7422V33.6523H11.2305V38.5352H10.7422V39.0234H10.2539V39.5117H7.32422V39.0234H6.83594V38.5352H6.34766V33.6523H6.83594V33.1641H7.32422ZM13.1836 34.6289H13.6719V33.6523H13.1836V34.6289ZM16.6016 39.0234V39.5117H15.1367V39.0234H14.6484V37.0703H15.1367V36.582H16.6016V37.0703H17.0898V39.0234H16.6016ZM15.625 38.5352H16.1133V37.5586H15.625V38.5352ZM14.6484 35.1172H15.1367V34.6289H15.625V34.1406H16.1133V32.6758H17.0898V34.6289H16.6016V35.1172H16.1133V35.6055H15.625V36.0938H15.1367V36.582H14.6484V37.0703H14.1602V37.5586H13.6719V38.0469H13.1836V39.5117H12.207V37.5586H12.6953V37.0703H13.1836V36.582H13.6719V36.0938H14.1602V35.6055H12.6953V35.1172H12.207V33.1641H12.6953V32.6758H14.1602V33.1641H14.6484V35.1172ZM14.1602 35.6055H14.6484V35.1172H14.1602V35.6055Z" fill="white"/>
+                                                            <path d="M1.46484 57.5352H5.37109V58.5117H0.488281V55.582H0.976562V55.0938H1.46484V54.6055H3.90625V54.1172H4.39453V53.1406H3.90625V52.6523H1.95312V53.1406H1.46484V53.6289H0.488281V52.6523H0.976562V52.1641H1.46484V51.6758H4.39453V52.1641H4.88281V52.6523H5.37109V54.6055H4.88281V55.0938H4.39453V55.582H1.95312V56.0703H1.46484V57.5352ZM6.34766 51.6758H11.2305V52.6523H7.32422V53.6289H10.2539V54.1172H10.7422V54.6055H11.2305V57.5352H10.7422V58.0234H10.2539V58.5117H7.32422V58.0234H6.83594V57.5352H6.34766V56.5586H7.32422V57.0469H7.8125V57.5352H9.76562V57.0469H10.2539V55.0938H9.76562V54.6055H6.34766V51.6758ZM13.1836 53.6289H13.6719V52.6523H13.1836V53.6289ZM16.6016 58.0234V58.5117H15.1367V58.0234H14.6484V56.0703H15.1367V55.582H16.6016V56.0703H17.0898V58.0234H16.6016ZM15.625 57.5352H16.1133V56.5586H15.625V57.5352ZM14.6484 54.1172H15.1367V53.6289H15.625V53.1406H16.1133V51.6758H17.0898V53.6289H16.6016V54.1172H16.1133V54.6055H15.625V55.0938H15.1367V55.582H14.6484V56.0703H14.1602V56.5586H13.6719V57.0469H13.1836V58.5117H12.207V56.5586H12.6953V56.0703H13.1836V55.582H13.6719V55.0938H14.1602V54.6055H12.6953V54.1172H12.207V52.1641H12.6953V51.6758H14.1602V52.1641H14.6484V54.1172ZM14.1602 54.6055H14.6484V54.1172H14.1602V54.6055Z" fill="white"/>
+                                                            <path d="M1.46484 76.5352H5.37109V77.5117H0.488281V74.582H0.976562V74.0938H1.46484V73.6055H3.90625V73.1172H4.39453V72.1406H3.90625V71.6523H1.95312V72.1406H1.46484V72.6289H0.488281V71.6523H0.976562V71.1641H1.46484V70.6758H4.39453V71.1641H4.88281V71.6523H5.37109V73.6055H4.88281V74.0938H4.39453V74.582H1.95312V75.0703H1.46484V76.5352ZM7.8125 74.582V74.0938H8.30078V73.6055H8.78906V73.1172H9.27734V72.6289H10.2539V72.1406H9.76562V71.6523H7.8125V72.1406H7.32422V74.582H7.8125ZM7.32422 75.5586V76.0469H7.8125V76.5352H9.76562V76.0469H10.2539V73.6055H9.76562V74.0938H9.27734V74.582H8.78906V75.0703H8.30078V75.5586H7.32422ZM7.32422 71.1641V70.6758H10.2539V71.1641H10.7422V71.6523H11.2305V76.5352H10.7422V77.0234H10.2539V77.5117H7.32422V77.0234H6.83594V76.5352H6.34766V71.6523H6.83594V71.1641H7.32422ZM13.1836 72.6289H13.6719V71.6523H13.1836V72.6289ZM16.6016 77.0234V77.5117H15.1367V77.0234H14.6484V75.0703H15.1367V74.582H16.6016V75.0703H17.0898V77.0234H16.6016ZM15.625 76.5352H16.1133V75.5586H15.625V76.5352ZM14.6484 73.1172H15.1367V72.6289H15.625V72.1406H16.1133V70.6758H17.0898V72.6289H16.6016V73.1172H16.1133V73.6055H15.625V74.0938H15.1367V74.582H14.6484V75.0703H14.1602V75.5586H13.6719V76.0469H13.1836V77.5117H12.207V75.5586H12.6953V75.0703H13.1836V74.582H13.6719V74.0938H14.1602V73.6055H12.6953V73.1172H12.207V71.1641H12.6953V70.6758H14.1602V71.1641H14.6484V73.1172ZM14.1602 73.6055H14.6484V73.1172H14.1602V73.6055Z" fill="white"/>
+                                                            <path d="M3.41797 95.5352H4.39453V96.5117H1.46484V95.5352H2.44141V91.6289H1.46484V90.6523H1.95312V90.1641H2.44141V89.6758H3.41797V95.5352ZM6.34766 89.6758H11.2305V90.6523H7.32422V91.6289H10.2539V92.1172H10.7422V92.6055H11.2305V95.5352H10.7422V96.0234H10.2539V96.5117H7.32422V96.0234H6.83594V95.5352H6.34766V94.5586H7.32422V95.0469H7.8125V95.5352H9.76562V95.0469H10.2539V93.0938H9.76562V92.6055H6.34766V89.6758ZM13.1836 91.6289H13.6719V90.6523H13.1836V91.6289ZM16.6016 96.0234V96.5117H15.1367V96.0234H14.6484V94.0703H15.1367V93.582H16.6016V94.0703H17.0898V96.0234H16.6016ZM15.625 95.5352H16.1133V94.5586H15.625V95.5352ZM14.6484 92.1172H15.1367V91.6289H15.625V91.1406H16.1133V89.6758H17.0898V91.6289H16.6016V92.1172H16.1133V92.6055H15.625V93.0938H15.1367V93.582H14.6484V94.0703H14.1602V94.5586H13.6719V95.0469H13.1836V96.5117H12.207V94.5586H12.6953V94.0703H13.1836V93.582H13.6719V93.0938H14.1602V92.6055H12.6953V92.1172H12.207V90.1641H12.6953V89.6758H14.1602V90.1641H14.6484V92.1172ZM14.1602 92.6055H14.6484V92.1172H14.1602V92.6055Z" fill="white"/>
+                                                            <path d="M3.41797 114.535H4.39453V115.512H1.46484V114.535H2.44141V110.629H1.46484V109.652H1.95312V109.164H2.44141V108.676H3.41797V114.535ZM7.8125 112.582V112.094H8.30078V111.605H8.78906V111.117H9.27734V110.629H10.2539V110.141H9.76562V109.652H7.8125V110.141H7.32422V112.582H7.8125ZM7.32422 113.559V114.047H7.8125V114.535H9.76562V114.047H10.2539V111.605H9.76562V112.094H9.27734V112.582H8.78906V113.07H8.30078V113.559H7.32422ZM7.32422 109.164V108.676H10.2539V109.164H10.7422V109.652H11.2305V114.535H10.7422V115.023H10.2539V115.512H7.32422V115.023H6.83594V114.535H6.34766V109.652H6.83594V109.164H7.32422ZM13.1836 110.629H13.6719V109.652H13.1836V110.629ZM16.6016 115.023V115.512H15.1367V115.023H14.6484V113.07H15.1367V112.582H16.6016V113.07H17.0898V115.023H16.6016ZM15.625 114.535H16.1133V113.559H15.625V114.535ZM14.6484 111.117H15.1367V110.629H15.625V110.141H16.1133V108.676H17.0898V110.629H16.6016V111.117H16.1133V111.605H15.625V112.094H15.1367V112.582H14.6484V113.07H14.1602V113.559H13.6719V114.047H13.1836V115.512H12.207V113.559H12.6953V113.07H13.1836V112.582H13.6719V112.094H14.1602V111.605H12.6953V111.117H12.207V109.164H12.6953V108.676H14.1602V109.164H14.6484V111.117ZM14.1602 111.605H14.6484V111.117H14.1602V111.605Z" fill="white"/>
+                                                            <path d="M0.488281 127.676H5.37109V128.652H1.46484V129.629H4.39453V130.117H4.88281V130.605H5.37109V133.535H4.88281V134.023H4.39453V134.512H1.46484V134.023H0.976562V133.535H0.488281V132.559H1.46484V133.047H1.95312V133.535H3.90625V133.047H4.39453V131.094H3.90625V130.605H0.488281V127.676ZM7.32422 129.629H7.8125V128.652H7.32422V129.629ZM10.7422 134.023V134.512H9.27734V134.023H8.78906V132.07H9.27734V131.582H10.7422V132.07H11.2305V134.023H10.7422ZM9.76562 133.535H10.2539V132.559H9.76562V133.535ZM8.78906 130.117H9.27734V129.629H9.76562V129.141H10.2539V127.676H11.2305V129.629H10.7422V130.117H10.2539V130.605H9.76562V131.094H9.27734V131.582H8.78906V132.07H8.30078V132.559H7.8125V133.047H7.32422V134.512H6.34766V132.559H6.83594V132.07H7.32422V131.582H7.8125V131.094H8.30078V130.605H6.83594V130.117H6.34766V128.164H6.83594V127.676H8.30078V128.164H8.78906V130.117ZM8.30078 130.605H8.78906V130.117H8.30078V130.605Z" fill="white"/>
+                                                            <path d="M16.9531 159.582V159.094H17.4414V158.605H17.9297V158.117H18.418V157.629H19.3945V157.141H18.9062V156.652H16.9531V157.141H16.4648V159.582H16.9531ZM16.4648 160.559V161.047H16.9531V161.535H18.9062V161.047H19.3945V158.605H18.9062V159.094H18.418V159.582H17.9297V160.07H17.4414V160.559H16.4648ZM16.4648 156.164V155.676H19.3945V156.164H19.8828V156.652H20.3711V161.535H19.8828V162.023H19.3945V162.512H16.4648V162.023H15.9766V161.535H15.4883V156.652H15.9766V156.164H16.4648Z" fill="white"/>
+                                                            <path d="M27 148L37.5 138L78 124L116.5 70L152.5 17" stroke="white"/>
+                                                            <circle cx="38" cy="138" r="3" fill="white"/>
+                                                            <circle cx="78" cy="124" r="3" fill="white"/>
+                                                            <circle cx="115" cy="72" r="3" fill="white"/>
+                                                            <circle cx="153" cy="17" r="3" fill="white"/>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Calculated Returns on Right */}
+                                                <div className="flex-1 bg-neutral-900 rounded-xl p-6 flex flex-col justify-center items-center">
+                                                    <span className="text-neutral-400 font-pixeloid text-xs mb-2">Return in {fdReturn.termLabel}</span>
+                                                    <span className="text-white font-pixeloid text-5xl mb-3">₹{fdReturn.return.toLocaleString()}</span>
+                                                    <span className="text-neutral-500 font-pixeloid text-[10px] mb-3">{fdReturn.formula}</span>
+                                                    <div className="mt-2 pt-2 border-t border-neutral-700 w-full text-center">
+                                                        <span className="text-neutral-400 font-pixeloid text-[10px]">Matures in (IRL):</span>
+                                                        <div className="text-emerald-400 font-pixeloid text-sm mt-1">{fdReturn.maturityTime}</div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            /* Placeholder when no amount entered */
+                                            <div className="flex-1 bg-neutral-900 rounded-xl p-8 flex flex-col items-center justify-center">
+                                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-4 opacity-50">
+                                                    <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="1.5"/>
+                                                    <path d="M12 8V12M12 16H12.01" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
                                                 </svg>
+                                                <p className="text-neutral-500 font-pixeloid text-lg text-center">
+                                                    Enter an amount above to see
+                                                </p>
+                                                <p className="text-neutral-500 font-pixeloid text-lg text-center mt-1">
+                                                    projected returns & maturity time
+                                                </p>
                                             </div>
-                                            {/* Graph SVG Placeholder - PASTE YOUR SVG HERE */}
-                                            <div className="flex-1 flex items-center justify-left">
-                                                <svg width="178" height="169" viewBox="0 0 178 169" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M27 0L24.1132 5H29.8868L27 0ZM27 148H26.5V148.5H27V148ZM178 148L173 145.113V150.887L178 148ZM27 4.5H26.5V148H27H27.5V4.5H27ZM27 148V148.5H173.5V148V147.5H27V148Z" fill="white"/>
-                                                    <path d="M45.3945 167.023V167.512H42.4648V167.023H41.9766V166.535H41.4883V161.652H41.9766V161.164H42.4648V160.676H45.3945V161.164H45.8828V161.652H46.3711V162.629H45.3945V162.141H44.9062V161.652H42.9531V162.141H42.4648V163.605H45.3945V164.094H45.8828V164.582H46.3711V166.535H45.8828V167.023H45.3945ZM42.9531 166.535H44.9062V166.047H45.3945V165.07H44.9062V164.582H42.4648V166.047H42.9531V166.535ZM48.3242 163.605V167.512H47.3477V162.141H48.3242V162.629H48.8125V162.141H51.2539V162.629H51.7422V163.117H52.2305V167.512H51.2539V163.605H50.7656V163.117H50.2773V167.512H49.3008V163.117H48.8125V163.605H48.3242Z" fill="white"/>
-                                                    <path d="M80.418 166.535H81.3945V167.512H78.4648V166.535H79.4414V162.629H78.4648V161.652H78.9531V161.164H79.4414V160.676H80.418V166.535ZM84.3242 167.512V166.535H86.7656V166.047H87.2539V164.582H86.7656V165.07H86.2773V165.559H84.3242V165.07H83.8359V164.582H83.3477V161.652H84.3242V164.094H84.8125V164.582H85.7891V164.094H86.2773V163.605H86.7656V162.629H87.2539V161.652H88.2305V166.535H87.7422V167.023H87.2539V167.512H84.3242Z" fill="white"/>
-                                                    <path d="M113.977 166.535H113.488V165.559H114.465V166.047H114.953V166.535H116.906V166.047H117.395V165.07H116.906V164.582H115.441V163.605H116.906V163.117H117.395V162.141H116.906V161.652H114.953V162.141H114.465V162.629H113.488V161.652H113.977V161.164H114.465V160.676H117.395V161.164H117.883V161.652H118.371V163.605H117.883V164.582H118.371V166.535H117.883V167.023H117.395V167.512H114.465V167.023H113.977V166.535ZM120.324 167.512V166.535H122.766V166.047H123.254V164.582H122.766V165.07H122.277V165.559H120.324V165.07H119.836V164.582H119.348V161.652H120.324V164.094H120.812V164.582H121.789V164.094H122.277V163.605H122.766V162.629H123.254V161.652H124.23V166.535H123.742V167.023H123.254V167.512H120.324Z" fill="white"/>
-                                                    <path d="M149.488 160.676H154.371V161.652H150.465V162.629H153.395V163.117H153.883V163.605H154.371V166.535H153.883V167.023H153.395V167.512H150.465V167.023H149.977V166.535H149.488V165.559H150.465V166.047H150.953V166.535H152.906V166.047H153.395V164.094H152.906V163.605H149.488V160.676ZM156.324 167.512V166.535H158.766V166.047H159.254V164.582H158.766V165.07H158.277V165.559H156.324V165.07H155.836V164.582H155.348V161.652H156.324V164.094H156.812V164.582H157.789V164.094H158.277V163.605H158.766V162.629H159.254V161.652H160.23V166.535H159.742V167.023H159.254V167.512H156.324Z" fill="white"/>
-                                                    <path d="M0.976562 19.5352H0.488281V18.5586H1.46484V19.0469H1.95312V19.5352H3.90625V19.0469H4.39453V18.0703H3.90625V17.582H2.44141V16.6055H3.90625V16.1172H4.39453V15.1406H3.90625V14.6523H1.95312V15.1406H1.46484V15.6289H0.488281V14.6523H0.976562V14.1641H1.46484V13.6758H4.39453V14.1641H4.88281V14.6523H5.37109V16.6055H4.88281V17.582H5.37109V19.5352H4.88281V20.0234H4.39453V20.5117H1.46484V20.0234H0.976562V19.5352ZM6.34766 13.6758H11.2305V14.6523H7.32422V15.6289H10.2539V16.1172H10.7422V16.6055H11.2305V19.5352H10.7422V20.0234H10.2539V20.5117H7.32422V20.0234H6.83594V19.5352H6.34766V18.5586H7.32422V19.0469H7.8125V19.5352H9.76562V19.0469H10.2539V17.0938H9.76562V16.6055H6.34766V13.6758ZM13.1836 15.6289H13.6719V14.6523H13.1836V15.6289ZM16.6016 20.0234V20.5117H15.1367V20.0234H14.6484V18.0703H15.1367V17.582H16.6016V18.0703H17.0898V20.0234H16.6016ZM15.625 19.5352H16.1133V18.5586H15.625V19.5352ZM14.6484 16.1172H15.1367V15.6289H15.625V15.1406H16.1133V13.6758H17.0898V15.6289H16.6016V16.1172H16.1133V16.6055H15.625V17.0938H15.1367V17.582H14.6484V18.0703H14.1602V18.5586H13.6719V19.0469H13.1836V20.5117H12.207V18.5586H12.6953V18.0703H13.1836V17.582H13.6719V17.0938H14.1602V16.6055H12.6953V16.1172H12.207V14.1641H12.6953V13.6758H14.1602V14.1641H14.6484V16.1172ZM14.1602 16.6055H14.6484V16.1172H14.1602V16.6055Z" fill="white"/>
-                                                    <path d="M0.976562 38.5352H0.488281V37.5586H1.46484V38.0469H1.95312V38.5352H3.90625V38.0469H4.39453V37.0703H3.90625V36.582H2.44141V35.6055H3.90625V35.1172H4.39453V34.1406H3.90625V33.6523H1.95312V34.1406H1.46484V34.6289H0.488281V33.6523H0.976562V33.1641H1.46484V32.6758H4.39453V33.1641H4.88281V33.6523H5.37109V35.6055H4.88281V36.582H5.37109V38.5352H4.88281V39.0234H4.39453V39.5117H1.46484V39.0234H0.976562V38.5352ZM7.8125 36.582V36.0938H8.30078V35.6055H8.78906V35.1172H9.27734V34.6289H10.2539V34.1406H9.76562V33.6523H7.8125V34.1406H7.32422V36.582H7.8125ZM7.32422 37.5586V38.0469H7.8125V38.5352H9.76562V38.0469H10.2539V35.6055H9.76562V36.0938H9.27734V36.582H8.78906V37.0703H8.30078V37.5586H7.32422ZM7.32422 33.1641V32.6758H10.2539V33.1641H10.7422V33.6523H11.2305V38.5352H10.7422V39.0234H10.2539V39.5117H7.32422V39.0234H6.83594V38.5352H6.34766V33.6523H6.83594V33.1641H7.32422ZM13.1836 34.6289H13.6719V33.6523H13.1836V34.6289ZM16.6016 39.0234V39.5117H15.1367V39.0234H14.6484V37.0703H15.1367V36.582H16.6016V37.0703H17.0898V39.0234H16.6016ZM15.625 38.5352H16.1133V37.5586H15.625V38.5352ZM14.6484 35.1172H15.1367V34.6289H15.625V34.1406H16.1133V32.6758H17.0898V34.6289H16.6016V35.1172H16.1133V35.6055H15.625V36.0938H15.1367V36.582H14.6484V37.0703H14.1602V37.5586H13.6719V38.0469H13.1836V39.5117H12.207V37.5586H12.6953V37.0703H13.1836V36.582H13.6719V36.0938H14.1602V35.6055H12.6953V35.1172H12.207V33.1641H12.6953V32.6758H14.1602V33.1641H14.6484V35.1172ZM14.1602 35.6055H14.6484V35.1172H14.1602V35.6055Z" fill="white"/>
-                                                    <path d="M1.46484 57.5352H5.37109V58.5117H0.488281V55.582H0.976562V55.0938H1.46484V54.6055H3.90625V54.1172H4.39453V53.1406H3.90625V52.6523H1.95312V53.1406H1.46484V53.6289H0.488281V52.6523H0.976562V52.1641H1.46484V51.6758H4.39453V52.1641H4.88281V52.6523H5.37109V54.6055H4.88281V55.0938H4.39453V55.582H1.95312V56.0703H1.46484V57.5352ZM6.34766 51.6758H11.2305V52.6523H7.32422V53.6289H10.2539V54.1172H10.7422V54.6055H11.2305V57.5352H10.7422V58.0234H10.2539V58.5117H7.32422V58.0234H6.83594V57.5352H6.34766V56.5586H7.32422V57.0469H7.8125V57.5352H9.76562V57.0469H10.2539V55.0938H9.76562V54.6055H6.34766V51.6758ZM13.1836 53.6289H13.6719V52.6523H13.1836V53.6289ZM16.6016 58.0234V58.5117H15.1367V58.0234H14.6484V56.0703H15.1367V55.582H16.6016V56.0703H17.0898V58.0234H16.6016ZM15.625 57.5352H16.1133V56.5586H15.625V57.5352ZM14.6484 54.1172H15.1367V53.6289H15.625V53.1406H16.1133V51.6758H17.0898V53.6289H16.6016V54.1172H16.1133V54.6055H15.625V55.0938H15.1367V55.582H14.6484V56.0703H14.1602V56.5586H13.6719V57.0469H13.1836V58.5117H12.207V56.5586H12.6953V56.0703H13.1836V55.582H13.6719V55.0938H14.1602V54.6055H12.6953V54.1172H12.207V52.1641H12.6953V51.6758H14.1602V52.1641H14.6484V54.1172ZM14.1602 54.6055H14.6484V54.1172H14.1602V54.6055Z" fill="white"/>
-                                                    <path d="M1.46484 76.5352H5.37109V77.5117H0.488281V74.582H0.976562V74.0938H1.46484V73.6055H3.90625V73.1172H4.39453V72.1406H3.90625V71.6523H1.95312V72.1406H1.46484V72.6289H0.488281V71.6523H0.976562V71.1641H1.46484V70.6758H4.39453V71.1641H4.88281V71.6523H5.37109V73.6055H4.88281V74.0938H4.39453V74.582H1.95312V75.0703H1.46484V76.5352ZM7.8125 74.582V74.0938H8.30078V73.6055H8.78906V73.1172H9.27734V72.6289H10.2539V72.1406H9.76562V71.6523H7.8125V72.1406H7.32422V74.582H7.8125ZM7.32422 75.5586V76.0469H7.8125V76.5352H9.76562V76.0469H10.2539V73.6055H9.76562V74.0938H9.27734V74.582H8.78906V75.0703H8.30078V75.5586H7.32422ZM7.32422 71.1641V70.6758H10.2539V71.1641H10.7422V71.6523H11.2305V76.5352H10.7422V77.0234H10.2539V77.5117H7.32422V77.0234H6.83594V76.5352H6.34766V71.6523H6.83594V71.1641H7.32422ZM13.1836 72.6289H13.6719V71.6523H13.1836V72.6289ZM16.6016 77.0234V77.5117H15.1367V77.0234H14.6484V75.0703H15.1367V74.582H16.6016V75.0703H17.0898V77.0234H16.6016ZM15.625 76.5352H16.1133V75.5586H15.625V76.5352ZM14.6484 73.1172H15.1367V72.6289H15.625V72.1406H16.1133V70.6758H17.0898V72.6289H16.6016V73.1172H16.1133V73.6055H15.625V74.0938H15.1367V74.582H14.6484V75.0703H14.1602V75.5586H13.6719V76.0469H13.1836V77.5117H12.207V75.5586H12.6953V75.0703H13.1836V74.582H13.6719V74.0938H14.1602V73.6055H12.6953V73.1172H12.207V71.1641H12.6953V70.6758H14.1602V71.1641H14.6484V73.1172ZM14.1602 73.6055H14.6484V73.1172H14.1602V73.6055Z" fill="white"/>
-                                                    <path d="M3.41797 95.5352H4.39453V96.5117H1.46484V95.5352H2.44141V91.6289H1.46484V90.6523H1.95312V90.1641H2.44141V89.6758H3.41797V95.5352ZM6.34766 89.6758H11.2305V90.6523H7.32422V91.6289H10.2539V92.1172H10.7422V92.6055H11.2305V95.5352H10.7422V96.0234H10.2539V96.5117H7.32422V96.0234H6.83594V95.5352H6.34766V94.5586H7.32422V95.0469H7.8125V95.5352H9.76562V95.0469H10.2539V93.0938H9.76562V92.6055H6.34766V89.6758ZM13.1836 91.6289H13.6719V90.6523H13.1836V91.6289ZM16.6016 96.0234V96.5117H15.1367V96.0234H14.6484V94.0703H15.1367V93.582H16.6016V94.0703H17.0898V96.0234H16.6016ZM15.625 95.5352H16.1133V94.5586H15.625V95.5352ZM14.6484 92.1172H15.1367V91.6289H15.625V91.1406H16.1133V89.6758H17.0898V91.6289H16.6016V92.1172H16.1133V92.6055H15.625V93.0938H15.1367V93.582H14.6484V94.0703H14.1602V94.5586H13.6719V95.0469H13.1836V96.5117H12.207V94.5586H12.6953V94.0703H13.1836V93.582H13.6719V93.0938H14.1602V92.6055H12.6953V92.1172H12.207V90.1641H12.6953V89.6758H14.1602V90.1641H14.6484V92.1172ZM14.1602 92.6055H14.6484V92.1172H14.1602V92.6055Z" fill="white"/>
-                                                    <path d="M3.41797 114.535H4.39453V115.512H1.46484V114.535H2.44141V110.629H1.46484V109.652H1.95312V109.164H2.44141V108.676H3.41797V114.535ZM7.8125 112.582V112.094H8.30078V111.605H8.78906V111.117H9.27734V110.629H10.2539V110.141H9.76562V109.652H7.8125V110.141H7.32422V112.582H7.8125ZM7.32422 113.559V114.047H7.8125V114.535H9.76562V114.047H10.2539V111.605H9.76562V112.094H9.27734V112.582H8.78906V113.07H8.30078V113.559H7.32422ZM7.32422 109.164V108.676H10.2539V109.164H10.7422V109.652H11.2305V114.535H10.7422V115.023H10.2539V115.512H7.32422V115.023H6.83594V114.535H6.34766V109.652H6.83594V109.164H7.32422ZM13.1836 110.629H13.6719V109.652H13.1836V110.629ZM16.6016 115.023V115.512H15.1367V115.023H14.6484V113.07H15.1367V112.582H16.6016V113.07H17.0898V115.023H16.6016ZM15.625 114.535H16.1133V113.559H15.625V114.535ZM14.6484 111.117H15.1367V110.629H15.625V110.141H16.1133V108.676H17.0898V110.629H16.6016V111.117H16.1133V111.605H15.625V112.094H15.1367V112.582H14.6484V113.07H14.1602V113.559H13.6719V114.047H13.1836V115.512H12.207V113.559H12.6953V113.07H13.1836V112.582H13.6719V112.094H14.1602V111.605H12.6953V111.117H12.207V109.164H12.6953V108.676H14.1602V109.164H14.6484V111.117ZM14.1602 111.605H14.6484V111.117H14.1602V111.605Z" fill="white"/>
-                                                    <path d="M0.488281 127.676H5.37109V128.652H1.46484V129.629H4.39453V130.117H4.88281V130.605H5.37109V133.535H4.88281V134.023H4.39453V134.512H1.46484V134.023H0.976562V133.535H0.488281V132.559H1.46484V133.047H1.95312V133.535H3.90625V133.047H4.39453V131.094H3.90625V130.605H0.488281V127.676ZM7.32422 129.629H7.8125V128.652H7.32422V129.629ZM10.7422 134.023V134.512H9.27734V134.023H8.78906V132.07H9.27734V131.582H10.7422V132.07H11.2305V134.023H10.7422ZM9.76562 133.535H10.2539V132.559H9.76562V133.535ZM8.78906 130.117H9.27734V129.629H9.76562V129.141H10.2539V127.676H11.2305V129.629H10.7422V130.117H10.2539V130.605H9.76562V131.094H9.27734V131.582H8.78906V132.07H8.30078V132.559H7.8125V133.047H7.32422V134.512H6.34766V132.559H6.83594V132.07H7.32422V131.582H7.8125V131.094H8.30078V130.605H6.83594V130.117H6.34766V128.164H6.83594V127.676H8.30078V128.164H8.78906V130.117ZM8.30078 130.605H8.78906V130.117H8.30078V130.605Z" fill="white"/>
-                                                    <path d="M16.9531 159.582V159.094H17.4414V158.605H17.9297V158.117H18.418V157.629H19.3945V157.141H18.9062V156.652H16.9531V157.141H16.4648V159.582H16.9531ZM16.4648 160.559V161.047H16.9531V161.535H18.9062V161.047H19.3945V158.605H18.9062V159.094H18.418V159.582H17.9297V160.07H17.4414V160.559H16.4648ZM16.4648 156.164V155.676H19.3945V156.164H19.8828V156.652H20.3711V161.535H19.8828V162.023H19.3945V162.512H16.4648V162.023H15.9766V161.535H15.4883V156.652H15.9766V156.164H16.4648Z" fill="white"/>
-                                                    <path d="M27 148L37.5 138L78 124L116.5 70L152.5 17" stroke="white"/>
-                                                    <circle cx="38" cy="138" r="3" fill="white"/>
-                                                    <circle cx="78" cy="124" r="3" fill="white"/>
-                                                    <circle cx="115" cy="72" r="3" fill="white"/>
-                                                    <circle cx="153" cy="17" r="3" fill="white"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Calculated Returns on Right */}
-                                        <div className="flex-1 bg-neutral-900 rounded-xl p-6 flex flex-col justify-center items-center">
-                                            <span className="text-neutral-400 font-pixeloid text-xs mb-2">Return in 6 months</span>
-                                            <span className="text-white font-pixeloid text-5xl mb-2">$700</span>
-                                            <span className="text-neutral-500 font-pixeloid text-[10px]">10,000*0.5*3.5%</span>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

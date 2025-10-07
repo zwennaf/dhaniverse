@@ -65,7 +65,7 @@ const BankingUI: React.FC = () => {
             setIsLoading(true);
 
             try {
-                // Simulate connection delay for better UX
+                // Loading delay
                 await new Promise((resolve) => setTimeout(resolve, 800));
 
                 // Store the initial rupees value when banking UI opens
@@ -79,7 +79,7 @@ const BankingUI: React.FC = () => {
                     setBankAccount(customEvent.detail.bankAccount);
                 }
 
-                
+                setConnectionStatus("connected");
 
                 // Show the banking UI
                 setIsOpen(true);
@@ -174,7 +174,7 @@ const BankingUI: React.FC = () => {
         // Start exit animation
         const container = document.getElementById("banking-ui-container");
         if (container) {
-            container.style.transition = "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)";
+            container.style.transition = "opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)";
             container.style.opacity = "0";
         }
 
@@ -185,13 +185,15 @@ const BankingUI: React.FC = () => {
             setMessage("");
             setConnectionStatus("connecting");
 
-            // Remove the active class from the container
-            if (container) {
-                container.classList.remove("active");
-                container.style.opacity = "";
-                container.style.transform = "";
-                container.style.transition = "";
-            }
+            // Clean up container styles after component unmounts
+            setTimeout(() => {
+                if (container) {
+                    container.classList.remove("active");
+                    container.style.opacity = "";
+                    container.style.transform = "";
+                    container.style.transition = "";
+                }
+            }, 50); // Small delay to ensure component is unmounted first
 
             // Notify any game components that may need to know the banking UI was closed
             window.dispatchEvent(new CustomEvent("closeBankingUI"));
@@ -201,47 +203,14 @@ const BankingUI: React.FC = () => {
     // Render nothing if the banking UI is closed and not loading/closing
     if (!isOpen && !isLoading && !isClosing) return null;
 
-    // Show loading screen during initialization
+    // Show loading screen during initialization - minimal cal.com style
     if (isLoading && !isOpen) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in">
-                <div
-                    className="bg-white/5 border-2 border-dhani-gold p-8 max-w-md w-full mx-4 animate-scale-in"
-                    style={{ imageRendering: "pixelated" }}
-                >
-                    <div className="text-center space-y-6">
-                        <div className="text-6xl mb-4 animate-bounce">🏦</div>
-                        <div className="text-dhani-gold font-vcr font-bold text-xl tracking-wider">
-                            DHANIVERSE BANKING
-                        </div>
-                        <LoadingState
-                            message={
-                                connectionStatus === "connecting"
-                                    ? "Connecting to Banking System"
-                                    : "Initializing Services"
-                            }
-                            size="lg"
-                        />
-                        <div className="flex items-center justify-center space-x-3">
-                            <StatusIndicator
-                                type={
-                                    connectionStatus === "connected"
-                                        ? "success"
-                                        : connectionStatus === "error"
-                                        ? "error"
-                                        : "loading"
-                                }
-                                size="md"
-                            />
-                            <span className="text-white font-vcr text-sm tracking-wider">
-                                {connectionStatus === "connected"
-                                    ? "CONNECTED"
-                                    : connectionStatus === "error"
-                                    ? "CONNECTION FAILED"
-                                    : "CONNECTING..."}
-                            </span>
-                        </div>
-                    </div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="flex flex-col items-center space-y-3">
+                    {/* Minimal spinning circle loader */}
+                    <div className="w-12 h-12 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                    <div className="text-white font-sans text-sm">Loading...</div>
                 </div>
             </div>
         );
@@ -284,7 +253,7 @@ const BankingUI: React.FC = () => {
 
     // Main banking UI with enhanced wrapper
     return (
-        <div className="fixed inset-0 z-40 animate-fade-in">
+        <div id="banking-ui-container" className="fixed inset-0 z-40 animate-fade-in">
             {/* Enhanced backdrop with gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-black/95 via-gray-900/90 to-black/95" />
 
