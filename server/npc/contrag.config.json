@@ -1,4 +1,9 @@
 {
+  "compatibility": {
+    "autoFixDimensions": true,
+    "strictDimensionChecking": true,
+    "allowDimensionMigration": true
+  },
   "database": {
     "plugin": "mongodb",
     "config": {
@@ -14,19 +19,69 @@
       "database": "dhaniverse_vector",
       "user": "postgres",
       "password": "password",
-      "dimensions": 768
+      "dimensions": 1536
     }
   },
   "embedder": {
-    "plugin": "gemini",
+    "plugin": "openai",
     "config": {
       "apiKey": "",
-      "model": "embedding-001",
-      "dimensions": 768
+      "model": "text-embedding-ada-002",
+      "dimensions": 1536
     }
   },
   "contextBuilder": {
     "chunkSize": 1000,
     "overlap": 200
+  },
+  "entities": {
+    "users": {
+      "collection": "users",
+      "idField": "_id",
+      "relations": {
+        "playerState": {
+          "type": "one-to-one",
+          "target": "playerStates",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "bankAccounts": {
+          "type": "one-to-many",
+          "target": "bankAccounts",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "stockPortfolio": {
+          "type": "one-to-one",
+          "target": "stockPortfolios",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "stockTransactions": {
+          "type": "one-to-many",
+          "target": "stockTransactions",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "fixedDeposits": {
+          "type": "one-to-many",
+          "target": "fixedDeposits",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "gameSessions": {
+          "type": "one-to-many",
+          "target": "gameSessions",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        },
+        "achievements": {
+          "type": "one-to-many",
+          "target": "achievements",
+          "foreignKey": "userId",
+          "localKey": "_id"
+        }
+      }
+    }
   }
 }

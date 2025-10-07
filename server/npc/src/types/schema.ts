@@ -280,6 +280,61 @@ export interface ActivePlayerDocument extends Document {
 }
 
 // Collection names as constants
+// NPC Conversation System Types
+export interface ConversationOption {
+  text: string;
+  next: string;
+}
+
+export interface ConversationNode {
+  npc: string;
+  options?: {
+    [key: string]: ConversationOption;
+  };
+}
+
+export interface ConversationTree {
+  npc_name: string;
+  intro: string;
+  conversation_tree: {
+    [nodeId: string]: ConversationNode;
+  };
+}
+
+export interface UserProfile {
+  risk_profile: 'low' | 'medium' | 'high';
+  investment_experience: 'beginner' | 'intermediate' | 'advanced';
+  past_choices: string[];
+  financial_goals: string[];
+  character_type: string;
+  game_level: number;
+  achievements: string[];
+  personality_traits: string[];
+}
+
+export interface ChatResponse {
+  id: string;
+  userId: string;
+  message: string;
+  timestamp: Date;
+  type: 'simple' | 'conversation_graph';
+  response_data?: {
+    // For simple responses
+    text?: string;
+    // For conversation graph responses
+    conversation_tree?: ConversationTree;
+    user_profile?: UserProfile;
+  };
+}
+
+export interface NPCPersonality {
+  name: string;
+  role: string; // 'financial_advisor', 'trader', 'saver', 'risk_taker'
+  personality_traits: string[];
+  conversation_style: string;
+  financial_expertise: string[];
+}
+
 export const COLLECTIONS = {
   USERS: 'users',
   PLAYER_STATES: 'playerStates',
