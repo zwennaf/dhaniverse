@@ -1,6 +1,6 @@
 ![Dhaniverse Header.png](https://cdn.dorahacks.io/static/files/198e7f4ba1a9b7d8d11a0e64fc6ab990.png)
 
-# Dhaniverse: Gamified Financial Literacy Platform
+# Dhaniverse: Gamified Literacy Platform
 
 ---
 
